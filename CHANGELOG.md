@@ -1,3 +1,10 @@
+## [1.0.8](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.0.7...v1.0.8) (2023-07-07)
+
+
+### Bug Fixes
+
+* **npm-publish-github-packages.yml:** Commented out tests for now ([72fa0db](https://github.com/vasilistotskas/grooveshop-media-stream/commit/72fa0db2af007cafa529fa246088602059e7de2f))
+
 ## [1.0.7](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.0.6...v1.0.7) (2023-07-07)
 
 
