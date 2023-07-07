@@ -99,7 +99,7 @@ export default class MediaStreamImageRESTController {
 	}
 
 	@Get(
-		'public/nuxt/images/:imageName/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?/:path?'
+		'nuxt/images/:imageName/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?/:path?'
 	)
 	public async publicNuxtImage(
 		@Param('imageName') imageName: string,
@@ -113,7 +113,7 @@ export default class MediaStreamImageRESTController {
 		@Param('path') path: string,
 		@Res() res: Response
 	): Promise<void> {
-		let target = 'http://storefront_uinode_nuxt:3000/assets/images'
+		let target = `http://storefront_uinode_nuxt:3000/assets/images/${imageName}.${format}`
 		if (path) {
 			target += `/${path}`
 		}
