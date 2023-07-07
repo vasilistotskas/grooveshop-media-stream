@@ -1,3 +1,10 @@
+## [1.0.4](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.0.3...v1.0.4) (2023-07-07)
+
+
+### Bug Fixes
+
+* **docker.yml:** image fix ([226b214](https://github.com/vasilistotskas/grooveshop-media-stream/commit/226b214c649603b47a0e02b6d41046f2dbd8cb98))
+
 ## [1.0.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.0.2...v1.0.3) (2023-07-07)
 
 
