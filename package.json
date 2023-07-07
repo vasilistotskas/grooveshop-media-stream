@@ -1,14 +1,11 @@
 {
   "name": "mediastream",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "",
   "author": "",
   "private": true,
   "license": "UNLICENSED",
-  "repository": {
-    "type": "git",
-    "url": "git://github.com/vasilistotskas/grooveshop-media-stream"
-  },
+  "repository": "https://github.com/vasilistotskas/grooveshop-media-stream",
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "nest build",
@@ -70,6 +67,9 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.1.6"
   },
+  "publishConfig": {
+    "@vasilistotskas:registry": "https://npm.pkg.github.com"
+  },
   "release": {
     "branches": [
       "main"
@@ -78,6 +78,7 @@
       "@semantic-release/commit-analyzer",
       "@semantic-release/release-notes-generator",
       "@semantic-release/changelog",
+      "@semantic-release/npm",
       [
         "@semantic-release/git",
         {
@@ -86,6 +87,17 @@
             "package.json"
           ],
           "message": "chore(release): ${nextRelease.version}\n\n${nextRelease.notes}"
+        }
+      ],
+      [
+        "@semantic-release/github",
+        {
+          "assets": [
+            {
+              "path": "dist",
+              "label": "Distribution"
+            }
+          ]
         }
       ]
     ]
