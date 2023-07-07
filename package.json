@@ -1,11 +1,12 @@
 {
   "name": "mediastream",
   "version": "1.0.1",
-  "description": "",
-  "author": "",
-  "private": true,
-  "license": "UNLICENSED",
-  "repository": "https://github.com/vasilistotskas/grooveshop-media-stream",
+  "private": false,
+  "description": "Nuxt.js project",
+  "type": "module",
+  "repository": "https://github.com/vasilistotskas/grooveshop-media-stream.git",
+  "author": "vasilistotskas",
+  "license": "MIT",
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "nest build",
