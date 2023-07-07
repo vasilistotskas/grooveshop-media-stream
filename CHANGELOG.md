@@ -1,3 +1,10 @@
+## [1.0.7](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.0.6...v1.0.7) (2023-07-07)
+
+
+### Bug Fixes
+
+* **workflows:** npm publish on release published ([ace5bc4](https://github.com/vasilistotskas/grooveshop-media-stream/commit/ace5bc4c07c266529af189da83538e350fbb48f9))
+
 ## [1.0.6](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.0.5...v1.0.6) (2023-07-07)
 
 
