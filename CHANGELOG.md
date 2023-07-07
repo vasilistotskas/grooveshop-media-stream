@@ -1,3 +1,10 @@
+## [1.0.5](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.0.4...v1.0.5) (2023-07-07)
+
+
+### Bug Fixes
+
+* **Dockerfile:** Remove .env copy ([d6a5c21](https://github.com/vasilistotskas/grooveshop-media-stream/commit/d6a5c2171b039242d1471b0a564ba503229292d6))
+
 ## [1.0.4](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.0.3...v1.0.4) (2023-07-07)
 
 
