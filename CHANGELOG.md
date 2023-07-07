@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.0.0...v1.0.1) (2023-07-07)
+
+
+### Bug Fixes
+
+* **workflows:** workflow testing ([2f99eea](https://github.com/vasilistotskas/grooveshop-media-stream/commit/2f99eeacd35db43892a2f38d0babb54bede0c289))
+
 # 1.0.0 (2023-07-07)
 
 
