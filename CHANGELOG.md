@@ -1,3 +1,10 @@
+## [1.0.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.0.2...v1.0.3) (2023-07-07)
+
+
+### Bug Fixes
+
+* **package.json:** remove plugin npm ([d8dfb48](https://github.com/vasilistotskas/grooveshop-media-stream/commit/d8dfb480b4218d6153ba9840bf66cd1e8ab170bd))
+
 ## [1.0.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.0.1...v1.0.2) (2023-07-07)
 
 
