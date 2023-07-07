@@ -1,3 +1,10 @@
+## [1.0.6](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.0.5...v1.0.6) (2023-07-07)
+
+
+### Bug Fixes
+
+* **Dockerfile:** Comment .env related stuff ([3a04161](https://github.com/vasilistotskas/grooveshop-media-stream/commit/3a041615860b43fe14b46d822c72432e876f9761))
+
 ## [1.0.5](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.0.4...v1.0.5) (2023-07-07)
 
 
