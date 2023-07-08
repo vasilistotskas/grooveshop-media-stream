@@ -1,3 +1,10 @@
+## [1.1.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.1.0...v1.1.1) (2023-07-08)
+
+
+### Bug Fixes
+
+* **repo:** change repo name ([1e1bf29](https://github.com/vasilistotskas/grooveshop-media-stream/commit/1e1bf29ae52445597a77771497296015245456f8))
+
 # [1.1.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.0.8...v1.1.0) (2023-07-08)
 
 
