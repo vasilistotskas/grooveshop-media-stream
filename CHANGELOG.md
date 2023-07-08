@@ -1,3 +1,10 @@
+## [1.1.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.1.2...v1.1.3) (2023-07-08)
+
+
+### Bug Fixes
+
+* **workflows:** Trying to push to npm ([b4f3a04](https://github.com/vasilistotskas/grooveshop-media-stream/commit/b4f3a04d94eb4424b948540ceb0363e9aaf125e4))
+
 ## [1.1.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.1.1...v1.1.2) (2023-07-08)
 
 
