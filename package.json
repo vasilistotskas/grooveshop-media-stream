@@ -2,7 +2,7 @@
   "name": "grooveshop-media-stream",
   "version": "1.0.2",
   "private": false,
-  "description": "Nuxt.js project",
+  "description": "Grooveshop Media Stream",
   "type": "module",
   "repository": "https://github.com/vasilistotskas/grooveshop-media-stream.git",
   "author": "vasilistotskas",
