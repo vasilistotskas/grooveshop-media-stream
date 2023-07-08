@@ -1,3 +1,10 @@
+## [1.1.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.1.1...v1.1.2) (2023-07-08)
+
+
+### Bug Fixes
+
+* **package.json:** Description change ([c3ea91b](https://github.com/vasilistotskas/grooveshop-media-stream/commit/c3ea91b172cd8b696cc5a14073f5eb0db403d919))
+
 ## [1.1.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.1.0...v1.1.1) (2023-07-08)
 
 
