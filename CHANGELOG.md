@@ -1,3 +1,15 @@
+# [1.1.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.0.8...v1.1.0) (2023-07-08)
+
+
+### Bug Fixes
+
+* **package-lock.json:** built ([c51118f](https://github.com/vasilistotskas/grooveshop-media-stream/commit/c51118f8eee093faf383ff15f8c6410bd4ddbf68))
+
+
+### Features
+
+* **package.json:** versions bump ([38ae946](https://github.com/vasilistotskas/grooveshop-media-stream/commit/38ae946aa21aa9cb82826ed1510114fbd2b0fa79))
+
 ## [1.0.8](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.0.7...v1.0.8) (2023-07-07)
 
 
