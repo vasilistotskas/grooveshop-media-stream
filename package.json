@@ -1,10 +1,13 @@
 {
-  "name": "grooveshop-media-stream",
+  "name": "@vasilistotskas/grooveshop-media-stream",
   "version": "1.0.2",
   "private": false,
   "description": "Grooveshop Media Stream",
   "type": "module",
-  "repository": "https://github.com/vasilistotskas/grooveshop-media-stream.git",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vasilistotskas/grooveshop-media-stream.git"
+  },
   "author": "vasilistotskas",
   "license": "MIT",
   "scripts": {
