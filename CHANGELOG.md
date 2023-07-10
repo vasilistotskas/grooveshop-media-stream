@@ -1,3 +1,10 @@
+## [1.2.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.2.2...v1.2.3) (2023-07-10)
+
+
+### Bug Fixes
+
+* **workflows:** remove npm-publish-github-packages as job is done in ci.yml ([6767936](https://github.com/vasilistotskas/grooveshop-media-stream/commit/6767936d293c80400b91187416dd5ed60e215a9d))
+
 ## [1.2.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.2.1...v1.2.2) (2023-07-10)
 
 
