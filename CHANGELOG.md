@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.1.8...v1.2.0) (2023-07-10)
+
+
+### Features
+
+* **.dockerignore:** Created ([c94d0a6](https://github.com/vasilistotskas/grooveshop-media-stream/commit/c94d0a6dc10d547ff2cb6bdfb480c49d916c33b0))
+
 ## [1.1.8](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.1.7...v1.1.8) (2023-07-09)
 
 
