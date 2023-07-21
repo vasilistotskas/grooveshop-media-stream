@@ -12,6 +12,7 @@ import CacheImageRequest, {
 	BackgroundOptions
 } from '../../API/DTO/CacheImageRequest'
 import GenerateResourceIdentityFromRequestJob from '../../Job/GenerateResourceIdentityFromRequestJob'
+import * as process from 'process'
 
 @Controller({
 	path: IMAGE,
@@ -58,10 +59,10 @@ export default class MediaStreamImageRESTController {
 			fit,
 			trimThreshold
 		})
-
+		const djangoApiUrl = process.env.DJANGO_API_URL || 'http://127.0.0.1:8010'
 		const request = new CacheImageRequest({
 			resourceTarget: MediaStreamImageRESTController.resourceTargetPrepare(
-				`http://backend:8001/backend/media/uploads/${imageType}/${imageName}.${format}`
+				`${djangoApiUrl}/media/uploads/${imageType}/${imageName}.${format}`
 			),
 			resizeOptions: resizeOptions
 		})
@@ -82,9 +83,10 @@ export default class MediaStreamImageRESTController {
 		@Param('format') format: 'jpg' | 'jpeg' | 'png' | 'webp' = 'jpg',
 		@Res() res: Response
 	): Promise<void> {
+		const djangoApiUrl = process.env.DJANGO_API_URL || 'http://127.0.0.1:8010'
 		const request = new CacheImageRequest({
 			resourceTarget: MediaStreamImageRESTController.resourceTargetPrepare(
-				`http://backend:8001/backend/static/images/${imageName}.${format}`
+				`${djangoApiUrl}/static/images/${imageName}.${format}`
 			),
 			resizeOptions: new ResizeOptions({
 				width,
@@ -113,7 +115,8 @@ export default class MediaStreamImageRESTController {
 		@Param('path') path: string,
 		@Res() res: Response
 	): Promise<void> {
-		let target = `http://storefront_uinode_nuxt:3000/assets/images/${imageName}.${format}`
+		const nuxtPublicUrl = process.env.NEST_PUBLIC_NUXT_URL || 'http://localhost:3000'
+		let target = `${nuxtPublicUrl}/assets/images/${imageName}.${format}`
 		if (path) {
 			target += `/${path}`
 		}
