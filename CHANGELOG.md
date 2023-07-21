@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.2.3...v1.3.0) (2023-07-21)
+
+
+### Features
+
+* **app:** versions bump and add API default endpoints in env to use in MediaStreamImageRESTController.ts ([0526d08](https://github.com/vasilistotskas/grooveshop-media-stream/commit/0526d08c287d50a8b61a9b403d52a4613e496cc9))
+
 ## [1.2.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.2.2...v1.2.3) (2023-07-10)
 
 
