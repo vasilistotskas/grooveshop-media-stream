@@ -1,3 +1,15 @@
+# [1.4.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.3.0...v1.4.0) (2023-08-17)
+
+
+### Bug Fixes
+
+* **package-lock.json:** Run npm i ([cf56f4d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/cf56f4dbc87feab0873a9edaafa2f6c90c31e79c))
+
+
+### Features
+
+* **app:** Versions bump. .editorconfig added, .gitignore updated ([3f9cbbd](https://github.com/vasilistotskas/grooveshop-media-stream/commit/3f9cbbd3084a01b5339b7306a27ce3e3bca4f6cb))
+
 # [1.3.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.2.3...v1.3.0) (2023-07-21)
 
 
