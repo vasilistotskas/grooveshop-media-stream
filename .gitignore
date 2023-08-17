@@ -5,6 +5,9 @@
 # secrets
 .env
 
+# storage
+storage/*
+
 # Logs
 logs
 *.log
