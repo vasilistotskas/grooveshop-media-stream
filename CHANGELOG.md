@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.5.0...v1.6.0) (2023-09-01)
+
+
+### Features
+
+* Versions bump and change NEST_PUBLIC_DJANGO_URL. ([75fdd73](https://github.com/vasilistotskas/grooveshop-media-stream/commit/75fdd73bec49f4c49f711ed03885cb4f7a4e4b04))
+
 # [1.5.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.4.0...v1.5.0) (2023-08-29)
 
 
