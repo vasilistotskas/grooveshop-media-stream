@@ -59,7 +59,7 @@ export default class MediaStreamImageRESTController {
 			fit,
 			trimThreshold
 		})
-		const djangoApiUrl = process.env.DJANGO_API_URL || 'http://127.0.0.1:8010'
+		const djangoApiUrl = process.env.DJANGO_API_URL || 'http://127.0.0.1:8000'
 		const request = new CacheImageRequest({
 			resourceTarget: MediaStreamImageRESTController.resourceTargetPrepare(
 				`${djangoApiUrl}/media/uploads/${imageType}/${imageName}.${format}`
@@ -83,7 +83,7 @@ export default class MediaStreamImageRESTController {
 		@Param('format') format: 'jpg' | 'jpeg' | 'png' | 'webp' = 'jpg',
 		@Res() res: Response
 	): Promise<void> {
-		const djangoApiUrl = process.env.DJANGO_API_URL || 'http://127.0.0.1:8010'
+		const djangoApiUrl = process.env.DJANGO_API_URL || 'http://127.0.0.1:8000'
 		const request = new CacheImageRequest({
 			resourceTarget: MediaStreamImageRESTController.resourceTargetPrepare(
 				`${djangoApiUrl}/static/images/${imageName}.${format}`
