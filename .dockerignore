@@ -1,7 +1,9 @@
-/dist
-/node_modules
+node_modules
+build
+docker
 
+.git
 .gitignore
 README.md
 
-/storage/*
+/var/

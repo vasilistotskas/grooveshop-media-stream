@@ -1,21 +1,43 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "CommonJS",
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
-    "target": "es2017",
+    "moduleResolution": "Node",
+    "target": "ESNext",
+    "lib": [
+      "ESNext",
+      "DOM"
+    ],
     "sourceMap": true,
-    "outDir": "./dist",
+    "outDir": "./build/dist",
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
-    "strictNullChecks": false,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
-    "forceConsistentCasingInFileNames": false,
-    "noFallthroughCasesInSwitch": false
-  }
+    "paths": {
+      "@microservice/*": [
+        "src/MediaStream/*"
+      ],
+      "@storage/*": [
+        "var/*"
+      ]
+    },
+    "typeRoots": [
+      "node_modules/@types",
+      "typings.d.ts"
+    ]
+  },
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "node_modules",
+    "build"
+  ],
+  "files": [
+    "typings.d.ts"
+  ]
 }

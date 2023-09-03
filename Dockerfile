@@ -19,11 +19,11 @@ FROM node:18.16.0-alpine as production
 WORKDIR /usr/src/app
 
 #COPY --from=builder /usr/src/app/.env ./
-COPY --from=builder /usr/src/app/dist ./dist
+COPY --from=builder /usr/src/app/build ./build
 COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY --from=builder /usr/src/app/package*.json ./
 COPY --from=builder /usr/src/app/nest-cli.json ./
 
 VOLUME ["/usr/src/app/storage"]
 
-CMD ["node", "dist/main"]
+CMD ["node", "build/dist/src/main"]
