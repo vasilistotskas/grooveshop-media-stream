@@ -10,10 +10,10 @@ export default class ValidateCacheImageRequestRule {
 
 	public async setup(request: CacheImageRequest): Promise<void> {
 		this.request = request
-		await Promise.all([this.validateCacheImageRequestResizeTargetRule.setup(request)])
+		await this.validateCacheImageRequestResizeTargetRule.setup(request)
 	}
 
 	public async apply(): Promise<void> {
-		await Promise.all([this.validateCacheImageRequestResizeTargetRule.apply()])
+		await this.validateCacheImageRequestResizeTargetRule.apply()
 	}
 }
