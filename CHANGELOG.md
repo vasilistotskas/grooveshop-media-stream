@@ -1,3 +1,15 @@
+# [1.8.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.7.0...v1.8.0) (2023-09-20)
+
+
+### Bug Fixes
+
+* **package.json:** Add `semantic-release` package. ([a289588](https://github.com/vasilistotskas/grooveshop-media-stream/commit/a289588f15b1992499a0b35755f2933b727492c8))
+
+
+### Features
+
+* Versions bump, swc compiler , pnpm default. ([6e7656c](https://github.com/vasilistotskas/grooveshop-media-stream/commit/6e7656c1f6d5cb41b6aec8eb1c181f93babedc2c))
+
 # [1.7.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.6.0...v1.7.0) (2023-09-13)
 
 
