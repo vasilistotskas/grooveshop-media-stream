@@ -1,3 +1,10 @@
+## [1.9.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.9.0...v1.9.1) (2023-09-22)
+
+
+### Bug Fixes
+
+* **Dockerfile:** revert package*.json comment. ([f831be0](https://github.com/vasilistotskas/grooveshop-media-stream/commit/f831be097f60b65da79ee7c9a9f13495e1bef812))
+
 # [1.9.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.8.0...v1.9.0) (2023-09-22)
 
 
