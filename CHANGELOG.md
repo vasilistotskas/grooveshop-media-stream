@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.8.0...v1.9.0) (2023-09-22)
+
+
+### Features
+
+* App build, pnpm default manager and add axios package, ([1098106](https://github.com/vasilistotskas/grooveshop-media-stream/commit/1098106dca68fa1ef0010a98cb5a8786cfa6ae4a))
+
 # [1.8.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.7.0...v1.8.0) (2023-09-20)
 
 
