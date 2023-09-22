@@ -156,7 +156,7 @@ let MediaStreamImageRESTController = class MediaStreamImageRESTController {
         await this.streamRequestedResource(request, res);
     }
     async publicNuxtImage(image, width = null, height = null, fit = _CacheImageRequest.FitOptions.contain, position = _CacheImageRequest.PositionOptions.entropy, background = _CacheImageRequest.BackgroundOptions.transparent, trimThreshold = 5, format = _CacheImageRequest.SupportedResizeFormats.webp, res) {
-        const nuxtPublicUrl = _process.env.NEST_PUBLIC_NUXT_URL || 'http://127.0.0.1:3000';
+        const nuxtPublicUrl = _process.env.NEST_PUBLIC_NUXT_URL || 'http://localhost:3000';
         const request = new _CacheImageRequest.default({
             resourceTarget: MediaStreamImageRESTController.resourceTargetPrepare(`${nuxtPublicUrl}/assets/images/${image}`),
             resizeOptions: new _CacheImageRequest.ResizeOptions({

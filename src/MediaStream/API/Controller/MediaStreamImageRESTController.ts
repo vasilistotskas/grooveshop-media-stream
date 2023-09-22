@@ -154,7 +154,7 @@ export default class MediaStreamImageRESTController {
 		@Param('format') format: SupportedResizeFormats = SupportedResizeFormats.webp,
 		@Res() res: Response
 	): Promise<void> {
-		const nuxtPublicUrl = process.env.NEST_PUBLIC_NUXT_URL || 'http://127.0.0.1:3000'
+		const nuxtPublicUrl = process.env.NEST_PUBLIC_NUXT_URL || 'http://localhost:3000'
 
 		const request = new CacheImageRequest({
 			resourceTarget: MediaStreamImageRESTController.resourceTargetPrepare(`${nuxtPublicUrl}/assets/images/${image}`),
