@@ -1,3 +1,10 @@
+## [1.9.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.9.1...v1.9.2) (2023-09-25)
+
+
+### Bug Fixes
+
+* **Dockerfile:** Update node version. ([02b80f4](https://github.com/vasilistotskas/grooveshop-media-stream/commit/02b80f413960fa78795f4f689dda48dc09d5a0a3))
+
 ## [1.9.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.9.0...v1.9.1) (2023-09-22)
 
 
