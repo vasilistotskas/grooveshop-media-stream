@@ -132,7 +132,7 @@ let MediaStreamImageRESTController = class MediaStreamImageRESTController {
             trimThreshold,
             format
         });
-        const djangoApiUrl = _process.env.DJANGO_API_URL || 'http://127.0.0.1:8000';
+        const djangoApiUrl = _process.env.DJANGO_API_URL || 'http://localhost:8000';
         const request = new _CacheImageRequest.default({
             resourceTarget: MediaStreamImageRESTController.resourceTargetPrepare(`${djangoApiUrl}/media/uploads/${imageType}/${image}`),
             resizeOptions: resizeOptions
@@ -140,7 +140,7 @@ let MediaStreamImageRESTController = class MediaStreamImageRESTController {
         await this.streamRequestedResource(request, res);
     }
     async staticImage(image, width = null, height = null, fit = _CacheImageRequest.FitOptions.contain, position = _CacheImageRequest.PositionOptions.entropy, background = _CacheImageRequest.BackgroundOptions.transparent, trimThreshold = 5, format = _CacheImageRequest.SupportedResizeFormats.webp, res) {
-        const djangoApiUrl = _process.env.DJANGO_API_URL || 'http://127.0.0.1:8000';
+        const djangoApiUrl = _process.env.DJANGO_API_URL || 'http://localhost:8000';
         const request = new _CacheImageRequest.default({
             resourceTarget: MediaStreamImageRESTController.resourceTargetPrepare(`${djangoApiUrl}/static/images/${image}`),
             resizeOptions: new _CacheImageRequest.ResizeOptions({
