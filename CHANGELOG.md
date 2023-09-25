@@ -1,3 +1,10 @@
+# [1.10.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.9.2...v1.10.0) (2023-09-25)
+
+
+### Features
+
+* **ci:** Use actions/checkout@v4 and versions bump ([296927e](https://github.com/vasilistotskas/grooveshop-media-stream/commit/296927e8b8f32df7e4acca23a44672c6ffb88b1b))
+
 ## [1.9.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.9.1...v1.9.2) (2023-09-25)
 
 
