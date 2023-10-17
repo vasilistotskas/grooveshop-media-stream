@@ -1,3 +1,10 @@
+## [1.11.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.11.0...v1.11.1) (2023-10-17)
+
+
+### Bug Fixes
+
+* **ci:** Use node 20.8.1 (too early for 21 released like 3 hours ago) ([8c0c20f](https://github.com/vasilistotskas/grooveshop-media-stream/commit/8c0c20fcfff122d02e6eb9cd493bfedcc50211b3))
+
 # [1.11.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.10.0...v1.11.0) (2023-10-17)
 
 
