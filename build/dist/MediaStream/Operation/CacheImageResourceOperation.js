@@ -31,7 +31,8 @@ function _ts_decorate(decorators, target, key, desc) {
 function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 }
-let CacheImageResourceOperation = class CacheImageResourceOperation {
+var CacheImageResourceOperation;
+CacheImageResourceOperation = class CacheImageResourceOperation {
     get getResourcePath() {
         return `${process.cwd()}/storage/${this.id}.rsc`;
     }

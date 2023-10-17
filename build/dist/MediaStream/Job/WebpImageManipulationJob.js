@@ -38,7 +38,9 @@ function _interop_require_wildcard(obj, nodeInterop) {
     if (cache && cache.has(obj)) {
         return cache.get(obj);
     }
-    var newObj = {};
+    var newObj = {
+        __proto__: null
+    };
     var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor;
     for(var key in obj){
         if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) {
@@ -62,7 +64,8 @@ function _ts_decorate(decorators, target, key, desc) {
     else for(var i = decorators.length - 1; i >= 0; i--)if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 }
-let WebpImageManipulationJob = class WebpImageManipulationJob {
+var WebpImageManipulationJob;
+WebpImageManipulationJob = class WebpImageManipulationJob {
     async handle(filePathFrom, filePathTo, options) {
         const manipulation = _sharp(filePathFrom);
         switch(options.format){

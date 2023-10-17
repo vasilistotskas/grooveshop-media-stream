@@ -45,7 +45,8 @@ const rules = [
     _ValidateCacheImageRequestRule.default,
     _ValidateCacheImageRequestResizeTargetRule.default
 ];
-let MediaStreamModule = class MediaStreamModule {
+var MediaStreamModule;
+MediaStreamModule = class MediaStreamModule {
 };
 MediaStreamModule = _ts_decorate([
     (0, _common.Module)({

@@ -9,14 +9,14 @@ function _export(target, all) {
     });
 }
 _export(exports, {
+    IMAGE: function() {
+        return IMAGE;
+    },
     MODULE: function() {
         return MODULE;
     },
     VERSION: function() {
         return VERSION;
-    },
-    IMAGE: function() {
-        return IMAGE;
     }
 });
 const MODULE = 'media_stream';

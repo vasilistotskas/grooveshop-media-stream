@@ -27,7 +27,8 @@ const defaultPrivateTTL = 1 * 60 * 60 * 1000 // 1 hour * 60 minutes * 60 seconds
 const defaultPublicTTL = 24 * 60 * 60 * 1000 // 24 hours * 60 minutes * 60 seconds * 1000ms
 ;
 const resourceMetaVersion = 1;
-let ResourceMetaData = class ResourceMetaData {
+var ResourceMetaData;
+ResourceMetaData = class ResourceMetaData {
     constructor(data){
         if (!data.version) this.version = resourceMetaVersion;
         if (!data.publicTTL) this.publicTTL = defaultPublicTTL;

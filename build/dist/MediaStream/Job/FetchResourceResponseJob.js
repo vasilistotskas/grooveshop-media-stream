@@ -19,7 +19,8 @@ function _ts_decorate(decorators, target, key, desc) {
 function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 }
-let FetchResourceResponseJob = class FetchResourceResponseJob {
+var FetchResourceResponseJob;
+FetchResourceResponseJob = class FetchResourceResponseJob {
     async handle(request) {
         try {
             return await this.httpService.axiosRef({

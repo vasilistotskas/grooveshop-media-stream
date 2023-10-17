@@ -8,7 +8,8 @@ Object.defineProperty(exports, "default", {
         return UnableToFetchResourceException;
     }
 });
-let UnableToFetchResourceException = class UnableToFetchResourceException extends Error {
+var UnableToFetchResourceException;
+UnableToFetchResourceException = class UnableToFetchResourceException extends Error {
     constructor(resource){
         super(`Requested resource: ${resource} couldn't be fetched`);
     }
