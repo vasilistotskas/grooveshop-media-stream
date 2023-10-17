@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.10.0...v1.11.0) (2023-10-17)
+
+
+### Features
+
+* **ci:** Use node version 21 ([5d469fb](https://github.com/vasilistotskas/grooveshop-media-stream/commit/5d469fb6b2fca0124892ad98242d77560a98bbb2))
+
 # [1.10.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.9.2...v1.10.0) (2023-09-25)
 
 
