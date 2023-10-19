@@ -125,6 +125,5 @@
   "engines": {
     "node": ">=20.8.1",
     "npm": ">=10.2.0"
-  },
-  "packageManager": "^pnpm@8.9.2"
+  }
 }

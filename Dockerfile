@@ -9,9 +9,9 @@ COPY package*.json ./
 COPY pnpm-lock.yaml ./
 COPY src/ ./src/
 
-RUN npm install -g pnpm && \
-    pnpm install --frozen-lockfile && \
-    pnpm run build
+RUN npm install && \
+    npm ci && \
+    npm run build
 
 # debug: ENTRYPOINT ["tail", "-f", "/dev/null"]
 
