@@ -1,3 +1,10 @@
+## [1.12.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.12.0...v1.12.1) (2023-10-19)
+
+
+### Bug Fixes
+
+* **Dockerfile:** replace pnpm with npm ([727c0c5](https://github.com/vasilistotskas/grooveshop-media-stream/commit/727c0c50a9ea345481fde2de0f2c18f6f9e6b1c5))
+
 # [1.12.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.11.1...v1.12.0) (2023-10-19)
 
 
