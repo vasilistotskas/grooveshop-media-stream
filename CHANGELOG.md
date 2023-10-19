@@ -1,3 +1,10 @@
+## [1.12.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.12.1...v1.12.2) (2023-10-19)
+
+
+### Bug Fixes
+
+* **Dockerfile:** Remove pnpm-lock file copying. ([af96543](https://github.com/vasilistotskas/grooveshop-media-stream/commit/af965434be69b8d6c58873745c215f00035ff9a2))
+
 ## [1.12.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.12.0...v1.12.1) (2023-10-19)
 
 
