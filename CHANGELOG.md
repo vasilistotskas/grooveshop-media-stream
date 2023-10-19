@@ -1,3 +1,15 @@
+# [1.12.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.11.1...v1.12.0) (2023-10-19)
+
+
+### Bug Fixes
+
+* **package manager:** use npm instead of pnpm for now (outdated pnpm github action) ([148c789](https://github.com/vasilistotskas/grooveshop-media-stream/commit/148c789e5be2f9a57218f334bd73f65d6d575fa8))
+
+
+### Features
+
+* **ci:** Update package versions and use cache and build. ([b93dd40](https://github.com/vasilistotskas/grooveshop-media-stream/commit/b93dd40b0c76d6eb9892f930e271041d46515112))
+
 ## [1.11.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.11.0...v1.11.1) (2023-10-17)
 
 
