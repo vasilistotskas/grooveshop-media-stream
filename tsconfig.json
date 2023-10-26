@@ -30,6 +30,11 @@
       "typings.d.ts"
     ]
   },
+  "watchOptions": {
+    "watchFile": "dynamicPriorityPolling",
+    "watchDirectory": "dynamicPriorityPolling",
+    "excludeDirectories": ["**/node_modules", "dist", "build"],
+  },
   "include": [
     "src"
   ],

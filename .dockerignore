@@ -1,9 +1,16 @@
-node_modules
-build
-docker
+# Nest specific
+node_modules/
+build/
 
-.git
+# Docker
+.docker
+
+# Git files
 .gitignore
-README.md
 
-/var/
+# macOS specific files
+.DS_Store
+
+# IDE / Editor directories
+.idea/
+
