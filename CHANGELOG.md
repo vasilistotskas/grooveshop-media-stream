@@ -1,3 +1,10 @@
+# [1.14.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.13.0...v1.14.0) (2023-10-26)
+
+
+### Features
+
+* Preparing for docker setup. ([66c53c8](https://github.com/vasilistotskas/grooveshop-media-stream/commit/66c53c86c96dc475105536a9bcc6468cf51b5521))
+
 # [1.13.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.12.2...v1.13.0) (2023-10-20)
 
 
