@@ -1,3 +1,10 @@
+## [1.14.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.14.0...v1.14.1) (2023-10-29)
+
+
+### Bug Fixes
+
+* Docker fixes. ([c5472a1](https://github.com/vasilistotskas/grooveshop-media-stream/commit/c5472a1b388afe242aaed7598448b727f45d22b5))
+
 # [1.14.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.13.0...v1.14.0) (2023-10-26)
 
 
