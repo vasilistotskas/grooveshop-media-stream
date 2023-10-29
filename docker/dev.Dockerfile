@@ -1,14 +1,17 @@
-#
-# 🧑‍💻 Development
-#
 FROM node:21.0.0-alpine as development
 
-WORKDIR /usr/src/app
+COPY ./grooveshop-media-stream/docker/docker_entrypoint.sh /app/docker_entrypoint.sh
+RUN sed -i 's/\r$//g' /app/docker_entrypoint.sh
+RUN chmod +x /app/docker_entrypoint.sh
 
-COPY --chown=node:node package*.json ./
+RUN mkdir -p /mnt/app && \
+    chmod 777 -R /mnt/app && \
+    chown -R node:node /mnt/app
 
-RUN npm ci
+VOLUME /mnt/app
 
-COPY --chown=node:node . .
+WORKDIR /mnt/app
 
 USER node
+
+ENTRYPOINT ["/app/docker_entrypoint.sh"]

@@ -1,7 +1,7 @@
 import { Response } from 'express'
 import { createReadStream } from 'fs'
 import { HttpService } from '@nestjs/axios'
-import { Controller, Get, Param, Res, Scope } from '@nestjs/common'
+import { Controller, Get, Param, Res, Scope, Logger } from '@nestjs/common'
 import ResourceMetaData from '@microservice/DTO/ResourceMetaData'
 import { IMAGE, VERSION } from '@microservice/Constant/RoutePrefixes'
 import CacheImageResourceOperation from '@microservice/Operation/CacheImageResourceOperation'
@@ -21,6 +21,8 @@ import * as process from 'process'
 	scope: Scope.REQUEST
 })
 export default class MediaStreamImageRESTController {
+	private readonly logger = new Logger(MediaStreamImageRESTController.name)
+
 	constructor(
 		private readonly httpService: HttpService,
 		private readonly generateResourceIdentityFromRequestJob: GenerateResourceIdentityFromRequestJob,
@@ -63,6 +65,7 @@ export default class MediaStreamImageRESTController {
 				})
 			} catch (e) {
 				// ignore failed stream to client for now
+				this.logger.error(e)
 			} finally {
 				await this.cacheImageResourceOperation.execute()
 			}
@@ -73,6 +76,7 @@ export default class MediaStreamImageRESTController {
 				res = MediaStreamImageRESTController.addHeadersToRequest(res, headers)
 				createReadStream(this.cacheImageResourceOperation.getResourcePath).pipe(res)
 			} catch (e) {
+				this.logger.error(e)
 				res.status(404).send()
 			}
 		}

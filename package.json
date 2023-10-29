@@ -14,7 +14,7 @@
   "scripts": {
     "prebuild": "rimraf build/dist",
     "build": "nest build --builder swc",
-    "format": "prettier --write \"src/**/*.ts\" \"src/test/**/*.ts\"",
+    "format": "npx prettier --write \"src/**/*.ts\" \"src/test/**/*.ts\"",
     "start": "nest start --builder swc",
     "start:dev": "nest start --tsc --watch",
     "start:debug": "nest start --debug --watch",
@@ -39,7 +39,7 @@
     "rxjs": "^7.8.1",
     "sharp": "^0.32.6",
     "uuid": "^9.0.1",
-    "axios": "^1.5.1"
+    "axios": "^1.6.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.2.0",
