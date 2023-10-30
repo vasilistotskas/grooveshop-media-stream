@@ -1,3 +1,10 @@
+## [1.14.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.14.1...v1.14.2) (2023-10-30)
+
+
+### Bug Fixes
+
+* `docker.yml` Update dockerfile path, versions bump docker updates. ([4f0def2](https://github.com/vasilistotskas/grooveshop-media-stream/commit/4f0def28a579cdd722b0751d882d634f137e432c))
+
 ## [1.14.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.14.0...v1.14.1) (2023-10-29)
 
 
