@@ -1,11 +1,10 @@
 # Nest specific
 node_modules/
 build/
-
-# Docker
-.docker
+/var/
 
 # Git files
+.git
 .gitignore
 
 # macOS specific files

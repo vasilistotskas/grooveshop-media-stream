@@ -3,6 +3,8 @@ set -e
 
 cd /mnt/app
 
-npm i && npm run format && npm run lint
+rm -rf node_modules && rm -rf build
+
+npm i
 
 npm run start:dev

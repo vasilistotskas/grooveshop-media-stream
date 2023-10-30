@@ -1,4 +1,4 @@
-FROM node:21.0.0-alpine as builder
+FROM node:21.1.0-alpine as builder
 
 WORKDIR /usr/src/app
 
@@ -13,7 +13,7 @@ RUN npm install && \
 
 # debug: ENTRYPOINT ["tail", "-f", "/dev/null"]
 
-FROM node:21.0.0-alpine as production
+FROM node:21.1.0-alpine as production
 
 WORKDIR /usr/src/app
 
