@@ -1,3 +1,10 @@
+# [1.15.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.14.2...v1.15.0) (2023-10-31)
+
+
+### Features
+
+* **docker.yml:** add requirements for github actions cache. ([f2716e5](https://github.com/vasilistotskas/grooveshop-media-stream/commit/f2716e5759086f04315390e1b14b64cc2ec3fe32))
+
 ## [1.14.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.14.1...v1.14.2) (2023-10-30)
 
 
