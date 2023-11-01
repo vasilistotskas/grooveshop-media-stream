@@ -1,10 +1,11 @@
 import { AxiosResponse } from 'axios'
 import { HttpService } from '@nestjs/axios'
-import { Injectable, Scope } from '@nestjs/common'
+import { Injectable, Scope, Logger } from '@nestjs/common'
 import CacheImageRequest from '@microservice/API/DTO/CacheImageRequest'
 
 @Injectable({ scope: Scope.REQUEST })
 export default class FetchResourceResponseJob {
+  private readonly logger = new Logger(FetchResourceResponseJob.name)
 	constructor(private readonly httpService: HttpService) {}
 
 	async handle(request: CacheImageRequest): Promise<AxiosResponse> {
@@ -16,6 +17,7 @@ export default class FetchResourceResponseJob {
 			})
 		} catch (error) {
 			// Return a 404 Bad Request response
+      this.logger.error(error)
 			return {
 				status: 404,
 				statusText: 'Bad Request',

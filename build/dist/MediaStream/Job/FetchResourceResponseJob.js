@@ -30,6 +30,7 @@ FetchResourceResponseJob = class FetchResourceResponseJob {
             });
         } catch (error) {
             // Return a 404 Bad Request response
+            this.logger.error(error);
             return {
                 status: 404,
                 statusText: 'Bad Request',
@@ -41,6 +42,7 @@ FetchResourceResponseJob = class FetchResourceResponseJob {
     }
     constructor(httpService){
         this.httpService = httpService;
+        this.logger = new _common.Logger(FetchResourceResponseJob.name);
     }
 };
 FetchResourceResponseJob = _ts_decorate([

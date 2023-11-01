@@ -82,7 +82,9 @@ CacheImageResourceOperation = class CacheImageResourceOperation {
         this.metaData = new _ResourceMetaData.default(resourceMetaDataOptions);
         (0, _fs.writeFileSync)(this.getResourceMetaPath, JSON.stringify(this.metaData));
         (0, _fs.unlink)(this.getResourceTempPath, (err)=>{
-            if (null !== err) console.error(err);
+            if (null !== err) {
+                this.logger.error(err);
+            }
         });
     }
     constructor(httpService, validateCacheImageRequest, fetchResourceResponseJob, webpImageManipulationJob, storeResourceResponseToFileJob, generateResourceIdentityFromRequestJob){
@@ -92,6 +94,7 @@ CacheImageResourceOperation = class CacheImageResourceOperation {
         this.webpImageManipulationJob = webpImageManipulationJob;
         this.storeResourceResponseToFileJob = storeResourceResponseToFileJob;
         this.generateResourceIdentityFromRequestJob = generateResourceIdentityFromRequestJob;
+        this.logger = new _common.Logger(CacheImageResourceOperation.name);
     }
 };
 CacheImageResourceOperation = _ts_decorate([

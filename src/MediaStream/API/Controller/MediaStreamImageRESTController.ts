@@ -108,7 +108,7 @@ export default class MediaStreamImageRESTController {
 			trimThreshold,
 			format
 		})
-		const djangoApiUrl = process.env.DJANGO_API_URL || 'http://localhost:8000'
+		const djangoApiUrl = process.env.NEST_PUBLIC_DJANGO_URL || 'http://localhost:8000'
 		const request = new CacheImageRequest({
 			resourceTarget: MediaStreamImageRESTController.resourceTargetPrepare(
 				`${djangoApiUrl}/media/uploads/${imageType}/${image}`
@@ -130,7 +130,7 @@ export default class MediaStreamImageRESTController {
 		@Param('format') format: SupportedResizeFormats = SupportedResizeFormats.webp,
 		@Res() res: Response
 	): Promise<void> {
-		const djangoApiUrl = process.env.DJANGO_API_URL || 'http://localhost:8000'
+		const djangoApiUrl = process.env.NEST_PUBLIC_DJANGO_URL || 'http://localhost:8000'
 		const request = new CacheImageRequest({
 			resourceTarget: MediaStreamImageRESTController.resourceTargetPrepare(`${djangoApiUrl}/static/images/${image}`),
 			resizeOptions: new ResizeOptions({
