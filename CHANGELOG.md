@@ -1,3 +1,10 @@
+## [1.15.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.15.0...v1.15.1) (2023-11-01)
+
+
+### Bug Fixes
+
+* versions bump, `.dockerignore` update, `.env.docker` update. ([3e07cbd](https://github.com/vasilistotskas/grooveshop-media-stream/commit/3e07cbdde09680ab09c9a1cdfccd22f1380daa45))
+
 # [1.15.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.14.2...v1.15.0) (2023-10-31)
 
 
