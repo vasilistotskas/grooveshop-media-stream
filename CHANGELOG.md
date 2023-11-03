@@ -1,3 +1,10 @@
+## [1.16.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.16.2...v1.16.3) (2023-11-03)
+
+
+### Bug Fixes
+
+* **.gitignore:** Only include `.env.example` ([a6f4eb4](https://github.com/vasilistotskas/grooveshop-media-stream/commit/a6f4eb4251fa5d3e03813f7a43ab15b8070c3117))
+
 ## [1.16.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.16.1...v1.16.2) (2023-11-03)
 
 
