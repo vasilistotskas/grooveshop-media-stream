@@ -1,3 +1,10 @@
+## [1.16.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.16.0...v1.16.1) (2023-11-03)
+
+
+### Bug Fixes
+
+* **Dockerfile:** Run cmd path fixed. ([aa65455](https://github.com/vasilistotskas/grooveshop-media-stream/commit/aa65455e3f664ad7abbd1881ac17bed021411cca))
+
 # [1.16.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.15.1...v1.16.0) (2023-11-03)
 
 
