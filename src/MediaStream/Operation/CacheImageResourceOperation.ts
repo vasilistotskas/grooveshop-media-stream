@@ -12,7 +12,7 @@ import GenerateResourceIdentityFromRequestJob from '@microservice/Job/GenerateRe
 
 @Injectable({ scope: Scope.REQUEST })
 export default class CacheImageResourceOperation {
-  private readonly logger = new Logger(CacheImageResourceOperation.name)
+	private readonly logger = new Logger(CacheImageResourceOperation.name)
 
 	constructor(
 		private readonly httpService: HttpService,
@@ -97,8 +97,8 @@ export default class CacheImageResourceOperation {
 		writeFileSync(this.getResourceMetaPath, JSON.stringify(this.metaData))
 		unlink(this.getResourceTempPath, (err) => {
 			if (null !== err) {
-        this.logger.error(err)
-      }
+				this.logger.error(err)
+			}
 		})
 	}
 }
