@@ -24,4 +24,4 @@ COPY --from=builder /usr/src/app/nest-cli.json ./
 
 VOLUME ["/usr/src/app/storage"]
 
-CMD ["node", "build/dist/src/main", "swc"]
+CMD ["node", "build/dist/main", "swc"]
