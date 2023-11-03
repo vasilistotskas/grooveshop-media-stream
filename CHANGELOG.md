@@ -1,3 +1,11 @@
+## [1.16.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.16.1...v1.16.2) (2023-11-03)
+
+
+### Bug Fixes
+
+* add `"esModuleInterop": true,` in `tsconfig.json`, versions bump. ([30e53d0](https://github.com/vasilistotskas/grooveshop-media-stream/commit/30e53d05f9adab43cdf554a8443c79511d375e5c))
+* **WebpImageManipulationJob:** `sharp` import fix. ([c254838](https://github.com/vasilistotskas/grooveshop-media-stream/commit/c254838c3a927ed07f4b58a6b505b84ee59841f6))
+
 ## [1.16.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.16.0...v1.16.1) (2023-11-03)
 
 
