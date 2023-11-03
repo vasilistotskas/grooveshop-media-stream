@@ -1,3 +1,10 @@
+# [1.16.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.15.1...v1.16.0) (2023-11-03)
+
+
+### Features
+
+* Versions bump, lint fix. ([ad3d4b9](https://github.com/vasilistotskas/grooveshop-media-stream/commit/ad3d4b9c2b53921236c2a0e3f32fe3d81777fb6a))
+
 ## [1.15.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.15.0...v1.15.1) (2023-11-01)
 
 
