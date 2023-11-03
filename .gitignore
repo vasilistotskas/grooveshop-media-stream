@@ -1,6 +1,9 @@
 /node_modules
 !/build/dist
-.env
+
+# ignore all env files except .env.example
+.env*
+!*.env.example
 
 # storage
 storage/*
