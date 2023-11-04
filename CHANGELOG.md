@@ -1,3 +1,10 @@
+## [1.16.4](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.16.3...v1.16.4) (2023-11-04)
+
+
+### Bug Fixes
+
+* add `.env.example` and `storage` folder. ([4aa87e1](https://github.com/vasilistotskas/grooveshop-media-stream/commit/4aa87e1a574d0536d384d073bc5ef520e18d64a0))
+
 ## [1.16.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.16.2...v1.16.3) (2023-11-03)
 
 
