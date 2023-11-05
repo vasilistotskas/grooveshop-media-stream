@@ -1,3 +1,10 @@
+# [1.17.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.16.4...v1.17.0) (2023-11-05)
+
+
+### Features
+
+* update ci `setup-node` to v4, versions bump. ([9edd59a](https://github.com/vasilistotskas/grooveshop-media-stream/commit/9edd59a2686ac4042416ed9889668460d57b369f))
+
 ## [1.16.4](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.16.3...v1.16.4) (2023-11-04)
 
 
