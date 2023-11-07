@@ -1,3 +1,15 @@
+# [1.18.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.17.0...v1.18.0) (2023-11-07)
+
+
+### Bug Fixes
+
+* **ci.yml:** fix cache. ([61282a4](https://github.com/vasilistotskas/grooveshop-media-stream/commit/61282a414e78e1ede77ca2c99009638826588f7e))
+
+
+### Features
+
+* Replace npm with pnpm, tsconfig improved, add `relp`. ([d9fa4ba](https://github.com/vasilistotskas/grooveshop-media-stream/commit/d9fa4baeaab4131dfd4678d8910504b39200ee04))
+
 # [1.17.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.16.4...v1.17.0) (2023-11-05)
 
 
