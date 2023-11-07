@@ -1,12 +1,5 @@
 {
   "extends": "./tsconfig.json",
-  "include": [
-    "./**/*"
-  ],
-  "watch": [
-    "./**/*.json",
-    "./**/*.ts"
-  ],
   "exclude": [
     "node_modules",
     "test",
