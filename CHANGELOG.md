@@ -1,3 +1,10 @@
+## [1.18.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.18.1...v1.18.2) (2023-11-07)
+
+
+### Bug Fixes
+
+* **Dockerfile:** Include pnpm-lock file. ([100f24a](https://github.com/vasilistotskas/grooveshop-media-stream/commit/100f24a3ddedb60d0aeb5ab5e0c3857633f57225))
+
 ## [1.18.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.18.0...v1.18.1) (2023-11-07)
 
 
