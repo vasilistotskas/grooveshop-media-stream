@@ -19,7 +19,7 @@ COPY src/ ./src/
 FROM base AS build
 
 # Install pnpm
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 # Build the app
 RUN pnpm run build
