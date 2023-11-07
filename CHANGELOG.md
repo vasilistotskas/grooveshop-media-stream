@@ -1,3 +1,10 @@
+## [1.18.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.18.0...v1.18.1) (2023-11-07)
+
+
+### Bug Fixes
+
+* **Dockerfile:** remove --prod flag. ([e66bac8](https://github.com/vasilistotskas/grooveshop-media-stream/commit/e66bac8f45536b0c637e8a8360a3efd9fde1b332))
+
 # [1.18.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.17.0...v1.18.0) (2023-11-07)
 
 
