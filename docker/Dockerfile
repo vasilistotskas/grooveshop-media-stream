@@ -14,12 +14,13 @@ WORKDIR /usr/src/app
 COPY nest-cli.json ./
 COPY tsconfig*.json ./
 COPY package*.json ./
+COPY pnpm-lock.yaml ./
 COPY src/ ./src/
 
 FROM base AS build
 
 # Install pnpm
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile
 
 # Build the app
 RUN pnpm run build
@@ -35,6 +36,7 @@ WORKDIR /usr/src/app
 COPY --from=build /usr/src/app/build ./build
 COPY --from=build /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/package*.json ./
+COPY --from=build /usr/src/app/pnpm-lock.yaml ./
 COPY --from=build /usr/src/app/nest-cli.json ./
 
 # Volumes
