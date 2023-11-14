@@ -1,0 +1,1 @@
+{"version":3,"file":"UnableToFetchResourceException.js","sourceRoot":"","sources":["../../../../../src/MediaStream/API/Exception/UnableToFetchResourceException.ts"],"names":[],"mappings":";;AAAA,MAAqB,8BAA+B,SAAQ,KAAK;IAChE,YAAY,QAAgB;QAC3B,KAAK,CAAC,uBAAuB,QAAQ,sBAAsB,CAAC,CAAA;IAC7D,CAAC;CACD;AAJD,iDAIC"}

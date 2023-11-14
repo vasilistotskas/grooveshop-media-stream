@@ -1,0 +1,1 @@
+{"version":3,"file":"UnableToStoreFetchedResourceException.js","sourceRoot":"","sources":["../../../../../src/MediaStream/API/Exception/UnableToStoreFetchedResourceException.ts"],"names":[],"mappings":";;AAAA,MAAqB,qCAAsC,SAAQ,KAAK;IACvE,YAAY,QAAgB;QAC3B,KAAK,CAAC,uBAAuB,QAAQ,qBAAqB,CAAC,CAAA;IAC5D,CAAC;CACD;AAJD,wDAIC"}
