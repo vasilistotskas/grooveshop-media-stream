@@ -8,8 +8,7 @@ Object.defineProperty(exports, "default", {
         return ManipulationJobResult;
     }
 });
-var ManipulationJobResult;
-ManipulationJobResult = class ManipulationJobResult {
+let ManipulationJobResult = class ManipulationJobResult {
     constructor(data){
         Object.assign(this, data);
     }

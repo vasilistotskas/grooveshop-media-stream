@@ -77,8 +77,7 @@ function _ts_param(paramIndex, decorator) {
         decorator(target, key, paramIndex);
     };
 }
-var MediaStreamImageRESTController;
-MediaStreamImageRESTController = class MediaStreamImageRESTController {
+let MediaStreamImageRESTController = class MediaStreamImageRESTController {
     /**
 	 * Adds required headers to the response
 	 *
@@ -207,7 +206,8 @@ _ts_decorate([
         void 0,
         typeof _CacheImageRequest.SupportedResizeFormats === "undefined" ? Object : _CacheImageRequest.SupportedResizeFormats,
         typeof _express.Response === "undefined" ? Object : _express.Response
-    ])
+    ]),
+    _ts_metadata("design:returntype", Promise)
 ], MediaStreamImageRESTController.prototype, "uploadedImage", null);
 _ts_decorate([
     (0, _common.Get)('static/images/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?'),
@@ -231,7 +231,8 @@ _ts_decorate([
         void 0,
         typeof _CacheImageRequest.SupportedResizeFormats === "undefined" ? Object : _CacheImageRequest.SupportedResizeFormats,
         typeof _express.Response === "undefined" ? Object : _express.Response
-    ])
+    ]),
+    _ts_metadata("design:returntype", Promise)
 ], MediaStreamImageRESTController.prototype, "staticImage", null);
 _ts_decorate([
     (0, _common.Get)('nuxt/images/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?'),
@@ -255,7 +256,8 @@ _ts_decorate([
         void 0,
         typeof _CacheImageRequest.SupportedResizeFormats === "undefined" ? Object : _CacheImageRequest.SupportedResizeFormats,
         typeof _express.Response === "undefined" ? Object : _express.Response
-    ])
+    ]),
+    _ts_metadata("design:returntype", Promise)
 ], MediaStreamImageRESTController.prototype, "publicNuxtImage", null);
 MediaStreamImageRESTController = _ts_decorate([
     (0, _common.Controller)({

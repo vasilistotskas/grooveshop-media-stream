@@ -128,8 +128,7 @@ let ResizeOptions = class ResizeOptions {
         });
     }
 };
-var CacheImageRequest;
-CacheImageRequest = class CacheImageRequest {
+let CacheImageRequest = class CacheImageRequest {
     constructor(data){
         Object.assign(this, data);
     }

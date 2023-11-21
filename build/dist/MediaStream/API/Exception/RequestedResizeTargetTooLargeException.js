@@ -8,8 +8,7 @@ Object.defineProperty(exports, "default", {
         return RequestedResizeTargetTooLargeException;
     }
 });
-var RequestedResizeTargetTooLargeException;
-RequestedResizeTargetTooLargeException = class RequestedResizeTargetTooLargeException extends Error {
+let RequestedResizeTargetTooLargeException = class RequestedResizeTargetTooLargeException extends Error {
     constructor(resizeRequest, allowedPixelCount){
         super(`Requested resize target (${resizeRequest.width}x${resizeRequest.height}) exceeded maximum allowed size of ${allowedPixelCount} total pixels`);
     }

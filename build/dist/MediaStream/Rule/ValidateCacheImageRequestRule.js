@@ -24,8 +24,7 @@ function _ts_decorate(decorators, target, key, desc) {
 function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 }
-var ValidateCacheImageRequestRule;
-ValidateCacheImageRequestRule = class ValidateCacheImageRequestRule {
+let ValidateCacheImageRequestRule = class ValidateCacheImageRequestRule {
     async setup(request) {
         this.request = request;
         await this.validateCacheImageRequestResizeTargetRule.setup(request);
