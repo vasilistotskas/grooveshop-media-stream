@@ -1,3 +1,17 @@
+# [1.26.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.25.0...v1.26.0) (2023-11-23)
+
+
+### Bug Fixes
+
+* add `coveralls` lib ([fa73412](https://github.com/vasilistotskas/grooveshop-media-stream/commit/fa73412cf5409b793b44a4c1a69730bbeaafba03))
+* **ci.yml:** remove `make test-coverage` ([336736e](https://github.com/vasilistotskas/grooveshop-media-stream/commit/336736e1c75927ebca6ad99b222f3338a77a3c7a))
+
+
+### Features
+
+* **ci.yml:** Add coveralls ([16d4d40](https://github.com/vasilistotskas/grooveshop-media-stream/commit/16d4d406ff9dacfe771381fa71be4ea3c1cbf836))
+* update COVERALLS_REPO_TOKEN ([5d6718f](https://github.com/vasilistotskas/grooveshop-media-stream/commit/5d6718f324ca29c66b2a74d69734a1e633eb8f98))
+
 # [1.25.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.24.0...v1.25.0) (2023-11-23)
 
 
