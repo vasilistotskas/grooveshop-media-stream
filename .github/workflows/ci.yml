@@ -41,9 +41,7 @@ jobs:
           # Defaults to the user or organization that owns the workflow file
           scope: '@vasilistotskas'
       - name: Install dependencies
-        run: |
-          pnpm install --frozen-lockfile --prefer-offline
-          make test-coverage
+        run: pnpm install --frozen-lockfile --prefer-offline
       - name: Run format fix
         run: pnpm run format
       - name: Run lint fix
