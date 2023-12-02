@@ -17,3 +17,5 @@ build/
 # IDE / Editor directories
 .idea/
 
+# Tests
+coverage

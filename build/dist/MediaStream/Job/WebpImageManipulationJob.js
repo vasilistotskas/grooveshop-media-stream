@@ -64,7 +64,10 @@ let WebpImageManipulationJob = class WebpImageManipulationJob {
         });
         if (Object.keys(resizeScales).length > 0) {
             if (null !== options.trimThreshold && !isNaN(options.trimThreshold)) {
-                manipulation.trim(options.trimThreshold);
+                manipulation.trim({
+                    background: options.background,
+                    threshold: Number(options.trimThreshold)
+                });
             }
             manipulation.resize({
                 ...resizeScales,
