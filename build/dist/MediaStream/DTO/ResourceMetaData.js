@@ -22,9 +22,9 @@ _export(exports, {
         return resourceMetaVersion;
     }
 });
-const defaultPrivateTTL = 1 * 60 * 60 * 1000 // 1 hour * 60 minutes * 60 seconds * 1000ms
+const defaultPrivateTTL = 7 * 24 * 60 * 60 * 1000 // 7 days * 24 hours * 60 minutes * 60 seconds * 1000ms
 ;
-const defaultPublicTTL = 24 * 60 * 60 * 1000 // 24 hours * 60 minutes * 60 seconds * 1000ms
+const defaultPublicTTL = 30 * 24 * 60 * 60 * 1000 // 30 days * 24 hours * 60 minutes * 60 seconds * 1000ms
 ;
 const resourceMetaVersion = 1;
 let ResourceMetaData = class ResourceMetaData {

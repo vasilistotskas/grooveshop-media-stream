@@ -73,7 +73,7 @@ let CacheImageResourceOperation = class CacheImageResourceOperation {
             format: manipulationResult.format,
             p: this.request.ttl,
             dateCreated: Date.now(),
-            publicTTL: 24 * 60 * 60 * 1000
+            publicTTL: 30 * 24 * 60 * 60 * 1000
         };
         if (this.request.ttl) {
             resourceMetaDataOptions['privateTTL'] = this.request.ttl;
