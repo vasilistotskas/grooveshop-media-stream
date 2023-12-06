@@ -1,5 +1,5 @@
-export const defaultPrivateTTL = 7 * 24 * 60 * 60 * 1000 // 7 days * 24 hours * 60 minutes * 60 seconds * 1000ms
-export const defaultPublicTTL = 30 * 24 * 60 * 60 * 1000 // 30 days * 24 hours * 60 minutes * 60 seconds * 1000ms
+export const defaultPrivateTTL = 6 * 30 * 24 * 60 * 60 * 1000
+export const defaultPublicTTL = 12 * 30 * 24 * 60 * 60 * 1000
 export const resourceMetaVersion = 1
 
 export default class ResourceMetaData {
