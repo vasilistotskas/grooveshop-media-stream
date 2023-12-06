@@ -1,3 +1,10 @@
+# [1.31.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.30.0...v1.31.0) (2023-12-6)
+
+
+### Features
+
+* Increase TTL ([b0df07b](https://github.com/vasilistotskas/grooveshop-media-stream/commit/b0df07bc4317b9038051555d6ae0c4b9e18acc84))
+
 # [1.30.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.29.0...v1.30.0) (2023-12-6)
 
 
