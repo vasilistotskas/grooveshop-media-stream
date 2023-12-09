@@ -11,7 +11,7 @@ function _interop_require_default(obj) {
 }
 async function bootstrap() {
     const replServer = await (0, _core.repl)(_MediaStreamModule.default);
-    replServer.setupHistory(".nestjs_repl_history", (err)=>{
+    replServer.setupHistory('.nestjs_repl_history', (err)=>{
         if (err) {
             console.error(err);
         }
