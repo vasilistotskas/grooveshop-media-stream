@@ -8,6 +8,7 @@ import CacheImageResourceOperation from '@microservice/Operation/CacheImageResou
 import MediaStreamImageRESTController from '@microservice/API/Controller/MediaStreamImageRESTController'
 import GenerateResourceIdentityFromRequestJob from '@microservice/Job/GenerateResourceIdentityFromRequestJob'
 import ValidateCacheImageRequestResizeTargetRule from '@microservice/Rule/ValidateCacheImageRequestResizeTargetRule'
+import { DevtoolsModule } from '@nestjs/devtools-integration'
 
 const controllers = [MediaStreamImageRESTController]
 
@@ -23,7 +24,12 @@ const jobs = [
 const rules = [ValidateCacheImageRequestRule, ValidateCacheImageRequestResizeTargetRule]
 
 @Module({
-	imports: [HttpModule],
+	imports: [
+		DevtoolsModule.register({
+			http: process.env.NODE_ENV !== 'production'
+		}),
+		HttpModule
+	],
 	controllers,
 	providers: [...jobs, ...rules, ...operations]
 })
