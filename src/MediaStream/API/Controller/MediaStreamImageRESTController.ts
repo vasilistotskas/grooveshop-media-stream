@@ -86,7 +86,9 @@ export default class MediaStreamImageRESTController {
 		return resourceTarget
 	}
 
-	@Get('media/uploads/:imageType/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?')
+	@Get(
+		'media/uploads/:imageType/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?/:quality?'
+	)
 	public async uploadedImage(
 		@Param('imageType') imageType: string,
 		@Param('image') image: string,
@@ -97,6 +99,7 @@ export default class MediaStreamImageRESTController {
 		@Param('background') background = BackgroundOptions.transparent,
 		@Param('trimThreshold') trimThreshold = 5,
 		@Param('format') format: SupportedResizeFormats = SupportedResizeFormats.webp,
+		@Param('quality') quality = 100,
 		@Res() res: Response
 	): Promise<void> {
 		const resizeOptions = new ResizeOptions({
@@ -106,7 +109,8 @@ export default class MediaStreamImageRESTController {
 			background,
 			fit,
 			trimThreshold,
-			format
+			format,
+			quality
 		})
 		const djangoApiUrl = process.env.NEST_PUBLIC_DJANGO_URL || 'http://localhost:8000'
 		const request = new CacheImageRequest({
@@ -118,7 +122,7 @@ export default class MediaStreamImageRESTController {
 		await this.streamRequestedResource(request, res)
 	}
 
-	@Get('static/images/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?')
+	@Get('static/images/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?/:quality?')
 	public async staticImage(
 		@Param('image') image: string,
 		@Param('width') width: number = null,
@@ -128,6 +132,7 @@ export default class MediaStreamImageRESTController {
 		@Param('background') background = BackgroundOptions.transparent,
 		@Param('trimThreshold') trimThreshold = 5,
 		@Param('format') format: SupportedResizeFormats = SupportedResizeFormats.webp,
+		@Param('quality') quality = 100,
 		@Res() res: Response
 	): Promise<void> {
 		const djangoApiUrl = process.env.NEST_PUBLIC_DJANGO_URL || 'http://localhost:8000'
@@ -140,13 +145,14 @@ export default class MediaStreamImageRESTController {
 				background,
 				fit,
 				trimThreshold,
-				format
+				format,
+				quality
 			})
 		})
 		await this.streamRequestedResource(request, res)
 	}
 
-	@Get('nuxt/images/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?')
+	@Get('nuxt/images/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?/:quality?')
 	public async publicNuxtImage(
 		@Param('image') image: string,
 		@Param('width') width: number = null,
@@ -156,6 +162,7 @@ export default class MediaStreamImageRESTController {
 		@Param('background') background = BackgroundOptions.transparent,
 		@Param('trimThreshold') trimThreshold = 5,
 		@Param('format') format: SupportedResizeFormats = SupportedResizeFormats.webp,
+		@Param('quality') quality = 100,
 		@Res() res: Response
 	): Promise<void> {
 		const nuxtPublicUrl = process.env.NEST_PUBLIC_NUXT_URL || 'http://localhost:3000'
@@ -169,7 +176,8 @@ export default class MediaStreamImageRESTController {
 				background,
 				fit,
 				trimThreshold,
-				format
+				format,
+				quality
 			})
 		})
 		await this.streamRequestedResource(request, res)

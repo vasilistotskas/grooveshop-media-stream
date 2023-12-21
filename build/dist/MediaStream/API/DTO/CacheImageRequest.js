@@ -109,7 +109,7 @@ let ResizeOptions = class ResizeOptions {
         this.format = "webp";
         this.background = "#FFFFFF";
         this.trimThreshold = null;
-        this.quality = 80;
+        this.quality = 100;
         const { width, height, trimThreshold, background, fit, position, format, quality, ...rest } = data || {};
         this.width = width ?? null;
         this.height = height ?? null;
@@ -118,7 +118,7 @@ let ResizeOptions = class ResizeOptions {
         this.fit = fit ?? "contain";
         this.position = position ?? "entropy";
         this.format = format ?? "webp";
-        this.quality = quality ?? 80;
+        this.quality = Number(quality) ?? 100;
         Object.assign(this, rest);
         (0, _lodash.each)([
             'width',

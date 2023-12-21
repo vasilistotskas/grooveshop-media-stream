@@ -32,8 +32,8 @@ let ValidateCacheImageRequestResizeTargetRule = class ValidateCacheImageRequestR
         }
     }
     constructor(){
-        this.allowedPixelCount = 2048 * 2048 //2K Squared
-        ;
+        //8K Squared
+        this.allowedPixelCount = 7680 * 4320;
         this.request = null;
     }
 };

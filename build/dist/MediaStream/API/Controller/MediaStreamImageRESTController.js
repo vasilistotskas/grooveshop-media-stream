@@ -126,7 +126,7 @@ let MediaStreamImageRESTController = class MediaStreamImageRESTController {
     static resourceTargetPrepare(resourceTarget) {
         return resourceTarget;
     }
-    async uploadedImage(imageType, image, width = null, height = null, fit = _CacheImageRequest.FitOptions.contain, position = _CacheImageRequest.PositionOptions.entropy, background = _CacheImageRequest.BackgroundOptions.transparent, trimThreshold = 5, format = _CacheImageRequest.SupportedResizeFormats.webp, res) {
+    async uploadedImage(imageType, image, width = null, height = null, fit = _CacheImageRequest.FitOptions.contain, position = _CacheImageRequest.PositionOptions.entropy, background = _CacheImageRequest.BackgroundOptions.transparent, trimThreshold = 5, format = _CacheImageRequest.SupportedResizeFormats.webp, quality = 100, res) {
         const resizeOptions = new _CacheImageRequest.ResizeOptions({
             width,
             height,
@@ -134,7 +134,8 @@ let MediaStreamImageRESTController = class MediaStreamImageRESTController {
             background,
             fit,
             trimThreshold,
-            format
+            format,
+            quality
         });
         const djangoApiUrl = _process.env.NEST_PUBLIC_DJANGO_URL || 'http://localhost:8000';
         const request = new _CacheImageRequest.default({
@@ -143,7 +144,7 @@ let MediaStreamImageRESTController = class MediaStreamImageRESTController {
         });
         await this.streamRequestedResource(request, res);
     }
-    async staticImage(image, width = null, height = null, fit = _CacheImageRequest.FitOptions.contain, position = _CacheImageRequest.PositionOptions.entropy, background = _CacheImageRequest.BackgroundOptions.transparent, trimThreshold = 5, format = _CacheImageRequest.SupportedResizeFormats.webp, res) {
+    async staticImage(image, width = null, height = null, fit = _CacheImageRequest.FitOptions.contain, position = _CacheImageRequest.PositionOptions.entropy, background = _CacheImageRequest.BackgroundOptions.transparent, trimThreshold = 5, format = _CacheImageRequest.SupportedResizeFormats.webp, quality = 100, res) {
         const djangoApiUrl = _process.env.NEST_PUBLIC_DJANGO_URL || 'http://localhost:8000';
         const request = new _CacheImageRequest.default({
             resourceTarget: MediaStreamImageRESTController.resourceTargetPrepare(`${djangoApiUrl}/static/images/${image}`),
@@ -154,12 +155,13 @@ let MediaStreamImageRESTController = class MediaStreamImageRESTController {
                 background,
                 fit,
                 trimThreshold,
-                format
+                format,
+                quality
             })
         });
         await this.streamRequestedResource(request, res);
     }
-    async publicNuxtImage(image, width = null, height = null, fit = _CacheImageRequest.FitOptions.contain, position = _CacheImageRequest.PositionOptions.entropy, background = _CacheImageRequest.BackgroundOptions.transparent, trimThreshold = 5, format = _CacheImageRequest.SupportedResizeFormats.webp, res) {
+    async publicNuxtImage(image, width = null, height = null, fit = _CacheImageRequest.FitOptions.contain, position = _CacheImageRequest.PositionOptions.entropy, background = _CacheImageRequest.BackgroundOptions.transparent, trimThreshold = 5, format = _CacheImageRequest.SupportedResizeFormats.webp, quality = 100, res) {
         const nuxtPublicUrl = _process.env.NEST_PUBLIC_NUXT_URL || 'http://localhost:3000';
         const request = new _CacheImageRequest.default({
             resourceTarget: MediaStreamImageRESTController.resourceTargetPrepare(`${nuxtPublicUrl}/assets/images/${image}`),
@@ -170,7 +172,8 @@ let MediaStreamImageRESTController = class MediaStreamImageRESTController {
                 background,
                 fit,
                 trimThreshold,
-                format
+                format,
+                quality
             })
         });
         await this.streamRequestedResource(request, res);
@@ -183,7 +186,7 @@ let MediaStreamImageRESTController = class MediaStreamImageRESTController {
     }
 };
 _ts_decorate([
-    (0, _common.Get)('media/uploads/:imageType/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?'),
+    (0, _common.Get)('media/uploads/:imageType/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?/:quality?'),
     _ts_param(0, (0, _common.Param)('imageType')),
     _ts_param(1, (0, _common.Param)('image')),
     _ts_param(2, (0, _common.Param)('width')),
@@ -193,7 +196,8 @@ _ts_decorate([
     _ts_param(6, (0, _common.Param)('background')),
     _ts_param(7, (0, _common.Param)('trimThreshold')),
     _ts_param(8, (0, _common.Param)('format')),
-    _ts_param(9, (0, _common.Res)()),
+    _ts_param(9, (0, _common.Param)('quality')),
+    _ts_param(10, (0, _common.Res)()),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
         String,
@@ -205,12 +209,13 @@ _ts_decorate([
         void 0,
         void 0,
         typeof _CacheImageRequest.SupportedResizeFormats === "undefined" ? Object : _CacheImageRequest.SupportedResizeFormats,
+        void 0,
         typeof _express.Response === "undefined" ? Object : _express.Response
     ]),
     _ts_metadata("design:returntype", Promise)
 ], MediaStreamImageRESTController.prototype, "uploadedImage", null);
 _ts_decorate([
-    (0, _common.Get)('static/images/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?'),
+    (0, _common.Get)('static/images/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?/:quality?'),
     _ts_param(0, (0, _common.Param)('image')),
     _ts_param(1, (0, _common.Param)('width')),
     _ts_param(2, (0, _common.Param)('height')),
@@ -219,7 +224,8 @@ _ts_decorate([
     _ts_param(5, (0, _common.Param)('background')),
     _ts_param(6, (0, _common.Param)('trimThreshold')),
     _ts_param(7, (0, _common.Param)('format')),
-    _ts_param(8, (0, _common.Res)()),
+    _ts_param(8, (0, _common.Param)('quality')),
+    _ts_param(9, (0, _common.Res)()),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
         String,
@@ -230,12 +236,13 @@ _ts_decorate([
         void 0,
         void 0,
         typeof _CacheImageRequest.SupportedResizeFormats === "undefined" ? Object : _CacheImageRequest.SupportedResizeFormats,
+        void 0,
         typeof _express.Response === "undefined" ? Object : _express.Response
     ]),
     _ts_metadata("design:returntype", Promise)
 ], MediaStreamImageRESTController.prototype, "staticImage", null);
 _ts_decorate([
-    (0, _common.Get)('nuxt/images/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?'),
+    (0, _common.Get)('nuxt/images/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?/:quality?'),
     _ts_param(0, (0, _common.Param)('image')),
     _ts_param(1, (0, _common.Param)('width')),
     _ts_param(2, (0, _common.Param)('height')),
@@ -244,7 +251,8 @@ _ts_decorate([
     _ts_param(5, (0, _common.Param)('background')),
     _ts_param(6, (0, _common.Param)('trimThreshold')),
     _ts_param(7, (0, _common.Param)('format')),
-    _ts_param(8, (0, _common.Res)()),
+    _ts_param(8, (0, _common.Param)('quality')),
+    _ts_param(9, (0, _common.Res)()),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
         String,
@@ -255,6 +263,7 @@ _ts_decorate([
         void 0,
         void 0,
         typeof _CacheImageRequest.SupportedResizeFormats === "undefined" ? Object : _CacheImageRequest.SupportedResizeFormats,
+        void 0,
         typeof _express.Response === "undefined" ? Object : _express.Response
     ]),
     _ts_metadata("design:returntype", Promise)

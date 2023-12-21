@@ -92,7 +92,7 @@ export class ResizeOptions {
 	format = SupportedResizeFormats.webp
 	background: Color = BackgroundOptions.white
 	trimThreshold: null | number = null
-	quality = 80
+	quality = 100
 
 	constructor(data?: Partial<ResizeOptions>) {
 		const { width, height, trimThreshold, background, fit, position, format, quality, ...rest } = data || {}
@@ -103,7 +103,7 @@ export class ResizeOptions {
 		this.fit = fit ?? FitOptions.contain
 		this.position = position ?? PositionOptions.entropy
 		this.format = format ?? SupportedResizeFormats.webp
-		this.quality = quality ?? 80
+		this.quality = Number(quality) ?? 100
 
 		Object.assign(this, rest)
 		each(['width', 'height'], (sizeOption) => {

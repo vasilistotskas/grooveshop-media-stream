@@ -18,7 +18,6 @@ const _CacheImageResourceOperation = /*#__PURE__*/ _interop_require_default(requ
 const _MediaStreamImageRESTController = /*#__PURE__*/ _interop_require_default(require("../API/Controller/MediaStreamImageRESTController"));
 const _GenerateResourceIdentityFromRequestJob = /*#__PURE__*/ _interop_require_default(require("../Job/GenerateResourceIdentityFromRequestJob"));
 const _ValidateCacheImageRequestResizeTargetRule = /*#__PURE__*/ _interop_require_default(require("../Rule/ValidateCacheImageRequestResizeTargetRule"));
-const _devtoolsintegration = require("@nestjs/devtools-integration");
 function _interop_require_default(obj) {
     return obj && obj.__esModule ? obj : {
         default: obj
@@ -51,9 +50,6 @@ let MediaStreamModule = class MediaStreamModule {
 MediaStreamModule = _ts_decorate([
     (0, _common.Module)({
         imports: [
-            _devtoolsintegration.DevtoolsModule.register({
-                http: process.env.NODE_ENV !== 'production'
-            }),
             _axios.HttpModule
         ],
         controllers,

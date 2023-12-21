@@ -10,9 +10,7 @@ function _interop_require_default(obj) {
     };
 }
 async function bootstrap() {
-    const app = await _core.NestFactory.create(_MediaStreamModule.default, {
-        snapshot: true
-    });
+    const app = await _core.NestFactory.create(_MediaStreamModule.default);
     await app.listen(3003);
 }
 bootstrap();

@@ -4,7 +4,8 @@ import RequestedResizeTargetTooLargeException from '@microservice/API/Exception/
 
 @Injectable({ scope: Scope.REQUEST })
 export default class ValidateCacheImageRequestResizeTargetRule {
-	allowedPixelCount = 2048 * 2048 //2K Squared
+	//8K Squared
+	allowedPixelCount = 7680 * 4320
 
 	request: CacheImageRequest = null
 
