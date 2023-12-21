@@ -1,3 +1,10 @@
+# [1.35.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.34.0...v1.35.0) (2023-12-21)
+
+
+### Features
+
+* Expose quality in API controller ([ba91e60](https://github.com/vasilistotskas/grooveshop-media-stream/commit/ba91e60569aeb29392dec5b5c2328512a3f09fc2))
+
 # [1.34.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.33.0...v1.34.0) (2023-12-18)
 
 
