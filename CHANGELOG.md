@@ -1,3 +1,15 @@
+# [1.38.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.37.0...v1.38.0) (2024-1-3)
+
+
+### Bug Fixes
+
+* **package.json:** fix `packageManager` version ([052a21d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/052a21d47f052c9af3d8d8d2b46caa84701efac8))
+
+
+### Features
+
+* Bump Versions ([83047aa](https://github.com/vasilistotskas/grooveshop-media-stream/commit/83047aa36567cc193ce93c11d0fff72e15060baa))
+
 # [1.37.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.36.0...v1.37.0) (2023-12-28)
 
 
