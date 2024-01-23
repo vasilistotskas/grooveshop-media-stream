@@ -1,3 +1,10 @@
+## [1.43.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.43.0...v1.43.1) (2024-1-23)
+
+
+### Bug Fixes
+
+* **ci.yml:** set pnpm audit level to `critical` ([7d20c0a](https://github.com/vasilistotskas/grooveshop-media-stream/commit/7d20c0af48e2a92a47da45ee799129b779aa5ce2))
+
 # [1.43.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.42.0...v1.43.0) (2024-1-23)
 
 
