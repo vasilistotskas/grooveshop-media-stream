@@ -81,3 +81,5 @@ StoreResourceResponseToFileJob = _ts_decorate([
         scope: _common.Scope.REQUEST
     })
 ], StoreResourceResponseToFileJob);
+
+//# sourceMappingURL=StoreResourceResponseToFileJob.js.map

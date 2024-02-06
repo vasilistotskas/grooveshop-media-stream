@@ -13,3 +13,5 @@ let ManipulationJobResult = class ManipulationJobResult {
         Object.assign(this, data);
     }
 };
+
+//# sourceMappingURL=ManipulationJobResult.js.map

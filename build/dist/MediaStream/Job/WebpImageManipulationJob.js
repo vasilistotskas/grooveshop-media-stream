@@ -88,3 +88,5 @@ WebpImageManipulationJob = _ts_decorate([
         scope: _common.Scope.REQUEST
     })
 ], WebpImageManipulationJob);
+
+//# sourceMappingURL=WebpImageManipulationJob.js.map

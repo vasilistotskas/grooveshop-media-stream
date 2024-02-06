@@ -60,3 +60,5 @@ MediaStreamModule = _ts_decorate([
         ]
     })
 ], MediaStreamModule);
+
+//# sourceMappingURL=MediaStreamModule.js.map

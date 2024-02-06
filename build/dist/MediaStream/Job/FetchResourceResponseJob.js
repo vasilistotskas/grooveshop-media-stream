@@ -53,3 +53,5 @@ FetchResourceResponseJob = _ts_decorate([
         typeof _axios.HttpService === "undefined" ? Object : _axios.HttpService
     ])
 ], FetchResourceResponseJob);
+
+//# sourceMappingURL=FetchResourceResponseJob.js.map

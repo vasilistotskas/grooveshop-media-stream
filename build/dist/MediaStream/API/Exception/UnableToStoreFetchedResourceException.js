@@ -13,3 +13,5 @@ let UnableToStoreFetchedResourceException = class UnableToStoreFetchedResourceEx
         super(`Requested resource: ${resource} couldn't be stored`);
     }
 };
+
+//# sourceMappingURL=UnableToStoreFetchedResourceException.js.map

@@ -28,3 +28,5 @@ GenerateResourceIdentityFromRequestJob = _ts_decorate([
         scope: _common.Scope.REQUEST
     })
 ], GenerateResourceIdentityFromRequestJob);
+
+//# sourceMappingURL=GenerateResourceIdentityFromRequestJob.js.map

@@ -33,3 +33,5 @@ let ResourceMetaData = class ResourceMetaData {
         Object.assign(this, data);
     }
 };
+
+//# sourceMappingURL=ResourceMetaData.js.map

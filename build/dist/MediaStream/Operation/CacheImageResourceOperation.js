@@ -110,3 +110,5 @@ CacheImageResourceOperation = _ts_decorate([
         typeof _GenerateResourceIdentityFromRequestJob.default === "undefined" ? Object : _GenerateResourceIdentityFromRequestJob.default
     ])
 ], CacheImageResourceOperation);
+
+//# sourceMappingURL=CacheImageResourceOperation.js.map

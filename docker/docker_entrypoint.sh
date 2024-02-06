@@ -5,4 +5,4 @@ cd /mnt/app
 
 npm i
 
-npm run start:dev
+npm run dev

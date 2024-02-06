@@ -133,3 +133,5 @@ let CacheImageRequest = class CacheImageRequest {
         Object.assign(this, data);
     }
 };
+
+//# sourceMappingURL=CacheImageRequest.js.map

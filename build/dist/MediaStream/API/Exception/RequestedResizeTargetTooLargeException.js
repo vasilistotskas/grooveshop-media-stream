@@ -13,3 +13,5 @@ let RequestedResizeTargetTooLargeException = class RequestedResizeTargetTooLarge
         super(`Requested resize target (${resizeRequest.width}x${resizeRequest.height}) exceeded maximum allowed size of ${allowedPixelCount} total pixels`);
     }
 };
+
+//# sourceMappingURL=RequestedResizeTargetTooLargeException.js.map

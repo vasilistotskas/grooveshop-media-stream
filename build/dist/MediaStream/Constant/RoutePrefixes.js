@@ -22,3 +22,5 @@ _export(exports, {
 const MODULE = 'media_stream';
 const VERSION = '1';
 const IMAGE = `${MODULE}-image`;
+
+//# sourceMappingURL=RoutePrefixes.js.map

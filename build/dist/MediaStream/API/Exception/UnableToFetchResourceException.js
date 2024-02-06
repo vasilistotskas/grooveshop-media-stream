@@ -13,3 +13,5 @@ let UnableToFetchResourceException = class UnableToFetchResourceException extend
         super(`Requested resource: ${resource} couldn't be fetched`);
     }
 };
+
+//# sourceMappingURL=UnableToFetchResourceException.js.map

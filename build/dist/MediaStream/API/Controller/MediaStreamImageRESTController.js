@@ -281,3 +281,5 @@ MediaStreamImageRESTController = _ts_decorate([
         typeof _CacheImageResourceOperation.default === "undefined" ? Object : _CacheImageResourceOperation.default
     ])
 ], MediaStreamImageRESTController);
+
+//# sourceMappingURL=MediaStreamImageRESTController.js.map
