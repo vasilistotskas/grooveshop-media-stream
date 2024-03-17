@@ -152,7 +152,7 @@ export default class MediaStreamImageRESTController {
 		await this.streamRequestedResource(request, res)
 	}
 
-	@Get('nuxt/images/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?/:quality?')
+	@Get('img/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?/:quality?')
 	public async publicNuxtImage(
 		@Param('image') image: string,
 		@Param('width') width: number = null,
@@ -168,7 +168,7 @@ export default class MediaStreamImageRESTController {
 		const nuxtPublicUrl = process.env.NEST_PUBLIC_NUXT_URL || 'http://localhost:3000'
 
 		const request = new CacheImageRequest({
-			resourceTarget: MediaStreamImageRESTController.resourceTargetPrepare(`${nuxtPublicUrl}/assets/images/${image}`),
+			resourceTarget: MediaStreamImageRESTController.resourceTargetPrepare(`${nuxtPublicUrl}/img/${image}`),
 			resizeOptions: new ResizeOptions({
 				width,
 				height,

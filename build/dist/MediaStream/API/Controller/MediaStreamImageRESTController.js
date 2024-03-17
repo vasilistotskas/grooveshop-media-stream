@@ -164,7 +164,7 @@ let MediaStreamImageRESTController = class MediaStreamImageRESTController {
     async publicNuxtImage(image, width = null, height = null, fit = _CacheImageRequest.FitOptions.contain, position = _CacheImageRequest.PositionOptions.entropy, background = _CacheImageRequest.BackgroundOptions.transparent, trimThreshold = 5, format = _CacheImageRequest.SupportedResizeFormats.webp, quality = 100, res) {
         const nuxtPublicUrl = _process.env.NEST_PUBLIC_NUXT_URL || 'http://localhost:3000';
         const request = new _CacheImageRequest.default({
-            resourceTarget: MediaStreamImageRESTController.resourceTargetPrepare(`${nuxtPublicUrl}/assets/images/${image}`),
+            resourceTarget: MediaStreamImageRESTController.resourceTargetPrepare(`${nuxtPublicUrl}/img/${image}`),
             resizeOptions: new _CacheImageRequest.ResizeOptions({
                 width,
                 height,
@@ -242,7 +242,7 @@ _ts_decorate([
     _ts_metadata("design:returntype", Promise)
 ], MediaStreamImageRESTController.prototype, "staticImage", null);
 _ts_decorate([
-    (0, _common.Get)('nuxt/images/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?/:quality?'),
+    (0, _common.Get)('img/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?/:quality?'),
     _ts_param(0, (0, _common.Param)('image')),
     _ts_param(1, (0, _common.Param)('width')),
     _ts_param(2, (0, _common.Param)('height')),
