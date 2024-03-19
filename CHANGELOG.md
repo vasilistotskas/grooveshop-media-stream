@@ -1,3 +1,10 @@
+# [1.50.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.49.0...v1.50.0) (2024-03-19)
+
+
+### Features
+
+* Tasks introduce, implement task to clean `storages` cache ([c085135](https://github.com/vasilistotskas/grooveshop-media-stream/commit/c0851351a0d8f2446d52108ac1527b403d140a9f))
+
 # [1.49.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.48.0...v1.49.0) (2024-03-17)
 
 
