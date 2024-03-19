@@ -10,6 +10,8 @@ Object.defineProperty(exports, "default", {
 });
 const _common = require("@nestjs/common");
 const _axios = require("@nestjs/axios");
+const _schedule = require("@nestjs/schedule");
+const _tasksmodule = require("../Tasks/tasks.module");
 const _FetchResourceResponseJob = /*#__PURE__*/ _interop_require_default(require("../Job/FetchResourceResponseJob"));
 const _WebpImageManipulationJob = /*#__PURE__*/ _interop_require_default(require("../Job/WebpImageManipulationJob"));
 const _ValidateCacheImageRequestRule = /*#__PURE__*/ _interop_require_default(require("../Rule/ValidateCacheImageRequestRule"));
@@ -50,7 +52,9 @@ let MediaStreamModule = class MediaStreamModule {
 MediaStreamModule = _ts_decorate([
     (0, _common.Module)({
         imports: [
-            _axios.HttpModule
+            _axios.HttpModule,
+            _schedule.ScheduleModule.forRoot(),
+            _tasksmodule.TasksModule
         ],
         controllers,
         providers: [

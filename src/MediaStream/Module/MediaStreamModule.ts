@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common'
 import { HttpModule } from '@nestjs/axios'
+import { ScheduleModule } from '@nestjs/schedule'
+import { TasksModule } from '@microservice/Tasks/tasks.module'
 import FetchResourceResponseJob from '@microservice/Job/FetchResourceResponseJob'
 import WebpImageManipulationJob from '@microservice/Job/WebpImageManipulationJob'
 import ValidateCacheImageRequestRule from '@microservice/Rule/ValidateCacheImageRequestRule'
@@ -23,7 +25,7 @@ const jobs = [
 const rules = [ValidateCacheImageRequestRule, ValidateCacheImageRequestResizeTargetRule]
 
 @Module({
-	imports: [HttpModule],
+	imports: [HttpModule, ScheduleModule.forRoot(), TasksModule],
 	controllers,
 	providers: [...jobs, ...rules, ...operations]
 })
