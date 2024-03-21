@@ -85,7 +85,7 @@ let CleanupService = class CleanupService {
     }
 };
 _ts_decorate([
-    (0, _schedule.Cron)(_schedule.CronExpression.EVERY_DAY_AT_4PM, {
+    (0, _schedule.Cron)(_schedule.CronExpression.EVERY_WEEK, {
         name: 'cleanup'
     }),
     _ts_metadata("design:type", Function),

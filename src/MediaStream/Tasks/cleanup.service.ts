@@ -7,7 +7,7 @@ import * as path from 'path'
 export class CleanupService {
 	private readonly logger = new Logger(CleanupService.name)
 
-	@Cron(CronExpression.EVERY_DAY_AT_4PM, {
+	@Cron(CronExpression.EVERY_WEEK, {
 		name: 'cleanup'
 	})
 	async handleCleanup() {
