@@ -1,3 +1,10 @@
+# [1.52.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.51.0...v1.52.0) (2024-03-24)
+
+
+### Features
+
+* Return default image on failure ([7620123](https://github.com/vasilistotskas/grooveshop-media-stream/commit/762012331d4f9a5be0104b93d2e35d16204a4468))
+
 # [1.51.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.50.0...v1.51.0) (2024-03-21)
 
 
