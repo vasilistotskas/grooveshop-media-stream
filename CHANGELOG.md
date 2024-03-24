@@ -1,3 +1,10 @@
+## [1.52.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.52.0...v1.52.1) (2024-03-24)
+
+
+### Bug Fixes
+
+* default image fix ([2acfb9b](https://github.com/vasilistotskas/grooveshop-media-stream/commit/2acfb9b1eb3f98282d4e08b4fb1fbf004600c090))
+
 # [1.52.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.51.0...v1.52.0) (2024-03-24)
 
 
