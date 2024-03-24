@@ -53,29 +53,44 @@ export default class MediaStreamImageRESTController {
 	 * @protected
 	 */
 	private async streamRequestedResource(request: CacheImageRequest, res: Response): Promise<void> {
-		try {
-			await this.cacheImageResourceOperation.setup(request)
+		await this.cacheImageResourceOperation.setup(request)
+		if (this.cacheImageResourceOperation.resourceExists) {
 			const headers = this.cacheImageResourceOperation.getHeaders
 			res = MediaStreamImageRESTController.addHeadersToRequest(res, headers)
-
-			if (this.cacheImageResourceOperation.resourceExists) {
-				createReadStream(this.cacheImageResourceOperation.getResourcePath).pipe(res)
-			} else {
-				await this.cacheImageResourceOperation.execute()
-				createReadStream(this.cacheImageResourceOperation.getResourcePath).pipe(res)
-			}
-		} catch (error) {
-			this.logger.warn('Failed to stream requested resource', error)
-
+			const stream = createReadStream(this.cacheImageResourceOperation.getResourcePath).pipe(res)
 			try {
-				const optimizedDefaultImagePath = await this.cacheImageResourceOperation.optimizeAndServeDefaultImage(
-					request.resizeOptions
-				)
-				res.sendFile(optimizedDefaultImagePath)
-			} catch (defaultImageError) {
-				this.logger.error('Failed to serve default image', defaultImageError)
-				throw new InternalServerErrorException('Failed to process the image request.')
+				await new Promise((resolve, reject) => {
+					stream.on('finish', () => resolve)
+					stream.on('error', () => reject)
+				})
+			} catch (e) {
+				// ignore failed stream to client for now
+				this.logger.error(e)
+			} finally {
+				await this.cacheImageResourceOperation.execute()
 			}
+		} else {
+			try {
+				await this.cacheImageResourceOperation.execute()
+				const headers = this.cacheImageResourceOperation.getHeaders
+				res = MediaStreamImageRESTController.addHeadersToRequest(res, headers)
+				createReadStream(this.cacheImageResourceOperation.getResourcePath).pipe(res)
+			} catch (e) {
+				this.logger.warn(e)
+				await this.defaultImageFallback(request, res)
+			}
+		}
+	}
+
+	private async defaultImageFallback(request: CacheImageRequest, res: Response): Promise<void> {
+		try {
+			const optimizedDefaultImagePath = await this.cacheImageResourceOperation.optimizeAndServeDefaultImage(
+				request.resizeOptions
+			)
+			res.sendFile(optimizedDefaultImagePath)
+		} catch (defaultImageError) {
+			this.logger.error('Failed to serve default image', defaultImageError)
+			throw new InternalServerErrorException('Failed to process the image request.')
 		}
 	}
 
