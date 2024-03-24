@@ -11,6 +11,7 @@ function _interop_require_default(obj) {
 }
 async function bootstrap() {
     const app = await _core.NestFactory.create(_MediaStreamModule.default);
+    app.useStaticAssets('public');
     await app.listen(3003);
 }
 bootstrap();

@@ -70,7 +70,7 @@ let CleanupService = class CleanupService {
         try {
             const files = await _promises.readdir(directoryPath);
             for (const file of files){
-                if (file.endsWith('.rst') || file.endsWith('.rsc') || file.endsWith('.rsm')) {
+                if (file.endsWith('.rst') || file.endsWith('.rsc') || file.endsWith('.rsm') || file.endsWith('.webp')) {
                     await _promises.unlink(_path.join(directoryPath, file));
                     deletedFilesCount++;
                 }

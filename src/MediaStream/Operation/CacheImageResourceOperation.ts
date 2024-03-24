@@ -2,13 +2,20 @@ import { HttpService } from '@nestjs/axios'
 import { Injectable, Scope, Logger } from '@nestjs/common'
 import { existsSync, readFileSync, unlink, writeFileSync } from 'fs'
 import ResourceMetaData from '@microservice/DTO/ResourceMetaData'
-import CacheImageRequest from '@microservice/API/DTO/CacheImageRequest'
+import CacheImageRequest, {
+	BackgroundOptions,
+	FitOptions,
+	PositionOptions,
+	ResizeOptions,
+	SupportedResizeFormats
+} from '@microservice/API/DTO/CacheImageRequest'
 import { ResourceIdentifierKP } from '@microservice/Constant/KeyProperties'
 import FetchResourceResponseJob from '@microservice/Job/FetchResourceResponseJob'
 import WebpImageManipulationJob from '@microservice/Job/WebpImageManipulationJob'
 import ValidateCacheImageRequestRule from '@microservice/Rule/ValidateCacheImageRequestRule'
 import StoreResourceResponseToFileJob from '@microservice/Job/StoreResourceResponseToFileJob'
 import GenerateResourceIdentityFromRequestJob from '@microservice/Job/GenerateResourceIdentityFromRequestJob'
+import { createHash } from 'crypto'
 
 @Injectable({ scope: Scope.REQUEST })
 export default class CacheImageResourceOperation {
@@ -100,5 +107,41 @@ export default class CacheImageResourceOperation {
 				this.logger.error(err)
 			}
 		})
+	}
+
+	public async optimizeAndServeDefaultImage(resizeOptions: ResizeOptions): Promise<string> {
+		const optionsString = this.createOptionsString(resizeOptions)
+		const optimizedImageName = `default_optimized_${optionsString}.webp`
+		const optimizedImagePath = `${process.cwd()}/storage/${optimizedImageName}`
+
+		const resizeOptionsWithDefaults = {
+			...resizeOptions,
+			fit: FitOptions.contain,
+			position: PositionOptions.entropy,
+			format: SupportedResizeFormats.webp,
+			background: BackgroundOptions.transparent,
+			trimThreshold: 5,
+			quality: 100
+		}
+
+		if (!existsSync(optimizedImagePath)) {
+			const defaultImagePath = `${process.cwd()}/public/default.png`
+			await this.webpImageManipulationJob.handle(defaultImagePath, optimizedImagePath, resizeOptionsWithDefaults)
+		}
+
+		return optimizedImagePath
+	}
+
+	private createOptionsString(resizeOptions: ResizeOptions): string {
+		const sortedOptions = Object.keys(resizeOptions)
+			.sort()
+			.reduce((obj, key) => {
+				obj[key] = resizeOptions[key]
+				return obj
+			}, {})
+
+		const optionsString = JSON.stringify(sortedOptions)
+
+		return createHash('md5').update(optionsString).digest('hex')
 	}
 }

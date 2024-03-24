@@ -18,7 +18,7 @@ export class CleanupService {
 		try {
 			const files = await fs.readdir(directoryPath)
 			for (const file of files) {
-				if (file.endsWith('.rst') || file.endsWith('.rsc') || file.endsWith('.rsm')) {
+				if (file.endsWith('.rst') || file.endsWith('.rsc') || file.endsWith('.rsm') || file.endsWith('.webp')) {
 					await fs.unlink(path.join(directoryPath, file))
 					deletedFilesCount++
 				}

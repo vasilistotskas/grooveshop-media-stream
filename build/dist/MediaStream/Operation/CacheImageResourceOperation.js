@@ -12,11 +12,13 @@ const _axios = require("@nestjs/axios");
 const _common = require("@nestjs/common");
 const _fs = require("fs");
 const _ResourceMetaData = /*#__PURE__*/ _interop_require_default(require("../DTO/ResourceMetaData"));
+const _CacheImageRequest = require("../API/DTO/CacheImageRequest");
 const _FetchResourceResponseJob = /*#__PURE__*/ _interop_require_default(require("../Job/FetchResourceResponseJob"));
 const _WebpImageManipulationJob = /*#__PURE__*/ _interop_require_default(require("../Job/WebpImageManipulationJob"));
 const _ValidateCacheImageRequestRule = /*#__PURE__*/ _interop_require_default(require("../Rule/ValidateCacheImageRequestRule"));
 const _StoreResourceResponseToFileJob = /*#__PURE__*/ _interop_require_default(require("../Job/StoreResourceResponseToFileJob"));
 const _GenerateResourceIdentityFromRequestJob = /*#__PURE__*/ _interop_require_default(require("../Job/GenerateResourceIdentityFromRequestJob"));
+const _crypto = require("crypto");
 function _interop_require_default(obj) {
     return obj && obj.__esModule ? obj : {
         default: obj
@@ -85,6 +87,33 @@ let CacheImageResourceOperation = class CacheImageResourceOperation {
                 this.logger.error(err);
             }
         });
+    }
+    async optimizeAndServeDefaultImage(resizeOptions) {
+        const optionsString = this.createOptionsString(resizeOptions);
+        const optimizedImageName = `default_optimized_${optionsString}.webp`;
+        const optimizedImagePath = `${process.cwd()}/storage/${optimizedImageName}`;
+        const resizeOptionsWithDefaults = {
+            ...resizeOptions,
+            fit: _CacheImageRequest.FitOptions.contain,
+            position: _CacheImageRequest.PositionOptions.entropy,
+            format: _CacheImageRequest.SupportedResizeFormats.webp,
+            background: _CacheImageRequest.BackgroundOptions.transparent,
+            trimThreshold: 5,
+            quality: 100
+        };
+        if (!(0, _fs.existsSync)(optimizedImagePath)) {
+            const defaultImagePath = `${process.cwd()}/public/default.png`;
+            await this.webpImageManipulationJob.handle(defaultImagePath, optimizedImagePath, resizeOptionsWithDefaults);
+        }
+        return optimizedImagePath;
+    }
+    createOptionsString(resizeOptions) {
+        const sortedOptions = Object.keys(resizeOptions).sort().reduce((obj, key)=>{
+            obj[key] = resizeOptions[key];
+            return obj;
+        }, {});
+        const optionsString = JSON.stringify(sortedOptions);
+        return (0, _crypto.createHash)('md5').update(optionsString).digest('hex');
     }
     constructor(httpService, validateCacheImageRequest, fetchResourceResponseJob, webpImageManipulationJob, storeResourceResponseToFileJob, generateResourceIdentityFromRequestJob){
         this.httpService = httpService;
