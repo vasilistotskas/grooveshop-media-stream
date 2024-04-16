@@ -1,3 +1,10 @@
+# [1.56.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.55.0...v1.56.0) (2024-04-16)
+
+
+### Features
+
+* Bump Versions for npm and pnpm ([3248fd1](https://github.com/vasilistotskas/grooveshop-media-stream/commit/3248fd11aa0d2ca0ed569c2831716cc6d3a68b6d))
+
 # [1.55.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.54.0...v1.55.0) (2024-04-15)
 
 
