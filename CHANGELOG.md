@@ -1,3 +1,10 @@
+## [1.60.5](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.60.4...v1.60.5) (2024-05-07)
+
+
+### Bug Fixes
+
+* remove useless file ([19cd64a](https://github.com/vasilistotskas/grooveshop-media-stream/commit/19cd64a7e020876a0176c138140189923da5122a))
+
 ## [1.60.4](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.60.3...v1.60.4) (2024-05-07)
 
 
