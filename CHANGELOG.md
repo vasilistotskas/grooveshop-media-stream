@@ -1,3 +1,10 @@
+## [1.60.7](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.60.6...v1.60.7) (2024-05-07)
+
+
+### Bug Fixes
+
+* remove bunfig.toml ([6124257](https://github.com/vasilistotskas/grooveshop-media-stream/commit/612425739906ed0f47746bd105ff3400679ca5e1))
+
 ## [1.60.6](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.60.5...v1.60.6) (2024-05-07)
 
 
