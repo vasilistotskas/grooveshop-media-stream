@@ -1,3 +1,10 @@
+## [1.60.6](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.60.5...v1.60.6) (2024-05-07)
+
+
+### Bug Fixes
+
+* bun fixes ([397b16a](https://github.com/vasilistotskas/grooveshop-media-stream/commit/397b16aa27ac598a941b992d6a6d2aaadc2af3a6))
+
 ## [1.60.5](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.60.4...v1.60.5) (2024-05-07)
 
 
