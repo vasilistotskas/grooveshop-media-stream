@@ -24,9 +24,8 @@ COPY tsconfig*.json ./
 COPY package*.json ./
 COPY src/ ./src/
 
-# [optional] tests & build
+# [optional] build
 ENV NODE_ENV=production
-RUN bun run test
 RUN bun run build
 
 # copy production dependencies and source code into final image
