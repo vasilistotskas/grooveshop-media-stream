@@ -1,3 +1,11 @@
+## [1.60.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.60.0...v1.60.1) (2024-05-07)
+
+
+### Bug Fixes
+
+* **ci.yml:** Fix node version ([1a098e2](https://github.com/vasilistotskas/grooveshop-media-stream/commit/1a098e2b4f8f7cd31ed6a70b995c4bcc0faf8d5e))
+* **ci.yml:** Fix node version ([5d627cc](https://github.com/vasilistotskas/grooveshop-media-stream/commit/5d627cce5717a408c9fad22373af3caeac577321))
+
 # [1.60.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.59.0...v1.60.0) (2024-05-07)
 
 
