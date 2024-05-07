@@ -1,85 +1,56 @@
 "use strict";
-Object.defineProperty(exports, "__esModule", {
-    value: true
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
 });
-Object.defineProperty(exports, "default", {
-    enumerable: true,
-    get: function() {
-        return StoreResourceResponseToFileJob;
-    }
-});
-const _fs = /*#__PURE__*/ _interop_require_wildcard(require("fs"));
-const _common = require("@nestjs/common");
-const _UnableToStoreFetchedResourceException = /*#__PURE__*/ _interop_require_default(require("../API/Exception/UnableToStoreFetchedResourceException"));
-function _interop_require_default(obj) {
-    return obj && obj.__esModule ? obj : {
-        default: obj
-    };
-}
-function _getRequireWildcardCache(nodeInterop) {
-    if (typeof WeakMap !== "function") return null;
-    var cacheBabelInterop = new WeakMap();
-    var cacheNodeInterop = new WeakMap();
-    return (_getRequireWildcardCache = function(nodeInterop) {
-        return nodeInterop ? cacheNodeInterop : cacheBabelInterop;
-    })(nodeInterop);
-}
-function _interop_require_wildcard(obj, nodeInterop) {
-    if (!nodeInterop && obj && obj.__esModule) {
-        return obj;
-    }
-    if (obj === null || typeof obj !== "object" && typeof obj !== "function") {
-        return {
-            default: obj
-        };
-    }
-    var cache = _getRequireWildcardCache(nodeInterop);
-    if (cache && cache.has(obj)) {
-        return cache.get(obj);
-    }
-    var newObj = {
-        __proto__: null
-    };
-    var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor;
-    for(var key in obj){
-        if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) {
-            var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null;
-            if (desc && (desc.get || desc.set)) {
-                Object.defineProperty(newObj, key, desc);
-            } else {
-                newObj[key] = obj[key];
-            }
-        }
-    }
-    newObj.default = obj;
-    if (cache) {
-        cache.set(obj, newObj);
-    }
-    return newObj;
-}
-function _ts_decorate(decorators, target, key, desc) {
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for(var i = decorators.length - 1; i >= 0; i--)if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
-}
+};
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const fs = __importStar(require("fs"));
+const common_1 = require("@nestjs/common");
+const UnableToStoreFetchedResourceException_1 = __importDefault(require("../API/Exception/UnableToStoreFetchedResourceException"));
 let StoreResourceResponseToFileJob = class StoreResourceResponseToFileJob {
     async handle(resourceName, path, response) {
-        const fileStream = _fs.createWriteStream(path);
+        const fileStream = fs.createWriteStream(path);
         try {
             response.data.pipe(fileStream);
-            await new Promise((resolve, reject)=>{
+            await new Promise((resolve, reject) => {
                 fileStream.on('finish', resolve).on('error', reject);
             });
-        } catch (e) {
-            throw new _UnableToStoreFetchedResourceException.default(resourceName);
+        }
+        catch (e) {
+            throw new UnableToStoreFetchedResourceException_1.default(resourceName);
         }
     }
 };
-StoreResourceResponseToFileJob = _ts_decorate([
-    (0, _common.Injectable)({
-        scope: _common.Scope.REQUEST
-    })
+StoreResourceResponseToFileJob = __decorate([
+    (0, common_1.Injectable)({ scope: common_1.Scope.REQUEST })
 ], StoreResourceResponseToFileJob);
-
+exports.default = StoreResourceResponseToFileJob;
 //# sourceMappingURL=StoreResourceResponseToFileJob.js.map

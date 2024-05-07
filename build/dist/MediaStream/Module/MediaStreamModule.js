@@ -1,68 +1,43 @@
 "use strict";
-Object.defineProperty(exports, "__esModule", {
-    value: true
-});
-Object.defineProperty(exports, "default", {
-    enumerable: true,
-    get: function() {
-        return MediaStreamModule;
-    }
-});
-const _common = require("@nestjs/common");
-const _axios = require("@nestjs/axios");
-const _schedule = require("@nestjs/schedule");
-const _tasksmodule = require("../Tasks/tasks.module");
-const _FetchResourceResponseJob = /*#__PURE__*/ _interop_require_default(require("../Job/FetchResourceResponseJob"));
-const _WebpImageManipulationJob = /*#__PURE__*/ _interop_require_default(require("../Job/WebpImageManipulationJob"));
-const _ValidateCacheImageRequestRule = /*#__PURE__*/ _interop_require_default(require("../Rule/ValidateCacheImageRequestRule"));
-const _StoreResourceResponseToFileJob = /*#__PURE__*/ _interop_require_default(require("../Job/StoreResourceResponseToFileJob"));
-const _CacheImageResourceOperation = /*#__PURE__*/ _interop_require_default(require("../Operation/CacheImageResourceOperation"));
-const _MediaStreamImageRESTController = /*#__PURE__*/ _interop_require_default(require("../API/Controller/MediaStreamImageRESTController"));
-const _GenerateResourceIdentityFromRequestJob = /*#__PURE__*/ _interop_require_default(require("../Job/GenerateResourceIdentityFromRequestJob"));
-const _ValidateCacheImageRequestResizeTargetRule = /*#__PURE__*/ _interop_require_default(require("../Rule/ValidateCacheImageRequestResizeTargetRule"));
-function _interop_require_default(obj) {
-    return obj && obj.__esModule ? obj : {
-        default: obj
-    };
-}
-function _ts_decorate(decorators, target, key, desc) {
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for(var i = decorators.length - 1; i >= 0; i--)if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
-}
-const controllers = [
-    _MediaStreamImageRESTController.default
-];
-const operations = [
-    _CacheImageResourceOperation.default
-];
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const common_1 = require("@nestjs/common");
+const axios_1 = require("@nestjs/axios");
+const schedule_1 = require("@nestjs/schedule");
+const tasks_module_1 = require("../Tasks/tasks.module");
+const FetchResourceResponseJob_1 = __importDefault(require("../Job/FetchResourceResponseJob"));
+const WebpImageManipulationJob_1 = __importDefault(require("../Job/WebpImageManipulationJob"));
+const ValidateCacheImageRequestRule_1 = __importDefault(require("../Rule/ValidateCacheImageRequestRule"));
+const StoreResourceResponseToFileJob_1 = __importDefault(require("../Job/StoreResourceResponseToFileJob"));
+const CacheImageResourceOperation_1 = __importDefault(require("../Operation/CacheImageResourceOperation"));
+const MediaStreamImageRESTController_1 = __importDefault(require("../API/Controller/MediaStreamImageRESTController"));
+const GenerateResourceIdentityFromRequestJob_1 = __importDefault(require("../Job/GenerateResourceIdentityFromRequestJob"));
+const ValidateCacheImageRequestResizeTargetRule_1 = __importDefault(require("../Rule/ValidateCacheImageRequestResizeTargetRule"));
+const controllers = [MediaStreamImageRESTController_1.default];
+const operations = [CacheImageResourceOperation_1.default];
 const jobs = [
-    _GenerateResourceIdentityFromRequestJob.default,
-    _FetchResourceResponseJob.default,
-    _StoreResourceResponseToFileJob.default,
-    _WebpImageManipulationJob.default
+    GenerateResourceIdentityFromRequestJob_1.default,
+    FetchResourceResponseJob_1.default,
+    StoreResourceResponseToFileJob_1.default,
+    WebpImageManipulationJob_1.default
 ];
-const rules = [
-    _ValidateCacheImageRequestRule.default,
-    _ValidateCacheImageRequestResizeTargetRule.default
-];
+const rules = [ValidateCacheImageRequestRule_1.default, ValidateCacheImageRequestResizeTargetRule_1.default];
 let MediaStreamModule = class MediaStreamModule {
 };
-MediaStreamModule = _ts_decorate([
-    (0, _common.Module)({
-        imports: [
-            _axios.HttpModule,
-            _schedule.ScheduleModule.forRoot(),
-            _tasksmodule.TasksModule
-        ],
+MediaStreamModule = __decorate([
+    (0, common_1.Module)({
+        imports: [axios_1.HttpModule, schedule_1.ScheduleModule.forRoot(), tasks_module_1.TasksModule],
         controllers,
-        providers: [
-            ...jobs,
-            ...rules,
-            ...operations
-        ]
+        providers: [...jobs, ...rules, ...operations]
     })
 ], MediaStreamModule);
-
+exports.default = MediaStreamModule;
 //# sourceMappingURL=MediaStreamModule.js.map

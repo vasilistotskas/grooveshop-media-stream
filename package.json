@@ -17,10 +17,10 @@
   ],
   "scripts": {
     "prebuild": "rimraf build/dist",
-    "build": "nest build --builder swc",
+    "build": "nest build",
     "format": "npx prettier --check \"src/**/*.ts\" \"src/test/**/*.ts\"",
     "format:fix": "npx prettier --write \"src/**/*.ts\" \"src/test/**/*.ts\"",
-    "start": "nest start --builder swc",
+    "start": "nest start",
     "dev": "nest start --tsc --watch",
     "dev:all": "ncu -u && bun i && bun run build && bun run format:fix && bun run lint:fix && bun run dev",
     "debug": "nest start --debug --watch",

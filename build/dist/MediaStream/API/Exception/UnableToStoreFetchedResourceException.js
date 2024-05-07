@@ -1,17 +1,9 @@
 "use strict";
-Object.defineProperty(exports, "__esModule", {
-    value: true
-});
-Object.defineProperty(exports, "default", {
-    enumerable: true,
-    get: function() {
-        return UnableToStoreFetchedResourceException;
-    }
-});
-let UnableToStoreFetchedResourceException = class UnableToStoreFetchedResourceException extends Error {
-    constructor(resource){
+Object.defineProperty(exports, "__esModule", { value: true });
+class UnableToStoreFetchedResourceException extends Error {
+    constructor(resource) {
         super(`Requested resource: ${resource} couldn't be stored`);
     }
-};
-
+}
+exports.default = UnableToStoreFetchedResourceException;
 //# sourceMappingURL=UnableToStoreFetchedResourceException.js.map

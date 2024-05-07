@@ -1,39 +1,39 @@
 "use strict";
-Object.defineProperty(exports, "__esModule", {
-    value: true
-});
-Object.defineProperty(exports, "default", {
-    enumerable: true,
-    get: function() {
-        return CacheImageResourceOperation;
-    }
-});
-const _axios = require("@nestjs/axios");
-const _common = require("@nestjs/common");
-const _fs = require("fs");
-const _ResourceMetaData = /*#__PURE__*/ _interop_require_default(require("../DTO/ResourceMetaData"));
-const _CacheImageRequest = require("../API/DTO/CacheImageRequest");
-const _FetchResourceResponseJob = /*#__PURE__*/ _interop_require_default(require("../Job/FetchResourceResponseJob"));
-const _WebpImageManipulationJob = /*#__PURE__*/ _interop_require_default(require("../Job/WebpImageManipulationJob"));
-const _ValidateCacheImageRequestRule = /*#__PURE__*/ _interop_require_default(require("../Rule/ValidateCacheImageRequestRule"));
-const _StoreResourceResponseToFileJob = /*#__PURE__*/ _interop_require_default(require("../Job/StoreResourceResponseToFileJob"));
-const _GenerateResourceIdentityFromRequestJob = /*#__PURE__*/ _interop_require_default(require("../Job/GenerateResourceIdentityFromRequestJob"));
-const _crypto = require("crypto");
-function _interop_require_default(obj) {
-    return obj && obj.__esModule ? obj : {
-        default: obj
-    };
-}
-function _ts_decorate(decorators, target, key, desc) {
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for(var i = decorators.length - 1; i >= 0; i--)if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
-}
-function _ts_metadata(k, v) {
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-}
-let CacheImageResourceOperation = class CacheImageResourceOperation {
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+var CacheImageResourceOperation_1;
+Object.defineProperty(exports, "__esModule", { value: true });
+const axios_1 = require("@nestjs/axios");
+const common_1 = require("@nestjs/common");
+const fs_1 = require("fs");
+const ResourceMetaData_1 = __importDefault(require("../DTO/ResourceMetaData"));
+const CacheImageRequest_1 = require("../API/DTO/CacheImageRequest");
+const FetchResourceResponseJob_1 = __importDefault(require("../Job/FetchResourceResponseJob"));
+const WebpImageManipulationJob_1 = __importDefault(require("../Job/WebpImageManipulationJob"));
+const ValidateCacheImageRequestRule_1 = __importDefault(require("../Rule/ValidateCacheImageRequestRule"));
+const StoreResourceResponseToFileJob_1 = __importDefault(require("../Job/StoreResourceResponseToFileJob"));
+const GenerateResourceIdentityFromRequestJob_1 = __importDefault(require("../Job/GenerateResourceIdentityFromRequestJob"));
+const crypto_1 = require("crypto");
+let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheImageResourceOperation {
+    constructor(httpService, validateCacheImageRequest, fetchResourceResponseJob, webpImageManipulationJob, storeResourceResponseToFileJob, generateResourceIdentityFromRequestJob) {
+        this.httpService = httpService;
+        this.validateCacheImageRequest = validateCacheImageRequest;
+        this.fetchResourceResponseJob = fetchResourceResponseJob;
+        this.webpImageManipulationJob = webpImageManipulationJob;
+        this.storeResourceResponseToFileJob = storeResourceResponseToFileJob;
+        this.generateResourceIdentityFromRequestJob = generateResourceIdentityFromRequestJob;
+        this.logger = new common_1.Logger(CacheImageResourceOperation_1.name);
+    }
     get getResourcePath() {
         return `${process.cwd()}/storage/${this.id}.rsc`;
     }
@@ -44,15 +44,18 @@ let CacheImageResourceOperation = class CacheImageResourceOperation {
         return `${process.cwd()}/storage/${this.id}.rsm`;
     }
     get resourceExists() {
-        if (!(0, _fs.existsSync)(this.getResourcePath)) return false;
-        if (!(0, _fs.existsSync)(this.getResourceMetaPath)) return false;
+        if (!(0, fs_1.existsSync)(this.getResourcePath))
+            return false;
+        if (!(0, fs_1.existsSync)(this.getResourceMetaPath))
+            return false;
         const headers = this.getHeaders;
-        if (!headers.version || 1 !== headers.version) return false;
+        if (!headers.version || 1 !== headers.version)
+            return false;
         return headers.dateCreated + headers.privateTTL > Date.now();
     }
     get getHeaders() {
         if (null === this.metaData) {
-            this.metaData = JSON.parse((0, _fs.readFileSync)(this.getResourceMetaPath));
+            this.metaData = JSON.parse((0, fs_1.readFileSync)(this.getResourceMetaPath));
         }
         return this.metaData;
     }
@@ -80,9 +83,9 @@ let CacheImageResourceOperation = class CacheImageResourceOperation {
         if (this.request.ttl) {
             resourceMetaDataOptions['privateTTL'] = this.request.ttl;
         }
-        this.metaData = new _ResourceMetaData.default(resourceMetaDataOptions);
-        (0, _fs.writeFileSync)(this.getResourceMetaPath, JSON.stringify(this.metaData));
-        (0, _fs.unlink)(this.getResourceTempPath, (err)=>{
+        this.metaData = new ResourceMetaData_1.default(resourceMetaDataOptions);
+        (0, fs_1.writeFileSync)(this.getResourceMetaPath, JSON.stringify(this.metaData));
+        (0, fs_1.unlink)(this.getResourceTempPath, (err) => {
             if (null !== err) {
                 this.logger.error(err);
             }
@@ -94,50 +97,38 @@ let CacheImageResourceOperation = class CacheImageResourceOperation {
         const optimizedImagePath = `${process.cwd()}/storage/${optimizedImageName}`;
         const resizeOptionsWithDefaults = {
             ...resizeOptions,
-            fit: _CacheImageRequest.FitOptions.contain,
-            position: _CacheImageRequest.PositionOptions.entropy,
-            format: _CacheImageRequest.SupportedResizeFormats.webp,
-            background: _CacheImageRequest.BackgroundOptions.transparent,
+            fit: CacheImageRequest_1.FitOptions.contain,
+            position: CacheImageRequest_1.PositionOptions.entropy,
+            format: CacheImageRequest_1.SupportedResizeFormats.webp,
+            background: CacheImageRequest_1.BackgroundOptions.transparent,
             trimThreshold: 5,
             quality: 100
         };
-        if (!(0, _fs.existsSync)(optimizedImagePath)) {
+        if (!(0, fs_1.existsSync)(optimizedImagePath)) {
             const defaultImagePath = `${process.cwd()}/public/default.png`;
             await this.webpImageManipulationJob.handle(defaultImagePath, optimizedImagePath, resizeOptionsWithDefaults);
         }
         return optimizedImagePath;
     }
     createOptionsString(resizeOptions) {
-        const sortedOptions = Object.keys(resizeOptions).sort().reduce((obj, key)=>{
+        const sortedOptions = Object.keys(resizeOptions)
+            .sort()
+            .reduce((obj, key) => {
             obj[key] = resizeOptions[key];
             return obj;
         }, {});
         const optionsString = JSON.stringify(sortedOptions);
-        return (0, _crypto.createHash)('md5').update(optionsString).digest('hex');
-    }
-    constructor(httpService, validateCacheImageRequest, fetchResourceResponseJob, webpImageManipulationJob, storeResourceResponseToFileJob, generateResourceIdentityFromRequestJob){
-        this.httpService = httpService;
-        this.validateCacheImageRequest = validateCacheImageRequest;
-        this.fetchResourceResponseJob = fetchResourceResponseJob;
-        this.webpImageManipulationJob = webpImageManipulationJob;
-        this.storeResourceResponseToFileJob = storeResourceResponseToFileJob;
-        this.generateResourceIdentityFromRequestJob = generateResourceIdentityFromRequestJob;
-        this.logger = new _common.Logger(CacheImageResourceOperation.name);
+        return (0, crypto_1.createHash)('md5').update(optionsString).digest('hex');
     }
 };
-CacheImageResourceOperation = _ts_decorate([
-    (0, _common.Injectable)({
-        scope: _common.Scope.REQUEST
-    }),
-    _ts_metadata("design:type", Function),
-    _ts_metadata("design:paramtypes", [
-        typeof _axios.HttpService === "undefined" ? Object : _axios.HttpService,
-        typeof _ValidateCacheImageRequestRule.default === "undefined" ? Object : _ValidateCacheImageRequestRule.default,
-        typeof _FetchResourceResponseJob.default === "undefined" ? Object : _FetchResourceResponseJob.default,
-        typeof _WebpImageManipulationJob.default === "undefined" ? Object : _WebpImageManipulationJob.default,
-        typeof _StoreResourceResponseToFileJob.default === "undefined" ? Object : _StoreResourceResponseToFileJob.default,
-        typeof _GenerateResourceIdentityFromRequestJob.default === "undefined" ? Object : _GenerateResourceIdentityFromRequestJob.default
-    ])
+CacheImageResourceOperation = CacheImageResourceOperation_1 = __decorate([
+    (0, common_1.Injectable)({ scope: common_1.Scope.REQUEST }),
+    __metadata("design:paramtypes", [axios_1.HttpService,
+        ValidateCacheImageRequestRule_1.default,
+        FetchResourceResponseJob_1.default,
+        WebpImageManipulationJob_1.default,
+        StoreResourceResponseToFileJob_1.default,
+        GenerateResourceIdentityFromRequestJob_1.default])
 ], CacheImageResourceOperation);
-
+exports.default = CacheImageResourceOperation;
 //# sourceMappingURL=CacheImageResourceOperation.js.map

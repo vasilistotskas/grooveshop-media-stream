@@ -1,44 +1,17 @@
 "use strict";
-Object.defineProperty(exports, "__esModule", {
-    value: true
-});
-function _export(target, all) {
-    for(var name in all)Object.defineProperty(target, name, {
-        enumerable: true,
-        get: all[name]
-    });
-}
-_export(exports, {
-    BackgroundOptions: function() {
-        return BackgroundOptions;
-    },
-    FitOptions: function() {
-        return FitOptions;
-    },
-    PositionOptions: function() {
-        return PositionOptions;
-    },
-    ResizeOptions: function() {
-        return ResizeOptions;
-    },
-    SupportedResizeFormats: function() {
-        return SupportedResizeFormats;
-    },
-    default: function() {
-        return CacheImageRequest;
-    }
-});
-const _lodash = require("lodash");
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ResizeOptions = exports.FitOptions = exports.BackgroundOptions = exports.PositionOptions = exports.SupportedResizeFormats = void 0;
+const lodash_1 = require("lodash");
 var SupportedResizeFormats;
-(function(SupportedResizeFormats) {
+(function (SupportedResizeFormats) {
     SupportedResizeFormats["webp"] = "webp";
     SupportedResizeFormats["jpeg"] = "jpeg";
     SupportedResizeFormats["png"] = "png";
     SupportedResizeFormats["gif"] = "gif";
     SupportedResizeFormats["tiff"] = "tiff";
-})(SupportedResizeFormats || (SupportedResizeFormats = {}));
+})(SupportedResizeFormats || (exports.SupportedResizeFormats = SupportedResizeFormats = {}));
 var PositionOptions;
-(function(PositionOptions) {
+(function (PositionOptions) {
     PositionOptions["centre"] = "centre";
     PositionOptions["center"] = "center";
     PositionOptions["left"] = "left";
@@ -55,23 +28,22 @@ var PositionOptions;
     PositionOptions["southeast"] = "southeast";
     PositionOptions["entropy"] = "entropy";
     PositionOptions["attention"] = "attention";
-})(PositionOptions || (PositionOptions = {}));
+})(PositionOptions || (exports.PositionOptions = PositionOptions = {}));
 var BackgroundOptions;
-(function(BackgroundOptions) {
+(function (BackgroundOptions) {
     BackgroundOptions["white"] = "#FFFFFF";
     BackgroundOptions["black"] = "#000000";
     BackgroundOptions["transparent"] = "transparent";
-})(BackgroundOptions || (BackgroundOptions = {}));
+})(BackgroundOptions || (exports.BackgroundOptions = BackgroundOptions = {}));
 var FitOptions;
-(function(FitOptions) {
+(function (FitOptions) {
     FitOptions["contain"] = "contain";
     FitOptions["cover"] = "cover";
     FitOptions["fill"] = "fill";
     FitOptions["inside"] = "inside";
     FitOptions["outside"] = "outside";
-})(FitOptions || (FitOptions = {}));
+})(FitOptions || (exports.FitOptions = FitOptions = {}));
 function parseColor(color) {
-    // Convert the background property from a hex color string to an RGBA color object
     if (typeof color === 'string') {
         if (color === 'transparent') {
             return {
@@ -85,14 +57,17 @@ function parseColor(color) {
             color = color.slice(1);
         }
         if (color.length === 3) {
-            color = color.split('').map(function(char) {
+            color = color
+                .split('')
+                .map(function (char) {
                 return char + char;
-            }).join('');
+            })
+                .join('');
         }
         const num = parseInt(color, 16);
         const colorToRgba = {
             r: num >> 16,
-            g: num >> 8 & 255,
+            g: (num >> 8) & 255,
             b: num & 255,
             alpha: 1
         };
@@ -100,14 +75,14 @@ function parseColor(color) {
     }
     return color;
 }
-let ResizeOptions = class ResizeOptions {
-    constructor(data){
+class ResizeOptions {
+    constructor(data) {
         this.width = null;
         this.height = null;
-        this.fit = "contain";
-        this.position = "entropy";
-        this.format = "webp";
-        this.background = "#FFFFFF";
+        this.fit = FitOptions.contain;
+        this.position = PositionOptions.entropy;
+        this.format = SupportedResizeFormats.webp;
+        this.background = BackgroundOptions.white;
         this.trimThreshold = null;
         this.quality = 100;
         const { width, height, trimThreshold, background, fit, position, format, quality, ...rest } = data || {};
@@ -115,23 +90,22 @@ let ResizeOptions = class ResizeOptions {
         this.height = height ?? null;
         this.trimThreshold = trimThreshold ? Number(trimThreshold) : null;
         this.background = typeof background === 'string' ? parseColor(background) : background;
-        this.fit = fit ?? "contain";
-        this.position = position ?? "entropy";
-        this.format = format ?? "webp";
+        this.fit = fit ?? FitOptions.contain;
+        this.position = position ?? PositionOptions.entropy;
+        this.format = format ?? SupportedResizeFormats.webp;
         this.quality = Number(quality) ?? 100;
         Object.assign(this, rest);
-        (0, _lodash.each)([
-            'width',
-            'height'
-        ], (sizeOption)=>{
-            if (null === data[sizeOption]) delete this[sizeOption];
+        (0, lodash_1.each)(['width', 'height'], (sizeOption) => {
+            if (null === data[sizeOption])
+                delete this[sizeOption];
         });
     }
-};
-let CacheImageRequest = class CacheImageRequest {
-    constructor(data){
+}
+exports.ResizeOptions = ResizeOptions;
+class CacheImageRequest {
+    constructor(data) {
         Object.assign(this, data);
     }
-};
-
+}
+exports.default = CacheImageRequest;
 //# sourceMappingURL=CacheImageRequest.js.map

@@ -1,19 +1,14 @@
 "use strict";
-Object.defineProperty(exports, "__esModule", {
-    value: true
-});
-const _core = require("@nestjs/core");
-const _MediaStreamModule = /*#__PURE__*/ _interop_require_default(require("./MediaStream/Module/MediaStreamModule"));
-function _interop_require_default(obj) {
-    return obj && obj.__esModule ? obj : {
-        default: obj
-    };
-}
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const core_1 = require("@nestjs/core");
+const MediaStreamModule_1 = __importDefault(require("./MediaStream/Module/MediaStreamModule"));
 async function bootstrap() {
-    const app = await _core.NestFactory.create(_MediaStreamModule.default);
+    const app = await core_1.NestFactory.create(MediaStreamModule_1.default);
     app.useStaticAssets('public');
     await app.listen(3003);
 }
 bootstrap();
-
 //# sourceMappingURL=main.js.map

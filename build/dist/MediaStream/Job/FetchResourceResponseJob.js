@@ -1,25 +1,22 @@
 "use strict";
-Object.defineProperty(exports, "__esModule", {
-    value: true
-});
-Object.defineProperty(exports, "default", {
-    enumerable: true,
-    get: function() {
-        return FetchResourceResponseJob;
-    }
-});
-const _axios = require("@nestjs/axios");
-const _common = require("@nestjs/common");
-function _ts_decorate(decorators, target, key, desc) {
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for(var i = decorators.length - 1; i >= 0; i--)if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
-}
-function _ts_metadata(k, v) {
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-}
-let FetchResourceResponseJob = class FetchResourceResponseJob {
+};
+var FetchResourceResponseJob_1;
+Object.defineProperty(exports, "__esModule", { value: true });
+const axios_1 = require("@nestjs/axios");
+const common_1 = require("@nestjs/common");
+let FetchResourceResponseJob = FetchResourceResponseJob_1 = class FetchResourceResponseJob {
+    constructor(httpService) {
+        this.httpService = httpService;
+        this.logger = new common_1.Logger(FetchResourceResponseJob_1.name);
+    }
     async handle(request) {
         try {
             return await this.httpService.axiosRef({
@@ -27,8 +24,8 @@ let FetchResourceResponseJob = class FetchResourceResponseJob {
                 method: 'GET',
                 responseType: 'stream'
             });
-        } catch (error) {
-            // Return a 404 Bad Request response
+        }
+        catch (error) {
             this.logger.error(error);
             return {
                 status: 404,
@@ -39,19 +36,10 @@ let FetchResourceResponseJob = class FetchResourceResponseJob {
             };
         }
     }
-    constructor(httpService){
-        this.httpService = httpService;
-        this.logger = new _common.Logger(FetchResourceResponseJob.name);
-    }
 };
-FetchResourceResponseJob = _ts_decorate([
-    (0, _common.Injectable)({
-        scope: _common.Scope.REQUEST
-    }),
-    _ts_metadata("design:type", Function),
-    _ts_metadata("design:paramtypes", [
-        typeof _axios.HttpService === "undefined" ? Object : _axios.HttpService
-    ])
+FetchResourceResponseJob = FetchResourceResponseJob_1 = __decorate([
+    (0, common_1.Injectable)({ scope: common_1.Scope.REQUEST }),
+    __metadata("design:paramtypes", [axios_1.HttpService])
 ], FetchResourceResponseJob);
-
+exports.default = FetchResourceResponseJob;
 //# sourceMappingURL=FetchResourceResponseJob.js.map

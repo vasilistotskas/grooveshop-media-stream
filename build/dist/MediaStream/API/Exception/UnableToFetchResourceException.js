@@ -1,17 +1,9 @@
 "use strict";
-Object.defineProperty(exports, "__esModule", {
-    value: true
-});
-Object.defineProperty(exports, "default", {
-    enumerable: true,
-    get: function() {
-        return UnableToFetchResourceException;
-    }
-});
-let UnableToFetchResourceException = class UnableToFetchResourceException extends Error {
-    constructor(resource){
+Object.defineProperty(exports, "__esModule", { value: true });
+class UnableToFetchResourceException extends Error {
+    constructor(resource) {
         super(`Requested resource: ${resource} couldn't be fetched`);
     }
-};
-
+}
+exports.default = UnableToFetchResourceException;
 //# sourceMappingURL=UnableToFetchResourceException.js.map
