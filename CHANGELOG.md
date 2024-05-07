@@ -1,3 +1,10 @@
+## [1.60.4](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.60.3...v1.60.4) (2024-05-07)
+
+
+### Bug Fixes
+
+* dont use swc builder ([89a3427](https://github.com/vasilistotskas/grooveshop-media-stream/commit/89a34271428d94faabcdf14c6ebbd5b4d271d8e3))
+
 ## [1.60.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.60.2...v1.60.3) (2024-05-07)
 
 
