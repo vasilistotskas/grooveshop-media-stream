@@ -4,28 +4,31 @@ Dockerfile*
 docker-compose*
 .dockerignore
 
-# Nest specific
-node_modules
-build/
-/var/
-
 # Git files
 .git
 .gitignore
+.gitattributes
 
 # macOS specific files
 .DS_Store
 
 # IDE / Editor directories
+.editorconfig
 .idea
 .vscode
+
+# Nest dev/build outputs
+build/
+/var/
 
 # Tests
 coverage*
 
+# Node dependencies
+node_modules
+
 # Others
 .env
-.editorconfig
 README.md
 LICENSE
 Makefile
