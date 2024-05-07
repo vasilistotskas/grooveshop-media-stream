@@ -1,3 +1,10 @@
+## [1.60.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.60.1...v1.60.2) (2024-05-07)
+
+
+### Bug Fixes
+
+* **Dockerfile:** Fix test ([4b76af9](https://github.com/vasilistotskas/grooveshop-media-stream/commit/4b76af953f313ea81897f5a5b030f82fca98f11a))
+
 ## [1.60.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.60.0...v1.60.1) (2024-05-07)
 
 
