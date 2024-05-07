@@ -22,7 +22,7 @@
     "format:fix": "npx prettier --write \"src/**/*.ts\" \"src/test/**/*.ts\"",
     "start": "nest start --builder swc",
     "dev": "nest start --tsc --watch",
-    "dev:all": "ncu -u && pnpm i && pnpm run build && pnpm run format:fix && pnpm run lint:fix && pnpm run dev",
+    "dev:all": "ncu -u && bun i && bun run build && bun run format:fix && bun run lint:fix && bun run dev",
     "debug": "nest start --debug --watch",
     "prod": "node build/dist/main",
     "repl": "nest start --watch --entryFile repl",
@@ -63,11 +63,11 @@
     "@semantic-release/npm": "12.0.0",
     "@semantic-release/release-notes-generator": "13.0.0",
     "@swc/cli": "0.3.12",
-    "@swc/core": "1.5.0",
+    "@swc/core": "1.5.3",
     "@types/express": "4.17.21",
     "@types/jest": "29.5.12",
     "@types/lodash": "4.17.1",
-    "@types/node": "20.12.8",
+    "@types/node": "20.12.10",
     "@types/sharp": "0.31.1",
     "@types/supertest": "6.0.2",
     "@types/uuid": "9.0.8",
@@ -132,10 +132,8 @@
   },
   "engines": {
     "node": ">=20.12.2",
-    "npm": ">=10.7.0",
-    "pnpm": "^9.0.0"
+    "npm": ">=10.7.0"
   },
-  "packageManager": "pnpm@9.1.0",
   "_moduleAliases": {
     "@microservice": "./build/dist"
   }

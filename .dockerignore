@@ -1,9 +1,11 @@
 # Docker
 dev.Dockerfile
-Dockerfile
+Dockerfile*
+docker-compose*
+.dockerignore
 
 # Nest specific
-node_modules/
+node_modules
 build/
 /var/
 
@@ -15,7 +17,16 @@ build/
 .DS_Store
 
 # IDE / Editor directories
-.idea/
+.idea
+.vscode
 
 # Tests
-coverage
+coverage*
+
+# Others
+.env
+.editorconfig
+README.md
+LICENSE
+Makefile
+helm-charts
