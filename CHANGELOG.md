@@ -1,3 +1,18 @@
+# [1.60.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.59.0...v1.60.0) (2024-05-07)
+
+
+### Bug Fixes
+
+* **ci.yml:** Add testing step ([6eceb7a](https://github.com/vasilistotskas/grooveshop-media-stream/commit/6eceb7ace26452852a8c35844dc6d4b84294066c))
+* **ci.yml:** Fix node version ([81602ed](https://github.com/vasilistotskas/grooveshop-media-stream/commit/81602ed8d06f3bbf4be521c6c65400fbe5132207))
+* **ci.yml:** Fix node version ([53b450a](https://github.com/vasilistotskas/grooveshop-media-stream/commit/53b450a86706113b00fb8aafdf0a6b9df196a236))
+* **ci.yml:** Fix node version ([f7e5118](https://github.com/vasilistotskas/grooveshop-media-stream/commit/f7e5118d77f42358c4afd23ba64c675423420f82))
+
+
+### Features
+
+* Replace `pnpm` with `bun` ([dbbf94d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/dbbf94d3c8661400b8e94585019fc2f280345167))
+
 # [1.59.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.58.0...v1.59.0) (2024-05-06)
 
 
