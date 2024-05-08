@@ -1,3 +1,10 @@
+# [1.62.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.61.0...v1.62.0) (2024-05-08)
+
+
+### Features
+
+* Bump node ([67f1071](https://github.com/vasilistotskas/grooveshop-media-stream/commit/67f1071ba6d6cbde44988b915cbe5a00b5f2e9d1))
+
 # [1.61.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.60.7...v1.61.0) (2024-05-08)
 
 
