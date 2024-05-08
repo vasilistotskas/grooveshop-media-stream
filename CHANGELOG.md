@@ -1,3 +1,10 @@
+# [1.61.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.60.7...v1.61.0) (2024-05-08)
+
+
+### Features
+
+* Replace `bun` with `pnpm` ([9159641](https://github.com/vasilistotskas/grooveshop-media-stream/commit/91596412fce90468a9e0b9b673f92f5571d2a0be))
+
 ## [1.60.7](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.60.6...v1.60.7) (2024-05-07)
 
 
