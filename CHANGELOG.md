@@ -1,3 +1,10 @@
+# [1.64.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.63.0...v1.64.0) (2024-05-13)
+
+
+### Features
+
+* update `package.json` ([f2110b7](https://github.com/vasilistotskas/grooveshop-media-stream/commit/f2110b7b5cbddc11911830d2756fad0c4d561700))
+
 # [1.63.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.62.0...v1.63.0) (2024-05-13)
 
 
