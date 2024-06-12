@@ -1,3 +1,10 @@
+# [1.67.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.66.0...v1.67.0) (2024-06-12)
+
+
+### Features
+
+* Bump Versions / Node version bump to 22.3.0 ([fafc65d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/fafc65d95227a9c7896207d7cef86587b2a838cf))
+
 # [1.66.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.65.0...v1.66.0) (2024-06-01)
 
 
