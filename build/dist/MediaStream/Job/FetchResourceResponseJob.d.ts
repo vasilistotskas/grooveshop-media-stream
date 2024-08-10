@@ -1,6 +1,6 @@
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { HttpService } from '@nestjs/axios';
-import CacheImageRequest from '@microservice/API/DTO/CacheImageRequest';
+import type CacheImageRequest from '@microservice/API/DTO/CacheImageRequest';
 export default class FetchResourceResponseJob {
     private readonly httpService;
     private readonly logger;

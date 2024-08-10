@@ -31,11 +31,15 @@ var __importStar = (this && this.__importStar) || function (mod) {
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
+var StoreResourceResponseToFileJob_1;
 Object.defineProperty(exports, "__esModule", { value: true });
-const fs = __importStar(require("fs"));
+const fs = __importStar(require("node:fs"));
 const common_1 = require("@nestjs/common");
 const UnableToStoreFetchedResourceException_1 = __importDefault(require("../API/Exception/UnableToStoreFetchedResourceException"));
-let StoreResourceResponseToFileJob = class StoreResourceResponseToFileJob {
+let StoreResourceResponseToFileJob = StoreResourceResponseToFileJob_1 = class StoreResourceResponseToFileJob {
+    constructor() {
+        this.logger = new common_1.Logger(StoreResourceResponseToFileJob_1.name);
+    }
     async handle(resourceName, path, response) {
         const fileStream = fs.createWriteStream(path);
         try {
@@ -45,11 +49,12 @@ let StoreResourceResponseToFileJob = class StoreResourceResponseToFileJob {
             });
         }
         catch (e) {
+            this.logger.error(e);
             throw new UnableToStoreFetchedResourceException_1.default(resourceName);
         }
     }
 };
-StoreResourceResponseToFileJob = __decorate([
+StoreResourceResponseToFileJob = StoreResourceResponseToFileJob_1 = __decorate([
     (0, common_1.Injectable)({ scope: common_1.Scope.REQUEST })
 ], StoreResourceResponseToFileJob);
 exports.default = StoreResourceResponseToFileJob;

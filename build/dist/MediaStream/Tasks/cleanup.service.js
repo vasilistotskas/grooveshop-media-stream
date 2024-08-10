@@ -34,16 +34,17 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var CleanupService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CleanupService = void 0;
+const fs = __importStar(require("node:fs/promises"));
+const path = __importStar(require("node:path"));
+const node_process_1 = require("node:process");
 const common_1 = require("@nestjs/common");
 const schedule_1 = require("@nestjs/schedule");
-const fs = __importStar(require("fs/promises"));
-const path = __importStar(require("path"));
 let CleanupService = CleanupService_1 = class CleanupService {
     constructor() {
         this.logger = new common_1.Logger(CleanupService_1.name);
     }
     async handleCleanup() {
-        const projectRoot = process.cwd();
+        const projectRoot = (0, node_process_1.cwd)();
         const directoryPath = path.join(projectRoot, 'storage');
         let deletedFilesCount = 0;
         try {
@@ -64,7 +65,7 @@ let CleanupService = CleanupService_1 = class CleanupService {
 exports.CleanupService = CleanupService;
 __decorate([
     (0, schedule_1.Cron)(schedule_1.CronExpression.EVERY_WEEK, {
-        name: 'cleanup'
+        name: 'cleanup',
     }),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),

@@ -1,21 +1,24 @@
+import { existsSync, readFileSync, unlink, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { cwd } from 'node:process'
 import { HttpService } from '@nestjs/axios'
-import { Injectable, Scope, Logger } from '@nestjs/common'
-import { existsSync, readFileSync, unlink, writeFileSync } from 'fs'
+import { Injectable, Logger, Scope } from '@nestjs/common'
 import ResourceMetaData from '@microservice/DTO/ResourceMetaData'
+import type {
+	ResizeOptions,
+} from '@microservice/API/DTO/CacheImageRequest'
 import CacheImageRequest, {
 	BackgroundOptions,
 	FitOptions,
 	PositionOptions,
-	ResizeOptions,
-	SupportedResizeFormats
+	SupportedResizeFormats,
 } from '@microservice/API/DTO/CacheImageRequest'
-import { ResourceIdentifierKP } from '@microservice/Constant/KeyProperties'
+import type { ResourceIdentifierKP } from '@microservice/Constant/KeyProperties'
 import FetchResourceResponseJob from '@microservice/Job/FetchResourceResponseJob'
 import WebpImageManipulationJob from '@microservice/Job/WebpImageManipulationJob'
 import ValidateCacheImageRequestRule from '@microservice/Rule/ValidateCacheImageRequestRule'
 import StoreResourceResponseToFileJob from '@microservice/Job/StoreResourceResponseToFileJob'
 import GenerateResourceIdentityFromRequestJob from '@microservice/Job/GenerateResourceIdentityFromRequestJob'
-import { createHash } from 'crypto'
 
 @Injectable({ scope: Scope.REQUEST })
 export default class CacheImageResourceOperation {
@@ -27,7 +30,7 @@ export default class CacheImageResourceOperation {
 		private readonly fetchResourceResponseJob: FetchResourceResponseJob,
 		private readonly webpImageManipulationJob: WebpImageManipulationJob,
 		private readonly storeResourceResponseToFileJob: StoreResourceResponseToFileJob,
-		private readonly generateResourceIdentityFromRequestJob: GenerateResourceIdentityFromRequestJob
+		private readonly generateResourceIdentityFromRequestJob: GenerateResourceIdentityFromRequestJob,
 	) {}
 
 	request: CacheImageRequest
@@ -37,31 +40,34 @@ export default class CacheImageResourceOperation {
 	metaData: ResourceMetaData
 
 	get getResourcePath(): string {
-		return `${process.cwd()}/storage/${this.id}.rsc`
+		return `${cwd()}/storage/${this.id}.rsc`
 	}
 
 	get getResourceTempPath(): string {
-		return `${process.cwd()}/storage/${this.id}.rst`
+		return `${cwd()}/storage/${this.id}.rst`
 	}
 
 	get getResourceMetaPath(): string {
-		return `${process.cwd()}/storage/${this.id}.rsm`
+		return `${cwd()}/storage/${this.id}.rsm`
 	}
 
 	get resourceExists(): boolean {
-		if (!existsSync(this.getResourcePath)) return false
+		if (!existsSync(this.getResourcePath))
+			return false
 
-		if (!existsSync(this.getResourceMetaPath)) return false
+		if (!existsSync(this.getResourceMetaPath))
+			return false
 
 		const headers = this.getHeaders
 
-		if (!headers.version || 1 !== headers.version) return false
+		if (!headers.version || headers.version !== 1)
+			return false
 
 		return headers.dateCreated + headers.privateTTL > Date.now()
 	}
 
 	get getHeaders(): ResourceMetaData {
-		if (null === this.metaData) {
+		if (this.metaData === null) {
 			this.metaData = JSON.parse(readFileSync(this.getResourceMetaPath) as unknown as string)
 		}
 
@@ -86,7 +92,7 @@ export default class CacheImageResourceOperation {
 		const manipulationResult = await this.webpImageManipulationJob.handle(
 			this.getResourceTempPath,
 			this.getResourcePath,
-			this.request.resizeOptions
+			this.request.resizeOptions,
 		)
 
 		const resourceMetaDataOptions = {
@@ -94,16 +100,16 @@ export default class CacheImageResourceOperation {
 			format: manipulationResult.format,
 			p: this.request.ttl,
 			dateCreated: Date.now(),
-			publicTTL: 12 * 30 * 24 * 60 * 60 * 1000
+			publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
 		} as unknown as ResourceMetaData
 		if (this.request.ttl) {
-			resourceMetaDataOptions['privateTTL'] = this.request.ttl
+			resourceMetaDataOptions.privateTTL = this.request.ttl
 		}
 		this.metaData = new ResourceMetaData(resourceMetaDataOptions)
 
 		writeFileSync(this.getResourceMetaPath, JSON.stringify(this.metaData))
 		unlink(this.getResourceTempPath, (err) => {
-			if (null !== err) {
+			if (err !== null) {
 				this.logger.error(err)
 			}
 		})
@@ -112,7 +118,7 @@ export default class CacheImageResourceOperation {
 	public async optimizeAndServeDefaultImage(resizeOptions: ResizeOptions): Promise<string> {
 		const optionsString = this.createOptionsString(resizeOptions)
 		const optimizedImageName = `default_optimized_${optionsString}.webp`
-		const optimizedImagePath = `${process.cwd()}/storage/${optimizedImageName}`
+		const optimizedImagePath = `${cwd()}/storage/${optimizedImageName}`
 
 		const resizeOptionsWithDefaults = {
 			...resizeOptions,
@@ -121,11 +127,11 @@ export default class CacheImageResourceOperation {
 			format: SupportedResizeFormats.webp,
 			background: BackgroundOptions.transparent,
 			trimThreshold: 5,
-			quality: 100
+			quality: 100,
 		}
 
 		if (!existsSync(optimizedImagePath)) {
-			const defaultImagePath = `${process.cwd()}/public/default.png`
+			const defaultImagePath = `${cwd()}/public/default.png`
 			await this.webpImageManipulationJob.handle(defaultImagePath, optimizedImagePath, resizeOptionsWithDefaults)
 		}
 

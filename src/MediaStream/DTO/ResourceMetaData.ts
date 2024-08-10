@@ -11,9 +11,12 @@ export default class ResourceMetaData {
 	publicTTL: number
 
 	constructor(data?: Partial<ResourceMetaData>) {
-		if (!data.version) this.version = resourceMetaVersion
-		if (!data.publicTTL) this.publicTTL = defaultPublicTTL
-		if (!data.privateTTL) this.privateTTL = defaultPrivateTTL
+		if (!data.version)
+			this.version = resourceMetaVersion
+		if (!data.publicTTL)
+			this.publicTTL = defaultPublicTTL
+		if (!data.privateTTL)
+			this.privateTTL = defaultPrivateTTL
 		Object.assign(this, data)
 	}
 }

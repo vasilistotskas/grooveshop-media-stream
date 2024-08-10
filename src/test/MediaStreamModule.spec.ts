@@ -1,4 +1,5 @@
-import { Test, TestingModule } from '@nestjs/testing'
+import type { TestingModule } from '@nestjs/testing'
+import { Test } from '@nestjs/testing'
 import MediaStreamImageRESTController from '@microservice/API/Controller/MediaStreamImageRESTController'
 import { HttpService } from '@nestjs/axios'
 import GenerateResourceIdentityFromRequestJob from '@microservice/Job/GenerateResourceIdentityFromRequestJob'
@@ -9,7 +10,7 @@ import StoreResourceResponseToFileJob from '@microservice/Job/StoreResourceRespo
 import ValidateCacheImageRequestRule from '@microservice/Rule/ValidateCacheImageRequestRule'
 import ValidateCacheImageRequestResizeTargetRule from '@microservice/Rule/ValidateCacheImageRequestResizeTargetRule'
 
-describe('MediaStreamModule', () => {
+describe('mediaStreamModule', () => {
 	let module: TestingModule
 	let controller: MediaStreamImageRESTController
 
@@ -24,8 +25,8 @@ describe('MediaStreamModule', () => {
 				WebpImageManipulationJob,
 				StoreResourceResponseToFileJob,
 				ValidateCacheImageRequestRule,
-				ValidateCacheImageRequestResizeTargetRule
-			]
+				ValidateCacheImageRequestResizeTargetRule,
+			],
 		}).compile()
 
 		controller = await module.resolve<MediaStreamImageRESTController>(MediaStreamImageRESTController)

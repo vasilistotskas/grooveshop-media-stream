@@ -16,13 +16,14 @@ let FetchResourceResponseJob = FetchResourceResponseJob_1 = class FetchResourceR
     constructor(httpService) {
         this.httpService = httpService;
         this.logger = new common_1.Logger(FetchResourceResponseJob_1.name);
+        this.logger.log('HttpService has been injected successfully');
     }
     async handle(request) {
         try {
             return await this.httpService.axiosRef({
                 url: request.resourceTarget,
                 method: 'GET',
-                responseType: 'stream'
+                responseType: 'stream',
             });
         }
         catch (error) {
@@ -32,7 +33,7 @@ let FetchResourceResponseJob = FetchResourceResponseJob_1 = class FetchResourceR
                 statusText: 'Bad Request',
                 headers: {},
                 config: error.config,
-                data: null
+                data: null,
             };
         }
     }

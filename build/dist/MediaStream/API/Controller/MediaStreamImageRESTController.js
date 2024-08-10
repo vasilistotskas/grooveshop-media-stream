@@ -39,14 +39,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 var MediaStreamImageRESTController_1;
 Object.defineProperty(exports, "__esModule", { value: true });
-const fs_1 = require("fs");
+const node_fs_1 = require("node:fs");
+const process = __importStar(require("node:process"));
 const axios_1 = require("@nestjs/axios");
 const common_1 = require("@nestjs/common");
 const RoutePrefixes_1 = require("../../Constant/RoutePrefixes");
 const CacheImageResourceOperation_1 = __importDefault(require("../../Operation/CacheImageResourceOperation"));
 const CacheImageRequest_1 = __importStar(require("../DTO/CacheImageRequest"));
 const GenerateResourceIdentityFromRequestJob_1 = __importDefault(require("../../Job/GenerateResourceIdentityFromRequestJob"));
-const process = __importStar(require("process"));
 let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class MediaStreamImageRESTController {
     constructor(httpService, generateResourceIdentityFromRequestJob, cacheImageResourceOperation) {
         this.httpService = httpService;
@@ -67,7 +67,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
         if (this.cacheImageResourceOperation.resourceExists) {
             const headers = this.cacheImageResourceOperation.getHeaders;
             res = MediaStreamImageRESTController_1.addHeadersToRequest(res, headers);
-            const stream = (0, fs_1.createReadStream)(this.cacheImageResourceOperation.getResourcePath).pipe(res);
+            const stream = (0, node_fs_1.createReadStream)(this.cacheImageResourceOperation.getResourcePath).pipe(res);
             try {
                 await new Promise((resolve, reject) => {
                     stream.on('finish', () => resolve);
@@ -86,7 +86,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                 await this.cacheImageResourceOperation.execute();
                 const headers = this.cacheImageResourceOperation.getHeaders;
                 res = MediaStreamImageRESTController_1.addHeadersToRequest(res, headers);
-                (0, fs_1.createReadStream)(this.cacheImageResourceOperation.getResourcePath).pipe(res);
+                (0, node_fs_1.createReadStream)(this.cacheImageResourceOperation.getResourcePath).pipe(res);
             }
             catch (e) {
                 this.logger.warn(e);
@@ -116,12 +116,12 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
             fit,
             trimThreshold,
             format,
-            quality
+            quality,
         });
         const djangoApiUrl = process.env.NEST_PUBLIC_DJANGO_URL || 'http://localhost:8000';
         const request = new CacheImageRequest_1.default({
             resourceTarget: MediaStreamImageRESTController_1.resourceTargetPrepare(`${djangoApiUrl}/media/uploads/${imageType}/${image}`),
-            resizeOptions: resizeOptions
+            resizeOptions,
         });
         await this.streamRequestedResource(request, res);
     }
@@ -137,8 +137,8 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                 fit,
                 trimThreshold,
                 format,
-                quality
-            })
+                quality,
+            }),
         });
         await this.streamRequestedResource(request, res);
     }
@@ -154,8 +154,8 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                 fit,
                 trimThreshold,
                 format,
-                quality
-            })
+                quality,
+            }),
         });
         await this.streamRequestedResource(request, res);
     }
@@ -213,7 +213,7 @@ MediaStreamImageRESTController = MediaStreamImageRESTController_1 = __decorate([
     (0, common_1.Controller)({
         path: RoutePrefixes_1.IMAGE,
         version: RoutePrefixes_1.VERSION,
-        scope: common_1.Scope.REQUEST
+        scope: common_1.Scope.REQUEST,
     }),
     __metadata("design:paramtypes", [axios_1.HttpService,
         GenerateResourceIdentityFromRequestJob_1.default,

@@ -1,8 +1,8 @@
 import { v5 as uuid5 } from 'uuid'
 import { cloneDeep } from 'lodash'
 import { Injectable, Scope } from '@nestjs/common'
-import CacheImageRequest from '@microservice/API/DTO/CacheImageRequest'
-import { ResourceIdentifierKP } from '@microservice/Constant/KeyProperties'
+import type CacheImageRequest from '@microservice/API/DTO/CacheImageRequest'
+import type { ResourceIdentifierKP } from '@microservice/Constant/KeyProperties'
 
 @Injectable({ scope: Scope.REQUEST })
 export default class GenerateResourceIdentityFromRequestJob {

@@ -1,6 +1,6 @@
-import { Response } from 'express';
+import type { Response } from 'express';
 import { HttpService } from '@nestjs/axios';
-import ResourceMetaData from '@microservice/DTO/ResourceMetaData';
+import type ResourceMetaData from '@microservice/DTO/ResourceMetaData';
 import CacheImageResourceOperation from '@microservice/Operation/CacheImageResourceOperation';
 import { BackgroundOptions, FitOptions, PositionOptions, SupportedResizeFormats } from '@microservice/API/DTO/CacheImageRequest';
 import GenerateResourceIdentityFromRequestJob from '@microservice/Job/GenerateResourceIdentityFromRequestJob';

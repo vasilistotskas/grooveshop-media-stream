@@ -1,17 +1,18 @@
+import * as fs from 'node:fs/promises'
+import * as path from 'node:path'
+import { cwd } from 'node:process'
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
-import * as fs from 'fs/promises'
-import * as path from 'path'
 
 @Injectable()
 export class CleanupService {
 	private readonly logger = new Logger(CleanupService.name)
 
 	@Cron(CronExpression.EVERY_WEEK, {
-		name: 'cleanup'
+		name: 'cleanup',
 	})
-	async handleCleanup() {
-		const projectRoot = process.cwd()
+	async handleCleanup(): Promise<void> {
+		const projectRoot = cwd()
 		const directoryPath = path.join(projectRoot, 'storage')
 		let deletedFilesCount = 0
 
@@ -24,7 +25,8 @@ export class CleanupService {
 				}
 			}
 			this.logger.log(`${deletedFilesCount} files deleted.`)
-		} catch (err) {
+		}
+		catch (err) {
 			this.logger.error(`Error during cleanup: ${err}`)
 		}
 	}

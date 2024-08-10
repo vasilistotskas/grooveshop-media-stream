@@ -1,7 +1,8 @@
 import { HttpService } from '@nestjs/axios';
 import ResourceMetaData from '@microservice/DTO/ResourceMetaData';
-import CacheImageRequest, { ResizeOptions } from '@microservice/API/DTO/CacheImageRequest';
-import { ResourceIdentifierKP } from '@microservice/Constant/KeyProperties';
+import type { ResizeOptions } from '@microservice/API/DTO/CacheImageRequest';
+import CacheImageRequest from '@microservice/API/DTO/CacheImageRequest';
+import type { ResourceIdentifierKP } from '@microservice/Constant/KeyProperties';
 import FetchResourceResponseJob from '@microservice/Job/FetchResourceResponseJob';
 import WebpImageManipulationJob from '@microservice/Job/WebpImageManipulationJob';
 import ValidateCacheImageRequestRule from '@microservice/Rule/ValidateCacheImageRequestRule';

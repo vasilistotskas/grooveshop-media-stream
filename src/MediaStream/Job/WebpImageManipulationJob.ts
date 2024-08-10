@@ -1,6 +1,6 @@
 import { each } from 'lodash'
 import { Injectable, Scope } from '@nestjs/common'
-import { ResizeOptions } from '@microservice/API/DTO/CacheImageRequest'
+import type { ResizeOptions } from '@microservice/API/DTO/CacheImageRequest'
 import ManipulationJobResult from '@microservice/DTO/ManipulationJobResult'
 import sharp from 'sharp'
 
@@ -30,13 +30,13 @@ export default class WebpImageManipulationJob {
 
 		const resizeScales: Record<string, number> = {}
 		each(['width', 'height'], (scale) => {
-			if (null !== options[scale] && !isNaN(options[scale])) {
+			if (options[scale] !== null && !Number.isNaN(options[scale])) {
 				resizeScales[scale] = Number(options[scale])
 			}
 		})
 
 		if (Object.keys(resizeScales).length > 0) {
-			if (null !== options.trimThreshold && !isNaN(options.trimThreshold)) {
+			if (options.trimThreshold !== null && !Number.isNaN(options.trimThreshold)) {
 				manipulation.trim({ background: options.background, threshold: Number(options.trimThreshold) })
 			}
 
@@ -44,7 +44,7 @@ export default class WebpImageManipulationJob {
 				...resizeScales,
 				fit: options.fit,
 				position: options.position,
-				background: options.background
+				background: options.background,
 			})
 		}
 
@@ -52,7 +52,7 @@ export default class WebpImageManipulationJob {
 
 		return new ManipulationJobResult({
 			size: String(manipulatedFile.size),
-			format: manipulatedFile.format
+			format: manipulatedFile.format,
 		})
 	}
 }

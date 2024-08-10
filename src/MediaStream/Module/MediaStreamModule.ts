@@ -19,7 +19,7 @@ const jobs = [
 	GenerateResourceIdentityFromRequestJob,
 	FetchResourceResponseJob,
 	StoreResourceResponseToFileJob,
-	WebpImageManipulationJob
+	WebpImageManipulationJob,
 ]
 
 const rules = [ValidateCacheImageRequestRule, ValidateCacheImageRequestResizeTargetRule]
@@ -27,6 +27,6 @@ const rules = [ValidateCacheImageRequestRule, ValidateCacheImageRequestResizeTar
 @Module({
 	imports: [HttpModule, ScheduleModule.forRoot(), TasksModule],
 	controllers,
-	providers: [...jobs, ...rules, ...operations]
+	providers: [...jobs, ...rules, ...operations],
 })
 export default class MediaStreamModule {}

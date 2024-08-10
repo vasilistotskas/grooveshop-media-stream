@@ -27,7 +27,7 @@ const jobs = [
     GenerateResourceIdentityFromRequestJob_1.default,
     FetchResourceResponseJob_1.default,
     StoreResourceResponseToFileJob_1.default,
-    WebpImageManipulationJob_1.default
+    WebpImageManipulationJob_1.default,
 ];
 const rules = [ValidateCacheImageRequestRule_1.default, ValidateCacheImageRequestResizeTargetRule_1.default];
 let MediaStreamModule = class MediaStreamModule {
@@ -36,7 +36,7 @@ MediaStreamModule = __decorate([
     (0, common_1.Module)({
         imports: [axios_1.HttpModule, schedule_1.ScheduleModule.forRoot(), tasks_module_1.TasksModule],
         controllers,
-        providers: [...jobs, ...rules, ...operations]
+        providers: [...jobs, ...rules, ...operations],
     })
 ], MediaStreamModule);
 exports.default = MediaStreamModule;

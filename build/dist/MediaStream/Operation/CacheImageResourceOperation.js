@@ -13,9 +13,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 var CacheImageResourceOperation_1;
 Object.defineProperty(exports, "__esModule", { value: true });
+const node_fs_1 = require("node:fs");
+const node_crypto_1 = require("node:crypto");
+const node_process_1 = require("node:process");
 const axios_1 = require("@nestjs/axios");
 const common_1 = require("@nestjs/common");
-const fs_1 = require("fs");
 const ResourceMetaData_1 = __importDefault(require("../DTO/ResourceMetaData"));
 const CacheImageRequest_1 = require("../API/DTO/CacheImageRequest");
 const FetchResourceResponseJob_1 = __importDefault(require("../Job/FetchResourceResponseJob"));
@@ -23,7 +25,6 @@ const WebpImageManipulationJob_1 = __importDefault(require("../Job/WebpImageMani
 const ValidateCacheImageRequestRule_1 = __importDefault(require("../Rule/ValidateCacheImageRequestRule"));
 const StoreResourceResponseToFileJob_1 = __importDefault(require("../Job/StoreResourceResponseToFileJob"));
 const GenerateResourceIdentityFromRequestJob_1 = __importDefault(require("../Job/GenerateResourceIdentityFromRequestJob"));
-const crypto_1 = require("crypto");
 let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheImageResourceOperation {
     constructor(httpService, validateCacheImageRequest, fetchResourceResponseJob, webpImageManipulationJob, storeResourceResponseToFileJob, generateResourceIdentityFromRequestJob) {
         this.httpService = httpService;
@@ -35,27 +36,27 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
         this.logger = new common_1.Logger(CacheImageResourceOperation_1.name);
     }
     get getResourcePath() {
-        return `${process.cwd()}/storage/${this.id}.rsc`;
+        return `${(0, node_process_1.cwd)()}/storage/${this.id}.rsc`;
     }
     get getResourceTempPath() {
-        return `${process.cwd()}/storage/${this.id}.rst`;
+        return `${(0, node_process_1.cwd)()}/storage/${this.id}.rst`;
     }
     get getResourceMetaPath() {
-        return `${process.cwd()}/storage/${this.id}.rsm`;
+        return `${(0, node_process_1.cwd)()}/storage/${this.id}.rsm`;
     }
     get resourceExists() {
-        if (!(0, fs_1.existsSync)(this.getResourcePath))
+        if (!(0, node_fs_1.existsSync)(this.getResourcePath))
             return false;
-        if (!(0, fs_1.existsSync)(this.getResourceMetaPath))
+        if (!(0, node_fs_1.existsSync)(this.getResourceMetaPath))
             return false;
         const headers = this.getHeaders;
-        if (!headers.version || 1 !== headers.version)
+        if (!headers.version || headers.version !== 1)
             return false;
         return headers.dateCreated + headers.privateTTL > Date.now();
     }
     get getHeaders() {
-        if (null === this.metaData) {
-            this.metaData = JSON.parse((0, fs_1.readFileSync)(this.getResourceMetaPath));
+        if (this.metaData === null) {
+            this.metaData = JSON.parse((0, node_fs_1.readFileSync)(this.getResourceMetaPath));
         }
         return this.metaData;
     }
@@ -78,15 +79,15 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
             format: manipulationResult.format,
             p: this.request.ttl,
             dateCreated: Date.now(),
-            publicTTL: 12 * 30 * 24 * 60 * 60 * 1000
+            publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
         };
         if (this.request.ttl) {
-            resourceMetaDataOptions['privateTTL'] = this.request.ttl;
+            resourceMetaDataOptions.privateTTL = this.request.ttl;
         }
         this.metaData = new ResourceMetaData_1.default(resourceMetaDataOptions);
-        (0, fs_1.writeFileSync)(this.getResourceMetaPath, JSON.stringify(this.metaData));
-        (0, fs_1.unlink)(this.getResourceTempPath, (err) => {
-            if (null !== err) {
+        (0, node_fs_1.writeFileSync)(this.getResourceMetaPath, JSON.stringify(this.metaData));
+        (0, node_fs_1.unlink)(this.getResourceTempPath, (err) => {
+            if (err !== null) {
                 this.logger.error(err);
             }
         });
@@ -94,7 +95,7 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
     async optimizeAndServeDefaultImage(resizeOptions) {
         const optionsString = this.createOptionsString(resizeOptions);
         const optimizedImageName = `default_optimized_${optionsString}.webp`;
-        const optimizedImagePath = `${process.cwd()}/storage/${optimizedImageName}`;
+        const optimizedImagePath = `${(0, node_process_1.cwd)()}/storage/${optimizedImageName}`;
         const resizeOptionsWithDefaults = {
             ...resizeOptions,
             fit: CacheImageRequest_1.FitOptions.contain,
@@ -102,10 +103,10 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
             format: CacheImageRequest_1.SupportedResizeFormats.webp,
             background: CacheImageRequest_1.BackgroundOptions.transparent,
             trimThreshold: 5,
-            quality: 100
+            quality: 100,
         };
-        if (!(0, fs_1.existsSync)(optimizedImagePath)) {
-            const defaultImagePath = `${process.cwd()}/public/default.png`;
+        if (!(0, node_fs_1.existsSync)(optimizedImagePath)) {
+            const defaultImagePath = `${(0, node_process_1.cwd)()}/public/default.png`;
             await this.webpImageManipulationJob.handle(defaultImagePath, optimizedImagePath, resizeOptionsWithDefaults);
         }
         return optimizedImagePath;
@@ -118,7 +119,7 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
             return obj;
         }, {});
         const optionsString = JSON.stringify(sortedOptions);
-        return (0, crypto_1.createHash)('md5').update(optionsString).digest('hex');
+        return (0, node_crypto_1.createHash)('md5').update(optionsString).digest('hex');
     }
 };
 CacheImageResourceOperation = CacheImageResourceOperation_1 = __decorate([

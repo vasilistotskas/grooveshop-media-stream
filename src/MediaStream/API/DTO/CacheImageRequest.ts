@@ -14,7 +14,7 @@ export enum SupportedResizeFormats {
 	jpeg = 'jpeg',
 	png = 'png',
 	gif = 'gif',
-	tiff = 'tiff'
+	tiff = 'tiff',
 }
 
 export enum PositionOptions {
@@ -33,13 +33,13 @@ export enum PositionOptions {
 	southwest = 'southwest',
 	southeast = 'southeast',
 	entropy = 'entropy',
-	attention = 'attention'
+	attention = 'attention',
 }
 
 export enum BackgroundOptions {
 	white = '#FFFFFF',
 	black = '#000000',
-	transparent = 'transparent'
+	transparent = 'transparent',
 }
 
 export enum FitOptions {
@@ -47,7 +47,7 @@ export enum FitOptions {
 	cover = 'cover',
 	fill = 'fill',
 	inside = 'inside',
-	outside = 'outside'
+	outside = 'outside',
 }
 
 function parseColor(color: string): RGBA {
@@ -58,7 +58,7 @@ function parseColor(color: string): RGBA {
 				r: 0,
 				g: 0,
 				b: 0,
-				alpha: 0
+				alpha: 0,
 			}
 		}
 		if (color[0] === '#') {
@@ -67,17 +67,17 @@ function parseColor(color: string): RGBA {
 		if (color.length === 3) {
 			color = color
 				.split('')
-				.map(function (char) {
+				.map((char) => {
 					return char + char
 				})
 				.join('')
 		}
-		const num = parseInt(color, 16)
+		const num = Number.parseInt(color, 16)
 		const colorToRgba = {
 			r: num >> 16,
 			g: (num >> 8) & 255,
 			b: num & 255,
-			alpha: 1
+			alpha: 1,
 		}
 		return colorToRgba
 	}
@@ -107,7 +107,8 @@ export class ResizeOptions {
 
 		Object.assign(this, rest)
 		each(['width', 'height'], (sizeOption) => {
-			if (null === data[sizeOption]) delete this[sizeOption]
+			if (data[sizeOption] === null)
+				delete this[sizeOption]
 		})
 	}
 }

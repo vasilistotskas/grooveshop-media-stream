@@ -14,7 +14,7 @@ let TasksModule = class TasksModule {
 exports.TasksModule = TasksModule;
 exports.TasksModule = TasksModule = __decorate([
     (0, common_1.Module)({
-        providers: [cleanup_service_1.CleanupService]
+        providers: [cleanup_service_1.CleanupService],
     })
 ], TasksModule);
 //# sourceMappingURL=tasks.module.js.map

@@ -1,4 +1,4 @@
-import CacheImageRequest from '@microservice/API/DTO/CacheImageRequest';
+import type CacheImageRequest from '@microservice/API/DTO/CacheImageRequest';
 export default class ValidateCacheImageRequestResizeTargetRule {
     allowedPixelCount: number;
     request: CacheImageRequest;

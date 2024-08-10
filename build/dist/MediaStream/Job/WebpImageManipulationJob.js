@@ -37,25 +37,25 @@ let WebpImageManipulationJob = class WebpImageManipulationJob {
         }
         const resizeScales = {};
         (0, lodash_1.each)(['width', 'height'], (scale) => {
-            if (null !== options[scale] && !isNaN(options[scale])) {
+            if (options[scale] !== null && !Number.isNaN(options[scale])) {
                 resizeScales[scale] = Number(options[scale]);
             }
         });
         if (Object.keys(resizeScales).length > 0) {
-            if (null !== options.trimThreshold && !isNaN(options.trimThreshold)) {
+            if (options.trimThreshold !== null && !Number.isNaN(options.trimThreshold)) {
                 manipulation.trim({ background: options.background, threshold: Number(options.trimThreshold) });
             }
             manipulation.resize({
                 ...resizeScales,
                 fit: options.fit,
                 position: options.position,
-                background: options.background
+                background: options.background,
             });
         }
         const manipulatedFile = await manipulation.toFile(filePathTo);
         return new ManipulationJobResult_1.default({
             size: String(manipulatedFile.size),
-            format: manipulatedFile.format
+            format: manipulatedFile.format,
         });
     }
 };

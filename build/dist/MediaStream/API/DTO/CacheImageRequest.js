@@ -50,7 +50,7 @@ function parseColor(color) {
                 r: 0,
                 g: 0,
                 b: 0,
-                alpha: 0
+                alpha: 0,
             };
         }
         if (color[0] === '#') {
@@ -59,17 +59,17 @@ function parseColor(color) {
         if (color.length === 3) {
             color = color
                 .split('')
-                .map(function (char) {
+                .map((char) => {
                 return char + char;
             })
                 .join('');
         }
-        const num = parseInt(color, 16);
+        const num = Number.parseInt(color, 16);
         const colorToRgba = {
             r: num >> 16,
             g: (num >> 8) & 255,
             b: num & 255,
-            alpha: 1
+            alpha: 1,
         };
         return colorToRgba;
     }
@@ -96,7 +96,7 @@ class ResizeOptions {
         this.quality = Number(quality) ?? 100;
         Object.assign(this, rest);
         (0, lodash_1.each)(['width', 'height'], (sizeOption) => {
-            if (null === data[sizeOption])
+            if (data[sizeOption] === null)
                 delete this[sizeOption];
         });
     }
