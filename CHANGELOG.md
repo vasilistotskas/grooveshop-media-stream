@@ -1,3 +1,16 @@
+# [1.77.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.76.0...v1.77.0) (2024-08-10)
+
+
+### Bug Fixes
+
+* **ci.yml:** Bump node version ([cf35652](https://github.com/vasilistotskas/grooveshop-media-stream/commit/cf35652f20405e49db9887b18d2494fc77d4ab64))
+* pnpm install ([014adb9](https://github.com/vasilistotskas/grooveshop-media-stream/commit/014adb9c8f924da09a4f8f14b6d28f09f0670fc0))
+
+
+### Features
+
+* Bump Versions and integrate to eslint v9 ([b9328d6](https://github.com/vasilistotskas/grooveshop-media-stream/commit/b9328d67e98d14c7e9a5bc10e61e1e2c75cd7521))
+
 # [1.76.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.75.0...v1.76.0) (2024-07-26)
 
 
