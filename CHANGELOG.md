@@ -1,3 +1,10 @@
+# [1.80.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.79.0...v1.80.0) (2024-08-27)
+
+
+### Features
+
+* Bump Versions ([0a9e27a](https://github.com/vasilistotskas/grooveshop-media-stream/commit/0a9e27a9eedaa3338e204681289fbba373fc1790))
+
 # [1.79.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.78.0...v1.79.0) (2024-08-19)
 
 
