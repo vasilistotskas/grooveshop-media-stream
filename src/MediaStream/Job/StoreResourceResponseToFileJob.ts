@@ -8,6 +8,11 @@ export default class StoreResourceResponseToFileJob {
 	private readonly logger = new Logger(StoreResourceResponseToFileJob.name)
 
 	async handle(resourceName: string, path: string, response: AxiosResponse): Promise<void> {
+		if (!response.data) {
+			this.logger.error('No data found in response')
+			throw new UnableToStoreFetchedResourceException(resourceName)
+		}
+
 		const fileStream = fs.createWriteStream(path)
 		try {
 			response.data.pipe(fileStream)
