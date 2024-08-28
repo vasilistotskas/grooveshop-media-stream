@@ -41,6 +41,10 @@ let StoreResourceResponseToFileJob = StoreResourceResponseToFileJob_1 = class St
         this.logger = new common_1.Logger(StoreResourceResponseToFileJob_1.name);
     }
     async handle(resourceName, path, response) {
+        if (!response.data) {
+            this.logger.error('No data found in response');
+            throw new UnableToStoreFetchedResourceException_1.default(resourceName);
+        }
         const fileStream = fs.createWriteStream(path);
         try {
             response.data.pipe(fileStream);
