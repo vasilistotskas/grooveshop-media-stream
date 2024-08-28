@@ -1,3 +1,10 @@
+## [1.80.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.80.0...v1.80.1) (2024-08-28)
+
+
+### Bug Fixes
+
+* add public dir in Dockerfile ([cff58ee](https://github.com/vasilistotskas/grooveshop-media-stream/commit/cff58eebccae9b946a3f987a49163a19e5415568))
+
 # [1.80.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.79.0...v1.80.0) (2024-08-27)
 
 
