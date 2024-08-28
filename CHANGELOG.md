@@ -1,3 +1,10 @@
+## [1.80.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.80.1...v1.80.2) (2024-08-28)
+
+
+### Bug Fixes
+
+* **StoreResourceResponseToFileJob:** in case there are no data in response ([4cdd72c](https://github.com/vasilistotskas/grooveshop-media-stream/commit/4cdd72c31f042cb4371610613dc3602bc31dbfdd))
+
 ## [1.80.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.80.0...v1.80.1) (2024-08-28)
 
 
