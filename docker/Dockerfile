@@ -11,6 +11,7 @@ RUN corepack enable
 WORKDIR /usr/src/app
 
 # Copy files
+COPY public/ ./public/
 COPY nest-cli.json ./
 COPY tsconfig*.json ./
 COPY package*.json ./
@@ -34,6 +35,7 @@ WORKDIR /usr/src/app
 
 # Copy necessary files from the build stage
 COPY --from=build /usr/src/app/build ./build
+COPY --from=build /usr/src/app/public ./public
 COPY --from=build /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/package*.json ./
 COPY --from=build /usr/src/app/pnpm-lock.yaml ./
