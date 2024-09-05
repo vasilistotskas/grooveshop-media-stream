@@ -112,9 +112,7 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
         return optimizedImagePath;
     }
     createOptionsString(resizeOptions) {
-        const sortedOptions = Object.keys(resizeOptions)
-            .sort()
-            .reduce((obj, key) => {
+        const sortedOptions = Object.keys(resizeOptions).sort().reduce((obj, key) => {
             obj[key] = resizeOptions[key];
             return obj;
         }, {});

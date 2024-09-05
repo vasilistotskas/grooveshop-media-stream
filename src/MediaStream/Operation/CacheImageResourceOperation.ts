@@ -139,12 +139,10 @@ export default class CacheImageResourceOperation {
 	}
 
 	private createOptionsString(resizeOptions: ResizeOptions): string {
-		const sortedOptions = Object.keys(resizeOptions)
-			.sort()
-			.reduce((obj, key) => {
-				obj[key] = resizeOptions[key]
-				return obj
-			}, {})
+		const sortedOptions = Object.keys(resizeOptions).sort().reduce((obj, key) => {
+			obj[key] = resizeOptions[key]
+			return obj
+		}, {})
 
 		const optionsString = JSON.stringify(sortedOptions)
 
