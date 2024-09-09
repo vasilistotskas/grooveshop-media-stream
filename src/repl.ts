@@ -1,5 +1,5 @@
-import { repl } from '@nestjs/core'
 import MediaStreamModule from '@microservice/Module/MediaStreamModule'
+import { repl } from '@nestjs/core'
 
 async function bootstrap(): Promise<void> {
 	const replServer = await repl(MediaStreamModule)

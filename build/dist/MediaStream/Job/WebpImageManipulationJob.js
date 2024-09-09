@@ -9,9 +9,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const lodash_1 = require("lodash");
-const common_1 = require("@nestjs/common");
 const ManipulationJobResult_1 = __importDefault(require("../DTO/ManipulationJobResult"));
+const common_1 = require("@nestjs/common");
+const lodash_1 = require("lodash");
 const sharp_1 = __importDefault(require("sharp"));
 let WebpImageManipulationJob = class WebpImageManipulationJob {
     async handle(filePathFrom, filePathTo, options) {

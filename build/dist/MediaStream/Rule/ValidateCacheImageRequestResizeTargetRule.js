@@ -9,8 +9,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const common_1 = require("@nestjs/common");
 const RequestedResizeTargetTooLargeException_1 = __importDefault(require("../API/Exception/RequestedResizeTargetTooLargeException"));
+const common_1 = require("@nestjs/common");
 let ValidateCacheImageRequestResizeTargetRule = class ValidateCacheImageRequestResizeTargetRule {
     constructor() {
         this.allowedPixelCount = 7680 * 4320;

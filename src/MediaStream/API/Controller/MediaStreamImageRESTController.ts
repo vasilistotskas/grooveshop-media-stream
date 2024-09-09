@@ -1,11 +1,5 @@
 import { createReadStream } from 'node:fs'
 import * as process from 'node:process'
-import type { Response } from 'express'
-import { HttpService } from '@nestjs/axios'
-import { Controller, Get, InternalServerErrorException, Logger, Param, Res, Scope } from '@nestjs/common'
-import type ResourceMetaData from '@microservice/DTO/ResourceMetaData'
-import { IMAGE, VERSION } from '@microservice/Constant/RoutePrefixes'
-import CacheImageResourceOperation from '@microservice/Operation/CacheImageResourceOperation'
 import CacheImageRequest, {
 	BackgroundOptions,
 	FitOptions,
@@ -13,7 +7,13 @@ import CacheImageRequest, {
 	ResizeOptions,
 	SupportedResizeFormats,
 } from '@microservice/API/DTO/CacheImageRequest'
+import { IMAGE, VERSION } from '@microservice/Constant/RoutePrefixes'
 import GenerateResourceIdentityFromRequestJob from '@microservice/Job/GenerateResourceIdentityFromRequestJob'
+import CacheImageResourceOperation from '@microservice/Operation/CacheImageResourceOperation'
+import { HttpService } from '@nestjs/axios'
+import { Controller, Get, InternalServerErrorException, Logger, Param, Res, Scope } from '@nestjs/common'
+import type ResourceMetaData from '@microservice/DTO/ResourceMetaData'
+import type { Response } from 'express'
 
 @Controller({
 	path: IMAGE,

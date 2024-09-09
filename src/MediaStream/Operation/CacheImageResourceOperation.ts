@@ -1,24 +1,24 @@
-import { existsSync, readFileSync, unlink, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
+import { existsSync, readFileSync, unlink, writeFileSync } from 'node:fs'
 import { cwd } from 'node:process'
-import { HttpService } from '@nestjs/axios'
-import { Injectable, Logger, Scope } from '@nestjs/common'
-import ResourceMetaData from '@microservice/DTO/ResourceMetaData'
-import type {
-	ResizeOptions,
-} from '@microservice/API/DTO/CacheImageRequest'
 import CacheImageRequest, {
 	BackgroundOptions,
 	FitOptions,
 	PositionOptions,
 	SupportedResizeFormats,
 } from '@microservice/API/DTO/CacheImageRequest'
-import type { ResourceIdentifierKP } from '@microservice/Constant/KeyProperties'
+import ResourceMetaData from '@microservice/DTO/ResourceMetaData'
 import FetchResourceResponseJob from '@microservice/Job/FetchResourceResponseJob'
+import GenerateResourceIdentityFromRequestJob from '@microservice/Job/GenerateResourceIdentityFromRequestJob'
+import StoreResourceResponseToFileJob from '@microservice/Job/StoreResourceResponseToFileJob'
 import WebpImageManipulationJob from '@microservice/Job/WebpImageManipulationJob'
 import ValidateCacheImageRequestRule from '@microservice/Rule/ValidateCacheImageRequestRule'
-import StoreResourceResponseToFileJob from '@microservice/Job/StoreResourceResponseToFileJob'
-import GenerateResourceIdentityFromRequestJob from '@microservice/Job/GenerateResourceIdentityFromRequestJob'
+import { HttpService } from '@nestjs/axios'
+import { Injectable, Logger, Scope } from '@nestjs/common'
+import type {
+	ResizeOptions,
+} from '@microservice/API/DTO/CacheImageRequest'
+import type { ResourceIdentifierKP } from '@microservice/Constant/KeyProperties'
 
 @Injectable({ scope: Scope.REQUEST })
 export default class CacheImageResourceOperation {

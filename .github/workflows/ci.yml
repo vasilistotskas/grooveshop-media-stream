@@ -33,25 +33,24 @@ jobs:
           node-version: '22.x'
       - name: Enable corepack
         run: corepack enable
-      - name: Check pnpm version
-        run: pnpm --version
+      - name: Check npm version
+        run: npm --version
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22.x'
           registry-url: 'https://npm.pkg.github.com'
-          cache: 'pnpm'
-          cache-dependency-path: "**/pnpm-lock.yaml"
+          cache: 'npm'
           # Defaults to the user or organization that owns the workflow file
           scope: '@vasilistotskas'
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --prefer-offline
+        run: npm ci
       - name: Run lint fix
-        run: pnpm run lint:fix
+        run: npm run lint:fix
       - name: Verify the integrity of provenance attestations and registry signatures for installed dependencies
-        run: pnpm audit signatures --audit-level=critical
+        run: npm audit signatures --audit-level=critical
       - name: Test
-        run: pnpm run test
+        run: npm run test
       - name: Coveralls
         uses: coverallsapp/github-action@v2
         with:

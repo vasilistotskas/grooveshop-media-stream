@@ -12,8 +12,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const common_1 = require("@nestjs/common");
 const ValidateCacheImageRequestResizeTargetRule_1 = __importDefault(require("./ValidateCacheImageRequestResizeTargetRule"));
+const common_1 = require("@nestjs/common");
 let ValidateCacheImageRequestRule = class ValidateCacheImageRequestRule {
     constructor(validateCacheImageRequestResizeTargetRule) {
         this.validateCacheImageRequestResizeTargetRule = validateCacheImageRequestResizeTargetRule;

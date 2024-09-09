@@ -34,8 +34,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 var StoreResourceResponseToFileJob_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 const fs = __importStar(require("node:fs"));
-const common_1 = require("@nestjs/common");
 const UnableToStoreFetchedResourceException_1 = __importDefault(require("../API/Exception/UnableToStoreFetchedResourceException"));
+const common_1 = require("@nestjs/common");
 let StoreResourceResponseToFileJob = StoreResourceResponseToFileJob_1 = class StoreResourceResponseToFileJob {
     constructor() {
         this.logger = new common_1.Logger(StoreResourceResponseToFileJob_1.name);

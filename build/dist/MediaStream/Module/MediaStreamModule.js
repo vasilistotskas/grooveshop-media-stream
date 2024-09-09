@@ -9,18 +9,18 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const common_1 = require("@nestjs/common");
-const axios_1 = require("@nestjs/axios");
-const schedule_1 = require("@nestjs/schedule");
-const tasks_module_1 = require("../Tasks/tasks.module");
-const FetchResourceResponseJob_1 = __importDefault(require("../Job/FetchResourceResponseJob"));
-const WebpImageManipulationJob_1 = __importDefault(require("../Job/WebpImageManipulationJob"));
-const ValidateCacheImageRequestRule_1 = __importDefault(require("../Rule/ValidateCacheImageRequestRule"));
-const StoreResourceResponseToFileJob_1 = __importDefault(require("../Job/StoreResourceResponseToFileJob"));
-const CacheImageResourceOperation_1 = __importDefault(require("../Operation/CacheImageResourceOperation"));
 const MediaStreamImageRESTController_1 = __importDefault(require("../API/Controller/MediaStreamImageRESTController"));
+const FetchResourceResponseJob_1 = __importDefault(require("../Job/FetchResourceResponseJob"));
 const GenerateResourceIdentityFromRequestJob_1 = __importDefault(require("../Job/GenerateResourceIdentityFromRequestJob"));
+const StoreResourceResponseToFileJob_1 = __importDefault(require("../Job/StoreResourceResponseToFileJob"));
+const WebpImageManipulationJob_1 = __importDefault(require("../Job/WebpImageManipulationJob"));
+const CacheImageResourceOperation_1 = __importDefault(require("../Operation/CacheImageResourceOperation"));
 const ValidateCacheImageRequestResizeTargetRule_1 = __importDefault(require("../Rule/ValidateCacheImageRequestResizeTargetRule"));
+const ValidateCacheImageRequestRule_1 = __importDefault(require("../Rule/ValidateCacheImageRequestRule"));
+const tasks_module_1 = require("../Tasks/tasks.module");
+const axios_1 = require("@nestjs/axios");
+const common_1 = require("@nestjs/common");
+const schedule_1 = require("@nestjs/schedule");
 const controllers = [MediaStreamImageRESTController_1.default];
 const operations = [CacheImageResourceOperation_1.default];
 const jobs = [

@@ -1,11 +1,4 @@
-FROM node:22.7.0-alpine as base
-
-# Set environment variables for pnpm
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-
-# Enable corepack
-RUN corepack enable
+FROM node:22.8.0-alpine as base
 
 # Set up the work directory
 WORKDIR /usr/src/app
@@ -15,16 +8,14 @@ COPY public/ ./public/
 COPY nest-cli.json ./
 COPY tsconfig*.json ./
 COPY package*.json ./
-COPY pnpm-lock.yaml ./
+COPY package-lock.yaml ./
 COPY src/ ./src/
 
 FROM base AS build
 
-# Install pnpm
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
-
-# Build the app
-RUN pnpm run build
+# Install npm && Build the app
+RUN npm ci && \
+    npm run build
 
 # debug: ENTRYPOINT ["tail", "-f", "/dev/null"]
 
@@ -38,7 +29,7 @@ COPY --from=build /usr/src/app/build ./build
 COPY --from=build /usr/src/app/public ./public
 COPY --from=build /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/package*.json ./
-COPY --from=build /usr/src/app/pnpm-lock.yaml ./
+COPY --from=build /usr/src/app/package-lock.yaml ./
 COPY --from=build /usr/src/app/nest-cli.json ./
 
 # Volumes

@@ -1,8 +1,8 @@
-import { each } from 'lodash'
-import { Injectable, Scope } from '@nestjs/common'
-import type { ResizeOptions } from '@microservice/API/DTO/CacheImageRequest'
 import ManipulationJobResult from '@microservice/DTO/ManipulationJobResult'
+import { Injectable, Scope } from '@nestjs/common'
+import { each } from 'lodash'
 import sharp from 'sharp'
+import type { ResizeOptions } from '@microservice/API/DTO/CacheImageRequest'
 
 @Injectable({ scope: Scope.REQUEST })
 export default class WebpImageManipulationJob {

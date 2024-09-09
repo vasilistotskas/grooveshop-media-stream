@@ -41,12 +41,12 @@ var MediaStreamImageRESTController_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 const node_fs_1 = require("node:fs");
 const process = __importStar(require("node:process"));
+const CacheImageRequest_1 = __importStar(require("../DTO/CacheImageRequest"));
+const RoutePrefixes_1 = require("../../Constant/RoutePrefixes");
+const GenerateResourceIdentityFromRequestJob_1 = __importDefault(require("../../Job/GenerateResourceIdentityFromRequestJob"));
+const CacheImageResourceOperation_1 = __importDefault(require("../../Operation/CacheImageResourceOperation"));
 const axios_1 = require("@nestjs/axios");
 const common_1 = require("@nestjs/common");
-const RoutePrefixes_1 = require("../../Constant/RoutePrefixes");
-const CacheImageResourceOperation_1 = __importDefault(require("../../Operation/CacheImageResourceOperation"));
-const CacheImageRequest_1 = __importStar(require("../DTO/CacheImageRequest"));
-const GenerateResourceIdentityFromRequestJob_1 = __importDefault(require("../../Job/GenerateResourceIdentityFromRequestJob"));
 let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class MediaStreamImageRESTController {
     constructor(httpService, generateResourceIdentityFromRequestJob, cacheImageResourceOperation) {
         this.httpService = httpService;

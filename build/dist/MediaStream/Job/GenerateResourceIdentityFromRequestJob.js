@@ -6,9 +6,9 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const uuid_1 = require("uuid");
-const lodash_1 = require("lodash");
 const common_1 = require("@nestjs/common");
+const lodash_1 = require("lodash");
+const uuid_1 = require("uuid");
 let GenerateResourceIdentityFromRequestJob = class GenerateResourceIdentityFromRequestJob {
     async handle(cacheImageRequest) {
         const request = (0, lodash_1.cloneDeep)(cacheImageRequest);

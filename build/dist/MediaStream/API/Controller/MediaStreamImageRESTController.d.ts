@@ -1,9 +1,9 @@
-import type { Response } from 'express';
-import { HttpService } from '@nestjs/axios';
-import type ResourceMetaData from '@microservice/DTO/ResourceMetaData';
-import CacheImageResourceOperation from '@microservice/Operation/CacheImageResourceOperation';
 import { BackgroundOptions, FitOptions, PositionOptions, SupportedResizeFormats } from '@microservice/API/DTO/CacheImageRequest';
 import GenerateResourceIdentityFromRequestJob from '@microservice/Job/GenerateResourceIdentityFromRequestJob';
+import CacheImageResourceOperation from '@microservice/Operation/CacheImageResourceOperation';
+import { HttpService } from '@nestjs/axios';
+import type ResourceMetaData from '@microservice/DTO/ResourceMetaData';
+import type { Response } from 'express';
 export default class MediaStreamImageRESTController {
     private readonly httpService;
     private readonly generateResourceIdentityFromRequestJob;

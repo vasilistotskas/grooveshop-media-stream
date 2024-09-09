@@ -13,18 +13,18 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 var CacheImageResourceOperation_1;
 Object.defineProperty(exports, "__esModule", { value: true });
-const node_fs_1 = require("node:fs");
 const node_crypto_1 = require("node:crypto");
+const node_fs_1 = require("node:fs");
 const node_process_1 = require("node:process");
-const axios_1 = require("@nestjs/axios");
-const common_1 = require("@nestjs/common");
-const ResourceMetaData_1 = __importDefault(require("../DTO/ResourceMetaData"));
 const CacheImageRequest_1 = require("../API/DTO/CacheImageRequest");
+const ResourceMetaData_1 = __importDefault(require("../DTO/ResourceMetaData"));
 const FetchResourceResponseJob_1 = __importDefault(require("../Job/FetchResourceResponseJob"));
+const GenerateResourceIdentityFromRequestJob_1 = __importDefault(require("../Job/GenerateResourceIdentityFromRequestJob"));
+const StoreResourceResponseToFileJob_1 = __importDefault(require("../Job/StoreResourceResponseToFileJob"));
 const WebpImageManipulationJob_1 = __importDefault(require("../Job/WebpImageManipulationJob"));
 const ValidateCacheImageRequestRule_1 = __importDefault(require("../Rule/ValidateCacheImageRequestRule"));
-const StoreResourceResponseToFileJob_1 = __importDefault(require("../Job/StoreResourceResponseToFileJob"));
-const GenerateResourceIdentityFromRequestJob_1 = __importDefault(require("../Job/GenerateResourceIdentityFromRequestJob"));
+const axios_1 = require("@nestjs/axios");
+const common_1 = require("@nestjs/common");
 let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheImageResourceOperation {
     constructor(httpService, validateCacheImageRequest, fetchResourceResponseJob, webpImageManipulationJob, storeResourceResponseToFileJob, generateResourceIdentityFromRequestJob) {
         this.httpService = httpService;
