@@ -1,3 +1,10 @@
+## [1.83.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.83.0...v1.83.1) (2024-09-09)
+
+
+### Bug Fixes
+
+* remove use COPY from `Dockerfile` ([08eef23](https://github.com/vasilistotskas/grooveshop-media-stream/commit/08eef23118e14ad9ad54bf07ec77e04cdf9914ea))
+
 # [1.83.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.82.0...v1.83.0) (2024-09-09)
 
 
