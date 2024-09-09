@@ -8,7 +8,6 @@ COPY public/ ./public/
 COPY nest-cli.json ./
 COPY tsconfig*.json ./
 COPY package*.json ./
-COPY package-lock.yaml ./
 COPY src/ ./src/
 
 FROM base AS build
