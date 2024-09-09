@@ -1,3 +1,10 @@
+# [1.83.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.82.0...v1.83.0) (2024-09-09)
+
+
+### Features
+
+* replace `pnpm` with `npm` and Bump Versions ([8f2a39e](https://github.com/vasilistotskas/grooveshop-media-stream/commit/8f2a39e1cb72a8752fdd4d5ea7db95dd07acd427))
+
 # [1.82.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.81.0...v1.82.0) (2024-09-05)
 
 
