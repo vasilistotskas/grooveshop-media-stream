@@ -1,3 +1,10 @@
+## [1.84.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.84.0...v1.84.1) (2024-09-13)
+
+
+### Bug Fixes
+
+* **Dockerfile:** fix dockerfile ([99eb667](https://github.com/vasilistotskas/grooveshop-media-stream/commit/99eb6676e371d4ea669dd1c3bd2beaab4b5e884b))
+
 # [1.84.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.83.1...v1.84.0) (2024-09-13)
 
 
