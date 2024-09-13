@@ -28,7 +28,6 @@ COPY --from=build /usr/src/app/build ./build
 COPY --from=build /usr/src/app/public ./public
 COPY --from=build /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/package*.json ./
-COPY --from=build /usr/src/app/package-lock.yaml ./
 COPY --from=build /usr/src/app/nest-cli.json ./
 
 # Volumes
