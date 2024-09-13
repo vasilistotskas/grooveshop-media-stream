@@ -1,6 +1,6 @@
+import type CacheImageRequest from '@microservice/API/DTO/CacheImageRequest'
 import RequestedResizeTargetTooLargeException from '@microservice/API/Exception/RequestedResizeTargetTooLargeException'
 import { Injectable, Scope } from '@nestjs/common'
-import type CacheImageRequest from '@microservice/API/DTO/CacheImageRequest'
 
 @Injectable({ scope: Scope.REQUEST })
 export default class ValidateCacheImageRequestResizeTargetRule {

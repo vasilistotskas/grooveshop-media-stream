@@ -1,6 +1,6 @@
+import type CacheImageRequest from '@microservice/API/DTO/CacheImageRequest'
 import ValidateCacheImageRequestResizeTargetRule from '@microservice/Rule/ValidateCacheImageRequestResizeTargetRule'
 import { Injectable, Scope } from '@nestjs/common'
-import type CacheImageRequest from '@microservice/API/DTO/CacheImageRequest'
 
 @Injectable({ scope: Scope.REQUEST })
 export default class ValidateCacheImageRequestRule {

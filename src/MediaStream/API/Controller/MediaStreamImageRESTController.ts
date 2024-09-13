@@ -1,3 +1,5 @@
+import type ResourceMetaData from '@microservice/DTO/ResourceMetaData'
+import type { Response } from 'express'
 import { createReadStream } from 'node:fs'
 import * as process from 'node:process'
 import CacheImageRequest, {
@@ -12,8 +14,6 @@ import GenerateResourceIdentityFromRequestJob from '@microservice/Job/GenerateRe
 import CacheImageResourceOperation from '@microservice/Operation/CacheImageResourceOperation'
 import { HttpService } from '@nestjs/axios'
 import { Controller, Get, InternalServerErrorException, Logger, Param, Res, Scope } from '@nestjs/common'
-import type ResourceMetaData from '@microservice/DTO/ResourceMetaData'
-import type { Response } from 'express'
 
 @Controller({
 	path: IMAGE,

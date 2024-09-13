@@ -1,7 +1,7 @@
-import { HttpService } from '@nestjs/axios'
-import { Injectable, Logger, Scope } from '@nestjs/common'
 import type CacheImageRequest from '@microservice/API/DTO/CacheImageRequest'
 import type { AxiosResponse } from 'axios'
+import { HttpService } from '@nestjs/axios'
+import { Injectable, Logger, Scope } from '@nestjs/common'
 
 @Injectable({ scope: Scope.REQUEST })
 export default class FetchResourceResponseJob {

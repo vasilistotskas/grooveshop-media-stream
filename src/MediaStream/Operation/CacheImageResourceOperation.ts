@@ -1,3 +1,7 @@
+import type {
+	ResizeOptions,
+} from '@microservice/API/DTO/CacheImageRequest'
+import type { ResourceIdentifierKP } from '@microservice/Constant/KeyProperties'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, unlink, writeFileSync } from 'node:fs'
 import { cwd } from 'node:process'
@@ -15,10 +19,6 @@ import WebpImageManipulationJob from '@microservice/Job/WebpImageManipulationJob
 import ValidateCacheImageRequestRule from '@microservice/Rule/ValidateCacheImageRequestRule'
 import { HttpService } from '@nestjs/axios'
 import { Injectable, Logger, Scope } from '@nestjs/common'
-import type {
-	ResizeOptions,
-} from '@microservice/API/DTO/CacheImageRequest'
-import type { ResourceIdentifierKP } from '@microservice/Constant/KeyProperties'
 
 @Injectable({ scope: Scope.REQUEST })
 export default class CacheImageResourceOperation {

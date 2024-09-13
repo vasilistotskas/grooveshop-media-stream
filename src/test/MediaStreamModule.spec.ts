@@ -1,3 +1,4 @@
+import type { TestingModule } from '@nestjs/testing'
 import MediaStreamImageRESTController from '@microservice/API/Controller/MediaStreamImageRESTController'
 import FetchResourceResponseJob from '@microservice/Job/FetchResourceResponseJob'
 import GenerateResourceIdentityFromRequestJob from '@microservice/Job/GenerateResourceIdentityFromRequestJob'
@@ -8,7 +9,6 @@ import ValidateCacheImageRequestResizeTargetRule from '@microservice/Rule/Valida
 import ValidateCacheImageRequestRule from '@microservice/Rule/ValidateCacheImageRequestRule'
 import { HttpService } from '@nestjs/axios'
 import { Test } from '@nestjs/testing'
-import type { TestingModule } from '@nestjs/testing'
 
 describe('mediaStreamModule', () => {
 	let module: TestingModule
