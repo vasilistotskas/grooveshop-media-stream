@@ -10,7 +10,8 @@ export declare enum SupportedResizeFormats {
     jpeg = "jpeg",
     png = "png",
     gif = "gif",
-    tiff = "tiff"
+    tiff = "tiff",
+    svg = "svg"
 }
 export declare enum PositionOptions {
     centre = "centre",

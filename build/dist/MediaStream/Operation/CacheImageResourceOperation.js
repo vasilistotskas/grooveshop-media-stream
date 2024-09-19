@@ -13,8 +13,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 var CacheImageResourceOperation_1;
 Object.defineProperty(exports, "__esModule", { value: true });
+const node_buffer_1 = require("node:buffer");
 const node_crypto_1 = require("node:crypto");
-const node_fs_1 = require("node:fs");
+const promises_1 = require("node:fs/promises");
 const node_process_1 = require("node:process");
 const CacheImageRequest_1 = require("../API/DTO/CacheImageRequest");
 const ResourceMetaData_1 = __importDefault(require("../DTO/ResourceMetaData"));
@@ -45,20 +46,49 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
         return `${(0, node_process_1.cwd)()}/storage/${this.id}.rsm`;
     }
     get resourceExists() {
-        if (!(0, node_fs_1.existsSync)(this.getResourcePath))
-            return false;
-        if (!(0, node_fs_1.existsSync)(this.getResourceMetaPath))
-            return false;
-        const headers = this.getHeaders;
-        if (!headers.version || headers.version !== 1)
-            return false;
-        return headers.dateCreated + headers.privateTTL > Date.now();
+        return (async () => {
+            const resourcePathExists = await (0, promises_1.access)(this.getResourcePath).then(() => true).catch(() => false);
+            if (!resourcePathExists) {
+                this.logger.warn(`Resource path does not exist: ${this.getResourcePath}`);
+                return false;
+            }
+            const resourceMetaPathExists = await (0, promises_1.access)(this.getResourceMetaPath).then(() => true).catch(() => false);
+            if (!resourceMetaPathExists) {
+                this.logger.warn(`Metadata path does not exist: ${this.getResourceMetaPath}`);
+                return false;
+            }
+            const headers = await this.getHeaders;
+            if (!headers) {
+                this.logger.warn('Metadata headers are missing or invalid');
+                return false;
+            }
+            if (!headers.version || headers.version !== 1) {
+                this.logger.warn('Invalid or missing version in metadata');
+                return false;
+            }
+            return headers.dateCreated + headers.privateTTL > Date.now();
+        })();
     }
     get getHeaders() {
-        if (this.metaData === null) {
-            this.metaData = JSON.parse((0, node_fs_1.readFileSync)(this.getResourceMetaPath));
-        }
-        return this.metaData;
+        return (async () => {
+            if (!this.metaData) {
+                try {
+                    const exists = await (0, promises_1.access)(this.getResourceMetaPath).then(() => true).catch(() => false);
+                    if (exists) {
+                        this.metaData = JSON.parse(await (0, promises_1.readFile)(this.getResourceMetaPath));
+                    }
+                    else {
+                        this.logger.warn(`Metadata file does not exist: ${this.getResourceMetaPath}`);
+                        return null;
+                    }
+                }
+                catch (error) {
+                    this.logger.error('Failed to read or parse resource metadata', error);
+                    return null;
+                }
+            }
+            return this.metaData;
+        })();
     }
     async setup(cacheImageRequest) {
         this.request = cacheImageRequest;
@@ -68,29 +98,82 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
         this.metaData = null;
     }
     async execute() {
-        if (this.resourceExists) {
+        if (await this.resourceExists) {
+            this.logger.log('Resource already exists.');
             return;
         }
-        const response = await this.fetchResourceResponseJob.handle(this.request);
-        await this.storeResourceResponseToFileJob.handle(this.request.resourceTarget, this.getResourceTempPath, response);
-        const manipulationResult = await this.webpImageManipulationJob.handle(this.getResourceTempPath, this.getResourcePath, this.request.resizeOptions);
-        const resourceMetaDataOptions = {
-            size: manipulationResult.size,
-            format: manipulationResult.format,
-            p: this.request.ttl,
-            dateCreated: Date.now(),
-            publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
-        };
-        if (this.request.ttl) {
-            resourceMetaDataOptions.privateTTL = this.request.ttl;
-        }
-        this.metaData = new ResourceMetaData_1.default(resourceMetaDataOptions);
-        (0, node_fs_1.writeFileSync)(this.getResourceMetaPath, JSON.stringify(this.metaData));
-        (0, node_fs_1.unlink)(this.getResourceTempPath, (err) => {
-            if (err !== null) {
-                this.logger.error(err);
+        try {
+            const response = await this.fetchResourceResponseJob.handle(this.request);
+            if (!response) {
+                this.logger.error('Failed to fetch the resource. The response is empty or invalid.');
+                return;
             }
-        });
+            await this.storeResourceResponseToFileJob.handle(this.request.resourceTarget, this.getResourceTempPath, response);
+            if (this.request.resizeOptions.format === CacheImageRequest_1.SupportedResizeFormats.svg) {
+                this.logger.log('Skipping manipulation for SVG format.');
+                let fileContent;
+                try {
+                    fileContent = await (0, promises_1.readFile)(this.getResourceTempPath, 'utf8');
+                }
+                catch (error) {
+                    this.logger.error('Failed to read file content', error);
+                    throw new common_1.InternalServerErrorException('Error fetching or processing image.');
+                }
+                if (fileContent.trim().startsWith('<svg')) {
+                    await (0, promises_1.writeFile)(this.getResourcePath, fileContent);
+                    this.logger.log(`Successfully validated and wrote SVG to resource path: ${this.getResourcePath}`);
+                    const resourceMetaDataOptions = {
+                        size: String(node_buffer_1.Buffer.byteLength(fileContent, 'utf8')),
+                        format: CacheImageRequest_1.SupportedResizeFormats.svg,
+                        dateCreated: Date.now(),
+                        publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
+                    };
+                    this.metaData = new ResourceMetaData_1.default(resourceMetaDataOptions);
+                    await (0, promises_1.writeFile)(this.getResourceMetaPath, JSON.stringify(this.metaData));
+                }
+                else {
+                    this.logger.warn('The file is not a valid SVG. Serving default WebP image.');
+                    const manipulationResult = await this.webpImageManipulationJob.handle(this.getResourceTempPath, this.getResourcePath, this.request.resizeOptions);
+                    const resourceMetaDataOptions = {
+                        size: manipulationResult.size,
+                        format: manipulationResult.format,
+                        p: this.request.ttl,
+                        dateCreated: Date.now(),
+                        publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
+                    };
+                    if (this.request.ttl) {
+                        resourceMetaDataOptions.privateTTL = this.request.ttl;
+                    }
+                    this.metaData = new ResourceMetaData_1.default(resourceMetaDataOptions);
+                }
+            }
+            else {
+                this.logger.log('Processing image manipulation...');
+                const manipulationResult = await this.webpImageManipulationJob.handle(this.getResourceTempPath, this.getResourcePath, this.request.resizeOptions);
+                const resourceMetaDataOptions = {
+                    size: manipulationResult.size,
+                    format: manipulationResult.format,
+                    p: this.request.ttl,
+                    dateCreated: Date.now(),
+                    publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
+                };
+                if (this.request.ttl) {
+                    resourceMetaDataOptions.privateTTL = this.request.ttl;
+                }
+                this.metaData = new ResourceMetaData_1.default(resourceMetaDataOptions);
+            }
+            await (0, promises_1.writeFile)(this.getResourceMetaPath, JSON.stringify(this.metaData));
+            try {
+                await (0, promises_1.unlink)(this.getResourceTempPath);
+            }
+            catch (error) {
+                this.logger.error(error);
+            }
+        }
+        catch (error) {
+            this.logger.error('Failed to execute CacheImageResourceOperation', error);
+            throw new common_1.InternalServerErrorException('Error fetching or processing image.');
+        }
     }
     async optimizeAndServeDefaultImage(resizeOptions) {
         const optionsString = this.createOptionsString(resizeOptions);
@@ -105,7 +188,8 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
             trimThreshold: 5,
             quality: 100,
         };
-        if (!(0, node_fs_1.existsSync)(optimizedImagePath)) {
+        const exists = await (0, promises_1.access)(optimizedImagePath).then(() => true).catch(() => false);
+        if (!exists) {
             const defaultImagePath = `${(0, node_process_1.cwd)()}/public/default.png`;
             await this.webpImageManipulationJob.handle(defaultImagePath, optimizedImagePath, resizeOptionsWithDefaults);
         }

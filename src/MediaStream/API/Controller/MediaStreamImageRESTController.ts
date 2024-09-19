@@ -1,6 +1,6 @@
 import type ResourceMetaData from '@microservice/DTO/ResourceMetaData'
 import type { Response } from 'express'
-import { createReadStream } from 'node:fs'
+import { open } from 'node:fs/promises'
 import * as process from 'node:process'
 import CacheImageRequest, {
 	BackgroundOptions,
@@ -37,55 +37,131 @@ export default class MediaStreamImageRESTController {
 	 * @protected
 	 */
 	protected static addHeadersToRequest(res: Response, headers: ResourceMetaData): Response {
-		const expiresAt = Date.now() + headers.publicTTL
-		return res
-			.header('Content-Type', `image/${headers.format}`)
-			.header('Content-Length', headers.size.toString())
-			.header('Cache-Control', `max-age=${headers.publicTTL / 1000}, public`)
+		if (!headers) {
+			throw new Error('Headers object is undefined')
+		}
+
+		const size = headers.size !== undefined ? headers.size.toString() : '0'
+		const format = headers.format || 'png'
+		const publicTTL = headers.publicTTL || 0
+		const expiresAt = Date.now() + publicTTL
+
+		res
+			.header('Content-Length', size)
+			.header('Cache-Control', `max-age=${publicTTL / 1000}, public`)
 			.header('Expires', new Date(expiresAt).toUTCString())
+
+		if (format === 'svg') {
+			res.header('Content-Type', 'image/svg+xml')
+		}
+		else {
+			res.header('Content-Type', `image/${format}`)
+		}
+
+		return res
 	}
 
 	/**
-	 * Streams the resource from the cacheImageResourceOperation
+	 * Handles streaming the resource or falling back to the default image.
 	 *
 	 * @param request
 	 * @param res
 	 * @protected
 	 */
-	private async streamRequestedResource(request: CacheImageRequest, res: Response): Promise<void> {
-		await this.cacheImageResourceOperation.setup(request)
-		if (this.cacheImageResourceOperation.resourceExists) {
-			const headers = this.cacheImageResourceOperation.getHeaders
-			res = MediaStreamImageRESTController.addHeadersToRequest(res, headers)
-			const stream = createReadStream(this.cacheImageResourceOperation.getResourcePath).pipe(res)
-			try {
-				await new Promise((resolve, reject) => {
-					stream.on('finish', () => resolve)
-					stream.on('error', () => reject)
-				})
+	private async handleStreamOrFallback(request: CacheImageRequest, res: Response): Promise<void> {
+		try {
+			await this.cacheImageResourceOperation.setup(request)
+
+			if (await this.cacheImageResourceOperation.resourceExists) {
+				await this.streamResource(request, res)
 			}
-			catch (e) {
-				// ignore failed stream to client for now
-				this.logger.error(e)
-			}
-			finally {
-				await this.cacheImageResourceOperation.execute()
+			else {
+				this.logger.debug('Resource does not exist, attempting to fetch or fallback to default.')
+				await this.fetchAndStreamResource(request, res)
 			}
 		}
-		else {
-			try {
-				await this.cacheImageResourceOperation.execute()
-				const headers = this.cacheImageResourceOperation.getHeaders
-				res = MediaStreamImageRESTController.addHeadersToRequest(res, headers)
-				createReadStream(this.cacheImageResourceOperation.getResourcePath).pipe(res)
-			}
-			catch (e) {
-				this.logger.warn(e)
-				await this.defaultImageFallback(request, res)
-			}
+		catch (error) {
+			this.logger.error('Error while processing the image request', error)
+			await this.defaultImageFallback(request, res)
 		}
 	}
 
+	/**
+	 * Streams the requested resource if it exists.
+	 *
+	 * @param request
+	 * @param res
+	 * @protected
+	 */
+	private async streamResource(request: CacheImageRequest, res: Response): Promise<void> {
+		const headers = await this.cacheImageResourceOperation.getHeaders
+		if (!headers) {
+			this.logger.warn('Resource metadata is missing or invalid.')
+			await this.defaultImageFallback(request, res)
+			return
+		}
+
+		try {
+			this.logger.log('Checking if res is writable stream:', typeof res.pipe)
+
+			const fd = await open(this.cacheImageResourceOperation.getResourcePath, 'r')
+			res = MediaStreamImageRESTController.addHeadersToRequest(res, headers)
+
+			const fileStream = fd.createReadStream()
+			fileStream.pipe(res)
+
+			await new Promise((resolve, reject) => {
+				fileStream.on('finish', resolve)
+				fileStream.on('error', (error) => {
+					this.logger.error('Stream error', error)
+					reject(error)
+				})
+			})
+		}
+		catch (error) {
+			this.logger.error('Error while streaming resource', error)
+			await this.defaultImageFallback(request, res)
+		}
+		finally {
+			await this.cacheImageResourceOperation.execute()
+		}
+	}
+
+	/**
+	 * Fetches the resource, processes it, and streams it.
+	 *
+	 * @param request
+	 * @param res
+	 * @protected
+	 */
+	private async fetchAndStreamResource(request: CacheImageRequest, res: Response): Promise<void> {
+		try {
+			await this.cacheImageResourceOperation.execute()
+			const headers = await this.cacheImageResourceOperation.getHeaders
+
+			if (!headers) {
+				this.logger.warn('Failed to fetch resource or generate headers.')
+				await this.defaultImageFallback(request, res)
+				return
+			}
+
+			const fd = await open(this.cacheImageResourceOperation.getResourcePath, 'r')
+			res = MediaStreamImageRESTController.addHeadersToRequest(res, headers)
+			fd.createReadStream().pipe(res)
+		}
+		catch (error) {
+			this.logger.error('Error during resource fetch and stream', error)
+			await this.defaultImageFallback(request, res)
+		}
+	}
+
+	/**
+	 * Provides a fallback to serve a default image in case of errors or missing resources.
+	 *
+	 * @param request
+	 * @param res
+	 * @protected
+	 */
 	private async defaultImageFallback(request: CacheImageRequest, res: Response): Promise<void> {
 		try {
 			const optimizedDefaultImagePath = await this.cacheImageResourceOperation.optimizeAndServeDefaultImage(
@@ -108,16 +184,16 @@ export default class MediaStreamImageRESTController {
 	)
 	public async uploadedImage(
     @Param('imageType') imageType: string,
-		@Param('image') image: string,
-		@Param('width') width: number = null,
-		@Param('height') height: number = null,
-		@Param('fit') fit: FitOptions = FitOptions.contain,
-		@Param('position') position = PositionOptions.entropy,
-		@Param('background') background = BackgroundOptions.transparent,
-		@Param('trimThreshold') trimThreshold = 5,
-		@Param('format') format: SupportedResizeFormats = SupportedResizeFormats.webp,
-		@Param('quality') quality = 100,
-		@Res() res: Response,
+    @Param('image') image: string,
+    @Param('width') width: number = null,
+    @Param('height') height: number = null,
+    @Param('fit') fit: FitOptions = FitOptions.contain,
+    @Param('position') position = PositionOptions.entropy,
+    @Param('background') background = BackgroundOptions.transparent,
+    @Param('trimThreshold') trimThreshold = 5,
+    @Param('format') format: SupportedResizeFormats = SupportedResizeFormats.webp,
+    @Param('quality') quality = 100,
+    @Res() res: Response,
 	): Promise<void> {
 		const resizeOptions = new ResizeOptions({
 			width,
@@ -129,6 +205,7 @@ export default class MediaStreamImageRESTController {
 			format,
 			quality,
 		})
+
 		const djangoApiUrl = process.env.NEST_PUBLIC_DJANGO_URL || 'http://localhost:8000'
 		const request = new CacheImageRequest({
 			resourceTarget: MediaStreamImageRESTController.resourceTargetPrepare(
@@ -136,7 +213,8 @@ export default class MediaStreamImageRESTController {
 			),
 			resizeOptions,
 		})
-		await this.streamRequestedResource(request, res)
+
+		await this.handleStreamOrFallback(request, res)
 	}
 
 	@Get('static/images/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?/:quality?')
@@ -166,7 +244,7 @@ export default class MediaStreamImageRESTController {
 				quality,
 			}),
 		})
-		await this.streamRequestedResource(request, res)
+		await this.handleStreamOrFallback(request, res)
 	}
 
 	@Get('img/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?/:quality?')
@@ -197,6 +275,6 @@ export default class MediaStreamImageRESTController {
 				quality,
 			}),
 		})
-		await this.streamRequestedResource(request, res)
+		await this.handleStreamOrFallback(request, res)
 	}
 }

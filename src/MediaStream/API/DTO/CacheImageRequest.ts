@@ -15,6 +15,7 @@ export enum SupportedResizeFormats {
 	png = 'png',
 	gif = 'gif',
 	tiff = 'tiff',
+	svg = 'svg',
 }
 
 export enum PositionOptions {
@@ -51,7 +52,6 @@ export enum FitOptions {
 }
 
 function parseColor(color: string): RGBA {
-	// Convert the background property from a hex color string to an RGBA color object
 	if (typeof color === 'string') {
 		if (color === 'transparent') {
 			return {
@@ -73,13 +73,12 @@ function parseColor(color: string): RGBA {
 				.join('')
 		}
 		const num = Number.parseInt(color, 16)
-		const colorToRgba = {
+		return {
 			r: num >> 16,
 			g: (num >> 8) & 255,
 			b: num & 255,
 			alpha: 1,
 		}
-		return colorToRgba
 	}
 	return color
 }
@@ -99,15 +98,15 @@ export class ResizeOptions {
 		this.width = width ?? null
 		this.height = height ?? null
 		this.trimThreshold = trimThreshold ? Number(trimThreshold) : null
-		this.background = typeof background === 'string' ? parseColor(background) : background
+		this.background = background ? parseColor(String(background)) : BackgroundOptions.white
 		this.fit = fit ?? FitOptions.contain
 		this.position = position ?? PositionOptions.entropy
 		this.format = format ?? SupportedResizeFormats.webp
-		this.quality = Number(quality) ?? 100
+		this.quality = quality !== undefined ? Number(quality) : 100
 
 		Object.assign(this, rest)
 		each(['width', 'height'], (sizeOption) => {
-			if (data[sizeOption] === null)
+			if (data && data[sizeOption] === null)
 				delete this[sizeOption]
 		})
 	}

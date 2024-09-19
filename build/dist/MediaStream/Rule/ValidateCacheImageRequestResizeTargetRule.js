@@ -20,7 +20,8 @@ let ValidateCacheImageRequestResizeTargetRule = class ValidateCacheImageRequestR
         this.request = request;
     }
     async apply() {
-        const pixelCount = this.request.resizeOptions.width + this.request.resizeOptions.height;
+        const { width, height } = this.request.resizeOptions;
+        const pixelCount = width * height;
         if (pixelCount > this.allowedPixelCount) {
             throw new RequestedResizeTargetTooLargeException_1.default(this.request.resizeOptions, this.allowedPixelCount);
         }

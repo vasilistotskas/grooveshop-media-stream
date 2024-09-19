@@ -2,8 +2,9 @@ import type {
 	ResizeOptions,
 } from '@microservice/API/DTO/CacheImageRequest'
 import type { ResourceIdentifierKP } from '@microservice/Constant/KeyProperties'
+import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, unlink, writeFileSync } from 'node:fs'
+import { access, readFile, unlink, writeFile } from 'node:fs/promises'
 import { cwd } from 'node:process'
 import CacheImageRequest, {
 	BackgroundOptions,
@@ -18,7 +19,7 @@ import StoreResourceResponseToFileJob from '@microservice/Job/StoreResourceRespo
 import WebpImageManipulationJob from '@microservice/Job/WebpImageManipulationJob'
 import ValidateCacheImageRequestRule from '@microservice/Rule/ValidateCacheImageRequestRule'
 import { HttpService } from '@nestjs/axios'
-import { Injectable, Logger, Scope } from '@nestjs/common'
+import { Injectable, InternalServerErrorException, Logger, Scope } from '@nestjs/common'
 
 @Injectable({ scope: Scope.REQUEST })
 export default class CacheImageResourceOperation {
@@ -51,27 +52,56 @@ export default class CacheImageResourceOperation {
 		return `${cwd()}/storage/${this.id}.rsm`
 	}
 
-	get resourceExists(): boolean {
-		if (!existsSync(this.getResourcePath))
-			return false
+	get resourceExists(): Promise<boolean> {
+		return (async () => {
+			const resourcePathExists = await access(this.getResourcePath).then(() => true).catch(() => false)
+			if (!resourcePathExists) {
+				this.logger.warn(`Resource path does not exist: ${this.getResourcePath}`)
+				return false
+			}
 
-		if (!existsSync(this.getResourceMetaPath))
-			return false
+			const resourceMetaPathExists = await access(this.getResourceMetaPath).then(() => true).catch(() => false)
+			if (!resourceMetaPathExists) {
+				this.logger.warn(`Metadata path does not exist: ${this.getResourceMetaPath}`)
+				return false
+			}
 
-		const headers = this.getHeaders
+			const headers = await this.getHeaders
 
-		if (!headers.version || headers.version !== 1)
-			return false
+			if (!headers) {
+				this.logger.warn('Metadata headers are missing or invalid')
+				return false
+			}
 
-		return headers.dateCreated + headers.privateTTL > Date.now()
+			if (!headers.version || headers.version !== 1) {
+				this.logger.warn('Invalid or missing version in metadata')
+				return false
+			}
+
+			return headers.dateCreated + headers.privateTTL > Date.now()
+		})()
 	}
 
-	get getHeaders(): ResourceMetaData {
-		if (this.metaData === null) {
-			this.metaData = JSON.parse(readFileSync(this.getResourceMetaPath) as unknown as string)
-		}
-
-		return this.metaData
+	get getHeaders(): Promise<ResourceMetaData> {
+		return (async () => {
+			if (!this.metaData) {
+				try {
+					const exists = await access(this.getResourceMetaPath).then(() => true).catch(() => false)
+					if (exists) {
+						this.metaData = JSON.parse(await readFile(this.getResourceMetaPath) as unknown as string)
+					}
+					else {
+						this.logger.warn(`Metadata file does not exist: ${this.getResourceMetaPath}`)
+						return null
+					}
+				}
+				catch (error) {
+					this.logger.error('Failed to read or parse resource metadata', error)
+					return null
+				}
+			}
+			return this.metaData
+		})()
 	}
 
 	public async setup(cacheImageRequest: CacheImageRequest): Promise<void> {
@@ -83,36 +113,107 @@ export default class CacheImageResourceOperation {
 	}
 
 	public async execute(): Promise<void> {
-		if (this.resourceExists) {
+		if (await this.resourceExists) {
+			this.logger.log('Resource already exists.')
 			return
 		}
 
-		const response = await this.fetchResourceResponseJob.handle(this.request)
-		await this.storeResourceResponseToFileJob.handle(this.request.resourceTarget, this.getResourceTempPath, response)
-		const manipulationResult = await this.webpImageManipulationJob.handle(
-			this.getResourceTempPath,
-			this.getResourcePath,
-			this.request.resizeOptions,
-		)
+		try {
+			const response = await this.fetchResourceResponseJob.handle(this.request)
 
-		const resourceMetaDataOptions = {
-			size: manipulationResult.size,
-			format: manipulationResult.format,
-			p: this.request.ttl,
-			dateCreated: Date.now(),
-			publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
-		} as unknown as ResourceMetaData
-		if (this.request.ttl) {
-			resourceMetaDataOptions.privateTTL = this.request.ttl
-		}
-		this.metaData = new ResourceMetaData(resourceMetaDataOptions)
-
-		writeFileSync(this.getResourceMetaPath, JSON.stringify(this.metaData))
-		unlink(this.getResourceTempPath, (err) => {
-			if (err !== null) {
-				this.logger.error(err)
+			if (!response) {
+				this.logger.error('Failed to fetch the resource. The response is empty or invalid.')
+				return
 			}
-		})
+
+			await this.storeResourceResponseToFileJob.handle(this.request.resourceTarget, this.getResourceTempPath, response)
+
+			if (this.request.resizeOptions.format === SupportedResizeFormats.svg) {
+				this.logger.log('Skipping manipulation for SVG format.')
+
+				let fileContent: string
+				try {
+					fileContent = await readFile(this.getResourceTempPath, 'utf8')
+				}
+				catch (error) {
+					this.logger.error('Failed to read file content', error)
+					throw new InternalServerErrorException('Error fetching or processing image.')
+				}
+
+				if (fileContent.trim().startsWith('<svg')) {
+					await writeFile(this.getResourcePath, fileContent)
+
+					this.logger.log(`Successfully validated and wrote SVG to resource path: ${this.getResourcePath}`)
+
+					const resourceMetaDataOptions = {
+						size: String(Buffer.byteLength(fileContent, 'utf8')),
+						format: SupportedResizeFormats.svg,
+						dateCreated: Date.now(),
+						publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
+					} as unknown as ResourceMetaData
+
+					this.metaData = new ResourceMetaData(resourceMetaDataOptions)
+
+					await writeFile(this.getResourceMetaPath, JSON.stringify(this.metaData))
+				}
+				else {
+					this.logger.warn('The file is not a valid SVG. Serving default WebP image.')
+					const manipulationResult = await this.webpImageManipulationJob.handle(
+						this.getResourceTempPath,
+						this.getResourcePath,
+						this.request.resizeOptions,
+					)
+					const resourceMetaDataOptions = {
+						size: manipulationResult.size,
+						format: manipulationResult.format,
+						p: this.request.ttl,
+						dateCreated: Date.now(),
+						publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
+					} as unknown as ResourceMetaData
+
+					if (this.request.ttl) {
+						resourceMetaDataOptions.privateTTL = this.request.ttl
+					}
+					this.metaData = new ResourceMetaData(resourceMetaDataOptions)
+				}
+			}
+
+			else {
+				this.logger.log('Processing image manipulation...')
+				const manipulationResult = await this.webpImageManipulationJob.handle(
+					this.getResourceTempPath,
+					this.getResourcePath,
+					this.request.resizeOptions,
+				)
+
+				const resourceMetaDataOptions = {
+					size: manipulationResult.size,
+					format: manipulationResult.format,
+					p: this.request.ttl,
+					dateCreated: Date.now(),
+					publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
+				} as unknown as ResourceMetaData
+
+				if (this.request.ttl) {
+					resourceMetaDataOptions.privateTTL = this.request.ttl
+				}
+
+				this.metaData = new ResourceMetaData(resourceMetaDataOptions)
+			}
+
+			await writeFile(this.getResourceMetaPath, JSON.stringify(this.metaData))
+
+			try {
+				await unlink(this.getResourceTempPath)
+			}
+			catch (error) {
+				this.logger.error(error)
+			}
+		}
+		catch (error) {
+			this.logger.error('Failed to execute CacheImageResourceOperation', error)
+			throw new InternalServerErrorException('Error fetching or processing image.')
+		}
 	}
 
 	public async optimizeAndServeDefaultImage(resizeOptions: ResizeOptions): Promise<string> {
@@ -130,7 +231,8 @@ export default class CacheImageResourceOperation {
 			quality: 100,
 		}
 
-		if (!existsSync(optimizedImagePath)) {
+		const exists = await access(optimizedImagePath).then(() => true).catch(() => false)
+		if (!exists) {
 			const defaultImagePath = `${cwd()}/public/default.png`
 			await this.webpImageManipulationJob.handle(defaultImagePath, optimizedImagePath, resizeOptionsWithDefaults)
 		}

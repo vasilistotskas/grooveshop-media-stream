@@ -24,7 +24,7 @@ export class CleanupService {
 					deletedFilesCount++
 				}
 			}
-			this.logger.log(`${deletedFilesCount} files deleted.`)
+			this.logger.debug(`${deletedFilesCount} files deleted.`)
 		}
 		catch (err) {
 			this.logger.error(`Error during cleanup: ${err}`)

@@ -1,3 +1,5 @@
+import type { ResizeOptions } from '@microservice/API/DTO/CacheImageRequest';
+import type { ResourceIdentifierKP } from '@microservice/Constant/KeyProperties';
 import CacheImageRequest from '@microservice/API/DTO/CacheImageRequest';
 import ResourceMetaData from '@microservice/DTO/ResourceMetaData';
 import FetchResourceResponseJob from '@microservice/Job/FetchResourceResponseJob';
@@ -6,8 +8,6 @@ import StoreResourceResponseToFileJob from '@microservice/Job/StoreResourceRespo
 import WebpImageManipulationJob from '@microservice/Job/WebpImageManipulationJob';
 import ValidateCacheImageRequestRule from '@microservice/Rule/ValidateCacheImageRequestRule';
 import { HttpService } from '@nestjs/axios';
-import type { ResizeOptions } from '@microservice/API/DTO/CacheImageRequest';
-import type { ResourceIdentifierKP } from '@microservice/Constant/KeyProperties';
 export default class CacheImageResourceOperation {
     private readonly httpService;
     private readonly validateCacheImageRequest;
@@ -23,8 +23,8 @@ export default class CacheImageResourceOperation {
     get getResourcePath(): string;
     get getResourceTempPath(): string;
     get getResourceMetaPath(): string;
-    get resourceExists(): boolean;
-    get getHeaders(): ResourceMetaData;
+    get resourceExists(): Promise<boolean>;
+    get getHeaders(): Promise<ResourceMetaData>;
     setup(cacheImageRequest: CacheImageRequest): Promise<void>;
     execute(): Promise<void>;
     optimizeAndServeDefaultImage(resizeOptions: ResizeOptions): Promise<string>;

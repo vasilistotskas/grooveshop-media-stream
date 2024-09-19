@@ -6,12 +6,9 @@ exports.defaultPublicTTL = 12 * 30 * 24 * 60 * 60 * 1000;
 exports.resourceMetaVersion = 1;
 class ResourceMetaData {
     constructor(data) {
-        if (!data.version)
-            this.version = exports.resourceMetaVersion;
-        if (!data.publicTTL)
-            this.publicTTL = exports.defaultPublicTTL;
-        if (!data.privateTTL)
-            this.privateTTL = exports.defaultPrivateTTL;
+        this.version = data?.version ?? exports.resourceMetaVersion;
+        this.publicTTL = data?.publicTTL ?? exports.defaultPublicTTL;
+        this.privateTTL = data?.privateTTL ?? exports.defaultPrivateTTL;
         Object.assign(this, data);
     }
 }

@@ -9,7 +9,7 @@ export default class FetchResourceResponseJob {
 	constructor(
 		private readonly httpService: HttpService,
 	) {
-		this.logger.log('HttpService has been injected successfully')
+		this.logger.debug('HttpService has been injected successfully')
 	}
 
 	async handle(request: CacheImageRequest): Promise<AxiosResponse> {

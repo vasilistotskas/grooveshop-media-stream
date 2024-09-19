@@ -1,5 +1,5 @@
 import type { AxiosResponse } from 'axios'
-import * as fs from 'node:fs'
+import { open } from 'node:fs/promises'
 import UnableToStoreFetchedResourceException from '@microservice/API/Exception/UnableToStoreFetchedResourceException'
 import { Injectable, Logger, Scope } from '@nestjs/common'
 
@@ -8,12 +8,14 @@ export default class StoreResourceResponseToFileJob {
 	private readonly logger = new Logger(StoreResourceResponseToFileJob.name)
 
 	async handle(resourceName: string, path: string, response: AxiosResponse): Promise<void> {
-		if (!response.data) {
-			this.logger.error('No data found in response')
+		if (!response.data || typeof response.data.pipe !== 'function') {
+			this.logger.error('No data found in response or data is not streamable')
 			throw new UnableToStoreFetchedResourceException(resourceName)
 		}
 
-		const fileStream = fs.createWriteStream(path)
+		const fd = await open(path, 'w')
+		const fileStream = fd.createWriteStream()
+
 		try {
 			response.data.pipe(fileStream)
 			await new Promise((resolve, reject) => {

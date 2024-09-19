@@ -39,7 +39,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 var MediaStreamImageRESTController_1;
 Object.defineProperty(exports, "__esModule", { value: true });
-const node_fs_1 = require("node:fs");
+const promises_1 = require("node:fs/promises");
 const process = __importStar(require("node:process"));
 const CacheImageRequest_1 = __importStar(require("../DTO/CacheImageRequest"));
 const RoutePrefixes_1 = require("../../Constant/RoutePrefixes");
@@ -55,43 +55,86 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
         this.logger = new common_1.Logger(MediaStreamImageRESTController_1.name);
     }
     static addHeadersToRequest(res, headers) {
-        const expiresAt = Date.now() + headers.publicTTL;
-        return res
-            .header('Content-Type', `image/${headers.format}`)
-            .header('Content-Length', headers.size.toString())
-            .header('Cache-Control', `max-age=${headers.publicTTL / 1000}, public`)
+        if (!headers) {
+            throw new Error('Headers object is undefined');
+        }
+        const size = headers.size !== undefined ? headers.size.toString() : '0';
+        const format = headers.format || 'png';
+        const publicTTL = headers.publicTTL || 0;
+        const expiresAt = Date.now() + publicTTL;
+        res
+            .header('Content-Length', size)
+            .header('Cache-Control', `max-age=${publicTTL / 1000}, public`)
             .header('Expires', new Date(expiresAt).toUTCString());
-    }
-    async streamRequestedResource(request, res) {
-        await this.cacheImageResourceOperation.setup(request);
-        if (this.cacheImageResourceOperation.resourceExists) {
-            const headers = this.cacheImageResourceOperation.getHeaders;
-            res = MediaStreamImageRESTController_1.addHeadersToRequest(res, headers);
-            const stream = (0, node_fs_1.createReadStream)(this.cacheImageResourceOperation.getResourcePath).pipe(res);
-            try {
-                await new Promise((resolve, reject) => {
-                    stream.on('finish', () => resolve);
-                    stream.on('error', () => reject);
-                });
-            }
-            catch (e) {
-                this.logger.error(e);
-            }
-            finally {
-                await this.cacheImageResourceOperation.execute();
-            }
+        if (format === 'svg') {
+            res.header('Content-Type', 'image/svg+xml');
         }
         else {
-            try {
-                await this.cacheImageResourceOperation.execute();
-                const headers = this.cacheImageResourceOperation.getHeaders;
-                res = MediaStreamImageRESTController_1.addHeadersToRequest(res, headers);
-                (0, node_fs_1.createReadStream)(this.cacheImageResourceOperation.getResourcePath).pipe(res);
+            res.header('Content-Type', `image/${format}`);
+        }
+        return res;
+    }
+    async handleStreamOrFallback(request, res) {
+        try {
+            await this.cacheImageResourceOperation.setup(request);
+            if (await this.cacheImageResourceOperation.resourceExists) {
+                await this.streamResource(request, res);
             }
-            catch (e) {
-                this.logger.warn(e);
+            else {
+                this.logger.debug('Resource does not exist, attempting to fetch or fallback to default.');
+                await this.fetchAndStreamResource(request, res);
+            }
+        }
+        catch (error) {
+            this.logger.error('Error while processing the image request', error);
+            await this.defaultImageFallback(request, res);
+        }
+    }
+    async streamResource(request, res) {
+        const headers = await this.cacheImageResourceOperation.getHeaders;
+        if (!headers) {
+            this.logger.warn('Resource metadata is missing or invalid.');
+            await this.defaultImageFallback(request, res);
+            return;
+        }
+        try {
+            this.logger.log('Checking if res is writable stream:', typeof res.pipe);
+            const fd = await (0, promises_1.open)(this.cacheImageResourceOperation.getResourcePath, 'r');
+            res = MediaStreamImageRESTController_1.addHeadersToRequest(res, headers);
+            const fileStream = fd.createReadStream();
+            fileStream.pipe(res);
+            await new Promise((resolve, reject) => {
+                fileStream.on('finish', resolve);
+                fileStream.on('error', (error) => {
+                    this.logger.error('Stream error', error);
+                    reject(error);
+                });
+            });
+        }
+        catch (error) {
+            this.logger.error('Error while streaming resource', error);
+            await this.defaultImageFallback(request, res);
+        }
+        finally {
+            await this.cacheImageResourceOperation.execute();
+        }
+    }
+    async fetchAndStreamResource(request, res) {
+        try {
+            await this.cacheImageResourceOperation.execute();
+            const headers = await this.cacheImageResourceOperation.getHeaders;
+            if (!headers) {
+                this.logger.warn('Failed to fetch resource or generate headers.');
                 await this.defaultImageFallback(request, res);
+                return;
             }
+            const fd = await (0, promises_1.open)(this.cacheImageResourceOperation.getResourcePath, 'r');
+            res = MediaStreamImageRESTController_1.addHeadersToRequest(res, headers);
+            fd.createReadStream().pipe(res);
+        }
+        catch (error) {
+            this.logger.error('Error during resource fetch and stream', error);
+            await this.defaultImageFallback(request, res);
         }
     }
     async defaultImageFallback(request, res) {
@@ -123,7 +166,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
             resourceTarget: MediaStreamImageRESTController_1.resourceTargetPrepare(`${djangoApiUrl}/media/uploads/${imageType}/${image}`),
             resizeOptions,
         });
-        await this.streamRequestedResource(request, res);
+        await this.handleStreamOrFallback(request, res);
     }
     async staticImage(image, width = null, height = null, fit = CacheImageRequest_1.FitOptions.contain, position = CacheImageRequest_1.PositionOptions.entropy, background = CacheImageRequest_1.BackgroundOptions.transparent, trimThreshold = 5, format = CacheImageRequest_1.SupportedResizeFormats.webp, quality = 100, res) {
         const djangoApiUrl = process.env.NEST_PUBLIC_DJANGO_URL || 'http://localhost:8000';
@@ -140,7 +183,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                 quality,
             }),
         });
-        await this.streamRequestedResource(request, res);
+        await this.handleStreamOrFallback(request, res);
     }
     async publicNuxtImage(image, width = null, height = null, fit = CacheImageRequest_1.FitOptions.contain, position = CacheImageRequest_1.PositionOptions.entropy, background = CacheImageRequest_1.BackgroundOptions.transparent, trimThreshold = 5, format = CacheImageRequest_1.SupportedResizeFormats.webp, quality = 100, res) {
         const nuxtPublicUrl = process.env.NEST_PUBLIC_NUXT_URL || 'http://localhost:3000';
@@ -157,7 +200,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                 quality,
             }),
         });
-        await this.streamRequestedResource(request, res);
+        await this.handleStreamOrFallback(request, res);
     }
 };
 __decorate([

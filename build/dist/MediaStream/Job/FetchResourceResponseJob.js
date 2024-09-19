@@ -16,7 +16,7 @@ let FetchResourceResponseJob = FetchResourceResponseJob_1 = class FetchResourceR
     constructor(httpService) {
         this.httpService = httpService;
         this.logger = new common_1.Logger(FetchResourceResponseJob_1.name);
-        this.logger.log('HttpService has been injected successfully');
+        this.logger.debug('HttpService has been injected successfully');
     }
     async handle(request) {
         try {
