@@ -1,3 +1,10 @@
+# [1.85.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.84.1...v1.85.0) (2024-09-19)
+
+
+### Features
+
+* Tests added, bug fixes and svg handle ([cf2cfee](https://github.com/vasilistotskas/grooveshop-media-stream/commit/cf2cfeec7e0b7f1cfae606e89fe0a6a80451a43b))
+
 ## [1.84.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.84.0...v1.84.1) (2024-09-13)
 
 
