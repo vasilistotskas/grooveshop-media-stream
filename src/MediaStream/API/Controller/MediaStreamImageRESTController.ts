@@ -81,7 +81,7 @@ export default class MediaStreamImageRESTController {
 			}
 		}
 		catch (error) {
-			this.logger.error('Error while processing the image request', error)
+			this.logger.error(`Error while processing the image request: ${error}`)
 			await this.defaultImageFallback(request, res)
 		}
 	}
@@ -102,7 +102,7 @@ export default class MediaStreamImageRESTController {
 		}
 
 		try {
-			this.logger.log('Checking if res is writable stream:', typeof res.pipe)
+			this.logger.debug(`Checking if res is writable stream: ${typeof res.pipe}`)
 
 			const fd = await open(this.cacheImageResourceOperation.getResourcePath, 'r')
 			res = MediaStreamImageRESTController.addHeadersToRequest(res, headers)
@@ -113,13 +113,13 @@ export default class MediaStreamImageRESTController {
 			await new Promise((resolve, reject) => {
 				fileStream.on('finish', resolve)
 				fileStream.on('error', (error) => {
-					this.logger.error('Stream error', error)
+					this.logger.error(`Stream error: ${error}`)
 					reject(error)
 				})
 			})
 		}
 		catch (error) {
-			this.logger.error('Error while streaming resource', error)
+			this.logger.error(`Error while streaming resource: ${error}`)
 			await this.defaultImageFallback(request, res)
 		}
 		finally {
@@ -150,7 +150,7 @@ export default class MediaStreamImageRESTController {
 			fd.createReadStream().pipe(res)
 		}
 		catch (error) {
-			this.logger.error('Error during resource fetch and stream', error)
+			this.logger.error(`Error during resource fetch and stream: ${error}`)
 			await this.defaultImageFallback(request, res)
 		}
 	}
@@ -170,7 +170,7 @@ export default class MediaStreamImageRESTController {
 			res.sendFile(optimizedDefaultImagePath)
 		}
 		catch (defaultImageError) {
-			this.logger.error('Failed to serve default image', defaultImageError)
+			this.logger.error(`Failed to serve default image: ${defaultImageError}`)
 			throw new InternalServerErrorException('Failed to process the image request.')
 		}
 	}

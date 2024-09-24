@@ -86,7 +86,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
             }
         }
         catch (error) {
-            this.logger.error('Error while processing the image request', error);
+            this.logger.error(`Error while processing the image request: ${error}`);
             await this.defaultImageFallback(request, res);
         }
     }
@@ -98,7 +98,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
             return;
         }
         try {
-            this.logger.log('Checking if res is writable stream:', typeof res.pipe);
+            this.logger.debug(`Checking if res is writable stream: ${typeof res.pipe}`);
             const fd = await (0, promises_1.open)(this.cacheImageResourceOperation.getResourcePath, 'r');
             res = MediaStreamImageRESTController_1.addHeadersToRequest(res, headers);
             const fileStream = fd.createReadStream();
@@ -106,13 +106,13 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
             await new Promise((resolve, reject) => {
                 fileStream.on('finish', resolve);
                 fileStream.on('error', (error) => {
-                    this.logger.error('Stream error', error);
+                    this.logger.error(`Stream error: ${error}`);
                     reject(error);
                 });
             });
         }
         catch (error) {
-            this.logger.error('Error while streaming resource', error);
+            this.logger.error(`Error while streaming resource: ${error}`);
             await this.defaultImageFallback(request, res);
         }
         finally {
@@ -133,7 +133,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
             fd.createReadStream().pipe(res);
         }
         catch (error) {
-            this.logger.error('Error during resource fetch and stream', error);
+            this.logger.error(`Error during resource fetch and stream: ${error}`);
             await this.defaultImageFallback(request, res);
         }
     }
@@ -143,7 +143,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
             res.sendFile(optimizedDefaultImagePath);
         }
         catch (defaultImageError) {
-            this.logger.error('Failed to serve default image', defaultImageError);
+            this.logger.error(`Failed to serve default image: ${defaultImageError}`);
             throw new common_1.InternalServerErrorException('Failed to process the image request.');
         }
     }

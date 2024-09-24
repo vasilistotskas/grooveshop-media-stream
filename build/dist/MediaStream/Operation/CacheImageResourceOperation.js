@@ -83,7 +83,7 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
                     }
                 }
                 catch (error) {
-                    this.logger.error('Failed to read or parse resource metadata', error);
+                    this.logger.error(`Failed to read or parse resource metadata: ${error}`);
                     return null;
                 }
             }
@@ -116,7 +116,7 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
                     fileContent = await (0, promises_1.readFile)(this.getResourceTempPath, 'utf8');
                 }
                 catch (error) {
-                    this.logger.error('Failed to read file content', error);
+                    this.logger.error(`Failed to read file content: ${error}`);
                     throw new common_1.InternalServerErrorException('Error fetching or processing image.');
                 }
                 if (fileContent.trim().startsWith('<svg')) {
@@ -171,7 +171,7 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
             }
         }
         catch (error) {
-            this.logger.error('Failed to execute CacheImageResourceOperation', error);
+            this.logger.error(`Failed to execute CacheImageResourceOperation: ${error}`);
             throw new common_1.InternalServerErrorException('Error fetching or processing image.');
         }
     }

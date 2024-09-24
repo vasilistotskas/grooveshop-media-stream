@@ -96,7 +96,7 @@ export default class CacheImageResourceOperation {
 					}
 				}
 				catch (error) {
-					this.logger.error('Failed to read or parse resource metadata', error)
+					this.logger.error(`Failed to read or parse resource metadata: ${error}`)
 					return null
 				}
 			}
@@ -136,7 +136,7 @@ export default class CacheImageResourceOperation {
 					fileContent = await readFile(this.getResourceTempPath, 'utf8')
 				}
 				catch (error) {
-					this.logger.error('Failed to read file content', error)
+					this.logger.error(`Failed to read file content: ${error}`)
 					throw new InternalServerErrorException('Error fetching or processing image.')
 				}
 
@@ -211,7 +211,7 @@ export default class CacheImageResourceOperation {
 			}
 		}
 		catch (error) {
-			this.logger.error('Failed to execute CacheImageResourceOperation', error)
+			this.logger.error(`Failed to execute CacheImageResourceOperation: ${error}`)
 			throw new InternalServerErrorException('Error fetching or processing image.')
 		}
 	}
