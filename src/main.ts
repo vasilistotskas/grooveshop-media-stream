@@ -7,4 +7,6 @@ async function bootstrap(): Promise<void> {
 	app.useStaticAssets('public')
 	await app.listen(3003)
 }
-bootstrap()
+bootstrap().catch((error) => {
+	console.error('Error during application bootstrap:', error)
+})

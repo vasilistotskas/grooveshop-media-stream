@@ -13,5 +13,7 @@ async function bootstrap() {
         }
     });
 }
-bootstrap();
+bootstrap().catch((error) => {
+    console.error('Error during application bootstrap:', error);
+});
 //# sourceMappingURL=repl.js.map

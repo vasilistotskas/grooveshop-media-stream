@@ -137,7 +137,6 @@ export default class CacheImageResourceOperation {
 				}
 				catch (error) {
 					this.logger.error(`Failed to read file content: ${error}`)
-					throw new InternalServerErrorException('Error fetching or processing image.')
 				}
 
 				if (fileContent.trim().startsWith('<svg')) {

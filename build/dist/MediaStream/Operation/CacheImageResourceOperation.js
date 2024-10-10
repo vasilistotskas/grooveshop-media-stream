@@ -117,7 +117,6 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
                 }
                 catch (error) {
                     this.logger.error(`Failed to read file content: ${error}`);
-                    throw new common_1.InternalServerErrorException('Error fetching or processing image.');
                 }
                 if (fileContent.trim().startsWith('<svg')) {
                     await (0, promises_1.writeFile)(this.getResourcePath, fileContent);
