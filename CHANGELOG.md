@@ -1,3 +1,10 @@
+## [1.91.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.91.0...v1.91.1) (2024-10-17)
+
+
+### Bug Fixes
+
+* **package.json:** remove `packageManager` ([824f789](https://github.com/vasilistotskas/grooveshop-media-stream/commit/824f7892b7047884cd258503e99e3222c9646e81))
+
 # [1.91.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.90.0...v1.91.0) (2024-10-17)
 
 
