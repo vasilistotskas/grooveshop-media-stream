@@ -51,7 +51,7 @@
     "uuid": "10.0.0"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "^3.7.3",
+    "@antfu/eslint-config": "^3.8.0",
     "@nestjs/cli": "10.4.5",
     "@nestjs/schematics": "10.2.0",
     "@nestjs/testing": "10.4.5",
@@ -66,7 +66,7 @@
     "@types/express": "5.0.0",
     "@types/jest": "29.5.13",
     "@types/lodash": "4.17.10",
-    "@types/node": "22.7.5",
+    "@types/node": "22.7.6",
     "@types/potrace": "^2.1.5",
     "@types/supertest": "6.0.2",
     "@types/uuid": "10.0.0",
@@ -125,8 +125,8 @@
     ]
   },
   "engines": {
-    "node": ">=22.9.0",
-    "npm": ">=10.8.2"
+    "node": ">=23.0.0",
+    "npm": ">=10.9.0"
   },
   "_moduleAliases": {
     "@microservice": "./build/dist"
