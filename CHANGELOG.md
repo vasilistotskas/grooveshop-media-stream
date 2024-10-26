@@ -1,3 +1,10 @@
+# [1.94.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.93.0...v1.94.0) (2024-10-26)
+
+
+### Features
+
+* Bump Versions and add robots.txt ([3eb5b31](https://github.com/vasilistotskas/grooveshop-media-stream/commit/3eb5b313e8651031dc3d6bee2f4d55bf88357e64))
+
 # [1.93.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.92.0...v1.93.0) (2024-10-24)
 
 
