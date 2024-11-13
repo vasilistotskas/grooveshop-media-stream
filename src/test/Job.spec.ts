@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import CacheImageRequest, {
 	BackgroundOptions,
 	FitOptions,
@@ -5,15 +6,9 @@ import CacheImageRequest, {
 	SupportedResizeFormats,
 } from '@microservice/API/DTO/CacheImageRequest'
 import GenerateResourceIdentityFromRequestJob from '@microservice/Job/GenerateResourceIdentityFromRequestJob'
-import { cloneDeep } from 'lodash'
-import { v5 as uuid5 } from 'uuid'
 
-jest.mock('uuid', () => ({
-	v5: jest.fn(),
-}))
-
-jest.mock('lodash', () => ({
-	cloneDeep: jest.fn(),
+jest.mock('node:crypto', () => ({
+	randomUUID: jest.fn(),
 }))
 
 describe('generateResourceIdentityFromRequestJob', () => {
@@ -27,7 +22,7 @@ describe('generateResourceIdentityFromRequestJob', () => {
 		expect(job).toBeDefined()
 	})
 
-	it('should generate a resource identifier using uuid5', async () => {
+	it('should generate a resource identifier using randomUUID', async () => {
 		const mockRequest = new CacheImageRequest({
 			resourceTarget: 'http://localhost/resource',
 			resizeOptions: {
@@ -42,16 +37,12 @@ describe('generateResourceIdentityFromRequestJob', () => {
 			},
 		})
 
-		const clonedRequest = { ...mockRequest }
-    ;(cloneDeep as jest.Mock).mockReturnValue(clonedRequest)
-
 		const mockUUID = 'mocked-uuid'
-    ;(uuid5 as unknown as jest.Mock).mockReturnValue(mockUUID)
+    ;(randomUUID as jest.Mock).mockReturnValue(mockUUID)
 
 		const result = await job.handle(mockRequest)
 
-		expect(cloneDeep).toHaveBeenCalledWith(mockRequest)
-		expect(uuid5).toHaveBeenCalledWith(JSON.stringify(clonedRequest), uuid5.URL)
+		expect(randomUUID).toHaveBeenCalled()
 		expect(result).toBe(mockUUID)
 	})
 })

@@ -6,13 +6,11 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const node_crypto_1 = require("node:crypto");
 const common_1 = require("@nestjs/common");
-const lodash_1 = require("lodash");
-const uuid_1 = require("uuid");
 let GenerateResourceIdentityFromRequestJob = class GenerateResourceIdentityFromRequestJob {
-    async handle(cacheImageRequest) {
-        const request = (0, lodash_1.cloneDeep)(cacheImageRequest);
-        return (0, uuid_1.v5)(JSON.stringify(request), uuid_1.v5.URL);
+    async handle(_cacheImageRequest) {
+        return (0, node_crypto_1.randomUUID)();
     }
 };
 GenerateResourceIdentityFromRequestJob = __decorate([
