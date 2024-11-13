@@ -1,3 +1,10 @@
+# [1.98.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.97.0...v1.98.0) (2024-11-13)
+
+
+### Features
+
+* Bump Versions and drop `uuid` in favor of `node:crypto`  method `randomUUID ` ([52fe1b9](https://github.com/vasilistotskas/grooveshop-media-stream/commit/52fe1b990f427a8a3a9905966258ba3ba0e4b426))
+
 # [1.97.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.96.0...v1.97.0) (2024-11-06)
 
 
