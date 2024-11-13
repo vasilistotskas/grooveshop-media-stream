@@ -1,3 +1,10 @@
+## [1.98.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.98.0...v1.98.1) (2024-11-13)
+
+
+### Bug Fixes
+
+* correct node version ([1efc36c](https://github.com/vasilistotskas/grooveshop-media-stream/commit/1efc36c749eb5815139c080ecb87e852bd090f7a))
+
 # [1.98.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.97.0...v1.98.0) (2024-11-13)
 
 
