@@ -1,3 +1,10 @@
+# [1.101.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.100.0...v1.101.0) (2024-11-21)
+
+
+### Features
+
+* Dockerization improved, Bump Versions ([6904081](https://github.com/vasilistotskas/grooveshop-media-stream/commit/690408164c525e910b396e1c043861722d0ed835))
+
 # [1.100.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.99.0...v1.100.0) (2024-11-19)
 
 
