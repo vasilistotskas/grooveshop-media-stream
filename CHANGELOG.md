@@ -1,3 +1,10 @@
+## [1.102.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.102.0...v1.102.1) (2024-11-21)
+
+
+### Bug Fixes
+
+* set `NODE_ENV` at `Dockerfile` ([a91ad04](https://github.com/vasilistotskas/grooveshop-media-stream/commit/a91ad04bf2e7506a9a15cab61bef5c95a8ba0ba8))
+
 # [1.102.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.101.0...v1.102.0) (2024-11-21)
 
 
