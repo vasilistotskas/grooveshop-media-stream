@@ -1,3 +1,10 @@
+# [1.102.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.101.0...v1.102.0) (2024-11-21)
+
+
+### Features
+
+* docker.yaml github file target ([dfbdea9](https://github.com/vasilistotskas/grooveshop-media-stream/commit/dfbdea9c65203b0f6cc59e5e0c6003bad5000501))
+
 # [1.101.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.100.0...v1.101.0) (2024-11-21)
 
 
