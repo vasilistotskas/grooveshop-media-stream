@@ -1,3 +1,10 @@
+## [1.103.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.103.1...v1.103.2) (2024-11-22)
+
+
+### Bug Fixes
+
+* revert stuff ([a250964](https://github.com/vasilistotskas/grooveshop-media-stream/commit/a25096405e32ec3af76c60f02623d4d4d9930c98))
+
 ## [1.103.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.103.0...v1.103.1) (2024-11-22)
 
 
