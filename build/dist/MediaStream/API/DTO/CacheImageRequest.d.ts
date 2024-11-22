@@ -1,8 +1,8 @@
 interface RGBA {
-    r?: number | undefined;
-    g?: number | undefined;
-    b?: number | undefined;
-    alpha?: number | undefined;
+    r?: number;
+    g?: number;
+    b?: number;
+    alpha?: number;
 }
 type Color = string | RGBA;
 export declare enum SupportedResizeFormats {
@@ -44,8 +44,8 @@ export declare enum FitOptions {
     outside = "outside"
 }
 export declare class ResizeOptions {
-    width: number;
-    height: number;
+    width: number | null;
+    height: number | null;
     fit: FitOptions;
     position: PositionOptions | string;
     format: SupportedResizeFormats;

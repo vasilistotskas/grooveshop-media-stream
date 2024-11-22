@@ -1,10 +1,8 @@
-import { each } from 'lodash'
-
 interface RGBA {
-	r?: number | undefined
-	g?: number | undefined
-	b?: number | undefined
-	alpha?: number | undefined
+	r?: number
+	g?: number
+	b?: number
+	alpha?: number
 }
 
 type Color = string | RGBA
@@ -67,9 +65,7 @@ function parseColor(color: string): RGBA {
 		if (color.length === 3) {
 			color = color
 				.split('')
-				.map((char) => {
-					return char + char
-				})
+				.map(char => char + char)
 				.join('')
 		}
 		const num = Number.parseInt(color, 16)
@@ -80,12 +76,12 @@ function parseColor(color: string): RGBA {
 			alpha: 1,
 		}
 	}
-	return color
+	return color as RGBA
 }
 
 export class ResizeOptions {
-	width: number = null
-	height: number = null
+	width: number | null = null
+	height: number | null = null
 	fit = FitOptions.contain
 	position: PositionOptions | string = PositionOptions.entropy
 	format = SupportedResizeFormats.webp
@@ -104,10 +100,13 @@ export class ResizeOptions {
 		this.format = format ?? SupportedResizeFormats.webp
 		this.quality = quality !== undefined ? Number(quality) : 100
 
-		Object.assign(this, rest)
-		each(['width', 'height'], (sizeOption) => {
-			if (data && data[sizeOption] === null)
+		Object.assign(this, rest);
+
+		// Correct usage of forEach with dot notation
+		['width', 'height'].forEach((sizeOption: keyof ResizeOptions) => {
+			if (data && data[sizeOption] === null) {
 				delete this[sizeOption]
+			}
 		})
 	}
 }

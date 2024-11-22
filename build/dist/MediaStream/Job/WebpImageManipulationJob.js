@@ -11,7 +11,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const ManipulationJobResult_1 = __importDefault(require("../DTO/ManipulationJobResult"));
 const common_1 = require("@nestjs/common");
-const lodash_1 = require("lodash");
 const sharp_1 = __importDefault(require("sharp"));
 let WebpImageManipulationJob = class WebpImageManipulationJob {
     async handle(filePathFrom, filePathTo, options) {
@@ -36,14 +35,17 @@ let WebpImageManipulationJob = class WebpImageManipulationJob {
                 manipulation.webp({ quality: options.quality });
         }
         const resizeScales = {};
-        (0, lodash_1.each)(['width', 'height'], (scale) => {
+        ['width', 'height'].forEach((scale) => {
             if (options[scale] !== null && !Number.isNaN(options[scale])) {
                 resizeScales[scale] = Number(options[scale]);
             }
         });
         if (Object.keys(resizeScales).length > 0) {
             if (options.trimThreshold !== null && !Number.isNaN(options.trimThreshold)) {
-                manipulation.trim({ background: options.background, threshold: Number(options.trimThreshold) });
+                manipulation.trim({
+                    background: options.background,
+                    threshold: Number(options.trimThreshold),
+                });
             }
             manipulation.resize({
                 ...resizeScales,

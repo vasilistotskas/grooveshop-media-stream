@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ResizeOptions = exports.FitOptions = exports.BackgroundOptions = exports.PositionOptions = exports.SupportedResizeFormats = void 0;
-const lodash_1 = require("lodash");
 var SupportedResizeFormats;
 (function (SupportedResizeFormats) {
     SupportedResizeFormats["webp"] = "webp";
@@ -60,9 +59,7 @@ function parseColor(color) {
         if (color.length === 3) {
             color = color
                 .split('')
-                .map((char) => {
-                return char + char;
-            })
+                .map(char => char + char)
                 .join('');
         }
         const num = Number.parseInt(color, 16);
@@ -95,9 +92,10 @@ class ResizeOptions {
         this.format = format ?? SupportedResizeFormats.webp;
         this.quality = quality !== undefined ? Number(quality) : 100;
         Object.assign(this, rest);
-        (0, lodash_1.each)(['width', 'height'], (sizeOption) => {
-            if (data && data[sizeOption] === null)
+        ['width', 'height'].forEach((sizeOption) => {
+            if (data && data[sizeOption] === null) {
                 delete this[sizeOption];
+            }
         });
     }
 }

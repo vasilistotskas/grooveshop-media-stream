@@ -1,13 +1,18 @@
 import type { ResizeOptions } from '@microservice/API/DTO/CacheImageRequest'
 import ManipulationJobResult from '@microservice/DTO/ManipulationJobResult'
 import { Injectable, Scope } from '@nestjs/common'
-import { each } from 'lodash'
 import sharp from 'sharp'
 
 @Injectable({ scope: Scope.REQUEST })
 export default class WebpImageManipulationJob {
-	async handle(filePathFrom: string, filePathTo: string, options: ResizeOptions): Promise<ManipulationJobResult> {
+	async handle(
+		filePathFrom: string,
+		filePathTo: string,
+		options: ResizeOptions,
+	): Promise<ManipulationJobResult> {
 		const manipulation = sharp(filePathFrom)
+
+		// Configure output format based on options.format
 		switch (options.format) {
 			case 'jpeg':
 				manipulation.jpeg({ quality: options.quality })
@@ -28,8 +33,9 @@ export default class WebpImageManipulationJob {
 				manipulation.webp({ quality: options.quality })
 		}
 
-		const resizeScales: Record<string, number> = {}
-		each(['width', 'height'], (scale) => {
+		const resizeScales: Record<string, number> = {};
+
+		['width', 'height'].forEach((scale: keyof ResizeOptions) => {
 			if (options[scale] !== null && !Number.isNaN(options[scale])) {
 				resizeScales[scale] = Number(options[scale])
 			}
@@ -37,7 +43,10 @@ export default class WebpImageManipulationJob {
 
 		if (Object.keys(resizeScales).length > 0) {
 			if (options.trimThreshold !== null && !Number.isNaN(options.trimThreshold)) {
-				manipulation.trim({ background: options.background, threshold: Number(options.trimThreshold) })
+				manipulation.trim({
+					background: options.background,
+					threshold: Number(options.trimThreshold),
+				})
 			}
 
 			manipulation.resize({
