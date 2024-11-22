@@ -1,3 +1,10 @@
+# [1.103.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.102.2...v1.103.0) (2024-11-22)
+
+
+### Features
+
+* drop lodash ([c31ad48](https://github.com/vasilistotskas/grooveshop-media-stream/commit/c31ad48b4f735b047a72bf435fd03f4ff3bfa3ea))
+
 ## [1.102.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.102.1...v1.102.2) (2024-11-22)
 
 
