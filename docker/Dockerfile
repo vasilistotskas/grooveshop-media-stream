@@ -21,8 +21,8 @@ COPY --from=build --chown=node:node /usr/src/app/node_modules ./node_modules
 COPY --from=build --chown=node:node /usr/src/app/package*.json ./
 COPY --from=build --chown=node:node /usr/src/app/nest-cli.json ./
 
-USER node
+RUN mkdir -p /usr/src/app/storage && chown -R node:node /usr/src/app/storage
 
-VOLUME ["/usr/src/app/storage"]
+USER node
 
 CMD ["node", "build/dist/main", "swc"]
