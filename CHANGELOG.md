@@ -1,3 +1,10 @@
+## [1.103.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.103.2...v1.103.3) (2024-11-22)
+
+
+### Bug Fixes
+
+* dockerfile ([c82409b](https://github.com/vasilistotskas/grooveshop-media-stream/commit/c82409be4a3181d9ac6caf146e6015b15b12c44a))
+
 ## [1.103.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.103.1...v1.103.2) (2024-11-22)
 
 
