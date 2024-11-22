@@ -1,3 +1,10 @@
+## [1.102.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.102.1...v1.102.2) (2024-11-22)
+
+
+### Bug Fixes
+
+* nest cli at production deps ([34db4ef](https://github.com/vasilistotskas/grooveshop-media-stream/commit/34db4eff81359484eec58524c8b194e7cbc5f586))
+
 ## [1.102.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.102.0...v1.102.1) (2024-11-21)
 
 
