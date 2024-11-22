@@ -1,3 +1,10 @@
+# [1.104.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.103.3...v1.104.0) (2024-11-22)
+
+
+### Features
+
+* docker target production ([ab97de6](https://github.com/vasilistotskas/grooveshop-media-stream/commit/ab97de68b6af82c6d180bd15b1a2b62eb40dfdec))
+
 ## [1.103.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.103.2...v1.103.3) (2024-11-22)
 
 
