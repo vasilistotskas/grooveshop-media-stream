@@ -1,3 +1,10 @@
+# [1.109.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.108.0...v1.109.0) (2024-12-08)
+
+
+### Features
+
+* remove qodana, Bump Versions ([cbf0cb5](https://github.com/vasilistotskas/grooveshop-media-stream/commit/cbf0cb540e2e1e40aa397cfa3dfe95da06477731))
+
 # [1.108.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.107.0...v1.108.0) (2024-12-04)
 
 
