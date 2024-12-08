@@ -1,0 +1,23 @@
+services:
+  service-media_stream:
+    container_name: service-media_stream
+    restart: no
+    image: gro0ve/grooveshop-media-stream:v1.102.1
+    env_file:
+      - ./grooveshop-media-stream/.env.docker
+    ports:
+      - "3003:3003"
+    networks:
+      - groovy-backbone
+
+  redis:
+    container_name: redis
+    image: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - groovy-backbone
+
+networks:
+  groovy-backbone:
+    driver: bridge

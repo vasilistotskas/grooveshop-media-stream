@@ -129,7 +129,7 @@ export default class CacheImageResourceOperation {
 			await this.storeResourceResponseToFileJob.handle(this.request.resourceTarget, this.getResourceTempPath, response)
 
 			if (this.request.resizeOptions.format === SupportedResizeFormats.svg) {
-				this.logger.log('Skipping manipulation for SVG format.')
+				this.logger.debug('Skipping manipulation for SVG format.')
 
 				let fileContent: string
 				try {
@@ -142,7 +142,7 @@ export default class CacheImageResourceOperation {
 				if (fileContent.trim().startsWith('<svg')) {
 					await writeFile(this.getResourcePath, fileContent)
 
-					this.logger.log(`Successfully validated and wrote SVG to resource path: ${this.getResourcePath}`)
+					this.logger.debug(`Successfully validated and wrote SVG to resource path: ${this.getResourcePath}`)
 
 					const resourceMetaDataOptions = {
 						size: String(Buffer.byteLength(fileContent, 'utf8')),

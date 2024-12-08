@@ -110,7 +110,7 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
             }
             await this.storeResourceResponseToFileJob.handle(this.request.resourceTarget, this.getResourceTempPath, response);
             if (this.request.resizeOptions.format === CacheImageRequest_1.SupportedResizeFormats.svg) {
-                this.logger.log('Skipping manipulation for SVG format.');
+                this.logger.debug('Skipping manipulation for SVG format.');
                 let fileContent;
                 try {
                     fileContent = await (0, promises_1.readFile)(this.getResourceTempPath, 'utf8');
@@ -120,7 +120,7 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
                 }
                 if (fileContent.trim().startsWith('<svg')) {
                     await (0, promises_1.writeFile)(this.getResourcePath, fileContent);
-                    this.logger.log(`Successfully validated and wrote SVG to resource path: ${this.getResourcePath}`);
+                    this.logger.debug(`Successfully validated and wrote SVG to resource path: ${this.getResourcePath}`);
                     const resourceMetaDataOptions = {
                         size: String(node_buffer_1.Buffer.byteLength(fileContent, 'utf8')),
                         format: CacheImageRequest_1.SupportedResizeFormats.svg,
