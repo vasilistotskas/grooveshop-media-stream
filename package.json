@@ -50,7 +50,7 @@
     "sharp": "0.33.5"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "^3.12.1",
+    "@antfu/eslint-config": "^3.14.0",
     "@nestjs/schematics": "10.2.3",
     "@nestjs/testing": "10.4.15",
     "@semantic-release/changelog": "6.0.3",
@@ -59,24 +59,24 @@
     "@semantic-release/github": "11.0.1",
     "@semantic-release/npm": "12.0.1",
     "@semantic-release/release-notes-generator": "14.0.3",
-    "@swc/cli": "0.5.2",
-    "@swc/core": "1.10.4",
+    "@swc/cli": "0.6.0",
+    "@swc/core": "1.10.7",
     "@types/express": "5.0.0",
     "@types/jest": "29.5.14",
     "@types/node": "22.10.5",
     "@types/potrace": "^2.1.5",
     "@types/supertest": "6.0.2",
     "coveralls": "3.1.1",
-    "eslint": "9.17.0",
+    "eslint": "9.18.0",
     "jest": "29.7.0",
     "semantic-release": "24.2.1",
     "source-map-support": "0.5.21",
     "supertest": "7.0.0",
     "ts-jest": "29.2.5",
-    "ts-loader": "9.5.1",
+    "ts-loader": "9.5.2",
     "ts-node": "10.9.2",
     "tsconfig-paths": "4.2.0",
-    "typescript": "5.7.2"
+    "typescript": "5.7.3"
   },
   "publishConfig": {
     "@vasilistotskas:registry": "https://npm.pkg.github.com"
