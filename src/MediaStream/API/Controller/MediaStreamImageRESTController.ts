@@ -180,7 +180,7 @@ export default class MediaStreamImageRESTController {
 	}
 
 	@Get(
-		'media/uploads/:imageType/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?/:quality?',
+		'media/uploads/:imageType/:image/:width/:height/:fit/:position/:background/:trimThreshold/:format/:quality',
 	)
 	public async uploadedImage(
     @Param('imageType') imageType: string,
@@ -217,7 +217,7 @@ export default class MediaStreamImageRESTController {
 		await this.handleStreamOrFallback(request, res)
 	}
 
-	@Get('static/images/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?/:quality?')
+	@Get('static/images/:image/:width/:height/:fit/:position/:background/:trimThreshold/:format/:quality')
 	public async staticImage(
 		@Param('image') image: string,
 		@Param('width') width: number = null,
@@ -247,7 +247,7 @@ export default class MediaStreamImageRESTController {
 		await this.handleStreamOrFallback(request, res)
 	}
 
-	@Get('img/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?/:quality?')
+	@Get('img/:image/:width/:height/:fit/:position/:background/:trimThreshold/:format/:quality')
 	public async publicNuxtImage(
 		@Param('image') image: string,
 		@Param('width') width: number = null,

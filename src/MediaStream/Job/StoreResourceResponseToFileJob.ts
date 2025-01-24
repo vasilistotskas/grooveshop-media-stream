@@ -18,8 +18,10 @@ export default class StoreResourceResponseToFileJob {
 
 		try {
 			response.data.pipe(fileStream)
-			await new Promise((resolve, reject) => {
-				fileStream.on('finish', resolve).on('error', reject)
+			await new Promise<void>((resolve, reject) => {
+				fileStream
+					.on('finish', () => resolve())
+					.on('error', error => reject(error))
 			})
 		}
 		catch (e) {

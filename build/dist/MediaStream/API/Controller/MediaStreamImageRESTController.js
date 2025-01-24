@@ -214,7 +214,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
     }
 };
 __decorate([
-    (0, common_1.Get)('media/uploads/:imageType/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?/:quality?'),
+    (0, common_1.Get)('media/uploads/:imageType/:image/:width/:height/:fit/:position/:background/:trimThreshold/:format/:quality'),
     __param(0, (0, common_1.Param)('imageType')),
     __param(1, (0, common_1.Param)('image')),
     __param(2, (0, common_1.Param)('width')),
@@ -231,7 +231,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], MediaStreamImageRESTController.prototype, "uploadedImage", null);
 __decorate([
-    (0, common_1.Get)('static/images/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?/:quality?'),
+    (0, common_1.Get)('static/images/:image/:width/:height/:fit/:position/:background/:trimThreshold/:format/:quality'),
     __param(0, (0, common_1.Param)('image')),
     __param(1, (0, common_1.Param)('width')),
     __param(2, (0, common_1.Param)('height')),
@@ -247,7 +247,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], MediaStreamImageRESTController.prototype, "staticImage", null);
 __decorate([
-    (0, common_1.Get)('img/:image/:width?/:height?/:fit?/:position?/:background?/:trimThreshold?/:format?/:quality?'),
+    (0, common_1.Get)('img/:image/:width/:height/:fit/:position/:background/:trimThreshold/:format/:quality'),
     __param(0, (0, common_1.Param)('image')),
     __param(1, (0, common_1.Param)('width')),
     __param(2, (0, common_1.Param)('height')),
