@@ -195,23 +195,6 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
         });
         await this.handleStreamOrFallback(request, res);
     }
-    async publicNuxtImage(image, width = null, height = null, fit = CacheImageRequest_1.FitOptions.contain, position = CacheImageRequest_1.PositionOptions.entropy, background = CacheImageRequest_1.BackgroundOptions.transparent, trimThreshold = 5, format = CacheImageRequest_1.SupportedResizeFormats.webp, quality = 100, res) {
-        const nuxtPublicUrl = process.env.NEST_PUBLIC_NUXT_URL || 'http://localhost:3000';
-        const request = new CacheImageRequest_1.default({
-            resourceTarget: MediaStreamImageRESTController_1.resourceTargetPrepare(`${nuxtPublicUrl}/img/${image}`),
-            resizeOptions: new CacheImageRequest_1.ResizeOptions({
-                width,
-                height,
-                position,
-                background,
-                fit,
-                trimThreshold,
-                format,
-                quality,
-            }),
-        });
-        await this.handleStreamOrFallback(request, res);
-    }
 };
 __decorate([
     (0, common_1.Get)('media/uploads/:imageType/:image/:width/:height/:fit/:position/:background/:trimThreshold/:format/:quality'),
@@ -246,22 +229,6 @@ __decorate([
     __metadata("design:paramtypes", [String, Number, Number, String, Object, Object, Object, String, Object, Object]),
     __metadata("design:returntype", Promise)
 ], MediaStreamImageRESTController.prototype, "staticImage", null);
-__decorate([
-    (0, common_1.Get)('img/:image/:width/:height/:fit/:position/:background/:trimThreshold/:format/:quality'),
-    __param(0, (0, common_1.Param)('image')),
-    __param(1, (0, common_1.Param)('width')),
-    __param(2, (0, common_1.Param)('height')),
-    __param(3, (0, common_1.Param)('fit')),
-    __param(4, (0, common_1.Param)('position')),
-    __param(5, (0, common_1.Param)('background')),
-    __param(6, (0, common_1.Param)('trimThreshold')),
-    __param(7, (0, common_1.Param)('format')),
-    __param(8, (0, common_1.Param)('quality')),
-    __param(9, (0, common_1.Res)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Number, Number, String, Object, Object, Object, String, Object, Object]),
-    __metadata("design:returntype", Promise)
-], MediaStreamImageRESTController.prototype, "publicNuxtImage", null);
 MediaStreamImageRESTController = MediaStreamImageRESTController_1 = __decorate([
     (0, common_1.Controller)({
         path: RoutePrefixes_1.IMAGE,

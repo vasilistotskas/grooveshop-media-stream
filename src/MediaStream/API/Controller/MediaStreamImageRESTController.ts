@@ -246,35 +246,4 @@ export default class MediaStreamImageRESTController {
 		})
 		await this.handleStreamOrFallback(request, res)
 	}
-
-	@Get('img/:image/:width/:height/:fit/:position/:background/:trimThreshold/:format/:quality')
-	public async publicNuxtImage(
-		@Param('image') image: string,
-		@Param('width') width: number = null,
-		@Param('height') height: number = null,
-		@Param('fit') fit: FitOptions = FitOptions.contain,
-		@Param('position') position = PositionOptions.entropy,
-		@Param('background') background = BackgroundOptions.transparent,
-		@Param('trimThreshold') trimThreshold = 5,
-		@Param('format') format: SupportedResizeFormats = SupportedResizeFormats.webp,
-		@Param('quality') quality = 100,
-		@Res() res: Response,
-	): Promise<void> {
-		const nuxtPublicUrl = process.env.NEST_PUBLIC_NUXT_URL || 'http://localhost:3000'
-
-		const request = new CacheImageRequest({
-			resourceTarget: MediaStreamImageRESTController.resourceTargetPrepare(`${nuxtPublicUrl}/img/${image}`),
-			resizeOptions: new ResizeOptions({
-				width,
-				height,
-				position,
-				background,
-				fit,
-				trimThreshold,
-				format,
-				quality,
-			}),
-		})
-		await this.handleStreamOrFallback(request, res)
-	}
 }

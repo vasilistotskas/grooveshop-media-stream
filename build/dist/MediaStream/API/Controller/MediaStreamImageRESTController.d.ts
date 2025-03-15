@@ -18,5 +18,4 @@ export default class MediaStreamImageRESTController {
     private static resourceTargetPrepare;
     uploadedImage(imageType: string, image: string, width: number, height: number, fit: FitOptions, position: PositionOptions, background: BackgroundOptions, trimThreshold: number, format: SupportedResizeFormats, quality: number, res: Response): Promise<void>;
     staticImage(image: string, width: number, height: number, fit: FitOptions, position: PositionOptions, background: BackgroundOptions, trimThreshold: number, format: SupportedResizeFormats, quality: number, res: Response): Promise<void>;
-    publicNuxtImage(image: string, width: number, height: number, fit: FitOptions, position: PositionOptions, background: BackgroundOptions, trimThreshold: number, format: SupportedResizeFormats, quality: number, res: Response): Promise<void>;
 }
