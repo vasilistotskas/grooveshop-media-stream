@@ -1,3 +1,10 @@
+# [1.120.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.119.0...v1.120.0) (2025-03-15)
+
+
+### Features
+
+* Bump Versions, remove `publicNuxtImage` ([e8e8196](https://github.com/vasilistotskas/grooveshop-media-stream/commit/e8e8196ad551d9fc659536ac49b255ace94e103d))
+
 # [1.119.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.118.0...v1.119.0) (2025-03-06)
 
 
