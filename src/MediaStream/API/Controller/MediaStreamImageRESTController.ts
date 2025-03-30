@@ -109,15 +109,21 @@ export default class MediaStreamImageRESTController {
 			res = MediaStreamImageRESTController.addHeadersToRequest(res, headers)
 
 			const fileStream = fd.createReadStream()
-			fileStream.pipe(res)
 
-			await new Promise((resolve, reject) => {
-				fileStream.on('finish', resolve)
-				fileStream.on('error', (error) => {
-					this.logger.error(`Stream error: ${error}`)
-					reject(error)
+			if (typeof res.on === 'function') {
+				fileStream.pipe(res)
+
+				await new Promise((resolve, reject) => {
+					fileStream.on('finish', resolve)
+					fileStream.on('error', (error) => {
+						this.logger.error(`Stream error: ${error}`)
+						reject(error)
+					})
 				})
-			})
+			}
+			else {
+				throw new TypeError('Response object is not a writable stream')
+			}
 		}
 		catch (error) {
 			this.logger.error(`Error while streaming resource: ${error}`)
@@ -148,7 +154,15 @@ export default class MediaStreamImageRESTController {
 
 			const fd = await open(this.cacheImageResourceOperation.getResourcePath, 'r')
 			res = MediaStreamImageRESTController.addHeadersToRequest(res, headers)
-			fd.createReadStream().pipe(res)
+
+			const fileStream = fd.createReadStream()
+
+			if (typeof res.on === 'function') {
+				fileStream.pipe(res)
+			}
+			else {
+				throw new TypeError('Response object is not a writable stream')
+			}
 		}
 		catch (error) {
 			this.logger.error(`Error during resource fetch and stream: ${error}`)
