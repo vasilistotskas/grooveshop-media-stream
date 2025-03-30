@@ -6,7 +6,7 @@ import { Cron, CronExpression } from '@nestjs/schedule'
 
 @Injectable()
 export class CleanupService {
-	private readonly logger = new Logger(CleanupService.name)
+	constructor(private readonly logger: Logger) {}
 
 	@Cron(CronExpression.EVERY_WEEK, {
 		name: 'cleanup',

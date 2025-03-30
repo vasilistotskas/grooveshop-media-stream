@@ -12,7 +12,6 @@ export default class WebpImageManipulationJob {
 	): Promise<ManipulationJobResult> {
 		const manipulation = sharp(filePathFrom)
 
-		// Configure output format based on options.format
 		switch (options.format) {
 			case 'jpeg':
 				manipulation.jpeg({ quality: options.quality })

@@ -17,7 +17,7 @@ describe('validateCacheImageRequestResizeTargetRule', () => {
 	it('should allow valid resize options within allowed pixel count', async () => {
 		const mockRequest: CacheImageRequest = new CacheImageRequest({
 			resizeOptions: new ResizeOptions({
-				width: 1920, // Small resolution within allowed limits
+				width: 1920,
 				height: 1080,
 			}),
 		})
@@ -29,7 +29,7 @@ describe('validateCacheImageRequestResizeTargetRule', () => {
 	it('should throw an exception when the requested pixel count exceeds the allowed limit', async () => {
 		const mockRequest: CacheImageRequest = new CacheImageRequest({
 			resizeOptions: new ResizeOptions({
-				width: 8000, // Exceeds allowed 8K pixel limit
+				width: 8000,
 				height: 5000,
 			}),
 		})
@@ -85,7 +85,7 @@ describe('validateCacheImageRequestRule', () => {
 	it('should throw an error if the resize target rule throws', async () => {
 		const mockRequest: CacheImageRequest = new CacheImageRequest({
 			resizeOptions: new ResizeOptions({
-				width: 8000, // Exceeds the allowed limit
+				width: 8000,
 				height: 5000,
 			}),
 		})

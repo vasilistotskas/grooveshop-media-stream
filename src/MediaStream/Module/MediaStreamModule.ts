@@ -8,7 +8,7 @@ import ValidateCacheImageRequestResizeTargetRule from '@microservice/Rule/Valida
 import ValidateCacheImageRequestRule from '@microservice/Rule/ValidateCacheImageRequestRule'
 import { TasksModule } from '@microservice/Tasks/tasks.module'
 import { HttpModule } from '@nestjs/axios'
-import { Module } from '@nestjs/common'
+import { Logger, Module } from '@nestjs/common'
 import { ScheduleModule } from '@nestjs/schedule'
 
 const controllers = [MediaStreamImageRESTController]
@@ -27,6 +27,6 @@ const rules = [ValidateCacheImageRequestRule, ValidateCacheImageRequestResizeTar
 @Module({
 	imports: [HttpModule, ScheduleModule.forRoot(), TasksModule],
 	controllers,
-	providers: [...jobs, ...rules, ...operations],
+	providers: [...jobs, ...rules, ...operations, Logger],
 })
 export default class MediaStreamModule {}

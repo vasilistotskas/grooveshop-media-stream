@@ -1,7 +1,7 @@
 import { CleanupService } from '@microservice/Tasks/cleanup.service'
-import { Module } from '@nestjs/common'
+import { Logger, Module } from '@nestjs/common'
 
 @Module({
-	providers: [CleanupService],
+	providers: [CleanupService, Logger],
 })
 export class TasksModule {}

@@ -12,6 +12,7 @@ var FetchResourceResponseJob_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 const axios_1 = require("@nestjs/axios");
 const common_1 = require("@nestjs/common");
+const axios_2 = require("axios");
 let FetchResourceResponseJob = FetchResourceResponseJob_1 = class FetchResourceResponseJob {
     constructor(httpService) {
         this.httpService = httpService;
@@ -27,14 +28,20 @@ let FetchResourceResponseJob = FetchResourceResponseJob_1 = class FetchResourceR
             });
         }
         catch (error) {
-            this.logger.error(error);
-            return {
-                status: 404,
-                statusText: 'Bad Request',
-                headers: {},
-                config: error.config,
-                data: null,
-            };
+            if ((0, axios_2.isAxiosError)(error)) {
+                this.logger.error(error.toJSON());
+                return {
+                    status: error.response?.status ?? 404,
+                    statusText: error.response?.statusText ?? 'Bad Request',
+                    headers: {},
+                    config: error.config,
+                    data: null,
+                };
+            }
+            else {
+                this.logger.error('Unknown error occurred while fetching resource');
+                throw error;
+            }
         }
     }
 };

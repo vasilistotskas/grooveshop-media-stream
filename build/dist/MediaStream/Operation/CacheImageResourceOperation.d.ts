@@ -16,6 +16,7 @@ export default class CacheImageResourceOperation {
     private readonly storeResourceResponseToFileJob;
     private readonly generateResourceIdentityFromRequestJob;
     private readonly logger;
+    private readonly basePath;
     constructor(httpService: HttpService, validateCacheImageRequest: ValidateCacheImageRequestRule, fetchResourceResponseJob: FetchResourceResponseJob, webpImageManipulationJob: WebpImageManipulationJob, storeResourceResponseToFileJob: StoreResourceResponseToFileJob, generateResourceIdentityFromRequestJob: GenerateResourceIdentityFromRequestJob);
     request: CacheImageRequest;
     id: ResourceIdentifierKP;

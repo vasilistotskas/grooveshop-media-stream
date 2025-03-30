@@ -23,7 +23,7 @@ describe('requestedResizeTargetTooLargeException', () => {
 			quality: 90,
 		}
 
-		const allowedPixelCount = 20000000 // e.g., 20 million pixels
+		const allowedPixelCount = 20000000
 		const expectedMessage = `Requested resize target (${resizeRequest.width}x${resizeRequest.height}) exceeded maximum allowed size of ${allowedPixelCount} total pixels`
 
 		const exception = new RequestedResizeTargetTooLargeException(resizeRequest, allowedPixelCount)

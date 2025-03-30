@@ -102,7 +102,6 @@ export class ResizeOptions {
 
 		Object.assign(this, rest);
 
-		// Correct usage of forEach with dot notation
 		['width', 'height'].forEach((sizeOption: keyof ResizeOptions) => {
 			if (data && data[sizeOption] === null) {
 				delete this[sizeOption]

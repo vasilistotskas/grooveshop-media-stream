@@ -36,7 +36,7 @@ MediaStreamModule = __decorate([
     (0, common_1.Module)({
         imports: [axios_1.HttpModule, schedule_1.ScheduleModule.forRoot(), tasks_module_1.TasksModule],
         controllers,
-        providers: [...jobs, ...rules, ...operations],
+        providers: [...jobs, ...rules, ...operations, common_1.Logger],
     })
 ], MediaStreamModule);
 exports.default = MediaStreamModule;
