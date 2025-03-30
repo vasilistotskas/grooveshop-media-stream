@@ -88,6 +88,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
         try {
             await this.cacheImageResourceOperation.setup(request);
             if (await this.cacheImageResourceOperation.resourceExists) {
+                this.logger.debug('Resource exists, attempting to stream.');
                 await this.streamResource(request, res);
             }
             else {
@@ -176,6 +177,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
             resourceTarget: MediaStreamImageRESTController_1.resourceTargetPrepare(`${djangoApiUrl}/media/uploads/${imageType}/${image}`),
             resizeOptions,
         });
+        this.logger.debug(`Request: ${JSON.stringify(request)}`);
         await this.handleStreamOrFallback(request, res);
     }
     async staticImage(image, width = null, height = null, fit = CacheImageRequest_1.FitOptions.contain, position = CacheImageRequest_1.PositionOptions.entropy, background = CacheImageRequest_1.BackgroundOptions.transparent, trimThreshold = 5, format = CacheImageRequest_1.SupportedResizeFormats.webp, quality = 100, res) {

@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import CacheImageRequest, {
 	BackgroundOptions,
 	FitOptions,
@@ -6,10 +5,6 @@ import CacheImageRequest, {
 	SupportedResizeFormats,
 } from '@microservice/API/DTO/CacheImageRequest'
 import GenerateResourceIdentityFromRequestJob from '@microservice/Job/GenerateResourceIdentityFromRequestJob'
-
-jest.mock('node:crypto', () => ({
-	randomUUID: jest.fn(),
-}))
 
 describe('generateResourceIdentityFromRequestJob', () => {
 	let job: GenerateResourceIdentityFromRequestJob
@@ -22,7 +17,7 @@ describe('generateResourceIdentityFromRequestJob', () => {
 		expect(job).toBeDefined()
 	})
 
-	it('should generate a resource identifier using randomUUID', async () => {
+	it('should generate a deterministic resource identifier', async () => {
 		const mockRequest = new CacheImageRequest({
 			resourceTarget: 'http://localhost/resource',
 			resizeOptions: {
@@ -37,12 +32,12 @@ describe('generateResourceIdentityFromRequestJob', () => {
 			},
 		})
 
-		const mockUUID = 'mocked-uuid'
-    ;(randomUUID as jest.Mock).mockReturnValue(mockUUID)
+		const id1 = await job.handle(mockRequest)
+		const id2 = await job.handle(mockRequest)
+		expect(id1).toEqual(id2)
 
-		const result = await job.handle(mockRequest)
-
-		expect(randomUUID).toHaveBeenCalled()
-		expect(result).toBe(mockUUID)
+		expect(id1).toMatch(
+			/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+		)
 	})
 })

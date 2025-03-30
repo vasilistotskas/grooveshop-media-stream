@@ -58,6 +58,7 @@ export default class CacheImageResourceOperation {
 	get resourceExists(): Promise<boolean> {
 		return (async () => {
 			try {
+				this.logger.debug(`Checking if resource exists: ${this.getResourcePath}`)
 				const resourcePathExists = await access(this.getResourcePath).then(() => true).catch(() => false)
 				if (!resourcePathExists) {
 					this.logger.warn(`Resource path does not exist: ${this.getResourcePath}`)

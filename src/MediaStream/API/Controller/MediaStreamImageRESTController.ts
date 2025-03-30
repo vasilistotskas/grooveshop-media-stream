@@ -73,6 +73,7 @@ export default class MediaStreamImageRESTController {
 			await this.cacheImageResourceOperation.setup(request)
 
 			if (await this.cacheImageResourceOperation.resourceExists) {
+				this.logger.debug('Resource exists, attempting to stream.')
 				await this.streamResource(request, res)
 			}
 			else {
@@ -213,6 +214,8 @@ export default class MediaStreamImageRESTController {
 			),
 			resizeOptions,
 		})
+
+		this.logger.debug(`Request: ${JSON.stringify(request)}`)
 
 		await this.handleStreamOrFallback(request, res)
 	}

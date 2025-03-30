@@ -84,6 +84,7 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
     get resourceExists() {
         return (async () => {
             try {
+                this.logger.debug(`Checking if resource exists: ${this.getResourcePath}`);
                 const resourcePathExists = await (0, promises_1.access)(this.getResourcePath).then(() => true).catch(() => false);
                 if (!resourcePathExists) {
                     this.logger.warn(`Resource path does not exist: ${this.getResourcePath}`);
