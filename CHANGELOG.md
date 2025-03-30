@@ -1,3 +1,16 @@
+# [1.121.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.120.0...v1.121.0) (2025-03-30)
+
+
+### Bug Fixes
+
+* handle TypeError in MediaStreamImageRESTController ([49f5e90](https://github.com/vasilistotskas/grooveshop-media-stream/commit/49f5e90aa0a6dde1a6b1cf130280f7c5c06760ab))
+* use deterministic UUID generation ([4bf77c4](https://github.com/vasilistotskas/grooveshop-media-stream/commit/4bf77c42f6c5b87281ac4213cf1173bb0c043930))
+
+
+### Features
+
+* add comprehensive test coverage ([996fae3](https://github.com/vasilistotskas/grooveshop-media-stream/commit/996fae381d69dfd4bffdfbcdf1cad13e76e56dab))
+
 # [1.120.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.119.0...v1.120.0) (2025-03-15)
 
 
