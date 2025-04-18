@@ -10,6 +10,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const MediaStreamImageRESTController_1 = __importDefault(require("../API/Controller/MediaStreamImageRESTController"));
+const MediaStreamExceptionFilter_1 = require("../Error/MediaStreamExceptionFilter");
 const FetchResourceResponseJob_1 = __importDefault(require("../Job/FetchResourceResponseJob"));
 const GenerateResourceIdentityFromRequestJob_1 = __importDefault(require("../Job/GenerateResourceIdentityFromRequestJob"));
 const StoreResourceResponseToFileJob_1 = __importDefault(require("../Job/StoreResourceResponseToFileJob"));
@@ -20,6 +21,7 @@ const ValidateCacheImageRequestRule_1 = __importDefault(require("../Rule/Validat
 const tasks_module_1 = require("../Tasks/tasks.module");
 const axios_1 = require("@nestjs/axios");
 const common_1 = require("@nestjs/common");
+const core_1 = require("@nestjs/core");
 const schedule_1 = require("@nestjs/schedule");
 const controllers = [MediaStreamImageRESTController_1.default];
 const operations = [CacheImageResourceOperation_1.default];
@@ -36,7 +38,15 @@ MediaStreamModule = __decorate([
     (0, common_1.Module)({
         imports: [axios_1.HttpModule, schedule_1.ScheduleModule.forRoot(), tasks_module_1.TasksModule],
         controllers,
-        providers: [...jobs, ...rules, ...operations, common_1.Logger],
+        providers: [
+            ...jobs,
+            ...rules,
+            ...operations,
+            {
+                provide: core_1.APP_FILTER,
+                useClass: MediaStreamExceptionFilter_1.MediaStreamExceptionFilter,
+            },
+        ],
     })
 ], MediaStreamModule);
 exports.default = MediaStreamModule;

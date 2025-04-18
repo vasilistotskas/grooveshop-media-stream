@@ -12,9 +12,20 @@ import { Response } from 'express'
 jest.mock('@nestjs/axios')
 jest.mock('@microservice/Job/GenerateResourceIdentityFromRequestJob')
 jest.mock('@microservice/Operation/CacheImageResourceOperation')
-jest.mock('node:fs/promises', () => ({
-	open: jest.fn(),
-}))
+jest.mock('node:fs/promises', () => {
+	return {
+		open: jest.fn().mockImplementation(() => {
+			return Promise.resolve({
+				createReadStream: jest.fn().mockImplementation(() => {
+					const mockReadStream = new Readable()
+					mockReadStream.push(null)
+					return mockReadStream
+				}),
+				close: jest.fn().mockResolvedValue(undefined),
+			})
+		}),
+	}
+})
 
 class TestMediaStreamImageRESTController extends MediaStreamImageRESTController {
 	public static testAddHeadersToRequest(res: Response, headers: ResourceMetaData): Response {
@@ -28,8 +39,6 @@ describe('mediaStreamImageRESTController', () => {
 	let mockGenerateResourceIdentityFromRequestJob: jest.Mocked<GenerateResourceIdentityFromRequestJob>
 	let mockCacheImageResourceOperation: jest.Mocked<CacheImageResourceOperation>
 	let mockResponse: jest.Mocked<Response>
-	let mockReadStream: Readable
-	let mockFileHandle: { createReadStream: jest.Mock }
 
 	beforeEach(async () => {
 		mockHttpService = {
@@ -61,20 +70,11 @@ describe('mediaStreamImageRESTController', () => {
 			writable: true,
 		})
 
-		mockReadStream = new Readable()
-		mockReadStream.push(null)
-
-		mockFileHandle = {
-			createReadStream: jest.fn().mockReturnValue(mockReadStream),
-		}
-
 		mockResponse = {
 			header: jest.fn().mockReturnThis(),
 			sendFile: jest.fn(),
 			pipe: jest.fn(),
 		} as any
-
-		jest.mocked(fs.open).mockResolvedValue(mockFileHandle as any)
 
 		const module: TestingModule = await Test.createTestingModule({
 			controllers: [MediaStreamImageRESTController],

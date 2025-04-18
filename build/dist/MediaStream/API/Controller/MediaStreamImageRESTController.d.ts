@@ -12,6 +12,7 @@ export default class MediaStreamImageRESTController {
     constructor(httpService: HttpService, generateResourceIdentityFromRequestJob: GenerateResourceIdentityFromRequestJob, cacheImageResourceOperation: CacheImageResourceOperation);
     protected static addHeadersToRequest(res: Response, headers: ResourceMetaData): Response;
     private handleStreamOrFallback;
+    private streamFileToResponse;
     private streamResource;
     private fetchAndStreamResource;
     private defaultImageFallback;

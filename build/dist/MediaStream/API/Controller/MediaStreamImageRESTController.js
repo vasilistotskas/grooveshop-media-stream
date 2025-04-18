@@ -53,6 +53,7 @@ const promises_1 = require("node:fs/promises");
 const process = __importStar(require("node:process"));
 const CacheImageRequest_1 = __importStar(require("../DTO/CacheImageRequest"));
 const RoutePrefixes_1 = require("../../Constant/RoutePrefixes");
+const MediaStreamErrors_1 = require("../../Error/MediaStreamErrors");
 const GenerateResourceIdentityFromRequestJob_1 = __importDefault(require("../../Job/GenerateResourceIdentityFromRequestJob"));
 const CacheImageResourceOperation_1 = __importDefault(require("../../Operation/CacheImageResourceOperation"));
 const axios_1 = require("@nestjs/axios");
@@ -66,7 +67,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
     }
     static addHeadersToRequest(res, headers) {
         if (!headers) {
-            throw new Error('Headers object is undefined');
+            throw new MediaStreamErrors_1.InvalidRequestError('Headers object is undefined', { headers });
         }
         const size = headers.size !== undefined ? headers.size.toString() : '0';
         const format = headers.format || 'png';
@@ -88,47 +89,77 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
         try {
             await this.cacheImageResourceOperation.setup(request);
             if (await this.cacheImageResourceOperation.resourceExists) {
-                this.logger.debug('Resource exists, attempting to stream.');
+                this.logger.debug('Resource exists, attempting to stream.', { request });
                 await this.streamResource(request, res);
             }
             else {
-                this.logger.debug('Resource does not exist, attempting to fetch or fallback to default.');
+                this.logger.debug('Resource does not exist, attempting to fetch or fallback to default.', { request });
                 await this.fetchAndStreamResource(request, res);
             }
         }
         catch (error) {
-            this.logger.error(`Error while processing the image request: ${error}`);
+            const context = { request, error };
+            this.logger.error(`Error while processing the image request: ${error.message || error}`, error, context);
             await this.defaultImageFallback(request, res);
         }
     }
-    async streamResource(request, res) {
-        const headers = await this.cacheImageResourceOperation.getHeaders;
-        if (!headers) {
-            this.logger.warn('Resource metadata is missing or invalid.');
-            await this.defaultImageFallback(request, res);
-            return;
-        }
+    async streamFileToResponse(filePath, headers, res) {
+        let fd = null;
         try {
-            this.logger.debug(`Checking if res is writable stream: ${typeof res.pipe}`);
-            const fd = await (0, promises_1.open)(this.cacheImageResourceOperation.getResourcePath, 'r');
+            this.logger.debug(`Streaming file: ${filePath}`, { filePath, headers });
+            fd = await (0, promises_1.open)(filePath, 'r');
             res = MediaStreamImageRESTController_1.addHeadersToRequest(res, headers);
             const fileStream = fd.createReadStream();
             if (typeof res.on === 'function') {
                 fileStream.pipe(res);
                 await new Promise((resolve, reject) => {
-                    fileStream.on('finish', resolve);
+                    fileStream.on('end', () => resolve());
                     fileStream.on('error', (error) => {
-                        this.logger.error(`Stream error: ${error}`);
-                        reject(error);
+                        const context = { filePath, headers, error };
+                        this.logger.error(`Stream error: ${error.message || error}`, error, context);
+                        reject(new MediaStreamErrors_1.ResourceStreamingError('Error streaming file', context));
+                    });
+                    res.on('close', () => {
+                        fileStream.destroy();
+                        resolve();
                     });
                 });
             }
             else {
-                throw new TypeError('Response object is not a writable stream');
+                throw new MediaStreamErrors_1.InvalidRequestError('Response object is not a writable stream', { filePath, headers });
             }
         }
         catch (error) {
-            this.logger.error(`Error while streaming resource: ${error}`);
+            if (error.name !== 'ResourceStreamingError') {
+                throw new MediaStreamErrors_1.ResourceStreamingError('Failed to stream file', { filePath, error: error.message || error });
+            }
+            throw error;
+        }
+        finally {
+            if (fd) {
+                await fd.close().catch((err) => {
+                    this.logger.error(`Error closing file descriptor: ${err.message || err}`, err, { filePath });
+                });
+            }
+        }
+    }
+    async streamResource(request, res) {
+        const headers = await this.cacheImageResourceOperation.getHeaders;
+        if (!headers) {
+            this.logger.warn('Resource metadata is missing or invalid.', { request });
+            await this.defaultImageFallback(request, res);
+            return;
+        }
+        try {
+            await this.streamFileToResponse(this.cacheImageResourceOperation.getResourcePath, headers, res);
+        }
+        catch (error) {
+            const context = {
+                request,
+                resourcePath: this.cacheImageResourceOperation.getResourcePath,
+                error: error.message || error,
+            };
+            this.logger.error(`Error while streaming resource: ${error.message || error}`, error, context);
             await this.defaultImageFallback(request, res);
         }
         finally {
@@ -140,22 +171,19 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
             await this.cacheImageResourceOperation.execute();
             const headers = await this.cacheImageResourceOperation.getHeaders;
             if (!headers) {
-                this.logger.warn('Failed to fetch resource or generate headers.');
+                this.logger.warn('Failed to fetch resource or generate headers.', { request });
                 await this.defaultImageFallback(request, res);
                 return;
             }
-            const fd = await (0, promises_1.open)(this.cacheImageResourceOperation.getResourcePath, 'r');
-            res = MediaStreamImageRESTController_1.addHeadersToRequest(res, headers);
-            const fileStream = fd.createReadStream();
-            if (typeof res.on === 'function') {
-                fileStream.pipe(res);
-            }
-            else {
-                throw new TypeError('Response object is not a writable stream');
-            }
+            await this.streamFileToResponse(this.cacheImageResourceOperation.getResourcePath, headers, res);
         }
         catch (error) {
-            this.logger.error(`Error during resource fetch and stream: ${error}`);
+            const context = {
+                request,
+                resourcePath: this.cacheImageResourceOperation.getResourcePath,
+                error: error.message || error,
+            };
+            this.logger.error(`Error during resource fetch and stream: ${error.message || error}`, error, context);
             await this.defaultImageFallback(request, res);
         }
     }
@@ -165,8 +193,13 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
             res.sendFile(optimizedDefaultImagePath);
         }
         catch (defaultImageError) {
-            this.logger.error(`Failed to serve default image: ${defaultImageError}`);
-            throw new common_1.InternalServerErrorException('Failed to process the image request.');
+            const context = {
+                request,
+                resizeOptions: request.resizeOptions,
+                error: defaultImageError.message || defaultImageError,
+            };
+            this.logger.error(`Failed to serve default image: ${defaultImageError.message || defaultImageError}`, defaultImageError, context);
+            throw new MediaStreamErrors_1.DefaultImageFallbackError('Failed to process the image request', context);
         }
     }
     static resourceTargetPrepare(resourceTarget) {
