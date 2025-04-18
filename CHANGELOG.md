@@ -1,3 +1,10 @@
+# [1.125.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.124.0...v1.125.0) (2025-04-18)
+
+
+### Features
+
+* improve error handling and request validation ([97c5611](https://github.com/vasilistotskas/grooveshop-media-stream/commit/97c56116b257338bc52492f63e102d7f9f81e2e0))
+
 # [1.124.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.123.0...v1.124.0) (2025-04-17)
 
 
