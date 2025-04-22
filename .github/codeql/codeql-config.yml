@@ -1,0 +1,18 @@
+name: "CodeQL Custom Configuration"
+
+queries:
+  # Add built-in queries for JavaScript
+  - uses: codeql/javascript-queries
+
+paths:
+  # Include these folders for analysis
+  - src/
+
+  # Exclude these folders from analysis
+  - exclude: tests/
+  - exclude: node_modules/
+
+paths-ignore:
+  - "**/dist/**"
+  - "**/build/**"
+  - "**/coverage/**"
