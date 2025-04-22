@@ -1,7 +1,7 @@
 name: "CodeQL Custom Configuration"
 
 queries:
-  - uses: github/codeql/javascript-queries@latest
+  - uses: github/codeql/javascript-queries
 
 paths:
   - src/
