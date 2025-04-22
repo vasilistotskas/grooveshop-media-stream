@@ -30,6 +30,13 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v2
 
+      - name: Verify SARIF file existence
+        run: |
+          if [ ! -f results.sarif ]; then
+            echo "Error: results.sarif file not found!"
+            exit 1
+          fi
+
       - name: Upload SARIF
         uses: actions/upload-artifact@v3
         with:
