@@ -1,3 +1,10 @@
+## [1.125.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.125.0...v1.125.1) (2025-04-22)
+
+
+### Bug Fixes
+
+* codeql ([a385124](https://github.com/vasilistotskas/grooveshop-media-stream/commit/a385124b45ca586e3d8a75c1fe0ffbe985ceae1c))
+
 # [1.125.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.124.0...v1.125.0) (2025-04-18)
 
 
