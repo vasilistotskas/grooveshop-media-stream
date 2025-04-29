@@ -41,7 +41,7 @@
     "@nestjs/platform-express": "11.1.0",
     "@nestjs/schedule": "6.0.0",
     "@nestjs/serve-static": "5.0.3",
-    "axios": "1.8.4",
+    "axios": "1.9.0",
     "express": "5.1.0",
     "module-alias": "2.2.3",
     "reflect-metadata": "0.2.2",
@@ -57,14 +57,14 @@
     "@semantic-release/changelog": "6.0.3",
     "@semantic-release/commit-analyzer": "13.0.1",
     "@semantic-release/git": "10.0.1",
-    "@semantic-release/github": "11.0.1",
+    "@semantic-release/github": "11.0.2",
     "@semantic-release/npm": "12.0.1",
     "@semantic-release/release-notes-generator": "14.0.3",
     "@swc/cli": "0.7.3",
     "@swc/core": "1.11.22",
     "@types/express": "5.0.1",
     "@types/jest": "29.5.14",
-    "@types/node": "22.14.1",
+    "@types/node": "22.15.3",
     "@types/potrace": "2.1.5",
     "@types/supertest": "6.0.3",
     "coveralls": "3.1.1",
@@ -124,7 +124,7 @@
   "_moduleAliases": {
     "@microservice": "./build/dist"
   },
-  "packageManager": "pnpm@10.9.0",
+  "packageManager": "pnpm@10.10.0",
   "pnpm": {
     "onlyBuiltDependencies": [
       "@nestjs/core",
