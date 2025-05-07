@@ -1,3 +1,10 @@
+# [1.129.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.128.0...v1.129.0) (2025-05-07)
+
+
+### Features
+
+* Bump Versions ([809dbeb](https://github.com/vasilistotskas/grooveshop-media-stream/commit/809dbeb804c8888a13c612e185397f40f3405469))
+
 # [1.128.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.127.0...v1.128.0) (2025-05-05)
 
 
