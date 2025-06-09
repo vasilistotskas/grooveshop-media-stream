@@ -1,3 +1,10 @@
+# [1.133.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.132.0...v1.133.0) (2025-06-09)
+
+
+### Features
+
+* Bump pnpm ([862bfce](https://github.com/vasilistotskas/grooveshop-media-stream/commit/862bfcead18d9b791adfa4e480779caf9d066b74))
+
 # [1.132.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.131.0...v1.132.0) (2025-06-07)
 
 
