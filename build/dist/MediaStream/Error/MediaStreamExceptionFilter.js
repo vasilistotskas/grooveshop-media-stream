@@ -12,11 +12,14 @@ var MediaStreamExceptionFilter_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MediaStreamExceptionFilter = void 0;
 const MediaStreamErrors_1 = require("./MediaStreamErrors");
+const correlation_service_1 = require("../Correlation/services/correlation.service");
+const logger_util_1 = require("../Correlation/utils/logger.util");
 const common_1 = require("@nestjs/common");
 const core_1 = require("@nestjs/core");
 let MediaStreamExceptionFilter = MediaStreamExceptionFilter_1 = class MediaStreamExceptionFilter {
-    constructor(httpAdapterHost) {
+    constructor(httpAdapterHost, correlationService) {
         this.httpAdapterHost = httpAdapterHost;
+        this.correlationService = correlationService;
         this.logger = new common_1.Logger(MediaStreamExceptionFilter_1.name);
     }
     catch(exception, host) {
@@ -29,7 +32,7 @@ let MediaStreamExceptionFilter = MediaStreamExceptionFilter_1 = class MediaStrea
         if (exception instanceof MediaStreamErrors_1.MediaStreamError) {
             status = exception.status;
             errorResponse = this.formatErrorResponse(exception, request);
-            this.logger.error(`MediaStream Error: ${exception.message}`, exception.toJSON());
+            logger_util_1.CorrelatedLogger.error(`MediaStream Error: ${exception.message}`, JSON.stringify(exception.toJSON()), MediaStreamExceptionFilter_1.name);
         }
         else if (exception instanceof common_1.HttpException) {
             status = exception.getStatus();
@@ -47,7 +50,7 @@ let MediaStreamExceptionFilter = MediaStreamExceptionFilter_1 = class MediaStrea
                     method: request.method,
                 },
             }, request);
-            this.logger.error(`HTTP Exception: ${exception.message}`, errorResponse);
+            logger_util_1.CorrelatedLogger.error(`HTTP Exception: ${exception.message}`, JSON.stringify(errorResponse), MediaStreamExceptionFilter_1.name);
         }
         else {
             status = common_1.HttpStatus.INTERNAL_SERVER_ERROR;
@@ -61,10 +64,7 @@ let MediaStreamExceptionFilter = MediaStreamExceptionFilter_1 = class MediaStrea
                     method: request.method,
                 },
             }, request);
-            this.logger.error(`Unexpected Error: ${exception.message}`, {
-                ...errorResponse,
-                stack: exception.stack,
-            });
+            logger_util_1.CorrelatedLogger.error(`Unexpected Error: ${exception.message}`, exception.stack || '', MediaStreamExceptionFilter_1.name);
         }
         httpAdapter.reply(response, errorResponse, status);
     }
@@ -72,6 +72,7 @@ let MediaStreamExceptionFilter = MediaStreamExceptionFilter_1 = class MediaStrea
         const timestamp = new Date().toISOString();
         const path = request.url;
         const method = request.method;
+        const correlationId = this.correlationService.getCorrelationId();
         if (error instanceof MediaStreamErrors_1.MediaStreamError) {
             const { stack, ...errorDetails } = error.toJSON();
             return {
@@ -79,6 +80,7 @@ let MediaStreamExceptionFilter = MediaStreamExceptionFilter_1 = class MediaStrea
                 timestamp,
                 path,
                 method,
+                correlationId,
             };
         }
         return {
@@ -89,6 +91,7 @@ let MediaStreamExceptionFilter = MediaStreamExceptionFilter_1 = class MediaStrea
             timestamp,
             path,
             method,
+            correlationId,
             context: error.context || {},
         };
     }
@@ -96,6 +99,7 @@ let MediaStreamExceptionFilter = MediaStreamExceptionFilter_1 = class MediaStrea
 exports.MediaStreamExceptionFilter = MediaStreamExceptionFilter;
 exports.MediaStreamExceptionFilter = MediaStreamExceptionFilter = MediaStreamExceptionFilter_1 = __decorate([
     (0, common_1.Catch)(),
-    __metadata("design:paramtypes", [core_1.HttpAdapterHost])
+    __metadata("design:paramtypes", [core_1.HttpAdapterHost,
+        correlation_service_1.CorrelationService])
 ], MediaStreamExceptionFilter);
 //# sourceMappingURL=MediaStreamExceptionFilter.js.map

@@ -1,3 +1,5 @@
+import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
+import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
 import { MediaStreamError } from '@microservice/Error/MediaStreamErrors'
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
@@ -11,7 +13,10 @@ import { Request, Response } from 'express'
 export class MediaStreamExceptionFilter implements ExceptionFilter {
 	private readonly logger = new Logger(MediaStreamExceptionFilter.name)
 
-	constructor(private readonly httpAdapterHost: HttpAdapterHost) {}
+	constructor(
+		private readonly httpAdapterHost: HttpAdapterHost,
+		private readonly correlationService: CorrelationService,
+	) {}
 
 	catch(exception: Error, host: ArgumentsHost): void {
 		const { httpAdapter } = this.httpAdapterHost
@@ -25,7 +30,7 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 		if (exception instanceof MediaStreamError) {
 			status = exception.status
 			errorResponse = this.formatErrorResponse(exception, request)
-			this.logger.error(`MediaStream Error: ${exception.message}`, exception.toJSON())
+			CorrelatedLogger.error(`MediaStream Error: ${exception.message}`, JSON.stringify(exception.toJSON()), MediaStreamExceptionFilter.name)
 		}
 		else if (exception instanceof HttpException) {
 			status = exception.getStatus()
@@ -45,7 +50,7 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 				},
 			}, request)
 
-			this.logger.error(`HTTP Exception: ${exception.message}`, errorResponse)
+			CorrelatedLogger.error(`HTTP Exception: ${exception.message}`, JSON.stringify(errorResponse), MediaStreamExceptionFilter.name)
 		}
 		else {
 			status = HttpStatus.INTERNAL_SERVER_ERROR
@@ -60,10 +65,7 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 				},
 			}, request)
 
-			this.logger.error(`Unexpected Error: ${exception.message}`, {
-				...errorResponse,
-				stack: exception.stack,
-			})
+			CorrelatedLogger.error(`Unexpected Error: ${exception.message}`, exception.stack || '', MediaStreamExceptionFilter.name)
 		}
 
 		httpAdapter.reply(response, errorResponse, status)
@@ -79,6 +81,7 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 		const timestamp = new Date().toISOString()
 		const path = request.url
 		const method = request.method
+		const correlationId = this.correlationService.getCorrelationId()
 
 		if (error instanceof MediaStreamError) {
 			const { stack, ...errorDetails } = error.toJSON()
@@ -87,6 +90,7 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 				timestamp,
 				path,
 				method,
+				correlationId,
 			}
 		}
 
@@ -98,6 +102,7 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 			timestamp,
 			path,
 			method,
+			correlationId,
 			context: error.context || {},
 		}
 	}

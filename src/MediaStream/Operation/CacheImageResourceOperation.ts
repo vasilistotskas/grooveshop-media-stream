@@ -13,6 +13,7 @@ import CacheImageRequest, {
 	PositionOptions,
 	SupportedResizeFormats,
 } from '@microservice/API/DTO/CacheImageRequest'
+import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
 import ResourceMetaData from '@microservice/DTO/ResourceMetaData'
 import FetchResourceResponseJob from '@microservice/Job/FetchResourceResponseJob'
 import GenerateResourceIdentityFromRequestJob from '@microservice/Job/GenerateResourceIdentityFromRequestJob'
@@ -58,35 +59,35 @@ export default class CacheImageResourceOperation {
 	get resourceExists(): Promise<boolean> {
 		return (async () => {
 			try {
-				this.logger.debug(`Checking if resource exists: ${this.getResourcePath}`)
+				CorrelatedLogger.debug(`Checking if resource exists: ${this.getResourcePath}`, CacheImageResourceOperation.name)
 				const resourcePathExists = await access(this.getResourcePath).then(() => true).catch(() => false)
 				if (!resourcePathExists) {
-					this.logger.warn(`Resource path does not exist: ${this.getResourcePath}`)
+					CorrelatedLogger.warn(`Resource path does not exist: ${this.getResourcePath}`, CacheImageResourceOperation.name)
 					return false
 				}
 
 				const resourceMetaPathExists = await access(this.getResourceMetaPath).then(() => true).catch(() => false)
 				if (!resourceMetaPathExists) {
-					this.logger.warn(`Metadata path does not exist: ${this.getResourceMetaPath}`)
+					CorrelatedLogger.warn(`Metadata path does not exist: ${this.getResourceMetaPath}`, CacheImageResourceOperation.name)
 					return false
 				}
 
 				const headers = await this.getHeaders
 
 				if (!headers) {
-					this.logger.warn('Metadata headers are missing or invalid')
+					CorrelatedLogger.warn('Metadata headers are missing or invalid', CacheImageResourceOperation.name)
 					return false
 				}
 
 				if (!headers.version || headers.version !== 1) {
-					this.logger.warn('Invalid or missing version in metadata')
+					CorrelatedLogger.warn('Invalid or missing version in metadata', CacheImageResourceOperation.name)
 					return false
 				}
 
 				return headers.dateCreated + headers.privateTTL > Date.now()
 			}
 			catch (error) {
-				this.logger.warn(`Error checking resource existence: ${error.message}`)
+				CorrelatedLogger.warn(`Error checking resource existence: ${error.message}`, CacheImageResourceOperation.name)
 				return false
 			}
 		})()
@@ -102,12 +103,12 @@ export default class CacheImageResourceOperation {
 						this.metaData = new ResourceMetaData(JSON.parse(content))
 					}
 					else {
-						this.logger.warn('Metadata file does not exist.')
+						CorrelatedLogger.warn('Metadata file does not exist.', CacheImageResourceOperation.name)
 						return null
 					}
 				}
 				catch (error) {
-					this.logger.error(`Failed to read or parse resource metadata: ${error}`)
+					CorrelatedLogger.error(`Failed to read or parse resource metadata: ${error}`, '', CacheImageResourceOperation.name)
 					return null
 				}
 			}
@@ -126,7 +127,7 @@ export default class CacheImageResourceOperation {
 	public async execute(): Promise<void> {
 		try {
 			if (await this.resourceExists) {
-				this.logger.log('Resource already exists.')
+				CorrelatedLogger.log('Resource already exists.', CacheImageResourceOperation.name)
 				return
 			}
 
@@ -138,11 +139,11 @@ export default class CacheImageResourceOperation {
 			await this.storeResourceResponseToFileJob.handle(this.request.resourceTarget, this.getResourceTempPath, response)
 
 			if (this.request.resourceTarget.toLowerCase().endsWith('.svg')) {
-				this.logger.debug('Processing SVG format.')
+				CorrelatedLogger.debug('Processing SVG format.', CacheImageResourceOperation.name)
 				try {
 					const svgContent = await readFile(this.getResourceTempPath, 'utf8')
 					if (!svgContent.toLowerCase().includes('<svg')) {
-						this.logger.warn('The file is not a valid SVG. Serving default WebP image.')
+						CorrelatedLogger.warn('The file is not a valid SVG. Serving default WebP image.', CacheImageResourceOperation.name)
 						await this.optimizeAndServeDefaultImage(this.request.resizeOptions)
 						return
 					}
@@ -157,7 +158,7 @@ export default class CacheImageResourceOperation {
 					})), 'utf8')
 				}
 				catch (error) {
-					this.logger.error(`Failed to process SVG: ${error.message}`)
+					CorrelatedLogger.error(`Failed to process SVG: ${error.message}`, error.stack, CacheImageResourceOperation.name)
 					throw error
 				}
 			}
@@ -182,11 +183,11 @@ export default class CacheImageResourceOperation {
 				await unlink(this.getResourceTempPath)
 			}
 			catch (error) {
-				this.logger.warn(`Failed to delete temporary file: ${error.message}`)
+				CorrelatedLogger.warn(`Failed to delete temporary file: ${error.message}`, CacheImageResourceOperation.name)
 			}
 		}
 		catch (error) {
-			this.logger.error(`Failed to execute CacheImageResourceOperation: ${error.message}`)
+			CorrelatedLogger.error(`Failed to execute CacheImageResourceOperation: ${error.message}`, error.stack, CacheImageResourceOperation.name)
 			throw new InternalServerErrorException('Error fetching or processing image.')
 		}
 	}

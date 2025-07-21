@@ -60,6 +60,7 @@ const WebpImageManipulationJob_1 = __importDefault(require("../Job/WebpImageMani
 const ValidateCacheImageRequestRule_1 = __importDefault(require("../Rule/ValidateCacheImageRequestRule"));
 const axios_1 = require("@nestjs/axios");
 const common_1 = require("@nestjs/common");
+const logger_util_1 = require("../Correlation/utils/logger.util");
 const UnableToFetchResourceException_1 = __importDefault(require("../API/Exception/UnableToFetchResourceException"));
 let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheImageResourceOperation {
     constructor(httpService, validateCacheImageRequest, fetchResourceResponseJob, webpImageManipulationJob, storeResourceResponseToFileJob, generateResourceIdentityFromRequestJob) {
@@ -84,30 +85,30 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
     get resourceExists() {
         return (async () => {
             try {
-                this.logger.debug(`Checking if resource exists: ${this.getResourcePath}`);
+                logger_util_1.CorrelatedLogger.debug(`Checking if resource exists: ${this.getResourcePath}`, CacheImageResourceOperation_1.name);
                 const resourcePathExists = await (0, promises_1.access)(this.getResourcePath).then(() => true).catch(() => false);
                 if (!resourcePathExists) {
-                    this.logger.warn(`Resource path does not exist: ${this.getResourcePath}`);
+                    logger_util_1.CorrelatedLogger.warn(`Resource path does not exist: ${this.getResourcePath}`, CacheImageResourceOperation_1.name);
                     return false;
                 }
                 const resourceMetaPathExists = await (0, promises_1.access)(this.getResourceMetaPath).then(() => true).catch(() => false);
                 if (!resourceMetaPathExists) {
-                    this.logger.warn(`Metadata path does not exist: ${this.getResourceMetaPath}`);
+                    logger_util_1.CorrelatedLogger.warn(`Metadata path does not exist: ${this.getResourceMetaPath}`, CacheImageResourceOperation_1.name);
                     return false;
                 }
                 const headers = await this.getHeaders;
                 if (!headers) {
-                    this.logger.warn('Metadata headers are missing or invalid');
+                    logger_util_1.CorrelatedLogger.warn('Metadata headers are missing or invalid', CacheImageResourceOperation_1.name);
                     return false;
                 }
                 if (!headers.version || headers.version !== 1) {
-                    this.logger.warn('Invalid or missing version in metadata');
+                    logger_util_1.CorrelatedLogger.warn('Invalid or missing version in metadata', CacheImageResourceOperation_1.name);
                     return false;
                 }
                 return headers.dateCreated + headers.privateTTL > Date.now();
             }
             catch (error) {
-                this.logger.warn(`Error checking resource existence: ${error.message}`);
+                logger_util_1.CorrelatedLogger.warn(`Error checking resource existence: ${error.message}`, CacheImageResourceOperation_1.name);
                 return false;
             }
         })();
@@ -122,12 +123,12 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
                         this.metaData = new ResourceMetaData_1.default(JSON.parse(content));
                     }
                     else {
-                        this.logger.warn('Metadata file does not exist.');
+                        logger_util_1.CorrelatedLogger.warn('Metadata file does not exist.', CacheImageResourceOperation_1.name);
                         return null;
                     }
                 }
                 catch (error) {
-                    this.logger.error(`Failed to read or parse resource metadata: ${error}`);
+                    logger_util_1.CorrelatedLogger.error(`Failed to read or parse resource metadata: ${error}`, '', CacheImageResourceOperation_1.name);
                     return null;
                 }
             }
@@ -144,7 +145,7 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
     async execute() {
         try {
             if (await this.resourceExists) {
-                this.logger.log('Resource already exists.');
+                logger_util_1.CorrelatedLogger.log('Resource already exists.', CacheImageResourceOperation_1.name);
                 return;
             }
             const response = await this.fetchResourceResponseJob.handle(this.request);
@@ -153,11 +154,11 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
             }
             await this.storeResourceResponseToFileJob.handle(this.request.resourceTarget, this.getResourceTempPath, response);
             if (this.request.resourceTarget.toLowerCase().endsWith('.svg')) {
-                this.logger.debug('Processing SVG format.');
+                logger_util_1.CorrelatedLogger.debug('Processing SVG format.', CacheImageResourceOperation_1.name);
                 try {
                     const svgContent = await (0, promises_1.readFile)(this.getResourceTempPath, 'utf8');
                     if (!svgContent.toLowerCase().includes('<svg')) {
-                        this.logger.warn('The file is not a valid SVG. Serving default WebP image.');
+                        logger_util_1.CorrelatedLogger.warn('The file is not a valid SVG. Serving default WebP image.', CacheImageResourceOperation_1.name);
                         await this.optimizeAndServeDefaultImage(this.request.resizeOptions);
                         return;
                     }
@@ -172,7 +173,7 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
                     })), 'utf8');
                 }
                 catch (error) {
-                    this.logger.error(`Failed to process SVG: ${error.message}`);
+                    logger_util_1.CorrelatedLogger.error(`Failed to process SVG: ${error.message}`, error.stack, CacheImageResourceOperation_1.name);
                     throw error;
                 }
             }
@@ -191,11 +192,11 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
                 await (0, promises_1.unlink)(this.getResourceTempPath);
             }
             catch (error) {
-                this.logger.warn(`Failed to delete temporary file: ${error.message}`);
+                logger_util_1.CorrelatedLogger.warn(`Failed to delete temporary file: ${error.message}`, CacheImageResourceOperation_1.name);
             }
         }
         catch (error) {
-            this.logger.error(`Failed to execute CacheImageResourceOperation: ${error.message}`);
+            logger_util_1.CorrelatedLogger.error(`Failed to execute CacheImageResourceOperation: ${error.message}`, error.stack, CacheImageResourceOperation_1.name);
             throw new common_1.InternalServerErrorException('Error fetching or processing image.');
         }
     }

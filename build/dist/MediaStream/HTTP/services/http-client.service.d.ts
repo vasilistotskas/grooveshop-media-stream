@@ -1,0 +1,36 @@
+import { OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import { AxiosRequestConfig, AxiosResponse } from 'axios';
+import { ConfigService } from '@microservice/Config/config.service';
+import { IHttpClient, HttpClientStats } from '../interfaces/http-client.interface';
+export declare class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDestroy {
+    private readonly httpService;
+    private readonly configService;
+    private readonly circuitBreaker;
+    private readonly httpAgent;
+    private readonly httpsAgent;
+    private readonly stats;
+    private totalResponseTime;
+    private readonly maxRetries;
+    private readonly retryDelay;
+    private readonly maxRetryDelay;
+    private readonly timeout;
+    constructor(httpService: HttpService, configService: ConfigService);
+    onModuleInit(): Promise<void>;
+    onModuleDestroy(): Promise<void>;
+    get<T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>;
+    post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>;
+    put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>;
+    delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>;
+    head<T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>;
+    patch<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>;
+    request<T = any>(config: AxiosRequestConfig): Promise<AxiosResponse<T>>;
+    getStats(): HttpClientStats;
+    resetStats(): void;
+    isCircuitOpen(): boolean;
+    resetCircuitBreaker(): void;
+    private executeRequest;
+    private isRetryableError;
+    private prepareConfig;
+    private configureAxios;
+}

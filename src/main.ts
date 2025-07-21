@@ -1,5 +1,6 @@
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import * as process from 'node:process'
+import { ConfigService } from '@microservice/Config/config.service'
 import MediaStreamModule from '@microservice/Module/MediaStreamModule'
 import { NestFactory } from '@nestjs/core'
 
@@ -11,18 +12,22 @@ import { NestFactory } from '@nestjs/core'
 export async function bootstrap(exitProcess = true): Promise<void> {
 	try {
 		const app = await NestFactory.create<NestExpressApplication>(MediaStreamModule)
+		const configService = app.get(ConfigService)
 
 		app.useStaticAssets('public')
+
+		const serverConfig = configService.get('server')
 		app.enableCors({
-			origin: '*',
-			methods: 'GET',
-			maxAge: 86400, // 24 hours
+			origin: serverConfig.cors.origin,
+			methods: serverConfig.cors.methods,
+			maxAge: serverConfig.cors.maxAge,
 		})
 
-		const port = process.env.PORT || 3003
-		await app.listen(port)
+		await app.listen(serverConfig.port, serverConfig.host)
+		console.log(`Application is running on: http://${serverConfig.host}:${serverConfig.port}`)
 	}
 	catch (error) {
+		console.error('Failed to start application:', error)
 		if (exitProcess) {
 			process.exit(1)
 		}

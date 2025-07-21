@@ -39,20 +39,24 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.bootstrap = bootstrap;
 const process = __importStar(require("node:process"));
 const MediaStreamModule_1 = __importDefault(require("./MediaStream/Module/MediaStreamModule"));
+const config_service_1 = require("./MediaStream/Config/config.service");
 const core_1 = require("@nestjs/core");
 async function bootstrap(exitProcess = true) {
     try {
         const app = await core_1.NestFactory.create(MediaStreamModule_1.default);
+        const configService = app.get(config_service_1.ConfigService);
         app.useStaticAssets('public');
+        const serverConfig = configService.get('server');
         app.enableCors({
-            origin: '*',
-            methods: 'GET',
-            maxAge: 86400,
+            origin: serverConfig.cors.origin,
+            methods: serverConfig.cors.methods,
+            maxAge: serverConfig.cors.maxAge,
         });
-        const port = process.env.PORT || 3003;
-        await app.listen(port);
+        await app.listen(serverConfig.port, serverConfig.host);
+        console.log(`Application is running on: http://${serverConfig.host}:${serverConfig.port}`);
     }
     catch (error) {
+        console.error('Failed to start application:', error);
         if (exitProcess) {
             process.exit(1);
         }

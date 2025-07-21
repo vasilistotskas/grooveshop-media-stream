@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
 import { MediaStreamError, ResourceNotFoundError } from '@microservice/Error/MediaStreamErrors'
 import { MediaStreamExceptionFilter } from '@microservice/Error/MediaStreamExceptionFilter'
 import { ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common'
@@ -15,6 +16,7 @@ describe('MediaStreamExceptionFilter', () => {
 	let mockSwitchToHttpFn: jest.Mock
 	let mockHttpAdapterHost: HttpAdapterHost
 	let mockHttpAdapterReply: jest.Mock
+	let mockCorrelationService: CorrelationService
 
 	beforeEach(() => {
 		mockRequest = {
@@ -45,7 +47,11 @@ describe('MediaStreamExceptionFilter', () => {
 			},
 		} as unknown as HttpAdapterHost
 
-		filter = new MediaStreamExceptionFilter(mockHttpAdapterHost)
+		mockCorrelationService = {
+			getCorrelationId: jest.fn().mockReturnValue('test-correlation-id'),
+		} as unknown as CorrelationService
+
+		filter = new MediaStreamExceptionFilter(mockHttpAdapterHost, mockCorrelationService)
 
 		jest.spyOn(console, 'error').mockImplementation(() => {})
 	})
