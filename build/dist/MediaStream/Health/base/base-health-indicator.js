@@ -19,7 +19,7 @@ let BaseHealthIndicator = class BaseHealthIndicator {
             timeout: 5000,
             retries: 3,
             threshold: 0.8,
-            ...options
+            ...options,
         };
     }
     async isHealthy() {
@@ -31,7 +31,7 @@ let BaseHealthIndicator = class BaseHealthIndicator {
                 timestamp: Date.now(),
                 status: 'healthy',
                 responseTime,
-                details: result[this.key] || {}
+                details: result[this.key] || {},
             };
             this.logger.debug(`Health check passed for ${this.key} in ${responseTime}ms`);
             return result;
@@ -42,7 +42,7 @@ let BaseHealthIndicator = class BaseHealthIndicator {
                 timestamp: Date.now(),
                 status: 'unhealthy',
                 responseTime,
-                details: { error: error instanceof Error ? error.message : 'Unknown error' }
+                details: { error: error instanceof Error ? error.message : 'Unknown error' },
             };
             this.logger.warn(`Health check failed for ${this.key}: ${error instanceof Error ? error.message : 'Unknown error'}`);
             return {
@@ -50,8 +50,8 @@ let BaseHealthIndicator = class BaseHealthIndicator {
                     status: 'down',
                     message: error instanceof Error ? error.message : 'Health check failed',
                     timestamp: new Date().toISOString(),
-                    responseTime
-                }
+                    responseTime,
+                },
             };
         }
     }
@@ -60,7 +60,7 @@ let BaseHealthIndicator = class BaseHealthIndicator {
             key: this.key,
             options: this.options,
             lastCheck: this.lastCheck,
-            description: this.getDescription()
+            description: this.getDescription(),
         };
     }
     getLastCheck() {
@@ -71,11 +71,11 @@ let BaseHealthIndicator = class BaseHealthIndicator {
             [this.key]: {
                 status: 'up',
                 timestamp: new Date().toISOString(),
-                ...details
-            }
+                ...details,
+            },
         };
     }
-    createUnhealthyResult(message, details = {}) {
+    createUnhealthyResult(message, _details = {}) {
         throw new Error(`${this.key} health check failed: ${message}`);
     }
     async executeWithTimeout(operation, timeoutMs = this.options.timeout || 5000) {

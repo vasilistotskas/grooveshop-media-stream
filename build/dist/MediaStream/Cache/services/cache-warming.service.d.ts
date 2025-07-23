@@ -1,7 +1,8 @@
-import { OnModuleInit } from '@nestjs/common';
-import { MemoryCacheService } from './memory-cache.service';
+import { Buffer } from 'node:buffer';
+import { MemoryCacheService } from '@microservice/Cache/services/memory-cache.service';
 import { ConfigService } from '@microservice/Config/config.service';
 import { MetricsService } from '@microservice/Metrics/services/metrics.service';
+import { OnModuleInit } from '@nestjs/common';
 export declare class CacheWarmingService implements OnModuleInit {
     private readonly memoryCacheService;
     private readonly configService;

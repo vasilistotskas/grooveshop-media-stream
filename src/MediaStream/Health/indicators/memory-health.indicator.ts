@@ -1,6 +1,7 @@
 import type { HealthIndicatorResult } from '@nestjs/terminus'
 import type { HealthCheckOptions } from '../interfaces/health-indicator.interface'
 import * as os from 'node:os'
+import * as process from 'node:process'
 import { Injectable } from '@nestjs/common'
 import { BaseHealthIndicator } from '../base/base-health-indicator'
 
@@ -54,16 +55,16 @@ export class MemoryHealthIndicator extends BaseHealthIndicator {
 				)
 			}
 
-			// Determine status based on thresholds
-			let status = 'healthy'
+			// Determine warning status for details
+			let detailStatus = 'healthy'
 			if (memoryInfo.memoryUsagePercentage >= this.warningThreshold
 				|| memoryInfo.heapUsagePercentage >= this.heapWarningThreshold) {
-				status = 'warning'
+				detailStatus = 'warning'
 			}
 
 			return this.createHealthyResult({
 				...memoryInfo,
-				status,
+				detailStatus,
 				thresholds: {
 					systemMemoryWarning: this.warningThreshold,
 					systemMemoryCritical: this.criticalThreshold,
@@ -118,8 +119,8 @@ export class MemoryHealthIndicator extends BaseHealthIndicator {
 	 * Force garbage collection if available (for testing/debugging)
 	 */
 	forceGarbageCollection(): boolean {
-		if (global.gc) {
-			global.gc()
+		if (globalThis.gc) {
+			globalThis.gc()
 			return true
 		}
 		return false

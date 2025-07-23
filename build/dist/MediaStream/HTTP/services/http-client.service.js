@@ -44,16 +44,16 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var HttpClientService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.HttpClientService = void 0;
-const common_1 = require("@nestjs/common");
-const axios_1 = require("@nestjs/axios");
+const http = __importStar(require("node:http"));
+const https = __importStar(require("node:https"));
+const node_perf_hooks_1 = require("node:perf_hooks");
 const config_service_1 = require("../../Config/config.service");
 const logger_util_1 = require("../../Correlation/utils/logger.util");
-const circuit_breaker_1 = require("../utils/circuit-breaker");
+const axios_1 = require("@nestjs/axios");
+const common_1 = require("@nestjs/common");
 const rxjs_1 = require("rxjs");
 const operators_1 = require("rxjs/operators");
-const http = __importStar(require("http"));
-const https = __importStar(require("https"));
-const perf_hooks_1 = require("perf_hooks");
+const circuit_breaker_1 = require("../utils/circuit-breaker");
 let HttpClientService = HttpClientService_1 = class HttpClientService {
     constructor(httpService, configService) {
         this.httpService = httpService;
@@ -147,7 +147,7 @@ let HttpClientService = HttpClientService_1 = class HttpClientService {
         if (this.circuitBreaker.isOpen()) {
             throw new Error('Circuit breaker is open');
         }
-        const startTime = perf_hooks_1.performance.now();
+        const startTime = node_perf_hooks_1.performance.now();
         this.stats.activeRequests++;
         this.stats.totalRequests++;
         try {
@@ -159,7 +159,7 @@ let HttpClientService = HttpClientService_1 = class HttpClientService {
                     return (0, rxjs_1.throwError)(() => error);
                 }
                 this.stats.retriedRequests++;
-                const delay = Math.min(this.retryDelay * Math.pow(2, attempt), this.maxRetryDelay);
+                const delay = Math.min(this.retryDelay * 2 ** attempt, this.maxRetryDelay);
                 logger_util_1.CorrelatedLogger.warn(`Retrying request (attempt ${attempt + 1}/${this.maxRetries}) after ${delay}ms: ${error.message}`, HttpClientService_1.name);
                 return (0, rxjs_1.timer)(delay);
             }))), (0, operators_1.tap)({
@@ -174,13 +174,13 @@ let HttpClientService = HttpClientService_1 = class HttpClientService {
                     logger_util_1.CorrelatedLogger.debug(`HTTP request succeeded: ${response.config?.method?.toUpperCase()} ${response.config?.url} ${response.status}`, HttpClientService_1.name);
                 },
             })));
-            const responseTime = perf_hooks_1.performance.now() - startTime;
+            const responseTime = node_perf_hooks_1.performance.now() - startTime;
             this.totalResponseTime += responseTime;
             this.stats.averageResponseTime = this.totalResponseTime / this.stats.successfulRequests;
             return response;
         }
         catch (error) {
-            const responseTime = perf_hooks_1.performance.now() - startTime;
+            const responseTime = node_perf_hooks_1.performance.now() - startTime;
             this.totalResponseTime += responseTime;
             throw error;
         }

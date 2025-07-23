@@ -1,6 +1,40 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PerformanceTracker = void 0;
+const process = __importStar(require("node:process"));
 const correlation_service_1 = require("../services/correlation.service");
 const logger_util_1 = require("./logger.util");
 class PerformanceTracker {
@@ -14,7 +48,7 @@ class PerformanceTracker {
         const phase = {
             name: phaseName,
             startTime: process.hrtime.bigint(),
-            metadata
+            metadata,
         };
         if (!this.phases.has(correlationId)) {
             this.phases.set(correlationId, []);
@@ -63,7 +97,7 @@ class PerformanceTracker {
             completedPhases: completedPhases.length,
             totalDuration,
             slowestPhase,
-            phases
+            phases,
         };
     }
     static clearPhases() {
@@ -82,7 +116,7 @@ class PerformanceTracker {
         catch (error) {
             this.endPhase(phaseName, {
                 success: false,
-                error: error instanceof Error ? error.message : 'Unknown error'
+                error: error instanceof Error ? error.message : 'Unknown error',
             });
             throw error;
         }
@@ -102,10 +136,8 @@ class PerformanceTracker {
             return;
         const context = this.getCorrelationService().getContext();
         const requestDuration = context?.duration;
-        logger_util_1.CorrelatedLogger.log(`Performance Summary: ${summary.completedPhases}/${summary.totalPhases} phases completed, ` +
-            `total phase time: ${summary.totalDuration.toFixed(2)}ms` +
-            (requestDuration ? `, request time: ${requestDuration.toFixed(2)}ms` : '') +
-            (summary.slowestPhase ? `, slowest: ${summary.slowestPhase.name} (${summary.slowestPhase.duration?.toFixed(2)}ms)` : ''), 'PerformanceTracker');
+        logger_util_1.CorrelatedLogger.log(`Performance Summary: ${summary.completedPhases}/${summary.totalPhases} phases completed, `
+            + `total phase time: ${summary.totalDuration.toFixed(2)}ms${requestDuration ? `, request time: ${requestDuration.toFixed(2)}ms` : ''}${summary.slowestPhase ? `, slowest: ${summary.slowestPhase.name} (${summary.slowestPhase.duration?.toFixed(2)}ms)` : ''}`, 'PerformanceTracker');
         this.clearPhases();
     }
 }

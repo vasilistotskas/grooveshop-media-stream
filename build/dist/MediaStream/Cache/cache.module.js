@@ -7,13 +7,15 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CacheModule = void 0;
-const common_1 = require("@nestjs/common");
-const schedule_1 = require("@nestjs/schedule");
-const memory_cache_service_1 = require("./services/memory-cache.service");
-const cache_warming_service_1 = require("./services/cache-warming.service");
 const cache_health_indicator_1 = require("./indicators/cache-health.indicator");
+const redis_health_indicator_1 = require("./indicators/redis-health.indicator");
+const cache_warming_service_1 = require("./services/cache-warming.service");
+const memory_cache_service_1 = require("./services/memory-cache.service");
+const redis_cache_service_1 = require("./services/redis-cache.service");
 const config_module_1 = require("../Config/config.module");
 const metrics_module_1 = require("../Metrics/metrics.module");
+const common_1 = require("@nestjs/common");
+const schedule_1 = require("@nestjs/schedule");
 let CacheModule = class CacheModule {
 };
 exports.CacheModule = CacheModule;
@@ -26,13 +28,17 @@ exports.CacheModule = CacheModule = __decorate([
         ],
         providers: [
             memory_cache_service_1.MemoryCacheService,
+            redis_cache_service_1.RedisCacheService,
             cache_warming_service_1.CacheWarmingService,
             cache_health_indicator_1.CacheHealthIndicator,
+            redis_health_indicator_1.RedisHealthIndicator,
         ],
         exports: [
             memory_cache_service_1.MemoryCacheService,
+            redis_cache_service_1.RedisCacheService,
             cache_warming_service_1.CacheWarmingService,
             cache_health_indicator_1.CacheHealthIndicator,
+            redis_health_indicator_1.RedisHealthIndicator,
         ],
     })
 ], CacheModule);

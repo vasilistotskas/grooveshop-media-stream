@@ -43,11 +43,11 @@ export class DiskSpaceHealthIndicator extends BaseHealthIndicator {
 				)
 			}
 
-			const status = diskInfo.usedPercentage >= this.warningThreshold ? 'warning' : 'healthy'
+			const detailStatus = diskInfo.usedPercentage >= this.warningThreshold ? 'warning' : 'healthy'
 
 			return this.createHealthyResult({
 				...diskInfo,
-				status,
+				detailStatus,
 				warningThreshold: this.warningThreshold,
 				criticalThreshold: this.criticalThreshold,
 			})
@@ -80,15 +80,13 @@ export class DiskSpaceHealthIndicator extends BaseHealthIndicator {
 		}
 		catch (error) {
 			// Fallback for systems that don't support statvfs
+			console.error(error)
 			return this.getFallbackDiskInfo()
 		}
 	}
 
 	private async getFallbackDiskInfo(): Promise<DiskSpaceInfo> {
 		try {
-			// Try to get basic directory info
-			const stats = await fs.stat(this.storagePath)
-
 			// For fallback, we'll estimate based on available system info
 			// This is a simplified approach when statvfs is not available
 			return {
@@ -100,6 +98,7 @@ export class DiskSpaceHealthIndicator extends BaseHealthIndicator {
 			}
 		}
 		catch (error) {
+			console.error(error)
 			throw new Error(`Unable to access storage directory: ${this.storagePath}`)
 		}
 	}

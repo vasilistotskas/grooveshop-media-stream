@@ -5,7 +5,7 @@ import { CorrelationService } from '../services/correlation.service'
  * Decorator to inject correlation ID into controller methods
  */
 export const CorrelationId = createParamDecorator(
-	(data: unknown, ctx: ExecutionContext): string | null => {
+	(_data: unknown, _ctx: ExecutionContext): string | null => {
 		const correlationService = new CorrelationService()
 		return correlationService.getCorrelationId()
 	},
@@ -15,7 +15,7 @@ export const CorrelationId = createParamDecorator(
  * Decorator to inject full request context into controller methods
  */
 export const RequestContext = createParamDecorator(
-	(data: unknown, ctx: ExecutionContext) => {
+	(_data: unknown, _ctx: ExecutionContext) => {
 		const correlationService = new CorrelationService()
 		return correlationService.getContext()
 	},

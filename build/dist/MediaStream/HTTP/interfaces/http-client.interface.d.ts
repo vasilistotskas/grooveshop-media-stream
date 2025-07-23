@@ -31,15 +31,15 @@ export interface HttpClientStats {
     queueSize: number;
 }
 export interface IHttpClient {
-    get<T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>;
-    post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>;
-    put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>;
-    delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>;
-    head<T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>;
-    patch<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>;
-    request<T = any>(config: AxiosRequestConfig): Promise<AxiosResponse<T>>;
-    getStats(): HttpClientStats;
-    resetStats(): void;
-    isCircuitOpen(): boolean;
-    resetCircuitBreaker(): void;
+    get: <T = any>(url: string, config?: AxiosRequestConfig) => Promise<AxiosResponse<T>>;
+    post: <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => Promise<AxiosResponse<T>>;
+    put: <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => Promise<AxiosResponse<T>>;
+    delete: <T = any>(url: string, config?: AxiosRequestConfig) => Promise<AxiosResponse<T>>;
+    head: <T = any>(url: string, config?: AxiosRequestConfig) => Promise<AxiosResponse<T>>;
+    patch: <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => Promise<AxiosResponse<T>>;
+    request: <T = any>(config: AxiosRequestConfig) => Promise<AxiosResponse<T>>;
+    getStats: () => HttpClientStats;
+    resetStats: () => void;
+    isCircuitOpen: () => boolean;
+    resetCircuitBreaker: () => void;
 }

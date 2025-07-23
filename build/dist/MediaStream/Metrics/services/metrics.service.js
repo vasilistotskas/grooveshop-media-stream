@@ -44,8 +44,9 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var MetricsService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MetricsService = void 0;
-const common_1 = require("@nestjs/common");
+const process = __importStar(require("node:process"));
 const config_service_1 = require("../../Config/config.service");
+const common_1 = require("@nestjs/common");
 const promClient = __importStar(require("prom-client"));
 let MetricsService = MetricsService_1 = class MetricsService {
     constructor(configService) {
@@ -54,69 +55,69 @@ let MetricsService = MetricsService_1 = class MetricsService {
         this.register = new promClient.Registry();
         promClient.collectDefaultMetrics({
             register: this.register,
-            prefix: 'mediastream_'
+            prefix: 'mediastream_',
         });
         this.httpRequestsTotal = new promClient.Counter({
             name: 'mediastream_http_requests_total',
             help: 'Total number of HTTP requests',
             labelNames: ['method', 'route', 'status_code'],
-            registers: [this.register]
+            registers: [this.register],
         });
         this.httpRequestDuration = new promClient.Histogram({
             name: 'mediastream_http_request_duration_seconds',
             help: 'Duration of HTTP requests in seconds',
             labelNames: ['method', 'route', 'status_code'],
             buckets: [0.1, 0.5, 1, 2, 5, 10],
-            registers: [this.register]
+            registers: [this.register],
         });
         this.memoryUsage = new promClient.Gauge({
             name: 'mediastream_memory_usage_bytes',
             help: 'Memory usage in bytes',
             labelNames: ['type'],
-            registers: [this.register]
+            registers: [this.register],
         });
         this.diskSpaceUsage = new promClient.Gauge({
             name: 'mediastream_disk_space_usage_bytes',
             help: 'Disk space usage in bytes',
             labelNames: ['type', 'path'],
-            registers: [this.register]
+            registers: [this.register],
         });
         this.cacheHitRatio = new promClient.Gauge({
             name: 'mediastream_cache_hit_ratio',
             help: 'Cache hit ratio (0-1)',
             labelNames: ['cache_type'],
-            registers: [this.register]
+            registers: [this.register],
         });
         this.activeConnections = new promClient.Gauge({
             name: 'mediastream_active_connections',
             help: 'Number of active connections',
             labelNames: ['type'],
-            registers: [this.register]
+            registers: [this.register],
         });
         this.imageProcessingDuration = new promClient.Histogram({
             name: 'mediastream_image_processing_duration_seconds',
             help: 'Duration of image processing operations in seconds',
             labelNames: ['operation', 'format', 'status'],
             buckets: [0.1, 0.5, 1, 2, 5, 10, 30],
-            registers: [this.register]
+            registers: [this.register],
         });
         this.imageProcessingTotal = new promClient.Counter({
             name: 'mediastream_image_processing_total',
             help: 'Total number of image processing operations',
             labelNames: ['operation', 'format', 'status'],
-            registers: [this.register]
+            registers: [this.register],
         });
         this.cacheOperationsTotal = new promClient.Counter({
             name: 'mediastream_cache_operations_total',
             help: 'Total number of cache operations',
             labelNames: ['operation', 'cache_type', 'status'],
-            registers: [this.register]
+            registers: [this.register],
         });
         this.errorTotal = new promClient.Counter({
             name: 'mediastream_errors_total',
             help: 'Total number of errors',
             labelNames: ['type', 'operation'],
-            registers: [this.register]
+            registers: [this.register],
         });
     }
     async onModuleInit() {
@@ -181,7 +182,7 @@ let MetricsService = MetricsService_1 = class MetricsService {
                 rss: memoryUsage.rss,
                 heapTotal: memoryUsage.heapTotal,
                 heapUsed: memoryUsage.heapUsed,
-                external: memoryUsage.external
+                external: memoryUsage.external,
             });
             this.logger.debug('System metrics collected');
         }

@@ -1,8 +1,8 @@
-import { OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
-import { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { ConfigService } from '@microservice/Config/config.service';
-import { IHttpClient, HttpClientStats } from '../interfaces/http-client.interface';
+import { HttpService } from '@nestjs/axios';
+import { OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { AxiosRequestConfig, AxiosResponse } from 'axios';
+import { HttpClientStats, IHttpClient } from '../interfaces/http-client.interface';
 export declare class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDestroy {
     private readonly httpService;
     private readonly configService;

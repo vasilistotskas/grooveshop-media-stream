@@ -7,7 +7,7 @@ class CorrelatedLogger {
         const correlationId = this.correlationService.getCorrelationId();
         const prefix = correlationId ? `[${correlationId}]` : '';
         const contextStr = context ? ` [${context}]` : '';
-        console.log(`${prefix}${contextStr} ${message}`);
+        console.warn(`${prefix}${contextStr} ${message}`);
     }
     static error(message, trace, context) {
         const correlationId = this.correlationService.getCorrelationId();
@@ -28,13 +28,13 @@ class CorrelatedLogger {
         const correlationId = this.correlationService.getCorrelationId();
         const prefix = correlationId ? `[${correlationId}]` : '';
         const contextStr = context ? ` [${context}]` : '';
-        console.debug(`${prefix}${contextStr} DEBUG: ${message}`);
+        console.warn(`${prefix}${contextStr} DEBUG: ${message}`);
     }
     static verbose(message, context) {
         const correlationId = this.correlationService.getCorrelationId();
         const prefix = correlationId ? `[${correlationId}]` : '';
         const contextStr = context ? ` [${context}]` : '';
-        console.log(`${prefix}${contextStr} VERBOSE: ${message}`);
+        console.warn(`${prefix}${contextStr} VERBOSE: ${message}`);
     }
 }
 exports.CorrelatedLogger = CorrelatedLogger;

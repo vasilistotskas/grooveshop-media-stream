@@ -109,7 +109,7 @@ export abstract class BaseHealthIndicator implements IHealthIndicator {
 	/**
 	 * Helper method to create an unhealthy result
 	 */
-	protected createUnhealthyResult(message: string, details: Record<string, any> = {}): HealthIndicatorResult {
+	protected createUnhealthyResult(message: string, _details: Record<string, any> = {}): HealthIndicatorResult {
 		throw new Error(`${this.key} health check failed: ${message}`)
 	}
 

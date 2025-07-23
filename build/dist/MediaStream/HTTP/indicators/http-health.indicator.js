@@ -11,11 +11,11 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var HttpHealthIndicator_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.HttpHealthIndicator = void 0;
+const config_service_1 = require("../../Config/config.service");
+const logger_util_1 = require("../../Correlation/utils/logger.util");
 const common_1 = require("@nestjs/common");
 const terminus_1 = require("@nestjs/terminus");
 const http_client_service_1 = require("../services/http-client.service");
-const config_service_1 = require("../../Config/config.service");
-const logger_util_1 = require("../../Correlation/utils/logger.util");
 let HttpHealthIndicator = HttpHealthIndicator_1 = class HttpHealthIndicator extends terminus_1.HealthIndicator {
     constructor(httpClient, configService) {
         super();
@@ -65,7 +65,7 @@ let HttpHealthIndicator = HttpHealthIndicator_1 = class HttpHealthIndicator exte
                     };
                 }
             });
-            const successCount = checks.filter((check) => check.success).length;
+            const successCount = checks.filter(check => check.success).length;
             const isHealthy = successCount === checks.length && !circuitBreakerOpen;
             if (!isHealthy) {
                 logger_util_1.CorrelatedLogger.warn(`HTTP health check failed: ${successCount}/${checks.length} endpoints healthy`, HttpHealthIndicator_1.name);

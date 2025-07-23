@@ -6,6 +6,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 describe('redisHealthIndicator', () => {
 	let indicator: RedisHealthIndicator
 	let redisCacheService: jest.Mocked<RedisCacheService>
+	// eslint-disable-next-line unused-imports/no-unused-vars
 	let configService: jest.Mocked<ConfigService>
 
 	const mockConfig = {
@@ -109,8 +110,6 @@ describe('redisHealthIndicator', () => {
 		})
 
 		it('should return unhealthy status when GET operation fails', async () => {
-			const testValue = { timestamp: Date.now(), test: true }
-
 			redisCacheService.ping.mockResolvedValue('PONG')
 			redisCacheService.set.mockResolvedValue(undefined)
 			redisCacheService.get.mockResolvedValue({ timestamp: 123, test: true }) // Different timestamp
@@ -227,17 +226,17 @@ describe('redisHealthIndicator', () => {
 
 			const result = await indicator.isHealthy()
 
-			expect(result.redis.warnings).toContain(
-				expect.stringContaining('Cache hit rate (33%) is below optimal (70%)'),
+			expect(result.redis.warnings).toEqual(
+				expect.arrayContaining([
+					expect.stringContaining('Cache hit rate (33%) is below optimal (70%)'),
+				]),
 			)
-			expect(result.redis.warnings).toContain(
-				expect.stringContaining('Memory fragmentation (2) is high (>1.5)'),
-			)
-			expect(result.redis.warnings).toContain(
-				expect.stringContaining('Redis has recorded 3 errors'),
-			)
-			expect(result.redis.warnings).toContain(
-				expect.stringContaining('Memory usage (200MB) is high'),
+			expect(result.redis.warnings).toEqual(
+				expect.arrayContaining([
+					expect.stringContaining('Memory fragmentation (2) is high (>1.5)'),
+					expect.stringContaining('Redis has recorded 3 errors'),
+					expect.stringContaining('Memory usage (200MB) is high'),
+				]),
 			)
 		})
 	})

@@ -33,7 +33,6 @@ class CircuitBreaker {
             throw new Error('Circuit breaker is open');
         }
         try {
-            this.totalRequests++;
             const result = await fn();
             this.recordSuccess();
             return result;
@@ -49,6 +48,7 @@ class CircuitBreaker {
     }
     recordSuccess() {
         this.successCount++;
+        this.totalRequests++;
         this.requestWindow.push({ timestamp: Date.now(), success: true });
         this.pruneWindow();
         if (this.state === CircuitState.HALF_OPEN) {
@@ -58,6 +58,7 @@ class CircuitBreaker {
     }
     recordFailure() {
         this.failureCount++;
+        this.totalRequests++;
         this.requestWindow.push({ timestamp: Date.now(), success: false });
         this.pruneWindow();
         if (this.state === CircuitState.HALF_OPEN) {
@@ -106,6 +107,7 @@ class CircuitBreaker {
         this.state = CircuitState.CLOSED;
         this.failureCount = 0;
         this.successCount = 0;
+        this.totalRequests = 0;
         this.lastStateChange = Date.now();
         this.nextAttempt = 0;
         this.requestWindow.length = 0;
@@ -128,7 +130,6 @@ class CircuitBreaker {
     pruneWindow() {
         const now = Date.now();
         const cutoff = now - this.options.rollingWindow;
-        const initialLength = this.requestWindow.length;
         let i = 0;
         while (i < this.requestWindow.length && this.requestWindow[i].timestamp < cutoff) {
             i++;

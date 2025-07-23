@@ -1,14 +1,14 @@
+import { CorrelationMiddleware } from '@microservice/Correlation/middleware/correlation.middleware'
+import { TimingMiddleware } from '@microservice/Correlation/middleware/timing.middleware'
+import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common'
-import { CorrelationMiddleware } from './middleware/correlation.middleware'
-import { TimingMiddleware } from './middleware/timing.middleware'
-import { CorrelationService } from './services/correlation.service'
 
 @Module({
 	providers: [CorrelationService],
 	exports: [CorrelationService],
 })
 export class CorrelationModule implements NestModule {
-	configure(consumer: MiddlewareConsumer) {
+	configure(consumer: MiddlewareConsumer): void {
 		consumer
 			.apply(CorrelationMiddleware, TimingMiddleware)
 			.forRoutes('*')

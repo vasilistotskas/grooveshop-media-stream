@@ -7,15 +7,15 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CorrelationService = void 0;
+const node_async_hooks_1 = require("node:async_hooks");
+const node_crypto_1 = require("node:crypto");
 const common_1 = require("@nestjs/common");
-const async_hooks_1 = require("async_hooks");
-const crypto_1 = require("crypto");
 let CorrelationService = class CorrelationService {
     constructor() {
-        this.asyncLocalStorage = new async_hooks_1.AsyncLocalStorage();
+        this.asyncLocalStorage = new node_async_hooks_1.AsyncLocalStorage();
     }
     generateCorrelationId() {
-        return (0, crypto_1.randomUUID)();
+        return (0, node_crypto_1.randomUUID)();
     }
     setContext(context) {
         this.asyncLocalStorage.enterWith(context);

@@ -21,7 +21,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
             'MONITORING_ENABLED',
             'PROCESSING_MAX_CONCURRENT',
             'CACHE_MEMORY_DEFAULT_TTL',
-            'CACHE_FILE_CLEANUP_INTERVAL'
+            'CACHE_FILE_CLEANUP_INTERVAL',
         ]);
         this.config = this.loadAndValidateConfig();
     }
@@ -76,26 +76,26 @@ let ConfigService = ConfigService_1 = class ConfigService {
         return this.loadConfig();
     }
     loadConfig() {
-        const serverPort = parseInt(this.nestConfigService.get('PORT') || '3003');
+        const serverPort = Number.parseInt(this.nestConfigService.get('PORT') || '3003');
         const serverHost = this.nestConfigService.get('HOST') || '0.0.0.0';
         const corsOrigin = this.nestConfigService.get('CORS_ORIGIN') || '*';
         const corsMethods = this.nestConfigService.get('CORS_METHODS') || 'GET';
-        const corsMaxAge = parseInt(this.nestConfigService.get('CORS_MAX_AGE') || '86400');
-        const memoryMaxSize = parseInt(this.nestConfigService.get('CACHE_MEMORY_MAX_SIZE') || '104857600');
-        const memoryDefaultTtl = parseInt(this.nestConfigService.get('CACHE_MEMORY_DEFAULT_TTL') || '3600');
-        const memoryCheckPeriod = parseInt(this.nestConfigService.get('CACHE_MEMORY_CHECK_PERIOD') || '600');
-        const memoryMaxKeys = parseInt(this.nestConfigService.get('CACHE_MEMORY_MAX_KEYS') || '1000');
-        const memoryWarningThreshold = parseInt(this.nestConfigService.get('CACHE_MEMORY_WARNING_THRESHOLD') || '80');
+        const corsMaxAge = Number.parseInt(this.nestConfigService.get('CORS_MAX_AGE') || '86400');
+        const memoryMaxSize = Number.parseInt(this.nestConfigService.get('CACHE_MEMORY_MAX_SIZE') || '104857600');
+        const memoryDefaultTtl = Number.parseInt(this.nestConfigService.get('CACHE_MEMORY_DEFAULT_TTL') || '3600');
+        const memoryCheckPeriod = Number.parseInt(this.nestConfigService.get('CACHE_MEMORY_CHECK_PERIOD') || '600');
+        const memoryMaxKeys = Number.parseInt(this.nestConfigService.get('CACHE_MEMORY_MAX_KEYS') || '1000');
+        const memoryWarningThreshold = Number.parseInt(this.nestConfigService.get('CACHE_MEMORY_WARNING_THRESHOLD') || '80');
         const redisHost = this.nestConfigService.get('REDIS_HOST') || 'localhost';
-        const redisPort = parseInt(this.nestConfigService.get('REDIS_PORT') || '6379');
+        const redisPort = Number.parseInt(this.nestConfigService.get('REDIS_PORT') || '6379');
         const redisPassword = this.nestConfigService.get('REDIS_PASSWORD');
-        const redisDb = parseInt(this.nestConfigService.get('REDIS_DB') || '0');
-        const redisTtl = parseInt(this.nestConfigService.get('REDIS_TTL') || '7200');
-        const redisMaxRetries = parseInt(this.nestConfigService.get('REDIS_MAX_RETRIES') || '3');
-        const redisRetryDelay = parseInt(this.nestConfigService.get('REDIS_RETRY_DELAY') || '100');
+        const redisDb = Number.parseInt(this.nestConfigService.get('REDIS_DB') || '0');
+        const redisTtl = Number.parseInt(this.nestConfigService.get('REDIS_TTL') || '7200');
+        const redisMaxRetries = Number.parseInt(this.nestConfigService.get('REDIS_MAX_RETRIES') || '3');
+        const redisRetryDelay = Number.parseInt(this.nestConfigService.get('REDIS_RETRY_DELAY') || '100');
         const fileDirectory = this.nestConfigService.get('CACHE_FILE_DIRECTORY') || './storage';
-        const fileMaxSize = parseInt(this.nestConfigService.get('CACHE_FILE_MAX_SIZE') || '1073741824');
-        const fileCleanupInterval = parseInt(this.nestConfigService.get('CACHE_FILE_CLEANUP_INTERVAL') || '3600');
+        const fileMaxSize = Number.parseInt(this.nestConfigService.get('CACHE_FILE_MAX_SIZE') || '1073741824');
+        const fileCleanupInterval = Number.parseInt(this.nestConfigService.get('CACHE_FILE_CLEANUP_INTERVAL') || '3600');
         const warmingEnabledStr = this.nestConfigService.get('CACHE_WARMING_ENABLED') || 'true';
         const warmingEnabled = typeof warmingEnabledStr === 'string'
             ? warmingEnabledStr.toLowerCase() === 'true'
@@ -104,13 +104,13 @@ let ConfigService = ConfigService_1 = class ConfigService {
         const warmingOnStart = typeof warmingOnStartStr === 'string'
             ? warmingOnStartStr.toLowerCase() === 'true'
             : warmingOnStartStr;
-        const warmingMaxFiles = parseInt(this.nestConfigService.get('CACHE_WARMING_MAX_FILES') || '50');
+        const warmingMaxFiles = Number.parseInt(this.nestConfigService.get('CACHE_WARMING_MAX_FILES') || '50');
         const warmingCron = this.nestConfigService.get('CACHE_WARMING_CRON') || '0 */6 * * *';
-        const warmingThreshold = parseInt(this.nestConfigService.get('CACHE_WARMING_THRESHOLD') || '5');
-        const processingMaxConcurrent = parseInt(this.nestConfigService.get('PROCESSING_MAX_CONCURRENT') || '10');
-        const processingTimeout = parseInt(this.nestConfigService.get('PROCESSING_TIMEOUT') || '30000');
-        const processingRetries = parseInt(this.nestConfigService.get('PROCESSING_RETRIES') || '3');
-        const processingMaxFileSize = parseInt(this.nestConfigService.get('PROCESSING_MAX_FILE_SIZE') || '10485760');
+        const warmingThreshold = Number.parseInt(this.nestConfigService.get('CACHE_WARMING_THRESHOLD') || '5');
+        const processingMaxConcurrent = Number.parseInt(this.nestConfigService.get('PROCESSING_MAX_CONCURRENT') || '10');
+        const processingTimeout = Number.parseInt(this.nestConfigService.get('PROCESSING_TIMEOUT') || '30000');
+        const processingRetries = Number.parseInt(this.nestConfigService.get('PROCESSING_RETRIES') || '3');
+        const processingMaxFileSize = Number.parseInt(this.nestConfigService.get('PROCESSING_MAX_FILE_SIZE') || '10485760');
         const allowedFormatsStr = this.nestConfigService.get('PROCESSING_ALLOWED_FORMATS') || 'jpg,jpeg,png,webp,gif,svg';
         const allowedFormats = typeof allowedFormatsStr === 'string'
             ? allowedFormatsStr.split(',').map(format => format.trim().toLowerCase())
@@ -119,13 +119,13 @@ let ConfigService = ConfigService_1 = class ConfigService {
         const monitoringEnabled = typeof monitoringEnabledStr === 'string'
             ? monitoringEnabledStr.toLowerCase() === 'true'
             : monitoringEnabledStr;
-        const monitoringMetricsPort = parseInt(this.nestConfigService.get('MONITORING_METRICS_PORT') || '9090');
+        const monitoringMetricsPort = Number.parseInt(this.nestConfigService.get('MONITORING_METRICS_PORT') || '9090');
         const monitoringHealthPath = this.nestConfigService.get('MONITORING_HEALTH_PATH') || '/health';
         const monitoringMetricsPath = this.nestConfigService.get('MONITORING_METRICS_PATH') || '/metrics';
         const djangoUrl = this.nestConfigService.get('NEST_PUBLIC_DJANGO_URL') || 'http://localhost:8000';
         const nuxtUrl = this.nestConfigService.get('NEST_PUBLIC_NUXT_URL') || 'http://localhost:3000';
-        const externalRequestTimeout = parseInt(this.nestConfigService.get('EXTERNAL_REQUEST_TIMEOUT') || '30000');
-        const externalMaxRetries = parseInt(this.nestConfigService.get('EXTERNAL_MAX_RETRIES') || '3');
+        const externalRequestTimeout = Number.parseInt(this.nestConfigService.get('EXTERNAL_REQUEST_TIMEOUT') || '30000');
+        const externalMaxRetries = Number.parseInt(this.nestConfigService.get('EXTERNAL_MAX_RETRIES') || '3');
         return {
             server: {
                 port: serverPort,
@@ -133,8 +133,8 @@ let ConfigService = ConfigService_1 = class ConfigService {
                 cors: {
                     origin: corsOrigin,
                     methods: corsMethods,
-                    maxAge: corsMaxAge
-                }
+                    maxAge: corsMaxAge,
+                },
             },
             cache: {
                 memory: {
@@ -142,7 +142,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
                     defaultTtl: memoryDefaultTtl,
                     checkPeriod: memoryCheckPeriod,
                     maxKeys: memoryMaxKeys,
-                    warningThreshold: memoryWarningThreshold
+                    warningThreshold: memoryWarningThreshold,
                 },
                 redis: {
                     host: redisHost,
@@ -151,40 +151,40 @@ let ConfigService = ConfigService_1 = class ConfigService {
                     db: redisDb,
                     ttl: redisTtl,
                     maxRetries: redisMaxRetries,
-                    retryDelayOnFailover: redisRetryDelay
+                    retryDelayOnFailover: redisRetryDelay,
                 },
                 file: {
                     directory: fileDirectory,
                     maxSize: fileMaxSize,
-                    cleanupInterval: fileCleanupInterval
+                    cleanupInterval: fileCleanupInterval,
                 },
                 warming: {
                     enabled: warmingEnabled,
                     warmupOnStart: warmingOnStart,
                     maxFilesToWarm: warmingMaxFiles,
                     warmupCron: warmingCron,
-                    popularImageThreshold: warmingThreshold
-                }
+                    popularImageThreshold: warmingThreshold,
+                },
             },
             processing: {
                 maxConcurrent: processingMaxConcurrent,
                 timeout: processingTimeout,
                 retries: processingRetries,
                 maxFileSize: processingMaxFileSize,
-                allowedFormats: allowedFormats
+                allowedFormats,
             },
             monitoring: {
                 enabled: monitoringEnabled,
                 metricsPort: monitoringMetricsPort,
                 healthPath: monitoringHealthPath,
-                metricsPath: monitoringMetricsPath
+                metricsPath: monitoringMetricsPath,
             },
             externalServices: {
-                djangoUrl: djangoUrl,
-                nuxtUrl: nuxtUrl,
+                djangoUrl,
+                nuxtUrl,
                 requestTimeout: externalRequestTimeout,
-                maxRetries: externalMaxRetries
-            }
+                maxRetries: externalMaxRetries,
+            },
         };
     }
     updateHotReloadableSettings(newConfig) {

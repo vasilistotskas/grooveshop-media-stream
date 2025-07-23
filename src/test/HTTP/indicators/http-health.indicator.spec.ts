@@ -6,7 +6,9 @@ import { AxiosResponse } from 'axios'
 
 describe('httpHealthIndicator', () => {
 	let indicator: HttpHealthIndicator
+	// eslint-disable-next-line unused-imports/no-unused-vars
 	let httpClientService: HttpClientService
+	// eslint-disable-next-line unused-imports/no-unused-vars
 	let configService: ConfigService
 
 	const mockHttpClientService = {

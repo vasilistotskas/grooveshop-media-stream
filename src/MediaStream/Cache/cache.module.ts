@@ -1,12 +1,12 @@
+import { CacheHealthIndicator } from '@microservice/Cache/indicators/cache-health.indicator'
+import { RedisHealthIndicator } from '@microservice/Cache/indicators/redis-health.indicator'
+import { CacheWarmingService } from '@microservice/Cache/services/cache-warming.service'
+import { MemoryCacheService } from '@microservice/Cache/services/memory-cache.service'
+import { RedisCacheService } from '@microservice/Cache/services/redis-cache.service'
 import { ConfigModule } from '@microservice/Config/config.module'
 import { MetricsModule } from '@microservice/Metrics/metrics.module'
 import { Module } from '@nestjs/common'
 import { ScheduleModule } from '@nestjs/schedule'
-import { CacheHealthIndicator } from './indicators/cache-health.indicator'
-import { RedisHealthIndicator } from './indicators/redis-health.indicator'
-import { CacheWarmingService } from './services/cache-warming.service'
-import { MemoryCacheService } from './services/memory-cache.service'
-import { RedisCacheService } from './services/redis-cache.service'
 
 @Module({
 	imports: [

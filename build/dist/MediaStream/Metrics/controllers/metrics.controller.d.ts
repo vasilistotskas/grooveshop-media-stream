@@ -1,5 +1,5 @@
-import { MetricsService } from '../services/metrics.service';
 import { ConfigService } from '@microservice/Config/config.service';
+import { MetricsService } from '@microservice/Metrics/services/metrics.service';
 export declare class MetricsController {
     private readonly metricsService;
     private readonly configService;

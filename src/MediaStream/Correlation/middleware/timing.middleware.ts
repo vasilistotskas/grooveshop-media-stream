@@ -1,3 +1,4 @@
+import * as process from 'node:process'
 import { Injectable, NestMiddleware } from '@nestjs/common'
 import { NextFunction, Request, Response } from 'express'
 import { CorrelationService } from '../services/correlation.service'

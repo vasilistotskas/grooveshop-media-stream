@@ -13,11 +13,11 @@ export interface RequestContext {
     endTimestamp?: number;
 }
 export interface CorrelationService {
-    generateCorrelationId(): string;
-    setContext(context: RequestContext): void;
-    getContext(): RequestContext | null;
-    getCorrelationId(): string | null;
-    clearContext(): void;
+    generateCorrelationId: () => string;
+    setContext: (context: RequestContext) => void;
+    getContext: () => RequestContext | null;
+    getCorrelationId: () => string | null;
+    clearContext: () => void;
 }
 export interface TimingInfo {
     startTime: number;

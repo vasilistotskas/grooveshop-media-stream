@@ -9,6 +9,7 @@ jest.mock('ioredis')
 
 describe('redisCacheService', () => {
 	let service: RedisCacheService
+	// eslint-disable-next-line unused-imports/no-unused-vars
 	let configService: jest.Mocked<ConfigService>
 	let metricsService: jest.Mocked<MetricsService>
 	let mockRedis: jest.Mocked<Redis>
@@ -91,9 +92,7 @@ describe('redisCacheService', () => {
 				password: mockConfig.password,
 				db: mockConfig.db,
 				maxRetriesPerRequest: mockConfig.maxRetries,
-				retryDelayOnFailover: mockConfig.retryDelayOnFailover,
 				enableReadyCheck: true,
-				maxLoadingTimeout: 5000,
 				lazyConnect: true,
 				keepAlive: 30000,
 				connectTimeout: 10000,

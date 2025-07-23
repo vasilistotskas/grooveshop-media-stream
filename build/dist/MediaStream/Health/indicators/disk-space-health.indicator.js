@@ -10,15 +10,15 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DiskSpaceHealthIndicator = void 0;
-const common_1 = require("@nestjs/common");
 const node_fs_1 = require("node:fs");
 const config_service_1 = require("../../Config/config.service");
+const common_1 = require("@nestjs/common");
 const base_health_indicator_1 = require("../base/base-health-indicator");
 let DiskSpaceHealthIndicator = class DiskSpaceHealthIndicator extends base_health_indicator_1.BaseHealthIndicator {
     constructor(configService) {
         const options = {
             timeout: 3000,
-            threshold: 0.9
+            threshold: 0.9,
         };
         super('disk_space', options);
         this.configService = configService;
@@ -32,12 +32,12 @@ let DiskSpaceHealthIndicator = class DiskSpaceHealthIndicator extends base_healt
             if (diskInfo.usedPercentage >= this.criticalThreshold) {
                 return this.createUnhealthyResult(`Disk space critically low: ${(diskInfo.usedPercentage * 100).toFixed(1)}% used`, diskInfo);
             }
-            const status = diskInfo.usedPercentage >= this.warningThreshold ? 'warning' : 'healthy';
+            const detailStatus = diskInfo.usedPercentage >= this.warningThreshold ? 'warning' : 'healthy';
             return this.createHealthyResult({
                 ...diskInfo,
-                status,
+                detailStatus,
                 warningThreshold: this.warningThreshold,
-                criticalThreshold: this.criticalThreshold
+                criticalThreshold: this.criticalThreshold,
             });
         });
     }
@@ -57,25 +57,26 @@ let DiskSpaceHealthIndicator = class DiskSpaceHealthIndicator extends base_healt
                 free: this.formatBytes(free),
                 used: this.formatBytes(used),
                 usedPercentage,
-                path: this.storagePath
+                path: this.storagePath,
             };
         }
         catch (error) {
+            console.error(error);
             return this.getFallbackDiskInfo();
         }
     }
     async getFallbackDiskInfo() {
         try {
-            const stats = await node_fs_1.promises.stat(this.storagePath);
             return {
                 total: 0,
                 free: 0,
                 used: 0,
                 usedPercentage: 0,
-                path: this.storagePath
+                path: this.storagePath,
             };
         }
         catch (error) {
+            console.error(error);
             throw new Error(`Unable to access storage directory: ${this.storagePath}`);
         }
     }

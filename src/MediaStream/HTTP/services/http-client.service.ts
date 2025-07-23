@@ -73,11 +73,11 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 		this.configureAxios()
 	}
 
-	async onModuleInit() {
+	async onModuleInit(): Promise<void> {
 		CorrelatedLogger.log('HTTP client service initialized', HttpClientService.name)
 	}
 
-	async onModuleDestroy() {
+	async onModuleDestroy(): Promise<void> {
 		// Close agents
 		this.httpAgent.destroy()
 		this.httpsAgent.destroy()

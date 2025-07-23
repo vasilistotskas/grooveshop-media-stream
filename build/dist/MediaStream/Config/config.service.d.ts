@@ -1,6 +1,6 @@
+import type { AppConfig } from '@microservice/Config/interfaces/app-config.interface';
 import { OnModuleInit } from '@nestjs/common';
 import { ConfigService as NestConfigService } from '@nestjs/config';
-import type { AppConfig } from './interfaces/app-config.interface';
 export declare class ConfigService implements OnModuleInit {
     private readonly nestConfigService;
     private readonly logger;

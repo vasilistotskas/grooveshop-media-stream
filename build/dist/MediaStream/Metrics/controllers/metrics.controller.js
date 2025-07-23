@@ -10,9 +10,9 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MetricsController = void 0;
-const common_1 = require("@nestjs/common");
-const metrics_service_1 = require("../services/metrics.service");
 const config_service_1 = require("../../Config/config.service");
+const metrics_service_1 = require("../services/metrics.service");
+const common_1 = require("@nestjs/common");
 let MetricsController = class MetricsController {
     constructor(metricsService, configService) {
         this.metricsService = metricsService;
@@ -33,7 +33,7 @@ let MetricsController = class MetricsController {
             timestamp: new Date().toISOString(),
             metrics: metricsText,
             registry: 'prometheus',
-            format: 'text/plain'
+            format: 'text/plain',
         };
     }
 };

@@ -7,10 +7,10 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MetricsModule = void 0;
-const common_1 = require("@nestjs/common");
-const metrics_service_1 = require("./services/metrics.service");
-const metrics_controller_1 = require("./controllers/metrics.controller");
 const config_module_1 = require("../Config/config.module");
+const metrics_controller_1 = require("./controllers/metrics.controller");
+const metrics_service_1 = require("./services/metrics.service");
+const common_1 = require("@nestjs/common");
 let MetricsModule = class MetricsModule {
 };
 exports.MetricsModule = MetricsModule;
@@ -19,7 +19,7 @@ exports.MetricsModule = MetricsModule = __decorate([
         imports: [config_module_1.ConfigModule],
         controllers: [metrics_controller_1.MetricsController],
         providers: [metrics_service_1.MetricsService],
-        exports: [metrics_service_1.MetricsService]
+        exports: [metrics_service_1.MetricsService],
     })
 ], MetricsModule);
 //# sourceMappingURL=metrics.module.js.map

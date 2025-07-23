@@ -26,19 +26,19 @@ exports.MemoryCacheConfigDto = MemoryCacheConfigDto;
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 104857600),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 104857600),
     __metadata("design:type", Number)
 ], MemoryCacheConfigDto.prototype, "maxSize", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 3600),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 3600),
     __metadata("design:type", Number)
 ], MemoryCacheConfigDto.prototype, "ttl", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 600),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 600),
     __metadata("design:type", Number)
 ], MemoryCacheConfigDto.prototype, "checkPeriod", void 0);
 __decorate([
@@ -76,7 +76,7 @@ __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1),
     (0, class_validator_1.Max)(65535),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 6379),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 6379),
     __metadata("design:type", Number)
 ], RedisConfigDto.prototype, "port", void 0);
 __decorate([
@@ -88,25 +88,25 @@ __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(0),
     (0, class_validator_1.Max)(15),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 0),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 0),
     __metadata("design:type", Number)
 ], RedisConfigDto.prototype, "db", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 7200),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 7200),
     __metadata("design:type", Number)
 ], RedisConfigDto.prototype, "ttl", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 3),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 3),
     __metadata("design:type", Number)
 ], RedisConfigDto.prototype, "maxRetries", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(100),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 100),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 100),
     __metadata("design:type", Number)
 ], RedisConfigDto.prototype, "retryDelayOnFailover", void 0);
 class FileCacheConfigDto {
@@ -125,13 +125,13 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 1073741824),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 1073741824),
     __metadata("design:type", Number)
 ], FileCacheConfigDto.prototype, "maxSize", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 3600),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 3600),
     __metadata("design:type", Number)
 ], FileCacheConfigDto.prototype, "cleanupInterval", void 0);
 class CacheConfigDto {

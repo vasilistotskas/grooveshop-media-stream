@@ -26,28 +26,28 @@ __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1),
     (0, class_validator_1.Max)(100),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 10),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 10),
     __metadata("design:type", Number)
 ], ProcessingConfigDto.prototype, "maxConcurrent", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1000),
     (0, class_validator_1.Max)(300000),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 30000),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 30000),
     __metadata("design:type", Number)
 ], ProcessingConfigDto.prototype, "timeout", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(0),
     (0, class_validator_1.Max)(10),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 3),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 3),
     __metadata("design:type", Number)
 ], ProcessingConfigDto.prototype, "retries", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1024),
     (0, class_validator_1.Max)(52428800),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 10485760),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 10485760),
     __metadata("design:type", Number)
 ], ProcessingConfigDto.prototype, "maxFileSize", void 0);
 __decorate([

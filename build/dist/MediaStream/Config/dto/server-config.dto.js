@@ -34,7 +34,7 @@ __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(0),
     (0, class_validator_1.Max)(86400),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 86400),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 86400),
     __metadata("design:type", Number)
 ], CorsConfigDto.prototype, "maxAge", void 0);
 class ServerConfigDto {
@@ -49,7 +49,7 @@ __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1),
     (0, class_validator_1.Max)(65535),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 3003),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 3003),
     __metadata("design:type", Number)
 ], ServerConfigDto.prototype, "port", void 0);
 __decorate([

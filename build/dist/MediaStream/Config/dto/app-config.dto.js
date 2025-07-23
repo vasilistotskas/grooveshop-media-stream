@@ -10,14 +10,14 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppConfigDto = void 0;
-const class_transformer_1 = require("class-transformer");
-const class_validator_1 = require("class-validator");
 const cache_config_dto_1 = require("./cache-config.dto");
-const external_services_config_dto_1 = require("./external-services-config.dto");
 const http_config_dto_1 = require("./http-config.dto");
 const monitoring_config_dto_1 = require("./monitoring-config.dto");
 const processing_config_dto_1 = require("./processing-config.dto");
 const server_config_dto_1 = require("./server-config.dto");
+const class_transformer_1 = require("class-transformer");
+const class_validator_1 = require("class-validator");
+const external_services_config_dto_1 = require("./external-services-config.dto");
 class AppConfigDto {
     constructor() {
         this.server = new server_config_dto_1.ServerConfigDto();

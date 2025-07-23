@@ -52,6 +52,7 @@ const promises_1 = require("node:fs/promises");
 const path = __importStar(require("node:path"));
 const node_process_1 = require("node:process");
 const CacheImageRequest_1 = require("../API/DTO/CacheImageRequest");
+const logger_util_1 = require("../Correlation/utils/logger.util");
 const ResourceMetaData_1 = __importDefault(require("../DTO/ResourceMetaData"));
 const FetchResourceResponseJob_1 = __importDefault(require("../Job/FetchResourceResponseJob"));
 const GenerateResourceIdentityFromRequestJob_1 = __importDefault(require("../Job/GenerateResourceIdentityFromRequestJob"));
@@ -60,7 +61,6 @@ const WebpImageManipulationJob_1 = __importDefault(require("../Job/WebpImageMani
 const ValidateCacheImageRequestRule_1 = __importDefault(require("../Rule/ValidateCacheImageRequestRule"));
 const axios_1 = require("@nestjs/axios");
 const common_1 = require("@nestjs/common");
-const logger_util_1 = require("../Correlation/utils/logger.util");
 const UnableToFetchResourceException_1 = __importDefault(require("../API/Exception/UnableToFetchResourceException"));
 let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheImageResourceOperation {
     constructor(httpService, validateCacheImageRequest, fetchResourceResponseJob, webpImageManipulationJob, storeResourceResponseToFileJob, generateResourceIdentityFromRequestJob) {

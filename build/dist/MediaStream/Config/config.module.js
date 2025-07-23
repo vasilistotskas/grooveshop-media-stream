@@ -7,9 +7,9 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ConfigModule = void 0;
+const config_service_1 = require("./config.service");
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
-const config_service_1 = require("./config.service");
 let ConfigModule = class ConfigModule {
 };
 exports.ConfigModule = ConfigModule;
@@ -21,11 +21,11 @@ exports.ConfigModule = ConfigModule = __decorate([
                 isGlobal: true,
                 envFilePath: ['.env.local', '.env'],
                 cache: true,
-                expandVariables: true
-            })
+                expandVariables: true,
+            }),
         ],
         providers: [config_service_1.ConfigService],
-        exports: [config_service_1.ConfigService]
+        exports: [config_service_1.ConfigService],
     })
 ], ConfigModule);
 //# sourceMappingURL=config.module.js.map

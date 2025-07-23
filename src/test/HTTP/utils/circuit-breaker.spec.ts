@@ -4,12 +4,17 @@ describe('circuitBreaker', () => {
 	let circuitBreaker: CircuitBreaker
 
 	beforeEach(() => {
+		jest.useFakeTimers()
 		circuitBreaker = new CircuitBreaker({
 			failureThreshold: 50,
 			resetTimeout: 1000,
 			rollingWindow: 5000,
 			minimumRequests: 3,
 		})
+	})
+
+	afterEach(() => {
+		jest.useRealTimers()
 	})
 
 	describe('initialization', () => {
@@ -39,14 +44,19 @@ describe('circuitBreaker', () => {
 		})
 
 		it('should reset circuit breaker from half-open to closed on success', () => {
-			// Force circuit to half-open state
-			for (let i = 0; i < 5; i++) {
+			// Force circuit to open state by recording enough failures
+			for (let i = 0; i < 10; i++) {
 				circuitBreaker.recordFailure()
 			}
 
-			// Wait for reset timeout and trigger half-open
+			// Verify circuit is open
+			expect(circuitBreaker.getState()).toBe(CircuitState.OPEN)
+
+			// Wait for reset timeout and check if circuit transitions to half-open
 			jest.advanceTimersByTime(1000)
-			circuitBreaker.isOpen() // This should transition to half-open
+			const isOpen = circuitBreaker.isOpen() // This should transition to half-open
+			expect(isOpen).toBe(false) // Should return false when in half-open state
+			expect(circuitBreaker.getState()).toBe(CircuitState.HALF_OPEN)
 
 			// Record success should close the circuit
 			circuitBreaker.recordSuccess()

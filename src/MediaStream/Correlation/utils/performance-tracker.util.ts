@@ -1,5 +1,6 @@
-import { CorrelationService } from '../services/correlation.service'
-import { CorrelatedLogger } from './logger.util'
+import * as process from 'node:process'
+import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
+import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
 
 export interface PerformancePhase {
 	name: string

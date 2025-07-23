@@ -8,13 +8,13 @@ import { CacheStats, ICacheManager } from '../interfaces/cache-manager.interface
 @Injectable()
 export class MemoryCacheService implements ICacheManager {
 	private readonly logger = new Logger(MemoryCacheService.name)
-	private readonly cache: NodeCache
+	protected readonly cache: NodeCache
 
 	constructor(
 		private readonly configService: ConfigService,
 		private readonly metricsService: MetricsService,
 	) {
-		const config = this.configService.get('cache.memory')
+		const config = this.configService.get('cache.memory') || {}
 
 		this.cache = new NodeCache({
 			stdTTL: config.defaultTtl || 3600, // 1 hour default
@@ -25,7 +25,7 @@ export class MemoryCacheService implements ICacheManager {
 		})
 
 		// Set up event listeners for metrics
-		this.cache.on('set', (key: string, value: any) => {
+		this.cache.on('set', (key: string, _value: any) => {
 			this.metricsService.recordCacheOperation('set', 'memory', 'success')
 			CorrelatedLogger.debug(`Memory cache SET: ${key}`, MemoryCacheService.name)
 		})
@@ -41,12 +41,12 @@ export class MemoryCacheService implements ICacheManager {
 			}
 		})
 
-		this.cache.on('del', (key: string, value: any) => {
+		this.cache.on('del', (key: string, _value: any) => {
 			this.metricsService.recordCacheOperation('delete', 'memory', 'success')
 			CorrelatedLogger.debug(`Memory cache DELETE: ${key}`, MemoryCacheService.name)
 		})
 
-		this.cache.on('expired', (key: string, value: any) => {
+		this.cache.on('expired', (key: string, _value: any) => {
 			this.metricsService.recordCacheOperation('expire', 'memory', 'success')
 			CorrelatedLogger.debug(`Memory cache EXPIRED: ${key}`, MemoryCacheService.name)
 		})

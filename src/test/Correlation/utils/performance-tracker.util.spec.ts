@@ -10,27 +10,52 @@ jest.mock('@microservice/Correlation/utils/logger.util', () => ({
 	},
 }))
 
+// Mock the CorrelationService to return a consistent correlation ID
+const mockCorrelationService = {
+	setContext: jest.fn(),
+	getContext: jest.fn(),
+	getCorrelationId: jest.fn().mockReturnValue('test-correlation-id'),
+	updateContext: jest.fn(),
+	clearContext: jest.fn(),
+}
+
+// Mock the CorrelationService class
+jest.mock('@microservice/Correlation/services/correlation.service', () => {
+	return {
+		CorrelationService: jest.fn().mockImplementation(() => mockCorrelationService),
+	}
+})
+
+// Ensure the mock is applied before importing PerformanceTracker
+jest.doMock('@microservice/Correlation/services/correlation.service', () => {
+	return {
+		CorrelationService: jest.fn().mockImplementation(() => mockCorrelationService),
+	}
+})
+
 describe('performanceTracker', () => {
 	let correlationService: CorrelationService
 
 	beforeEach(() => {
-		correlationService = new CorrelationService()
-		// Set up a mock correlation context
-		correlationService.setContext({
-			correlationId: 'test-correlation-id',
-			timestamp: Date.now(),
-			clientIp: '127.0.0.1',
-			method: 'GET',
-			url: '/test',
-			startTime: process.hrtime.bigint(),
-		})
+		// Reset all mocks
+		jest.clearAllMocks()
 
-		// Clear any existing phases
-		PerformanceTracker.clearPhases()
+		// Ensure the mock returns the correlation ID consistently
+		mockCorrelationService.getCorrelationId.mockReturnValue('test-correlation-id')
+
+		// Clear any existing phases by directly accessing the private phases map
+		;(PerformanceTracker as any).phases = new Map()
+
+		// Create correlation service instance
+		correlationService = new CorrelationService()
+
+		// Verify the mock is working
+		expect(correlationService.getCorrelationId()).toBe('test-correlation-id')
 	})
 
 	afterEach(() => {
-		PerformanceTracker.clearPhases()
+		// Clear phases directly since clearPhases() also depends on correlation ID
+		;(PerformanceTracker as any).phases = new Map()
 		jest.clearAllMocks()
 	})
 
@@ -211,8 +236,12 @@ describe('performanceTracker', () => {
 
 	describe('edge Cases', () => {
 		it('should handle missing correlation context gracefully', () => {
-			// Clear correlation context
+			// Clear correlation context and mock to return null
 			correlationService.clearContext()
+			;(correlationService.getCorrelationId as jest.Mock).mockReturnValue(null)
+			if (mockCorrelationService) {
+				;(mockCorrelationService.getCorrelationId as jest.Mock).mockReturnValue(null)
+			}
 
 			PerformanceTracker.startPhase('no-context-phase')
 			const duration = PerformanceTracker.endPhase('no-context-phase')

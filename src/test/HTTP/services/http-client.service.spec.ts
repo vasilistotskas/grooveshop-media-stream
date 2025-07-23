@@ -8,6 +8,7 @@ import { Observable, of, throwError } from 'rxjs'
 describe('httpClientService', () => {
 	let service: HttpClientService
 	let httpService: HttpService
+	// eslint-disable-next-line unused-imports/no-unused-vars
 	let configService: ConfigService
 
 	const mockConfigService = {
@@ -152,10 +153,18 @@ describe('httpClientService', () => {
 			jest.spyOn(httpService, 'get').mockReturnValue(throwError(() => mockError))
 
 			// Execute several failed requests
-			try { await service.get('https://example.com') }
-			catch {}
-			try { await service.get('https://example.com') }
-			catch {}
+			try {
+				await service.get('https://example.com')
+			}
+			catch {
+
+			}
+			try {
+				await service.get('https://example.com')
+			}
+			catch {
+
+			}
 
 			const stats = service.getStats()
 			expect(stats.successfulRequests).toBe(0)

@@ -1,5 +1,5 @@
 import { NestMiddleware } from '@nestjs/common';
-import { Request, Response, NextFunction } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import { CorrelationService } from '../services/correlation.service';
 export declare class TimingMiddleware implements NestMiddleware {
     private readonly correlationService;

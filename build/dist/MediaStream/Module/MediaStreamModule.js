@@ -28,7 +28,6 @@ const tasks_module_1 = require("../Tasks/tasks.module");
 const axios_1 = require("@nestjs/axios");
 const common_1 = require("@nestjs/common");
 const core_1 = require("@nestjs/core");
-const core_2 = require("@nestjs/core");
 const schedule_1 = require("@nestjs/schedule");
 const controllers = [MediaStreamImageRESTController_1.default];
 const operations = [CacheImageResourceOperation_1.default];
@@ -54,7 +53,7 @@ MediaStreamModule = __decorate([
                 useFactory: (httpAdapterHost, correlationService) => {
                     return new MediaStreamExceptionFilter_1.MediaStreamExceptionFilter(httpAdapterHost, correlationService);
                 },
-                inject: [core_2.HttpAdapterHost, correlation_service_1.CorrelationService],
+                inject: [core_1.HttpAdapterHost, correlation_service_1.CorrelationService],
             },
         ],
     })

@@ -1,3 +1,4 @@
+import * as process from 'node:process'
 import { Injectable, NestMiddleware } from '@nestjs/common'
 import { NextFunction, Request, Response } from 'express'
 import { RequestContext } from '../interfaces/correlation.interface'
@@ -12,8 +13,7 @@ export class CorrelationMiddleware implements NestMiddleware {
 	use(req: Request, res: Response, next: NextFunction): void {
 		// Get correlation ID from header or generate new one
 		const correlationId
-      = (req.headers[CORRELATION_ID_HEADER] as string)
-      	|| this.correlationService.generateCorrelationId()
+      = (req.headers[CORRELATION_ID_HEADER] as string) || this.correlationService.generateCorrelationId()
 
 		// Create request context
 		const context: RequestContext = {

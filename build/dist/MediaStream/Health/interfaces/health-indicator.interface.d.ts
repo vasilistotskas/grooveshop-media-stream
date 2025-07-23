@@ -1,8 +1,8 @@
 import type { HealthIndicatorResult } from '@nestjs/terminus';
 export interface IHealthIndicator {
     readonly key: string;
-    isHealthy(): Promise<HealthIndicatorResult>;
-    getDetails(): Record<string, any>;
+    isHealthy: () => Promise<HealthIndicatorResult>;
+    getDetails: () => Record<string, any>;
 }
 export interface HealthCheckOptions {
     timeout?: number;

@@ -48,12 +48,12 @@ describe('memoryCacheService Integration', () => {
 		service = module.get<MemoryCacheService>(MemoryCacheService)
 	})
 
-	afterAll(async () => {
-		await module.close()
-	})
-
 	afterEach(async () => {
 		await service.clear()
+	})
+
+	afterAll(async () => {
+		await module.close()
 	})
 
 	it('should be defined', () => {

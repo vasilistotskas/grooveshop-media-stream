@@ -1,5 +1,5 @@
-import { OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@microservice/Config/config.service';
+import { OnModuleInit } from '@nestjs/common';
 import * as promClient from 'prom-client';
 export declare class MetricsService implements OnModuleInit {
     private readonly configService;

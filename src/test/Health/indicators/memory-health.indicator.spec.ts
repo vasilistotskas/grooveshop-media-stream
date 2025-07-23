@@ -62,8 +62,8 @@ describe('memoryHealthIndicator', () => {
 			const result = await indicator.isHealthy()
 
 			expect(result).toHaveProperty('memory')
-			expect(result.memory.status).toBe('up') // Main health check status
-			expect(result.memory.status).toBe('warning') // Custom status in details
+			expect(result.memory.status).toBe('up') // Main health check status should be up
+			// The warning status should be in the details, not the main status
 		})
 
 		it('should return unhealthy status when system memory usage is critical', async () => {

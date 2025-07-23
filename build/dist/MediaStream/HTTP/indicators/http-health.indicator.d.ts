@@ -1,6 +1,6 @@
+import { ConfigService } from '@microservice/Config/config.service';
 import { HealthIndicator, HealthIndicatorResult } from '@nestjs/terminus';
 import { HttpClientService } from '../services/http-client.service';
-import { ConfigService } from '@microservice/Config/config.service';
 export declare class HttpHealthIndicator extends HealthIndicator {
     private readonly httpClient;
     private readonly configService;

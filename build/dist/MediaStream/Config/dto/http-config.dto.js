@@ -29,19 +29,19 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 5),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 5),
     __metadata("design:type", Number)
 ], CircuitBreakerConfigDto.prototype, "failureThreshold", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1000),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 60000),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 60000),
     __metadata("design:type", Number)
 ], CircuitBreakerConfigDto.prototype, "resetTimeout", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1000),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 30000),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 30000),
     __metadata("design:type", Number)
 ], CircuitBreakerConfigDto.prototype, "monitoringPeriod", void 0);
 class ConnectionPoolConfigDto {
@@ -58,19 +58,19 @@ exports.ConnectionPoolConfigDto = ConnectionPoolConfigDto;
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 50),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 50),
     __metadata("design:type", Number)
 ], ConnectionPoolConfigDto.prototype, "maxSockets", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 10),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 10),
     __metadata("design:type", Number)
 ], ConnectionPoolConfigDto.prototype, "maxFreeSockets", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(100),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 30000),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 30000),
     __metadata("design:type", Number)
 ], ConnectionPoolConfigDto.prototype, "timeout", void 0);
 __decorate([
@@ -81,13 +81,13 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(100),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 1000),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 1000),
     __metadata("design:type", Number)
 ], ConnectionPoolConfigDto.prototype, "keepAliveMsecs", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(100),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 5000),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 5000),
     __metadata("design:type", Number)
 ], ConnectionPoolConfigDto.prototype, "connectTimeout", void 0);
 class RetryConfigDto {
@@ -104,25 +104,25 @@ exports.RetryConfigDto = RetryConfigDto;
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(0),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 3),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 3),
     __metadata("design:type", Number)
 ], RetryConfigDto.prototype, "retries", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(100),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 1000),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 1000),
     __metadata("design:type", Number)
 ], RetryConfigDto.prototype, "retryDelay", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 2),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 2),
     __metadata("design:type", Number)
 ], RetryConfigDto.prototype, "retryDelayMultiplier", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1000),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 10000),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 10000),
     __metadata("design:type", Number)
 ], RetryConfigDto.prototype, "maxRetryDelay", void 0);
 __decorate([

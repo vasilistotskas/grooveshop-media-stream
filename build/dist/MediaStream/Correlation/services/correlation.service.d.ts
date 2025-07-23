@@ -1,4 +1,4 @@
-import { RequestContext, CorrelationService as ICorrelationService } from '../interfaces/correlation.interface';
+import { CorrelationService as ICorrelationService, RequestContext } from '../interfaces/correlation.interface';
 export declare class CorrelationService implements ICorrelationService {
     private readonly asyncLocalStorage;
     generateCorrelationId(): string;

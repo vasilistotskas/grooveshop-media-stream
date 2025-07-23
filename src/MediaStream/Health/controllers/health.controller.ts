@@ -1,14 +1,17 @@
+import * as process from 'node:process'
 import { RedisHealthIndicator } from '@microservice/Cache/indicators/redis-health.indicator'
 import { ConfigService } from '@microservice/Config/config.service'
+import { DiskSpaceHealthIndicator, DiskSpaceInfo } from '@microservice/Health/indicators/disk-space-health.indicator'
+import { MemoryHealthIndicator, MemoryInfo } from '@microservice/Health/indicators/memory-health.indicator'
 import { HttpHealthIndicator } from '@microservice/HTTP/indicators/http-health.indicator'
 import { Controller, Get } from '@nestjs/common'
 import {
 	HealthCheck,
 	HealthCheckResult,
 	HealthCheckService,
+	HealthCheckStatus,
+	HealthIndicatorResult,
 } from '@nestjs/terminus'
-import { DiskSpaceHealthIndicator } from '../indicators/disk-space-health.indicator'
-import { MemoryHealthIndicator } from '../indicators/memory-health.indicator'
 
 @Controller('health')
 export class HealthController {
@@ -33,7 +36,36 @@ export class HealthController {
 	}
 
 	@Get('detailed')
-	async getDetailedHealth() {
+	async getDetailedHealth(): Promise<{
+		status: HealthCheckStatus
+		info: HealthIndicatorResult
+		error: HealthIndicatorResult
+		details: HealthIndicatorResult
+		timestamp: string
+		uptime: number
+		version: string
+		environment: string
+		systemInfo: {
+			platform: NodeJS.Platform
+			arch: NodeJS.Architecture
+			nodeVersion: string
+			pid: number
+		}
+		resources: {
+			disk: DiskSpaceInfo
+			memory: MemoryInfo
+		}
+		configuration: {
+			monitoring: {
+				enabled: boolean
+				metricsPort: number
+			}
+			cache: {
+				fileDirectory: string
+				memoryMaxSize: number
+			}
+		}
+	}> {
 		const healthResults = await this.health.check([
 			() => this.diskSpaceIndicator.isHealthy(),
 			() => this.memoryIndicator.isHealthy(),
@@ -77,7 +109,7 @@ export class HealthController {
 	}
 
 	@Get('ready')
-	async readiness() {
+	async readiness(): Promise<{ status: string, timestamp: string, checks?: any, error?: string }> {
 		try {
 			const result = await this.health.check([
 				() => this.diskSpaceIndicator.isHealthy(),
@@ -102,7 +134,7 @@ export class HealthController {
 	}
 
 	@Get('live')
-	async liveness() {
+	async liveness(): Promise<{ status: string, timestamp: string, uptime: number, pid: number }> {
 		return {
 			status: 'alive',
 			timestamp: new Date().toISOString(),

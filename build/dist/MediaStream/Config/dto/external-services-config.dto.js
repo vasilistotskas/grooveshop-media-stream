@@ -37,14 +37,14 @@ __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1000),
     (0, class_validator_1.Max)(300000),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 30000),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 30000),
     __metadata("design:type", Number)
 ], ExternalServicesConfigDto.prototype, "requestTimeout", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(0),
     (0, class_validator_1.Max)(10),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 3),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 3),
     __metadata("design:type", Number)
 ], ExternalServicesConfigDto.prototype, "maxRetries", void 0);
 //# sourceMappingURL=external-services-config.dto.js.map

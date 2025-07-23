@@ -14,17 +14,17 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 var MemoryCacheService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MemoryCacheService = void 0;
+const config_service_1 = require("../../Config/config.service");
+const logger_util_1 = require("../../Correlation/utils/logger.util");
+const metrics_service_1 = require("../../Metrics/services/metrics.service");
 const common_1 = require("@nestjs/common");
 const node_cache_1 = __importDefault(require("node-cache"));
-const config_service_1 = require("../../Config/config.service");
-const metrics_service_1 = require("../../Metrics/services/metrics.service");
-const logger_util_1 = require("../../Correlation/utils/logger.util");
 let MemoryCacheService = MemoryCacheService_1 = class MemoryCacheService {
     constructor(configService, metricsService) {
         this.configService = configService;
         this.metricsService = metricsService;
         this.logger = new common_1.Logger(MemoryCacheService_1.name);
-        const config = this.configService.get('cache.memory');
+        const config = this.configService.get('cache.memory') || {};
         this.cache = new node_cache_1.default({
             stdTTL: config.defaultTtl || 3600,
             checkperiod: config.checkPeriod || 600,
@@ -32,7 +32,7 @@ let MemoryCacheService = MemoryCacheService_1 = class MemoryCacheService {
             deleteOnExpire: true,
             maxKeys: config.maxKeys || 1000,
         });
-        this.cache.on('set', (key, value) => {
+        this.cache.on('set', (key, _value) => {
             this.metricsService.recordCacheOperation('set', 'memory', 'success');
             logger_util_1.CorrelatedLogger.debug(`Memory cache SET: ${key}`, MemoryCacheService_1.name);
         });
@@ -46,11 +46,11 @@ let MemoryCacheService = MemoryCacheService_1 = class MemoryCacheService {
                 logger_util_1.CorrelatedLogger.debug(`Memory cache MISS: ${key}`, MemoryCacheService_1.name);
             }
         });
-        this.cache.on('del', (key, value) => {
+        this.cache.on('del', (key, _value) => {
             this.metricsService.recordCacheOperation('delete', 'memory', 'success');
             logger_util_1.CorrelatedLogger.debug(`Memory cache DELETE: ${key}`, MemoryCacheService_1.name);
         });
-        this.cache.on('expired', (key, value) => {
+        this.cache.on('expired', (key, _value) => {
             this.metricsService.recordCacheOperation('expire', 'memory', 'success');
             logger_util_1.CorrelatedLogger.debug(`Memory cache EXPIRED: ${key}`, MemoryCacheService_1.name);
         });

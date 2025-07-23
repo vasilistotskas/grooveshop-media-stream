@@ -7,10 +7,10 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CorrelationModule = void 0;
-const common_1 = require("@nestjs/common");
-const correlation_service_1 = require("./services/correlation.service");
 const correlation_middleware_1 = require("./middleware/correlation.middleware");
 const timing_middleware_1 = require("./middleware/timing.middleware");
+const correlation_service_1 = require("./services/correlation.service");
+const common_1 = require("@nestjs/common");
 let CorrelationModule = class CorrelationModule {
     configure(consumer) {
         consumer

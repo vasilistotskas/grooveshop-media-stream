@@ -35,7 +35,7 @@ __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1),
     (0, class_validator_1.Max)(65535),
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value) || 9090),
+    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 9090),
     __metadata("design:type", Number)
 ], MonitoringConfigDto.prototype, "metricsPort", void 0);
 __decorate([

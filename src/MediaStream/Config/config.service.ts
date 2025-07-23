@@ -1,4 +1,4 @@
-import type { AppConfig } from './interfaces/app-config.interface'
+import type { AppConfig } from '@microservice/Config/interfaces/app-config.interface'
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import { ConfigService as NestConfigService } from '@nestjs/config'
 

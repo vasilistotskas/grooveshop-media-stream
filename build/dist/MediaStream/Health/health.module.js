@@ -7,14 +7,15 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.HealthModule = void 0;
-const common_1 = require("@nestjs/common");
-const terminus_1 = require("@nestjs/terminus");
+const cache_module_1 = require("../Cache/cache.module");
+const config_module_1 = require("../Config/config.module");
 const health_controller_1 = require("./controllers/health.controller");
 const disk_space_health_indicator_1 = require("./indicators/disk-space-health.indicator");
 const memory_health_indicator_1 = require("./indicators/memory-health.indicator");
-const config_module_1 = require("../Config/config.module");
 const http_module_1 = require("../HTTP/http.module");
 const http_health_indicator_1 = require("../HTTP/indicators/http-health.indicator");
+const common_1 = require("@nestjs/common");
+const terminus_1 = require("@nestjs/terminus");
 let HealthModule = class HealthModule {
 };
 exports.HealthModule = HealthModule;
@@ -23,19 +24,20 @@ exports.HealthModule = HealthModule = __decorate([
         imports: [
             terminus_1.TerminusModule,
             config_module_1.ConfigModule,
-            http_module_1.HttpModule
+            http_module_1.HttpModule,
+            cache_module_1.CacheModule,
         ],
         controllers: [health_controller_1.HealthController],
         providers: [
             disk_space_health_indicator_1.DiskSpaceHealthIndicator,
             memory_health_indicator_1.MemoryHealthIndicator,
-            http_health_indicator_1.HttpHealthIndicator
+            http_health_indicator_1.HttpHealthIndicator,
         ],
         exports: [
             disk_space_health_indicator_1.DiskSpaceHealthIndicator,
             memory_health_indicator_1.MemoryHealthIndicator,
-            http_health_indicator_1.HttpHealthIndicator
-        ]
+            http_health_indicator_1.HttpHealthIndicator,
+        ],
     })
 ], HealthModule);
 //# sourceMappingURL=health.module.js.map

@@ -7,11 +7,11 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.HttpModule = void 0;
-const common_1 = require("@nestjs/common");
-const axios_1 = require("@nestjs/axios");
 const config_module_1 = require("../Config/config.module");
-const http_client_service_1 = require("./services/http-client.service");
 const http_health_indicator_1 = require("./indicators/http-health.indicator");
+const http_client_service_1 = require("./services/http-client.service");
+const axios_1 = require("@nestjs/axios");
+const common_1 = require("@nestjs/common");
 let HttpModule = class HttpModule {
 };
 exports.HttpModule = HttpModule;

@@ -43,14 +43,15 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MemoryHealthIndicator = void 0;
-const common_1 = require("@nestjs/common");
 const os = __importStar(require("node:os"));
+const process = __importStar(require("node:process"));
+const common_1 = require("@nestjs/common");
 const base_health_indicator_1 = require("../base/base-health-indicator");
 let MemoryHealthIndicator = class MemoryHealthIndicator extends base_health_indicator_1.BaseHealthIndicator {
     constructor() {
         const options = {
             timeout: 1000,
-            threshold: 0.9
+            threshold: 0.9,
         };
         super('memory', options);
         this.warningThreshold = 0.8;
@@ -67,20 +68,20 @@ let MemoryHealthIndicator = class MemoryHealthIndicator extends base_health_indi
             if (memoryInfo.heapUsagePercentage >= this.heapCriticalThreshold) {
                 return this.createUnhealthyResult(`Heap memory critically high: ${(memoryInfo.heapUsagePercentage * 100).toFixed(1)}% used`, memoryInfo);
             }
-            let status = 'healthy';
-            if (memoryInfo.memoryUsagePercentage >= this.warningThreshold ||
-                memoryInfo.heapUsagePercentage >= this.heapWarningThreshold) {
-                status = 'warning';
+            let detailStatus = 'healthy';
+            if (memoryInfo.memoryUsagePercentage >= this.warningThreshold
+                || memoryInfo.heapUsagePercentage >= this.heapWarningThreshold) {
+                detailStatus = 'warning';
             }
             return this.createHealthyResult({
                 ...memoryInfo,
-                status,
+                detailStatus,
                 thresholds: {
                     systemMemoryWarning: this.warningThreshold,
                     systemMemoryCritical: this.criticalThreshold,
                     heapMemoryWarning: this.heapWarningThreshold,
-                    heapMemoryCritical: this.heapCriticalThreshold
-                }
+                    heapMemoryCritical: this.heapCriticalThreshold,
+                },
             });
         });
     }
@@ -104,9 +105,9 @@ let MemoryHealthIndicator = class MemoryHealthIndicator extends base_health_indi
                 heapTotal: this.formatBytes(processMemory.heapTotal),
                 heapUsed: this.formatBytes(processMemory.heapUsed),
                 external: this.formatBytes(processMemory.external),
-                arrayBuffers: this.formatBytes(processMemory.arrayBuffers)
+                arrayBuffers: this.formatBytes(processMemory.arrayBuffers),
             },
-            heapUsagePercentage
+            heapUsagePercentage,
         };
     }
     formatBytes(bytes) {
@@ -116,8 +117,8 @@ let MemoryHealthIndicator = class MemoryHealthIndicator extends base_health_indi
         return this.getMemoryInfo();
     }
     forceGarbageCollection() {
-        if (global.gc) {
-            global.gc();
+        if (globalThis.gc) {
+            globalThis.gc();
             return true;
         }
         return false;

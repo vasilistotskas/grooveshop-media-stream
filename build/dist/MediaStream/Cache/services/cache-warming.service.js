@@ -11,15 +11,15 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var CacheWarmingService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CacheWarmingService = void 0;
-const common_1 = require("@nestjs/common");
-const schedule_1 = require("@nestjs/schedule");
-const memory_cache_service_1 = require("./memory-cache.service");
-const config_service_1 = require("../../Config/config.service");
-const metrics_service_1 = require("../../Metrics/services/metrics.service");
-const logger_util_1 = require("../../Correlation/utils/logger.util");
 const promises_1 = require("node:fs/promises");
 const node_path_1 = require("node:path");
 const node_process_1 = require("node:process");
+const memory_cache_service_1 = require("./memory-cache.service");
+const config_service_1 = require("../../Config/config.service");
+const logger_util_1 = require("../../Correlation/utils/logger.util");
+const metrics_service_1 = require("../../Metrics/services/metrics.service");
+const common_1 = require("@nestjs/common");
+const schedule_1 = require("@nestjs/schedule");
 let CacheWarmingService = CacheWarmingService_1 = class CacheWarmingService {
     constructor(memoryCacheService, configService, metricsService) {
         this.memoryCacheService = memoryCacheService;
@@ -86,7 +86,7 @@ let CacheWarmingService = CacheWarmingService_1 = class CacheWarmingService {
                     try {
                         const [fileStat, metaContent] = await Promise.all([
                             (0, promises_1.stat)(filePath),
-                            (0, promises_1.readFile)(metaPath, 'utf8').catch(() => null)
+                            (0, promises_1.readFile)(metaPath, 'utf8').catch(() => null),
                         ]);
                         let accessCount = 1;
                         if (metaContent) {

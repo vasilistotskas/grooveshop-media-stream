@@ -1,9 +1,9 @@
-import { CacheConfigDto } from './cache-config.dto';
+import { CacheConfigDto } from '@microservice/Config/dto/cache-config.dto';
+import { HttpConfigDto } from '@microservice/Config/dto/http-config.dto';
+import { MonitoringConfigDto } from '@microservice/Config/dto/monitoring-config.dto';
+import { ProcessingConfigDto } from '@microservice/Config/dto/processing-config.dto';
+import { ServerConfigDto } from '@microservice/Config/dto/server-config.dto';
 import { ExternalServicesConfigDto } from './external-services-config.dto';
-import { HttpConfigDto } from './http-config.dto';
-import { MonitoringConfigDto } from './monitoring-config.dto';
-import { ProcessingConfigDto } from './processing-config.dto';
-import { ServerConfigDto } from './server-config.dto';
 export declare class AppConfigDto {
     server: ServerConfigDto;
     cache: CacheConfigDto;

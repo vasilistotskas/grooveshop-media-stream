@@ -24,7 +24,7 @@ export async function bootstrap(exitProcess = true): Promise<void> {
 		})
 
 		await app.listen(serverConfig.port, serverConfig.host)
-		console.log(`Application is running on: http://${serverConfig.host}:${serverConfig.port}`)
+		console.warn(`Application is running on: http://${serverConfig.host}:${serverConfig.port}`)
 	}
 	catch (error) {
 		console.error('Failed to start application:', error)

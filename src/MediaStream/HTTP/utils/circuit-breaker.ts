@@ -45,7 +45,6 @@ export class CircuitBreaker {
 		}
 
 		try {
-			this.totalRequests++
 			const result = await fn()
 			this.recordSuccess()
 			return result
@@ -65,6 +64,7 @@ export class CircuitBreaker {
 	 */
 	recordSuccess(): void {
 		this.successCount++
+		this.totalRequests++
 		this.requestWindow.push({ timestamp: Date.now(), success: true })
 		this.pruneWindow()
 
@@ -79,6 +79,7 @@ export class CircuitBreaker {
 	 */
 	recordFailure(): void {
 		this.failureCount++
+		this.totalRequests++
 		this.requestWindow.push({ timestamp: Date.now(), success: false })
 		this.pruneWindow()
 
@@ -157,6 +158,7 @@ export class CircuitBreaker {
 		this.state = CircuitState.CLOSED
 		this.failureCount = 0
 		this.successCount = 0
+		this.totalRequests = 0
 		this.lastStateChange = Date.now()
 		this.nextAttempt = 0
 		this.requestWindow.length = 0
@@ -192,7 +194,6 @@ export class CircuitBreaker {
 	private pruneWindow(): void {
 		const now = Date.now()
 		const cutoff = now - this.options.rollingWindow
-		const initialLength = this.requestWindow.length
 
 		// Remove entries older than the rolling window
 		let i = 0

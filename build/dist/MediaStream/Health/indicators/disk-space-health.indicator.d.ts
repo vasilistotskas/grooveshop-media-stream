@@ -1,5 +1,5 @@
-import { ConfigService } from '@microservice/Config/config.service';
 import type { HealthIndicatorResult } from '@nestjs/terminus';
+import { ConfigService } from '@microservice/Config/config.service';
 import { BaseHealthIndicator } from '../base/base-health-indicator';
 export interface DiskSpaceInfo {
     total: number;

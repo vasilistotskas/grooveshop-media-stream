@@ -1,12 +1,13 @@
+import { Buffer } from 'node:buffer'
 import { readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { cwd } from 'node:process'
+import { MemoryCacheService } from '@microservice/Cache/services/memory-cache.service'
 import { ConfigService } from '@microservice/Config/config.service'
 import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
 import { MetricsService } from '@microservice/Metrics/services/metrics.service'
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
-import { MemoryCacheService } from './memory-cache.service'
 
 interface CacheWarmingConfig {
 	enabled: boolean
@@ -45,7 +46,7 @@ export class CacheWarmingService implements OnModuleInit {
 		this.storagePath = join(cwd(), 'storage')
 	}
 
-	async onModuleInit() {
+	async onModuleInit(): Promise<void> {
 		if (this.config.enabled && this.config.warmupOnStart) {
 			CorrelatedLogger.log('Starting cache warming on module initialization', CacheWarmingService.name)
 			// Run warmup in background to not block startup
@@ -54,7 +55,7 @@ export class CacheWarmingService implements OnModuleInit {
 	}
 
 	@Cron(CronExpression.EVERY_6_HOURS)
-	async scheduledWarmup() {
+	async scheduledWarmup(): Promise<void> {
 		if (this.config.enabled) {
 			CorrelatedLogger.log('Starting scheduled cache warmup', CacheWarmingService.name)
 			await this.warmupCache()
