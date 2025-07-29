@@ -1,0 +1,99 @@
+import { Injectable, Logger } from '@nestjs/common'
+import CacheImageRequest from '../../API/DTO/CacheImageRequest'
+import { ConfigService } from '../../Config/config.service'
+import { CorrelationService } from '../../Correlation/services/correlation.service'
+import { InputSanitizationService } from './input-sanitization.service'
+import { SecurityCheckerService } from './security-checker.service'
+
+export interface SimpleValidationResult {
+	isValid: boolean
+	errors: string[]
+	sanitizedInput?: any
+}
+
+@Injectable()
+export class SimpleValidationService {
+	private readonly logger = new Logger(SimpleValidationService.name)
+
+	constructor(
+		private readonly configService: ConfigService,
+		private readonly correlationService: CorrelationService,
+		private readonly sanitizationService: InputSanitizationService,
+		private readonly securityChecker: SecurityCheckerService,
+	) {}
+
+	async validateCacheImageRequest(request: CacheImageRequest): Promise<SimpleValidationResult> {
+		const errors: string[] = []
+
+		try {
+			// 1. Check for malicious content
+			const isMalicious = await this.securityChecker.checkForMaliciousContent(request)
+			if (isMalicious) {
+				errors.push('Request contains potentially malicious content')
+				await this.securityChecker.logSecurityEvent({
+					type: 'malicious_content',
+					source: 'simple_validation_service',
+					details: { resourceTarget: request.resourceTarget },
+					timestamp: new Date(),
+				})
+			}
+
+			// 2. Validate URL
+			if (!this.sanitizationService.validateUrl(request.resourceTarget)) {
+				errors.push('Invalid or disallowed URL')
+			}
+
+			// 3. Validate image dimensions
+			const { width, height } = request.resizeOptions
+			if (width && height) {
+				if (!this.sanitizationService.validateImageDimensions(width, height)) {
+					errors.push('Image dimensions exceed allowed limits')
+				}
+			}
+
+			// 4. Sanitize the request
+			const sanitizedInput = await this.sanitizationService.sanitize(request)
+
+			return {
+				isValid: errors.length === 0,
+				errors,
+				sanitizedInput,
+			}
+		}
+		catch (error) {
+			this.logger.error('Validation error', error)
+			return {
+				isValid: false,
+				errors: ['Validation service error'],
+			}
+		}
+	}
+
+	async validateInput(input: any): Promise<SimpleValidationResult> {
+		const errors: string[] = []
+
+		try {
+			// Check for malicious content
+			const isMalicious = await this.securityChecker.checkForMaliciousContent(input)
+			if (isMalicious) {
+				errors.push('Input contains potentially malicious content')
+			}
+
+			// Sanitize input
+			const sanitizedInput = await this.sanitizationService.sanitize(input)
+
+			return {
+				isValid: errors.length === 0,
+				errors,
+				sanitizedInput,
+			}
+		}
+		catch (error) {
+			this.logger.error('Input validation error', error)
+			return {
+				isValid: false,
+				errors: ['Input validation service error'],
+			}
+		}
+	}
+}

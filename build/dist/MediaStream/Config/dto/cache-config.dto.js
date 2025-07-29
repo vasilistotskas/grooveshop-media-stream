@@ -143,14 +143,17 @@ class CacheConfigDto {
 }
 exports.CacheConfigDto = CacheConfigDto;
 __decorate([
+    (0, class_validator_1.ValidateNested)(),
     (0, class_transformer_1.Type)(() => MemoryCacheConfigDto),
     __metadata("design:type", MemoryCacheConfigDto)
 ], CacheConfigDto.prototype, "memory", void 0);
 __decorate([
+    (0, class_validator_1.ValidateNested)(),
     (0, class_transformer_1.Type)(() => RedisConfigDto),
     __metadata("design:type", RedisConfigDto)
 ], CacheConfigDto.prototype, "redis", void 0);
 __decorate([
+    (0, class_validator_1.ValidateNested)(),
     (0, class_transformer_1.Type)(() => FileCacheConfigDto),
     __metadata("design:type", FileCacheConfigDto)
 ], CacheConfigDto.prototype, "file", void 0);

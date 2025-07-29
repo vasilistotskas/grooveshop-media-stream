@@ -58,7 +58,7 @@ export class RedisHealthIndicator extends BaseHealthIndicator {
 			const connectionStatus = this.redisCacheService.getConnectionStatus()
 
 			const responseTime = Date.now() - startTime
-			const isHealthy = responseTime < 200 && connectionStatus.connected
+			const isHealthy = connectionStatus.connected && responseTime <= 200
 
 			const result: HealthIndicatorResult = {
 				[this.key]: {
@@ -89,7 +89,7 @@ export class RedisHealthIndicator extends BaseHealthIndicator {
 						hitRate: '70%',
 						memoryFragmentation: '1.5',
 					},
-					warnings: this.generateWarnings(stats, memoryUsage, responseTime),
+					warnings: this.generateWarnings(stats, memoryUsage, responseTime, connectionStatus.stats.errors),
 				},
 			}
 
@@ -123,7 +123,7 @@ export class RedisHealthIndicator extends BaseHealthIndicator {
 		}
 	}
 
-	private generateWarnings(stats: any, memoryUsage: any, responseTime: number): string[] {
+	private generateWarnings(stats: any, memoryUsage: any, responseTime: number, errors: number = 0): string[] {
 		const warnings: string[] = []
 
 		if (responseTime > 100) {
@@ -138,8 +138,8 @@ export class RedisHealthIndicator extends BaseHealthIndicator {
 			warnings.push(`Memory fragmentation (${memoryUsage.fragmentation}) is high (>1.5)`)
 		}
 
-		if (stats.errors > 0) {
-			warnings.push(`Redis has recorded ${stats.errors} errors`)
+		if (errors > 0) {
+			warnings.push(`Redis has recorded ${errors} errors`)
 		}
 
 		const memoryUsageMB = memoryUsage.used / 1024 / 1024

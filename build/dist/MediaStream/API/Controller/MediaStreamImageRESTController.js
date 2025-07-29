@@ -49,34 +49,108 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 var MediaStreamImageRESTController_1;
 Object.defineProperty(exports, "__esModule", { value: true });
+const node_buffer_1 = require("node:buffer");
 const promises_1 = require("node:fs/promises");
 const process = __importStar(require("node:process"));
 const CacheImageRequest_1 = __importStar(require("../DTO/CacheImageRequest"));
 const RoutePrefixes_1 = require("../../Constant/RoutePrefixes");
+const correlation_service_1 = require("../../Correlation/services/correlation.service");
+const performance_tracker_util_1 = require("../../Correlation/utils/performance-tracker.util");
 const MediaStreamErrors_1 = require("../../Error/MediaStreamErrors");
 const GenerateResourceIdentityFromRequestJob_1 = __importDefault(require("../../Job/GenerateResourceIdentityFromRequestJob"));
+const metrics_service_1 = require("../../Metrics/services/metrics.service");
 const CacheImageResourceOperation_1 = __importDefault(require("../../Operation/CacheImageResourceOperation"));
+const adaptive_rate_limit_guard_1 = require("../../RateLimit/guards/adaptive-rate-limit.guard");
+const input_sanitization_service_1 = require("../../Validation/services/input-sanitization.service");
+const security_checker_service_1 = require("../../Validation/services/security-checker.service");
 const axios_1 = require("@nestjs/axios");
 const common_1 = require("@nestjs/common");
 let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class MediaStreamImageRESTController {
-    constructor(httpService, generateResourceIdentityFromRequestJob, cacheImageResourceOperation) {
+    constructor(httpService, generateResourceIdentityFromRequestJob, cacheImageResourceOperation, inputSanitizationService, securityCheckerService, correlationService, metricsService) {
         this.httpService = httpService;
         this.generateResourceIdentityFromRequestJob = generateResourceIdentityFromRequestJob;
         this.cacheImageResourceOperation = cacheImageResourceOperation;
+        this.inputSanitizationService = inputSanitizationService;
+        this.securityCheckerService = securityCheckerService;
+        this.correlationService = correlationService;
+        this.metricsService = metricsService;
         this.logger = new common_1.Logger(MediaStreamImageRESTController_1.name);
     }
-    static addHeadersToRequest(res, headers) {
+    async validateRequestParameters(params) {
+        const correlationId = this.correlationService.getCorrelationId();
+        if (params.imageType) {
+            const isMalicious = await this.securityCheckerService.checkForMaliciousContent(params.imageType);
+            if (isMalicious) {
+                throw new MediaStreamErrors_1.InvalidRequestError('Invalid imageType parameter', {
+                    correlationId,
+                    imageType: params.imageType,
+                });
+            }
+        }
+        if (params.image) {
+            const isMalicious = await this.securityCheckerService.checkForMaliciousContent(params.image);
+            if (isMalicious) {
+                throw new MediaStreamErrors_1.InvalidRequestError('Invalid image parameter', {
+                    correlationId,
+                    image: params.image,
+                });
+            }
+        }
+        if (params.width !== null && params.width !== undefined) {
+            const width = Number(params.width);
+            if (Number.isNaN(width) || width < 1 || width > 5000) {
+                throw new MediaStreamErrors_1.InvalidRequestError('Invalid width parameter', {
+                    correlationId,
+                    width: params.width,
+                });
+            }
+        }
+        if (params.height !== null && params.height !== undefined) {
+            const height = Number(params.height);
+            if (Number.isNaN(height) || height < 1 || height > 5000) {
+                throw new MediaStreamErrors_1.InvalidRequestError('Invalid height parameter', {
+                    correlationId,
+                    height: params.height,
+                });
+            }
+        }
+        if (params.quality !== undefined) {
+            const quality = Number(params.quality);
+            if (Number.isNaN(quality) || quality < 1 || quality > 100) {
+                throw new MediaStreamErrors_1.InvalidRequestError('Invalid quality parameter', {
+                    correlationId,
+                    quality: params.quality,
+                });
+            }
+        }
+        if (params.trimThreshold !== undefined) {
+            const trimThreshold = Number(params.trimThreshold);
+            if (Number.isNaN(trimThreshold) || trimThreshold < 0 || trimThreshold > 100) {
+                throw new MediaStreamErrors_1.InvalidRequestError('Invalid trimThreshold parameter', {
+                    correlationId,
+                    trimThreshold: params.trimThreshold,
+                });
+            }
+        }
+    }
+    addHeadersToRequest(res, headers) {
         if (!headers) {
-            throw new MediaStreamErrors_1.InvalidRequestError('Headers object is undefined', { headers });
+            const correlationId = this.correlationService.getCorrelationId();
+            throw new MediaStreamErrors_1.InvalidRequestError('Headers object is undefined', {
+                headers,
+                correlationId,
+            });
         }
         const size = headers.size !== undefined ? headers.size.toString() : '0';
         const format = headers.format || 'png';
         const publicTTL = headers.publicTTL || 0;
         const expiresAt = Date.now() + publicTTL;
+        const correlationId = this.correlationService.getCorrelationId();
         res
             .header('Content-Length', size)
             .header('Cache-Control', `max-age=${publicTTL / 1000}, public`)
-            .header('Expires', new Date(expiresAt).toUTCString());
+            .header('Expires', new Date(expiresAt).toUTCString())
+            .header('X-Correlation-ID', correlationId);
         if (format === 'svg') {
             res.header('Content-Type', 'image/svg+xml');
         }
@@ -86,37 +160,59 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
         return res;
     }
     async handleStreamOrFallback(request, res) {
+        const correlationId = this.correlationService.getCorrelationId();
+        performance_tracker_util_1.PerformanceTracker.startPhase('image_request_processing');
         try {
+            this.metricsService.recordError('image_requests', 'total');
             await this.cacheImageResourceOperation.setup(request);
             if (await this.cacheImageResourceOperation.resourceExists) {
-                this.logger.debug('Resource exists, attempting to stream.', { request });
+                this.logger.debug('Resource exists, attempting to stream.', {
+                    request,
+                    correlationId,
+                });
                 await this.streamResource(request, res);
             }
             else {
-                this.logger.debug('Resource does not exist, attempting to fetch or fallback to default.', { request });
+                this.logger.debug('Resource does not exist, attempting to fetch or fallback to default.', {
+                    request,
+                    correlationId,
+                });
                 await this.fetchAndStreamResource(request, res);
             }
         }
         catch (error) {
-            const context = { request, error };
+            const context = { request, error, correlationId };
             this.logger.error(`Error while processing the image request: ${error.message || error}`, error, context);
+            this.metricsService.recordError('image_request', error.constructor.name);
             await this.defaultImageFallback(request, res);
+        }
+        finally {
+            performance_tracker_util_1.PerformanceTracker.endPhase('image_request_processing');
         }
     }
     async streamFileToResponse(filePath, headers, res) {
+        const correlationId = this.correlationService.getCorrelationId();
+        performance_tracker_util_1.PerformanceTracker.startPhase('file_streaming');
         let fd = null;
         try {
-            this.logger.debug(`Streaming file: ${filePath}`, { filePath, headers });
+            this.logger.debug(`Streaming file: ${filePath}`, {
+                filePath,
+                headers,
+                correlationId,
+            });
             fd = await (0, promises_1.open)(filePath, 'r');
-            res = MediaStreamImageRESTController_1.addHeadersToRequest(res, headers);
+            res = this.addHeadersToRequest(res, headers);
             const fileStream = fd.createReadStream();
             if (typeof res.on === 'function') {
                 fileStream.pipe(res);
                 await new Promise((resolve, reject) => {
-                    fileStream.on('end', () => resolve());
+                    fileStream.on('end', () => {
+                        resolve();
+                    });
                     fileStream.on('error', (error) => {
-                        const context = { filePath, headers, error };
+                        const context = { filePath, headers, error, correlationId };
                         this.logger.error(`Stream error: ${error.message || error}`, error, context);
+                        this.metricsService.recordError('file_stream', 'stream_error');
                         reject(new MediaStreamErrors_1.ResourceStreamingError('Error streaming file', context));
                     });
                     res.on('close', () => {
@@ -126,53 +222,54 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                 });
             }
             else {
-                throw new MediaStreamErrors_1.InvalidRequestError('Response object is not a writable stream', { filePath, headers });
+                throw new MediaStreamErrors_1.InvalidRequestError('Response object is not a writable stream', {
+                    filePath,
+                    headers,
+                    correlationId,
+                });
             }
         }
         catch (error) {
             if (error.name !== 'ResourceStreamingError') {
-                throw new MediaStreamErrors_1.ResourceStreamingError('Failed to stream file', { filePath, error: error.message || error });
+                throw new MediaStreamErrors_1.ResourceStreamingError('Failed to stream file', {
+                    filePath,
+                    error: error.message || error,
+                    correlationId,
+                });
             }
             throw error;
         }
         finally {
+            performance_tracker_util_1.PerformanceTracker.endPhase('file_streaming');
             if (fd) {
                 await fd.close().catch((err) => {
-                    this.logger.error(`Error closing file descriptor: ${err.message || err}`, err, { filePath });
+                    this.logger.error(`Error closing file descriptor: ${err.message || err}`, err, {
+                        filePath,
+                        correlationId,
+                    });
                 });
             }
         }
     }
     async streamResource(request, res) {
+        const correlationId = this.correlationService.getCorrelationId();
         const headers = await this.cacheImageResourceOperation.getHeaders;
         if (!headers) {
-            this.logger.warn('Resource metadata is missing or invalid.', { request });
+            this.logger.warn('Resource metadata is missing or invalid.', {
+                request,
+                correlationId,
+            });
             await this.defaultImageFallback(request, res);
             return;
         }
         try {
-            await this.streamFileToResponse(this.cacheImageResourceOperation.getResourcePath, headers, res);
-        }
-        catch (error) {
-            const context = {
-                request,
-                resourcePath: this.cacheImageResourceOperation.getResourcePath,
-                error: error.message || error,
-            };
-            this.logger.error(`Error while streaming resource: ${error.message || error}`, error, context);
-            await this.defaultImageFallback(request, res);
-        }
-        finally {
-            await this.cacheImageResourceOperation.execute();
-        }
-    }
-    async fetchAndStreamResource(request, res) {
-        try {
-            await this.cacheImageResourceOperation.execute();
-            const headers = await this.cacheImageResourceOperation.getHeaders;
-            if (!headers) {
-                this.logger.warn('Failed to fetch resource or generate headers.', { request });
-                await this.defaultImageFallback(request, res);
+            const cachedResource = await this.cacheImageResourceOperation.getCachedResource();
+            if (cachedResource && cachedResource.data) {
+                res = this.addHeadersToRequest(res, headers);
+                const imageData = typeof cachedResource.data === 'string'
+                    ? node_buffer_1.Buffer.from(cachedResource.data, 'base64')
+                    : cachedResource.data;
+                res.end(imageData);
                 return;
             }
             await this.streamFileToResponse(this.cacheImageResourceOperation.getResourcePath, headers, res);
@@ -182,14 +279,58 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                 request,
                 resourcePath: this.cacheImageResourceOperation.getResourcePath,
                 error: error.message || error,
+                correlationId,
+            };
+            this.logger.error(`Error while streaming resource: ${error.message || error}`, error, context);
+            await this.defaultImageFallback(request, res);
+        }
+        finally {
+            await this.cacheImageResourceOperation.execute();
+        }
+    }
+    async fetchAndStreamResource(request, res) {
+        const correlationId = this.correlationService.getCorrelationId();
+        try {
+            await this.cacheImageResourceOperation.execute();
+            if (this.cacheImageResourceOperation.shouldUseBackgroundProcessing && this.cacheImageResourceOperation.shouldUseBackgroundProcessing()) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            const headers = await this.cacheImageResourceOperation.getHeaders;
+            if (!headers) {
+                this.logger.warn('Failed to fetch resource or generate headers.', {
+                    request,
+                    correlationId,
+                });
+                await this.defaultImageFallback(request, res);
+                return;
+            }
+            const cachedResource = await this.cacheImageResourceOperation.getCachedResource();
+            if (cachedResource && cachedResource.data) {
+                res = this.addHeadersToRequest(res, headers);
+                const imageData = typeof cachedResource.data === 'string'
+                    ? node_buffer_1.Buffer.from(cachedResource.data, 'base64')
+                    : cachedResource.data;
+                res.end(imageData);
+                return;
+            }
+            await this.streamFileToResponse(this.cacheImageResourceOperation.getResourcePath, headers, res);
+        }
+        catch (error) {
+            const context = {
+                request,
+                resourcePath: this.cacheImageResourceOperation.getResourcePath,
+                error: error.message || error,
+                correlationId,
             };
             this.logger.error(`Error during resource fetch and stream: ${error.message || error}`, error, context);
             await this.defaultImageFallback(request, res);
         }
     }
     async defaultImageFallback(request, res) {
+        const correlationId = this.correlationService.getCorrelationId();
         try {
             const optimizedDefaultImagePath = await this.cacheImageResourceOperation.optimizeAndServeDefaultImage(request.resizeOptions);
+            res.header('X-Correlation-ID', correlationId);
             res.sendFile(optimizedDefaultImagePath);
         }
         catch (defaultImageError) {
@@ -197,49 +338,145 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                 request,
                 resizeOptions: request.resizeOptions,
                 error: defaultImageError.message || defaultImageError,
+                correlationId,
             };
             this.logger.error(`Failed to serve default image: ${defaultImageError.message || defaultImageError}`, defaultImageError, context);
+            this.metricsService.recordError('default_image_fallback', 'fallback_error');
             throw new MediaStreamErrors_1.DefaultImageFallbackError('Failed to process the image request', context);
         }
     }
     static resourceTargetPrepare(resourceTarget) {
         return resourceTarget;
     }
-    async uploadedImage(imageType, image, width = null, height = null, fit = CacheImageRequest_1.FitOptions.contain, position = CacheImageRequest_1.PositionOptions.entropy, background = CacheImageRequest_1.BackgroundOptions.transparent, trimThreshold = 5, format = CacheImageRequest_1.SupportedResizeFormats.webp, quality = 100, res) {
-        const resizeOptions = new CacheImageRequest_1.ResizeOptions({
-            width,
-            height,
-            position,
-            background,
-            fit,
-            trimThreshold,
-            format,
-            quality,
-        });
-        const djangoApiUrl = process.env.NEST_PUBLIC_DJANGO_URL || 'http://localhost:8000';
-        const request = new CacheImageRequest_1.default({
-            resourceTarget: MediaStreamImageRESTController_1.resourceTargetPrepare(`${djangoApiUrl}/media/uploads/${imageType}/${image}`),
-            resizeOptions,
-        });
-        this.logger.debug(`Request: ${JSON.stringify(request)}`);
-        await this.handleStreamOrFallback(request, res);
-    }
-    async staticImage(image, width = null, height = null, fit = CacheImageRequest_1.FitOptions.contain, position = CacheImageRequest_1.PositionOptions.entropy, background = CacheImageRequest_1.BackgroundOptions.transparent, trimThreshold = 5, format = CacheImageRequest_1.SupportedResizeFormats.webp, quality = 100, res) {
-        const djangoApiUrl = process.env.NEST_PUBLIC_DJANGO_URL || 'http://localhost:8000';
-        const request = new CacheImageRequest_1.default({
-            resourceTarget: MediaStreamImageRESTController_1.resourceTargetPrepare(`${djangoApiUrl}/static/images/${image}`),
-            resizeOptions: new CacheImageRequest_1.ResizeOptions({
+    async uploadedImage(imageType, image, width = null, height = null, fit = CacheImageRequest_1.FitOptions.contain, position = CacheImageRequest_1.PositionOptions.entropy, background = CacheImageRequest_1.BackgroundOptions.transparent, trimThreshold = 5, format = CacheImageRequest_1.SupportedResizeFormats.webp, quality = 100, req, res) {
+        const correlationId = this.correlationService.getCorrelationId();
+        performance_tracker_util_1.PerformanceTracker.startPhase('uploaded_image_request');
+        try {
+            await this.validateRequestParameters({
+                imageType,
+                image,
                 width,
                 height,
+                quality,
+                trimThreshold,
+            });
+            const resizeOptions = new CacheImageRequest_1.ResizeOptions({
+                width: width ? Number(width) : null,
+                height: height ? Number(height) : null,
                 position,
                 background,
                 fit,
-                trimThreshold,
+                trimThreshold: Number(trimThreshold),
+                format,
+                quality: Number(quality),
+            });
+            const djangoApiUrl = process.env.NEST_PUBLIC_DJANGO_URL || 'http://localhost:8000';
+            const resourceUrl = `${djangoApiUrl}/media/uploads/${imageType}/${image}`;
+            const isValidUrl = this.inputSanitizationService.validateUrl(resourceUrl);
+            if (!isValidUrl) {
+                throw new MediaStreamErrors_1.InvalidRequestError('Invalid resource URL', {
+                    correlationId,
+                    resourceUrl,
+                });
+            }
+            const request = new CacheImageRequest_1.default({
+                resourceTarget: MediaStreamImageRESTController_1.resourceTargetPrepare(resourceUrl),
+                resizeOptions,
+            });
+            this.logger.debug(`Uploaded image request`, {
+                request: {
+                    imageType,
+                    image,
+                    width,
+                    height,
+                    format,
+                    quality,
+                },
+                correlationId,
+            });
+            await this.handleStreamOrFallback(request, res);
+        }
+        catch (error) {
+            const context = {
+                imageType,
+                image,
+                width,
+                height,
                 format,
                 quality,
-            }),
-        });
-        await this.handleStreamOrFallback(request, res);
+                correlationId,
+                error: error.message || error,
+            };
+            this.logger.error(`Error in uploadedImage: ${error.message || error}`, error, context);
+            this.metricsService.recordError('uploaded_image_request', error.constructor.name);
+            throw error;
+        }
+        finally {
+            performance_tracker_util_1.PerformanceTracker.endPhase('uploaded_image_request');
+        }
+    }
+    async staticImage(image, width = null, height = null, fit = CacheImageRequest_1.FitOptions.contain, position = CacheImageRequest_1.PositionOptions.entropy, background = CacheImageRequest_1.BackgroundOptions.transparent, trimThreshold = 5, format = CacheImageRequest_1.SupportedResizeFormats.webp, quality = 100, req, res) {
+        const correlationId = this.correlationService.getCorrelationId();
+        performance_tracker_util_1.PerformanceTracker.startPhase('static_image_request');
+        try {
+            await this.validateRequestParameters({
+                image,
+                width,
+                height,
+                quality,
+                trimThreshold,
+            });
+            const djangoApiUrl = process.env.NEST_PUBLIC_DJANGO_URL || 'http://localhost:8000';
+            const resourceUrl = `${djangoApiUrl}/static/images/${image}`;
+            const isValidUrl = this.inputSanitizationService.validateUrl(resourceUrl);
+            if (!isValidUrl) {
+                throw new MediaStreamErrors_1.InvalidRequestError('Invalid resource URL', {
+                    correlationId,
+                    resourceUrl,
+                });
+            }
+            const request = new CacheImageRequest_1.default({
+                resourceTarget: MediaStreamImageRESTController_1.resourceTargetPrepare(resourceUrl),
+                resizeOptions: new CacheImageRequest_1.ResizeOptions({
+                    width: width ? Number(width) : null,
+                    height: height ? Number(height) : null,
+                    position,
+                    background,
+                    fit,
+                    trimThreshold: Number(trimThreshold),
+                    format,
+                    quality: Number(quality),
+                }),
+            });
+            this.logger.debug(`Static image request`, {
+                request: {
+                    image,
+                    width,
+                    height,
+                    format,
+                    quality,
+                },
+                correlationId,
+            });
+            await this.handleStreamOrFallback(request, res);
+        }
+        catch (error) {
+            const context = {
+                image,
+                width,
+                height,
+                format,
+                quality,
+                correlationId,
+                error: error.message || error,
+            };
+            this.logger.error(`Error in staticImage: ${error.message || error}`, error, context);
+            this.metricsService.recordError('static_image_request', error.constructor.name);
+            throw error;
+        }
+        finally {
+            performance_tracker_util_1.PerformanceTracker.endPhase('static_image_request');
+        }
     }
 };
 __decorate([
@@ -254,9 +491,10 @@ __decorate([
     __param(7, (0, common_1.Param)('trimThreshold')),
     __param(8, (0, common_1.Param)('format')),
     __param(9, (0, common_1.Param)('quality')),
-    __param(10, (0, common_1.Res)()),
+    __param(10, (0, common_1.Req)()),
+    __param(11, (0, common_1.Res)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, Number, Number, String, Object, Object, Object, String, Object, Object]),
+    __metadata("design:paramtypes", [String, String, Number, Number, String, Object, Object, Object, String, Object, Object, Object]),
     __metadata("design:returntype", Promise)
 ], MediaStreamImageRESTController.prototype, "uploadedImage", null);
 __decorate([
@@ -270,9 +508,10 @@ __decorate([
     __param(6, (0, common_1.Param)('trimThreshold')),
     __param(7, (0, common_1.Param)('format')),
     __param(8, (0, common_1.Param)('quality')),
-    __param(9, (0, common_1.Res)()),
+    __param(9, (0, common_1.Req)()),
+    __param(10, (0, common_1.Res)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Number, Number, String, Object, Object, Object, String, Object, Object]),
+    __metadata("design:paramtypes", [String, Number, Number, String, Object, Object, Object, String, Object, Object, Object]),
     __metadata("design:returntype", Promise)
 ], MediaStreamImageRESTController.prototype, "staticImage", null);
 MediaStreamImageRESTController = MediaStreamImageRESTController_1 = __decorate([
@@ -281,9 +520,14 @@ MediaStreamImageRESTController = MediaStreamImageRESTController_1 = __decorate([
         version: RoutePrefixes_1.VERSION,
         scope: common_1.Scope.REQUEST,
     }),
+    (0, common_1.UseGuards)(adaptive_rate_limit_guard_1.AdaptiveRateLimitGuard),
     __metadata("design:paramtypes", [axios_1.HttpService,
         GenerateResourceIdentityFromRequestJob_1.default,
-        CacheImageResourceOperation_1.default])
+        CacheImageResourceOperation_1.default,
+        input_sanitization_service_1.InputSanitizationService,
+        security_checker_service_1.SecurityCheckerService,
+        correlation_service_1.CorrelationService,
+        metrics_service_1.MetricsService])
 ], MediaStreamImageRESTController);
 exports.default = MediaStreamImageRESTController;
 //# sourceMappingURL=MediaStreamImageRESTController.js.map

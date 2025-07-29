@@ -102,14 +102,27 @@ describe('appConfigDto', () => {
 		it('should fail validation with invalid external service URLs', async () => {
 			const invalidConfig = {
 				externalServices: {
-					djangoUrl: 'not-a-url',
-					nuxtUrl: 'also-not-a-url',
+					djangoUrl: 'invalid://url with spaces',
+					nuxtUrl: 'not a url at all',
+					requestTimeout: 30000,
+					maxRetries: 3,
 				},
 			}
 
-			const dto = plainToClass(AppConfigDto, invalidConfig)
-			const errors = await validate(dto)
+			const dto = plainToClass(AppConfigDto, invalidConfig, {
+				enableImplicitConversion: true,
+				excludeExtraneousValues: false,
+			})
+			const errors = await validate(dto, {
+				whitelist: false,
+				forbidNonWhitelisted: false,
+			})
 			expect(errors.length).toBeGreaterThan(0)
+
+			const externalServicesError = errors.find(error => error.property === 'externalServices')
+			expect(externalServicesError).toBeDefined()
+			expect(externalServicesError.children).toBeDefined()
+			expect(externalServicesError.children.length).toBeGreaterThan(0)
 		})
 	})
 

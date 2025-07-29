@@ -1,22 +1,31 @@
 import type ResourceMetaData from '@microservice/DTO/ResourceMetaData';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { BackgroundOptions, FitOptions, PositionOptions, SupportedResizeFormats } from '@microservice/API/DTO/CacheImageRequest';
+import { CorrelationService } from '@microservice/Correlation/services/correlation.service';
 import GenerateResourceIdentityFromRequestJob from '@microservice/Job/GenerateResourceIdentityFromRequestJob';
+import { MetricsService } from '@microservice/Metrics/services/metrics.service';
 import CacheImageResourceOperation from '@microservice/Operation/CacheImageResourceOperation';
+import { InputSanitizationService } from '@microservice/Validation/services/input-sanitization.service';
+import { SecurityCheckerService } from '@microservice/Validation/services/security-checker.service';
 import { HttpService } from '@nestjs/axios';
 export default class MediaStreamImageRESTController {
     private readonly httpService;
     private readonly generateResourceIdentityFromRequestJob;
     private readonly cacheImageResourceOperation;
+    private readonly inputSanitizationService;
+    private readonly securityCheckerService;
+    private readonly correlationService;
+    private readonly metricsService;
     private readonly logger;
-    constructor(httpService: HttpService, generateResourceIdentityFromRequestJob: GenerateResourceIdentityFromRequestJob, cacheImageResourceOperation: CacheImageResourceOperation);
-    protected static addHeadersToRequest(res: Response, headers: ResourceMetaData): Response;
+    constructor(httpService: HttpService, generateResourceIdentityFromRequestJob: GenerateResourceIdentityFromRequestJob, cacheImageResourceOperation: CacheImageResourceOperation, inputSanitizationService: InputSanitizationService, securityCheckerService: SecurityCheckerService, correlationService: CorrelationService, metricsService: MetricsService);
+    private validateRequestParameters;
+    protected addHeadersToRequest(res: Response, headers: ResourceMetaData): Response;
     private handleStreamOrFallback;
     private streamFileToResponse;
     private streamResource;
     private fetchAndStreamResource;
     private defaultImageFallback;
     private static resourceTargetPrepare;
-    uploadedImage(imageType: string, image: string, width: number, height: number, fit: FitOptions, position: PositionOptions, background: BackgroundOptions, trimThreshold: number, format: SupportedResizeFormats, quality: number, res: Response): Promise<void>;
-    staticImage(image: string, width: number, height: number, fit: FitOptions, position: PositionOptions, background: BackgroundOptions, trimThreshold: number, format: SupportedResizeFormats, quality: number, res: Response): Promise<void>;
+    uploadedImage(imageType: string, image: string, width: number, height: number, fit: FitOptions, position: PositionOptions, background: BackgroundOptions, trimThreshold: number, format: SupportedResizeFormats, quality: number, req: Request, res: Response): Promise<void>;
+    staticImage(image: string, width: number, height: number, fit: FitOptions, position: PositionOptions, background: BackgroundOptions, trimThreshold: number, format: SupportedResizeFormats, quality: number, req: Request, res: Response): Promise<void>;
 }

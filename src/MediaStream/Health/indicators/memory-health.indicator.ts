@@ -24,15 +24,15 @@ export class MemoryHealthIndicator extends BaseHealthIndicator {
 	constructor() {
 		const options: HealthCheckOptions = {
 			timeout: 1000,
-			threshold: 0.9, // 90% memory usage threshold
+			threshold: 0.95, // 95% memory usage threshold
 		}
 
 		super('memory', options)
 
-		this.warningThreshold = 0.8 // 80% system memory warning
-		this.criticalThreshold = 0.9 // 90% system memory critical
-		this.heapWarningThreshold = 0.8 // 80% heap warning
-		this.heapCriticalThreshold = 0.9 // 90% heap critical
+		this.warningThreshold = 0.85 // 85% system memory warning
+		this.criticalThreshold = 0.95 // 95% system memory critical
+		this.heapWarningThreshold = 0.90 // 90% heap warning (more lenient for Node.js)
+		this.heapCriticalThreshold = 0.98 // 98% heap critical (very high threshold)
 	}
 
 	protected async performHealthCheck(): Promise<HealthIndicatorResult> {

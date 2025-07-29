@@ -99,11 +99,11 @@ describe('memoryHealthIndicator', () => {
 				processMemory: {
 					rss: 100,
 					heapTotal: 50,
-					heapUsed: 47,
+					heapUsed: 49,
 					external: 10,
 					arrayBuffers: 5,
 				},
-				heapUsagePercentage: 0.95, // 95% heap usage (above 90% critical)
+				heapUsagePercentage: 0.99, // 99% heap usage (above 98% critical)
 			})
 
 			const result = await indicator.isHealthy()

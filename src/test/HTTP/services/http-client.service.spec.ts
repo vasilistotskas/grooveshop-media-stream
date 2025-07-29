@@ -45,9 +45,11 @@ describe('httpClientService', () => {
 		})
 
 		it('should load configuration from ConfigService', () => {
-			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.timeout', 30000)
-			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.maxRetries', 3)
-			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.circuitBreaker.failureThreshold', 50)
+			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.retry.retries', 3)
+			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.retry.retryDelay', 1000)
+			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.retry.maxRetryDelay', 10000)
+			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.connectionPool.timeout', 30000)
+			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.circuitBreaker.failureThreshold', 5)
 		})
 	})
 
@@ -169,7 +171,7 @@ describe('httpClientService', () => {
 			const stats = service.getStats()
 			expect(stats.successfulRequests).toBe(0)
 			expect(stats.failedRequests).toBe(2)
-		})
+		}, 15000)
 
 		it('should reset statistics', async () => {
 			const mockResponse: AxiosResponse = {

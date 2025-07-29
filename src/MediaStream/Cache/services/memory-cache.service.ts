@@ -146,6 +146,10 @@ export class MemoryCacheService implements ICacheManager {
 		}
 	}
 
+	async exists(key: string): Promise<boolean> {
+		return this.has(key)
+	}
+
 	async keys(): Promise<string[]> {
 		try {
 			return this.cache.keys()

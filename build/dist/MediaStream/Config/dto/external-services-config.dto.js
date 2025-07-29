@@ -23,13 +23,13 @@ class ExternalServicesConfigDto {
 exports.ExternalServicesConfigDto = ExternalServicesConfigDto;
 __decorate([
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsUrl)({ require_tld: false }),
+    (0, class_validator_1.IsUrl)({ require_tld: false }, { message: 'Django URL must be a valid URL' }),
     (0, class_transformer_1.Transform)(({ value }) => value || 'http://localhost:8000'),
     __metadata("design:type", String)
 ], ExternalServicesConfigDto.prototype, "djangoUrl", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsUrl)({ require_tld: false }),
+    (0, class_validator_1.IsUrl)({ require_tld: false }, { message: 'Nuxt URL must be a valid URL' }),
     (0, class_transformer_1.Transform)(({ value }) => value || 'http://localhost:3000'),
     __metadata("design:type", String)
 ], ExternalServicesConfigDto.prototype, "nuxtUrl", void 0);

@@ -49,7 +49,12 @@ __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1),
     (0, class_validator_1.Max)(65535),
-    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 3003),
+    (0, class_transformer_1.Transform)(({ value }) => {
+        if (value === undefined || value === null)
+            return 3003;
+        const parsed = Number.parseInt(value);
+        return Number.isNaN(parsed) ? value : parsed;
+    }),
     __metadata("design:type", Number)
 ], ServerConfigDto.prototype, "port", void 0);
 __decorate([
@@ -58,6 +63,7 @@ __decorate([
     __metadata("design:type", String)
 ], ServerConfigDto.prototype, "host", void 0);
 __decorate([
+    (0, class_validator_1.ValidateNested)(),
     (0, class_transformer_1.Type)(() => CorsConfigDto),
     __metadata("design:type", CorsConfigDto)
 ], ServerConfigDto.prototype, "cors", void 0);

@@ -40,7 +40,8 @@ describe('metricsService', () => {
 			expect(service).toBeDefined()
 		})
 
-		it('should initialize with monitoring enabled', () => {
+		it('should initialize with monitoring enabled', async () => {
+			await service.onModuleInit()
 			expect(configService.get).toHaveBeenCalledWith('monitoring.enabled')
 		})
 
@@ -60,6 +61,17 @@ describe('metricsService', () => {
 			expect(metrics).toContain('method="GET"')
 			expect(metrics).toContain('route="/test"')
 			expect(metrics).toContain('status_code="200"')
+		})
+
+		it('should record HTTP request with size metrics', async () => {
+			service.recordHttpRequest('POST', '/api/upload', 201, 1.2, 1024, 2048)
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_http_request_size_bytes')
+			expect(metrics).toContain('mediastream_http_response_size_bytes')
+			expect(metrics).toContain('method="POST"')
+			expect(metrics).toContain('route="/api/upload"')
+			expect(metrics).toContain('status_code="201"')
 		})
 
 		it('should record multiple HTTP requests', async () => {
@@ -95,6 +107,22 @@ describe('metricsService', () => {
 			expect(metrics).toContain('operation="convert"')
 			expect(metrics).toContain('format="jpg"')
 			expect(metrics).toContain('status="error"')
+			expect(metrics).toContain('mediastream_image_processing_errors_total')
+		})
+
+		it('should update image processing queue size', async () => {
+			service.updateImageProcessingQueueSize(5)
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_image_processing_queue_size')
+		})
+
+		it('should record image processing errors', async () => {
+			service.recordImageProcessingError('resize', 'invalid_format')
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_image_processing_errors_total')
+			expect(metrics).toContain('error_type="invalid_format"')
 		})
 	})
 
@@ -114,6 +142,31 @@ describe('metricsService', () => {
 			expect(metrics).toContain('status="hit"')
 			expect(metrics).toContain('status="miss"')
 			expect(metrics).toContain('status="success"')
+		})
+
+		it('should record cache operations with duration', async () => {
+			service.recordCacheOperation('get', 'memory', 'hit', 0.05)
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_cache_operation_duration_seconds')
+		})
+
+		it('should record cache evictions', async () => {
+			service.recordCacheEviction('memory', 'size')
+			service.recordCacheEviction('redis', 'ttl')
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_cache_evictions_total')
+			expect(metrics).toContain('reason="size"')
+			expect(metrics).toContain('reason="ttl"')
+		})
+
+		it('should update cache size', async () => {
+			service.updateCacheSize('memory', 1024000)
+			service.updateCacheSize('redis', 2048000)
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_cache_size_bytes')
 		})
 
 		it('should update cache hit ratio', async () => {
@@ -180,6 +233,45 @@ describe('metricsService', () => {
 			expect(metrics).toContain('type="http"')
 			expect(metrics).toContain('type="redis"')
 		})
+
+		it('should update CPU usage metrics', async () => {
+			service.updateCpuUsage(45.5, 12.3)
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_cpu_usage_percent')
+			expect(metrics).toContain('type="user"')
+			expect(metrics).toContain('type="system"')
+			expect(metrics).toContain('type="total"')
+		})
+
+		it('should update load average metrics', async () => {
+			service.updateLoadAverage(1.2, 1.5, 1.8)
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_load_average')
+			expect(metrics).toContain('period="1m"')
+			expect(metrics).toContain('period="5m"')
+			expect(metrics).toContain('period="15m"')
+		})
+
+		it('should update file descriptor metrics', async () => {
+			service.updateFileDescriptors(1024, 65536)
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_file_descriptors')
+			expect(metrics).toContain('type="open"')
+			expect(metrics).toContain('type="max"')
+		})
+
+		it('should update network connection metrics', async () => {
+			service.updateNetworkConnections(50, 10, 5)
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_network_connections')
+			expect(metrics).toContain('state="established"')
+			expect(metrics).toContain('state="listening"')
+			expect(metrics).toContain('state="time_wait"')
+		})
 	})
 
 	describe('metrics Export', () => {
@@ -218,8 +310,61 @@ describe('metricsService', () => {
 		})
 	})
 
+	describe('performance Metrics', () => {
+		it('should record garbage collection metrics', async () => {
+			service.recordGarbageCollection('major', 0.05)
+			service.recordGarbageCollection('minor', 0.01)
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_gc_duration_seconds')
+			expect(metrics).toContain('type="major"')
+			expect(metrics).toContain('type="minor"')
+		})
+
+		it('should record event loop lag', async () => {
+			service.recordEventLoopLag(0.02)
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_event_loop_lag_seconds')
+		})
+	})
+
+	describe('requests In Flight Tracking', () => {
+		it('should track requests in flight', async () => {
+			service.incrementRequestsInFlight()
+			service.incrementRequestsInFlight()
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_requests_in_flight')
+
+			service.decrementRequestsInFlight()
+
+			const updatedMetrics = await service.getMetrics()
+			expect(updatedMetrics).toContain('mediastream_requests_in_flight')
+		})
+
+		it('should not go below zero for requests in flight', async () => {
+			service.decrementRequestsInFlight()
+			service.decrementRequestsInFlight()
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_requests_in_flight')
+		})
+	})
+
+	describe('uptime Tracking', () => {
+		it('should track application uptime', async () => {
+			// Wait a bit to ensure uptime is tracked
+			await new Promise(resolve => setTimeout(resolve, 100))
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_uptime_seconds')
+		})
+	})
+
 	describe('configuration Integration', () => {
 		it('should respect monitoring enabled configuration', async () => {
+			await service.onModuleInit()
 			expect(configService.get).toHaveBeenCalledWith('monitoring.enabled')
 		})
 

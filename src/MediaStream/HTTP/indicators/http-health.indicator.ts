@@ -1,11 +1,12 @@
 import { ConfigService } from '@microservice/Config/config.service'
 import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
+import { BaseHealthIndicator } from '@microservice/Health/base/base-health-indicator'
 import { Injectable } from '@nestjs/common'
-import { HealthIndicator, HealthIndicatorResult } from '@nestjs/terminus'
+import { HealthIndicatorResult } from '@nestjs/terminus'
 import { HttpClientService } from '../services/http-client.service'
 
 @Injectable()
-export class HttpHealthIndicator extends HealthIndicator {
+export class HttpHealthIndicator extends BaseHealthIndicator {
 	private readonly healthCheckUrls: string[]
 	private readonly timeout: number
 
@@ -13,19 +14,27 @@ export class HttpHealthIndicator extends HealthIndicator {
 		private readonly httpClient: HttpClientService,
 		private readonly configService: ConfigService,
 	) {
-		super()
+		super('http')
 		this.healthCheckUrls = this.configService.getOptional('http.healthCheck.urls', [])
 		this.timeout = this.configService.getOptional('http.healthCheck.timeout', 5000)
 	}
 
-	async isHealthy(key: string): Promise<HealthIndicatorResult> {
+	protected async performHealthCheck(): Promise<HealthIndicatorResult> {
 		const stats = this.httpClient.getStats()
 		const circuitBreakerOpen = this.httpClient.isCircuitOpen()
 
 		// If no health check URLs are configured, just check the circuit breaker
 		if (!this.healthCheckUrls || this.healthCheckUrls.length === 0) {
-			return this.getStatus(key, !circuitBreakerOpen, {
-				circuitBreaker: circuitBreakerOpen ? 'open' : 'closed',
+			if (circuitBreakerOpen) {
+				return this.createUnhealthyResult('Circuit breaker is open', {
+					circuitBreaker: 'open',
+					checks: [],
+					stats,
+				})
+			}
+			return this.createHealthyResult({
+				circuitBreaker: 'closed',
+				checks: [],
 				stats,
 			})
 		}
@@ -63,6 +72,7 @@ export class HttpHealthIndicator extends HealthIndicator {
 				}
 				else {
 					return {
+						url: 'unknown',
 						error: result.reason.message,
 						success: false,
 					}
@@ -74,12 +84,20 @@ export class HttpHealthIndicator extends HealthIndicator {
 
 			if (!isHealthy) {
 				CorrelatedLogger.warn(
-					`HTTP health check failed: ${successCount}/${checks.length} endpoints healthy`,
+					`HTTP health check failed: ${successCount}/${checks.length} endpoints healthy, circuit breaker: ${circuitBreakerOpen}`,
 					HttpHealthIndicator.name,
 				)
 			}
 
-			return this.getStatus(key, isHealthy, {
+			if (!isHealthy) {
+				return this.createUnhealthyResult(`${successCount}/${checks.length} endpoints healthy, circuit breaker: ${circuitBreakerOpen}`, {
+					circuitBreaker: circuitBreakerOpen ? 'open' : 'closed',
+					checks,
+					stats,
+				})
+			}
+
+			return this.createHealthyResult({
 				circuitBreaker: circuitBreakerOpen ? 'open' : 'closed',
 				checks,
 				stats,
@@ -92,24 +110,19 @@ export class HttpHealthIndicator extends HealthIndicator {
 				HttpHealthIndicator.name,
 			)
 
-			return this.getStatus(key, false, {
-				error: error.message,
+			return this.createUnhealthyResult(error.message, {
 				circuitBreaker: circuitBreakerOpen ? 'open' : 'closed',
+				checks: [{
+					url: 'unknown',
+					error: error.message,
+					success: false,
+				}],
 				stats,
 			})
 		}
 	}
 
-	getDetails(): Record<string, any> {
-		return {
-			name: 'HTTP Health Indicator',
-			description: 'Monitors HTTP connection health',
-			checks: [
-				'Circuit breaker status',
-				'External endpoint connectivity',
-				'Response times',
-				'Success rates',
-			],
-		}
+	protected getDescription(): string {
+		return 'Monitors HTTP connection health including circuit breaker status and external endpoint connectivity'
 	}
 }

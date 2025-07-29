@@ -14,6 +14,7 @@ export declare class MemoryCacheService implements ICacheManager {
     clear(): Promise<void>;
     getStats(): Promise<CacheStats>;
     has(key: string): Promise<boolean>;
+    exists(key: string): Promise<boolean>;
     keys(): Promise<string[]>;
     flushAll(): Promise<void>;
     getTtl(key: string): number;

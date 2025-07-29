@@ -18,6 +18,7 @@ export declare class RedisCacheService implements ICacheManager, OnModuleInit, O
     delete(key: string): Promise<void>;
     clear(): Promise<void>;
     has(key: string): Promise<boolean>;
+    exists(key: string): Promise<boolean>;
     keys(): Promise<string[]>;
     flushAll(): Promise<void>;
     getStats(): Promise<CacheStats>;

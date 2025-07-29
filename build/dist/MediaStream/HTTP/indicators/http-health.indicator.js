@@ -13,23 +13,31 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.HttpHealthIndicator = void 0;
 const config_service_1 = require("../../Config/config.service");
 const logger_util_1 = require("../../Correlation/utils/logger.util");
+const base_health_indicator_1 = require("../../Health/base/base-health-indicator");
 const common_1 = require("@nestjs/common");
-const terminus_1 = require("@nestjs/terminus");
 const http_client_service_1 = require("../services/http-client.service");
-let HttpHealthIndicator = HttpHealthIndicator_1 = class HttpHealthIndicator extends terminus_1.HealthIndicator {
+let HttpHealthIndicator = HttpHealthIndicator_1 = class HttpHealthIndicator extends base_health_indicator_1.BaseHealthIndicator {
     constructor(httpClient, configService) {
-        super();
+        super('http');
         this.httpClient = httpClient;
         this.configService = configService;
         this.healthCheckUrls = this.configService.getOptional('http.healthCheck.urls', []);
         this.timeout = this.configService.getOptional('http.healthCheck.timeout', 5000);
     }
-    async isHealthy(key) {
+    async performHealthCheck() {
         const stats = this.httpClient.getStats();
         const circuitBreakerOpen = this.httpClient.isCircuitOpen();
         if (!this.healthCheckUrls || this.healthCheckUrls.length === 0) {
-            return this.getStatus(key, !circuitBreakerOpen, {
-                circuitBreaker: circuitBreakerOpen ? 'open' : 'closed',
+            if (circuitBreakerOpen) {
+                return this.createUnhealthyResult('Circuit breaker is open', {
+                    circuitBreaker: 'open',
+                    checks: [],
+                    stats,
+                });
+            }
+            return this.createHealthyResult({
+                circuitBreaker: 'closed',
+                checks: [],
                 stats,
             });
         }
@@ -60,6 +68,7 @@ let HttpHealthIndicator = HttpHealthIndicator_1 = class HttpHealthIndicator exte
                 }
                 else {
                     return {
+                        url: 'unknown',
                         error: result.reason.message,
                         success: false,
                     };
@@ -68,9 +77,16 @@ let HttpHealthIndicator = HttpHealthIndicator_1 = class HttpHealthIndicator exte
             const successCount = checks.filter(check => check.success).length;
             const isHealthy = successCount === checks.length && !circuitBreakerOpen;
             if (!isHealthy) {
-                logger_util_1.CorrelatedLogger.warn(`HTTP health check failed: ${successCount}/${checks.length} endpoints healthy`, HttpHealthIndicator_1.name);
+                logger_util_1.CorrelatedLogger.warn(`HTTP health check failed: ${successCount}/${checks.length} endpoints healthy, circuit breaker: ${circuitBreakerOpen}`, HttpHealthIndicator_1.name);
             }
-            return this.getStatus(key, isHealthy, {
+            if (!isHealthy) {
+                return this.createUnhealthyResult(`${successCount}/${checks.length} endpoints healthy, circuit breaker: ${circuitBreakerOpen}`, {
+                    circuitBreaker: circuitBreakerOpen ? 'open' : 'closed',
+                    checks,
+                    stats,
+                });
+            }
+            return this.createHealthyResult({
                 circuitBreaker: circuitBreakerOpen ? 'open' : 'closed',
                 checks,
                 stats,
@@ -78,24 +94,19 @@ let HttpHealthIndicator = HttpHealthIndicator_1 = class HttpHealthIndicator exte
         }
         catch (error) {
             logger_util_1.CorrelatedLogger.error(`HTTP health check error: ${error.message}`, error.stack, HttpHealthIndicator_1.name);
-            return this.getStatus(key, false, {
-                error: error.message,
+            return this.createUnhealthyResult(error.message, {
                 circuitBreaker: circuitBreakerOpen ? 'open' : 'closed',
+                checks: [{
+                        url: 'unknown',
+                        error: error.message,
+                        success: false,
+                    }],
                 stats,
             });
         }
     }
-    getDetails() {
-        return {
-            name: 'HTTP Health Indicator',
-            description: 'Monitors HTTP connection health',
-            checks: [
-                'Circuit breaker status',
-                'External endpoint connectivity',
-                'Response times',
-                'Success rates',
-            ],
-        };
+    getDescription() {
+        return 'Monitors HTTP connection health including circuit breaker status and external endpoint connectivity';
     }
 };
 exports.HttpHealthIndicator = HttpHealthIndicator;

@@ -40,6 +40,14 @@ let CorrelationService = class CorrelationService {
             this.setContext(updatedContext);
         }
     }
+    getClientIp() {
+        const context = this.getContext();
+        return context?.clientIp || 'unknown';
+    }
+    getUserAgent() {
+        const context = this.getContext();
+        return context?.userAgent || 'unknown';
+    }
 };
 exports.CorrelationService = CorrelationService;
 exports.CorrelationService = CorrelationService = __decorate([

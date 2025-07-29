@@ -26,7 +26,10 @@ __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(1),
     (0, class_validator_1.Max)(100),
-    (0, class_transformer_1.Transform)(({ value }) => Number.parseInt(value) || 10),
+    (0, class_transformer_1.Transform)(({ value }) => {
+        const parsed = Number.parseInt(value);
+        return Number.isNaN(parsed) ? 10 : parsed;
+    }),
     __metadata("design:type", Number)
 ], ProcessingConfigDto.prototype, "maxConcurrent", void 0);
 __decorate([

@@ -13,13 +13,19 @@ import CacheImageRequest, {
 	PositionOptions,
 	SupportedResizeFormats,
 } from '@microservice/API/DTO/CacheImageRequest'
+import { MultiLayerCacheManager } from '@microservice/Cache/services/multi-layer-cache.manager'
 import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
+import { PerformanceTracker } from '@microservice/Correlation/utils/performance-tracker.util'
 import ResourceMetaData from '@microservice/DTO/ResourceMetaData'
 import FetchResourceResponseJob from '@microservice/Job/FetchResourceResponseJob'
 import GenerateResourceIdentityFromRequestJob from '@microservice/Job/GenerateResourceIdentityFromRequestJob'
 import StoreResourceResponseToFileJob from '@microservice/Job/StoreResourceResponseToFileJob'
 import WebpImageManipulationJob from '@microservice/Job/WebpImageManipulationJob'
+import { MetricsService } from '@microservice/Metrics/services/metrics.service'
+import { JobQueueManager } from '@microservice/Queue/services/job-queue.manager'
+import { JobPriority } from '@microservice/Queue/types/job.types'
 import ValidateCacheImageRequestRule from '@microservice/Rule/ValidateCacheImageRequestRule'
+import { InputSanitizationService } from '@microservice/Validation/services/input-sanitization.service'
 import { HttpService } from '@nestjs/axios'
 import { Injectable, InternalServerErrorException, Logger, Scope } from '@nestjs/common'
 import UnableToFetchResourceException from '../API/Exception/UnableToFetchResourceException'
@@ -36,6 +42,10 @@ export default class CacheImageResourceOperation {
 		private readonly webpImageManipulationJob: WebpImageManipulationJob,
 		private readonly storeResourceResponseToFileJob: StoreResourceResponseToFileJob,
 		private readonly generateResourceIdentityFromRequestJob: GenerateResourceIdentityFromRequestJob,
+		private readonly cacheManager: MultiLayerCacheManager,
+		private readonly inputSanitizationService: InputSanitizationService,
+		private readonly jobQueueManager: JobQueueManager,
+		private readonly metricsService: MetricsService,
 	) {}
 
 	request: CacheImageRequest
@@ -58,17 +68,42 @@ export default class CacheImageResourceOperation {
 
 	get resourceExists(): Promise<boolean> {
 		return (async () => {
+			PerformanceTracker.startPhase('resource_exists_check')
+
 			try {
-				CorrelatedLogger.debug(`Checking if resource exists: ${this.getResourcePath}`, CacheImageResourceOperation.name)
+				CorrelatedLogger.debug(`Checking if resource exists in cache: ${this.id}`, CacheImageResourceOperation.name)
+
+				// First check multi-layer cache
+				const cachedResource = await this.cacheManager.get<{ data: Buffer, metadata: ResourceMetaData }>('image', this.id)
+				if (cachedResource) {
+					const isValid = cachedResource.metadata.dateCreated + cachedResource.metadata.privateTTL > Date.now()
+					if (isValid) {
+						CorrelatedLogger.debug(`Resource found in cache and is valid: ${this.id}`, CacheImageResourceOperation.name)
+						const duration = PerformanceTracker.endPhase('resource_exists_check')
+						this.metricsService.recordCacheOperation('get', 'multi-layer', 'hit', duration || 0)
+						return true
+					}
+					else {
+						CorrelatedLogger.debug(`Resource found in cache but expired: ${this.id}`, CacheImageResourceOperation.name)
+						// Remove expired resource from cache
+						await this.cacheManager.delete('image', this.id)
+					}
+				}
+
+				// Fallback to file system check for backward compatibility
 				const resourcePathExists = await access(this.getResourcePath).then(() => true).catch(() => false)
 				if (!resourcePathExists) {
-					CorrelatedLogger.warn(`Resource path does not exist: ${this.getResourcePath}`, CacheImageResourceOperation.name)
+					CorrelatedLogger.debug(`Resource not found in filesystem: ${this.getResourcePath}`, CacheImageResourceOperation.name)
+					const duration = PerformanceTracker.endPhase('resource_exists_check')
+					this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
 					return false
 				}
 
 				const resourceMetaPathExists = await access(this.getResourceMetaPath).then(() => true).catch(() => false)
 				if (!resourceMetaPathExists) {
 					CorrelatedLogger.warn(`Metadata path does not exist: ${this.getResourceMetaPath}`, CacheImageResourceOperation.name)
+					const duration = PerformanceTracker.endPhase('resource_exists_check')
+					this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
 					return false
 				}
 
@@ -76,18 +111,28 @@ export default class CacheImageResourceOperation {
 
 				if (!headers) {
 					CorrelatedLogger.warn('Metadata headers are missing or invalid', CacheImageResourceOperation.name)
+					const duration = PerformanceTracker.endPhase('resource_exists_check')
+					this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
 					return false
 				}
 
 				if (!headers.version || headers.version !== 1) {
 					CorrelatedLogger.warn('Invalid or missing version in metadata', CacheImageResourceOperation.name)
+					const duration = PerformanceTracker.endPhase('resource_exists_check')
+					this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
 					return false
 				}
 
-				return headers.dateCreated + headers.privateTTL > Date.now()
+				const isValid = headers.dateCreated + headers.privateTTL > Date.now()
+				const duration = PerformanceTracker.endPhase('resource_exists_check')
+				this.metricsService.recordCacheOperation('get', 'multi-layer', isValid ? 'hit' : 'miss', duration || 0)
+				return isValid
 			}
 			catch (error) {
 				CorrelatedLogger.warn(`Error checking resource existence: ${error.message}`, CacheImageResourceOperation.name)
+				this.metricsService.recordError('cache_check', 'resource_exists')
+				const duration = PerformanceTracker.endPhase('resource_exists_check')
+				this.metricsService.recordCacheOperation('get', 'multi-layer', 'error', duration || 0)
 				return false
 			}
 		})()
@@ -97,6 +142,14 @@ export default class CacheImageResourceOperation {
 		return (async () => {
 			if (!this.metaData) {
 				try {
+					// First check if we have cached resource data
+					const cachedResource = await this.getCachedResource()
+					if (cachedResource && cachedResource.metadata) {
+						this.metaData = cachedResource.metadata
+						return this.metaData
+					}
+
+					// Fallback to filesystem metadata
 					const exists = await access(this.getResourceMetaPath).then(() => true).catch(() => false)
 					if (exists) {
 						const content = await readFile(this.getResourceMetaPath, 'utf8')
@@ -117,79 +170,243 @@ export default class CacheImageResourceOperation {
 	}
 
 	public async setup(cacheImageRequest: CacheImageRequest): Promise<void> {
-		this.request = cacheImageRequest
-		await this.validateCacheImageRequest.setup(this.request)
-		await this.validateCacheImageRequest.apply()
-		this.id = await this.generateResourceIdentityFromRequestJob.handle(this.request)
-		this.metaData = null
+		PerformanceTracker.startPhase('setup')
+
+		try {
+			CorrelatedLogger.debug('Setting up cache image resource operation', CacheImageResourceOperation.name)
+
+			// Sanitize input request
+			this.request = await this.inputSanitizationService.sanitize(cacheImageRequest) as CacheImageRequest
+
+			// Validate URL if present
+			if (this.request.resourceTarget && !this.inputSanitizationService.validateUrl(this.request.resourceTarget)) {
+				throw new Error(`Invalid or disallowed URL: ${this.request.resourceTarget}`)
+			}
+
+			// Validate image dimensions if present
+			if (this.request.resizeOptions?.width && this.request.resizeOptions?.height) {
+				if (!this.inputSanitizationService.validateImageDimensions(this.request.resizeOptions.width, this.request.resizeOptions.height)) {
+					throw new Error(`Invalid image dimensions: ${this.request.resizeOptions.width}x${this.request.resizeOptions.height}`)
+				}
+			}
+
+			// Apply existing validation rules
+			await this.validateCacheImageRequest.setup(this.request)
+			await this.validateCacheImageRequest.apply()
+
+			// Generate resource identity
+			this.id = await this.generateResourceIdentityFromRequestJob.handle(this.request)
+			this.metaData = null
+
+			CorrelatedLogger.debug(`Resource ID generated: ${this.id}`, CacheImageResourceOperation.name)
+		}
+		catch (error) {
+			CorrelatedLogger.error(`Setup failed: ${error.message}`, error.stack, CacheImageResourceOperation.name)
+			this.metricsService.recordError('validation', 'setup')
+			throw error
+		}
+		finally {
+			PerformanceTracker.endPhase('setup')
+		}
 	}
 
 	public async execute(): Promise<void> {
+		PerformanceTracker.startPhase('execute')
+
 		try {
+			CorrelatedLogger.debug('Executing cache image resource operation', CacheImageResourceOperation.name)
+
+			// Check if resource already exists in cache
 			if (await this.resourceExists) {
-				CorrelatedLogger.log('Resource already exists.', CacheImageResourceOperation.name)
+				CorrelatedLogger.log('Resource already exists in cache', CacheImageResourceOperation.name)
+				const duration = PerformanceTracker.endPhase('execute')
+				this.metricsService.recordImageProcessing('cache_check', 'cached', 'success', duration || 0)
 				return
 			}
 
+			// Check if we should process this in background queue for large images
+			const shouldUseQueue = this.shouldUseBackgroundProcessing()
+
+			if (shouldUseQueue) {
+				CorrelatedLogger.debug('Queuing image processing job for background processing', CacheImageResourceOperation.name)
+				await this.queueImageProcessing()
+				return
+			}
+
+			// Process synchronously for smaller images
+			await this.processImageSynchronously()
+		}
+		catch (error) {
+			CorrelatedLogger.error(`Failed to execute CacheImageResourceOperation: ${error.message}`, error.stack, CacheImageResourceOperation.name)
+			this.metricsService.recordError('image_processing', 'execute')
+			const duration = PerformanceTracker.endPhase('execute')
+			this.metricsService.recordImageProcessing('execute', 'unknown', 'error', duration || 0)
+			throw new InternalServerErrorException('Error fetching or processing image.')
+		}
+		finally {
+			PerformanceTracker.endPhase('execute')
+		}
+	}
+
+	public shouldUseBackgroundProcessing(): boolean {
+		// Use background processing for large dimensions or complex operations
+		const resizeOptions = this.request.resizeOptions
+		if (!resizeOptions)
+			return false
+
+		const width = resizeOptions.width || 0
+		const height = resizeOptions.height || 0
+		const totalPixels = width * height
+
+		// Queue if dimensions are large (> 2MP) or if quality is high
+		return totalPixels > 2000000 || (resizeOptions.quality && resizeOptions.quality > 90)
+	}
+
+	private async queueImageProcessing(): Promise<void> {
+		const priority = this.request.resizeOptions?.width && this.request.resizeOptions.width > 1920
+			? JobPriority.LOW
+			: JobPriority.NORMAL
+
+		await this.jobQueueManager.addImageProcessingJob({
+			imageUrl: this.request.resourceTarget,
+			width: this.request.resizeOptions?.width,
+			height: this.request.resizeOptions?.height,
+			quality: this.request.resizeOptions?.quality,
+			format: this.request.resizeOptions?.format as 'webp' | 'jpeg' | 'png',
+			cacheKey: this.id,
+			priority,
+		})
+
+		CorrelatedLogger.debug(`Image processing job queued with priority: ${priority}`, CacheImageResourceOperation.name)
+	}
+
+	private async processImageSynchronously(): Promise<void> {
+		PerformanceTracker.startPhase('sync_processing')
+
+		try {
+			// Fetch the resource
 			const response = await this.fetchResourceResponseJob.handle(this.request)
 			if (!response || response.status === 404) {
 				throw new UnableToFetchResourceException(this.request.resourceTarget)
 			}
 
+			// Validate file size if available
+			const contentLength = response.headers['content-length']
+			if (contentLength) {
+				const sizeBytes = Number.parseInt(contentLength, 10)
+				const format = this.getFormatFromUrl(this.request.resourceTarget)
+				if (!this.inputSanitizationService.validateFileSize(sizeBytes, format)) {
+					throw new Error(`File size ${sizeBytes} bytes exceeds limit for format ${format}`)
+				}
+			}
+
+			// Store response to temporary file
 			await this.storeResourceResponseToFileJob.handle(this.request.resourceTarget, this.getResourceTempPath, response)
 
+			let processedData: Buffer
+			let metadata: ResourceMetaData
+
 			if (this.request.resourceTarget.toLowerCase().endsWith('.svg')) {
-				CorrelatedLogger.debug('Processing SVG format.', CacheImageResourceOperation.name)
-				try {
-					const svgContent = await readFile(this.getResourceTempPath, 'utf8')
-					if (!svgContent.toLowerCase().includes('<svg')) {
-						CorrelatedLogger.warn('The file is not a valid SVG. Serving default WebP image.', CacheImageResourceOperation.name)
-						await this.optimizeAndServeDefaultImage(this.request.resizeOptions)
-						return
-					}
-					await writeFile(this.getResourcePath, svgContent, 'utf8')
-					await writeFile(this.getResourceMetaPath, JSON.stringify(new ResourceMetaData({
-						version: 1,
-						size: Buffer.from(svgContent).length.toString(),
-						format: 'svg',
-						dateCreated: Date.now(),
-						publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
-						privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
-					})), 'utf8')
-				}
-				catch (error) {
-					CorrelatedLogger.error(`Failed to process SVG: ${error.message}`, error.stack, CacheImageResourceOperation.name)
-					throw error
-				}
+				const result = await this.processSvgImage()
+				processedData = result.data
+				metadata = result.metadata
 			}
 			else {
-				const result = await this.webpImageManipulationJob.handle(
-					this.getResourceTempPath,
-					this.getResourcePath,
-					this.request.resizeOptions,
-				)
-
-				await writeFile(this.getResourceMetaPath, JSON.stringify(new ResourceMetaData({
-					version: 1,
-					size: result.size,
-					format: result.format,
-					dateCreated: Date.now(),
-					publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
-					privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
-				})), 'utf8')
+				const result = await this.processRasterImage()
+				processedData = result.data
+				metadata = result.metadata
 			}
 
+			// Store in multi-layer cache
+			await this.cacheManager.set('image', this.id, {
+				data: processedData,
+				metadata,
+			}, metadata.privateTTL)
+
+			// Also store to filesystem for backward compatibility
+			await writeFile(this.getResourcePath, processedData)
+			await writeFile(this.getResourceMetaPath, JSON.stringify(metadata), 'utf8')
+
+			// Clean up temporary file
 			try {
 				await unlink(this.getResourceTempPath)
 			}
 			catch (error) {
 				CorrelatedLogger.warn(`Failed to delete temporary file: ${error.message}`, CacheImageResourceOperation.name)
 			}
+
+			const format = metadata.format || 'unknown'
+			const duration = PerformanceTracker.endPhase('sync_processing')
+			this.metricsService.recordImageProcessing('process', format, 'success', duration || 0)
+			CorrelatedLogger.debug(`Image processed successfully: ${this.id}`, CacheImageResourceOperation.name)
 		}
 		catch (error) {
-			CorrelatedLogger.error(`Failed to execute CacheImageResourceOperation: ${error.message}`, error.stack, CacheImageResourceOperation.name)
-			throw new InternalServerErrorException('Error fetching or processing image.')
+			const duration = PerformanceTracker.endPhase('sync_processing')
+			this.metricsService.recordImageProcessing('process', 'unknown', 'error', duration || 0)
+			throw error
 		}
+	}
+
+	private async processSvgImage(): Promise<{ data: Buffer, metadata: ResourceMetaData }> {
+		CorrelatedLogger.debug('Processing SVG format', CacheImageResourceOperation.name)
+
+		const svgContent = await readFile(this.getResourceTempPath, 'utf8')
+		if (!svgContent.toLowerCase().includes('<svg')) {
+			CorrelatedLogger.warn('The file is not a valid SVG. Serving default WebP image.', CacheImageResourceOperation.name)
+			return await this.processDefaultImage()
+		}
+
+		const data = Buffer.from(svgContent, 'utf8')
+		const metadata = new ResourceMetaData({
+			version: 1,
+			size: data.length.toString(),
+			format: 'svg',
+			dateCreated: Date.now(),
+			publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
+			privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
+		})
+
+		return { data, metadata }
+	}
+
+	private async processRasterImage(): Promise<{ data: Buffer, metadata: ResourceMetaData }> {
+		const result = await this.webpImageManipulationJob.handle(
+			this.getResourceTempPath,
+			this.getResourcePath,
+			this.request.resizeOptions,
+		)
+
+		const data = await readFile(this.getResourcePath)
+		const metadata = new ResourceMetaData({
+			version: 1,
+			size: result.size,
+			format: result.format,
+			dateCreated: Date.now(),
+			publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
+			privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
+		})
+
+		return { data, metadata }
+	}
+
+	private async processDefaultImage(): Promise<{ data: Buffer, metadata: ResourceMetaData }> {
+		const optimizedPath = await this.optimizeAndServeDefaultImage(this.request.resizeOptions)
+		const data = await readFile(optimizedPath)
+		const metadata = new ResourceMetaData({
+			version: 1,
+			size: data.length.toString(),
+			format: 'webp',
+			dateCreated: Date.now(),
+			publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
+			privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
+		})
+
+		return { data, metadata }
+	}
+
+	private getFormatFromUrl(url: string): string {
+		const extension = url.split('.').pop()?.toLowerCase()
+		return extension || 'unknown'
 	}
 
 	public async optimizeAndServeDefaultImage(resizeOptions: ResizeOptions): Promise<string> {
@@ -233,5 +450,75 @@ export default class CacheImageResourceOperation {
 		const hash = createHash('md5')
 		hash.update(JSON.stringify(options))
 		return hash.digest('hex')
+	}
+
+	/**
+	 * Get cached resource data from multi-layer cache or filesystem
+	 */
+	public async getCachedResource(): Promise<{ data: Buffer, metadata: ResourceMetaData } | null> {
+		PerformanceTracker.startPhase('get_cached_resource')
+
+		try {
+			// Try to get from multi-layer cache first (check both 'image' and 'images' keys)
+			let cachedResource = await this.cacheManager.get<{ data: Buffer, metadata: ResourceMetaData }>('image', this.id)
+
+			// If not found, check the 'images' key used by background processing
+			if (!cachedResource) {
+				const cachedData = await this.cacheManager.get<string>('images', this.id)
+				if (cachedData) {
+					// Create metadata for cached image data
+					const metadata = new ResourceMetaData({
+						version: 1,
+						size: Buffer.from(cachedData, 'base64').length.toString(),
+						format: this.request.resizeOptions?.format || 'webp',
+						dateCreated: Date.now(),
+						publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
+						privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
+					})
+
+					cachedResource = {
+						data: Buffer.from(cachedData, 'base64'),
+						metadata,
+					}
+				}
+			}
+
+			if (cachedResource) {
+				CorrelatedLogger.debug(`Resource retrieved from cache: ${this.id}`, CacheImageResourceOperation.name)
+				const duration = PerformanceTracker.endPhase('get_cached_resource')
+				this.metricsService.recordCacheOperation('get', 'multi-layer', 'hit', duration || 0)
+				return cachedResource
+			}
+
+			// Fallback to filesystem
+			const resourceExists = await access(this.getResourcePath).then(() => true).catch(() => false)
+			const metadataExists = await access(this.getResourceMetaPath).then(() => true).catch(() => false)
+
+			if (resourceExists && metadataExists) {
+				const data = await readFile(this.getResourcePath)
+				const metadataContent = await readFile(this.getResourceMetaPath, 'utf8')
+				const metadata = new ResourceMetaData(JSON.parse(metadataContent))
+
+				// Store in cache for future requests
+				await this.cacheManager.set('image', this.id, { data, metadata }, metadata.privateTTL)
+
+				CorrelatedLogger.debug(`Resource retrieved from filesystem and cached: ${this.id}`, CacheImageResourceOperation.name)
+				const duration = PerformanceTracker.endPhase('get_cached_resource')
+				this.metricsService.recordCacheOperation('get', 'filesystem', 'hit', duration || 0)
+				return { data, metadata }
+			}
+
+			CorrelatedLogger.debug(`Resource not found: ${this.id}`, CacheImageResourceOperation.name)
+			const duration = PerformanceTracker.endPhase('get_cached_resource')
+			this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
+			return null
+		}
+		catch (error) {
+			CorrelatedLogger.error(`Failed to get cached resource: ${error.message}`, error.stack, CacheImageResourceOperation.name)
+			this.metricsService.recordError('cache_retrieval', 'get_cached_resource')
+			const duration = PerformanceTracker.endPhase('get_cached_resource')
+			this.metricsService.recordCacheOperation('get', 'multi-layer', 'error', duration || 0)
+			return null
+		}
 	}
 }

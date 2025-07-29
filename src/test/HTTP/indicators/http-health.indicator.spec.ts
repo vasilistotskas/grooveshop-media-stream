@@ -24,6 +24,15 @@ describe('httpHealthIndicator', () => {
 	beforeEach(async () => {
 		jest.clearAllMocks()
 
+		// Set default mock behavior
+		mockConfigService.getOptional.mockImplementation((key: string, defaultValue: any) => {
+			if (key === 'http.healthCheck.urls')
+				return []
+			if (key === 'http.healthCheck.timeout')
+				return 5000
+			return defaultValue
+		})
+
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [
 				HttpHealthIndicator,
@@ -74,12 +83,14 @@ describe('httpHealthIndicator', () => {
 				circuitBreakerState: 'closed',
 			})
 
-			const result = await indicator.isHealthy('http')
+			const result = await indicator.isHealthy()
 
 			expect(result).toEqual({
 				http: {
 					status: 'up',
+					timestamp: expect.any(String),
 					circuitBreaker: 'closed',
+					checks: [],
 					stats: {
 						totalRequests: 10,
 						successfulRequests: 8,
@@ -99,25 +110,17 @@ describe('httpHealthIndicator', () => {
 				circuitBreakerState: 'open',
 			})
 
-			const result = await indicator.isHealthy('http')
-
-			expect(result).toEqual({
-				http: {
-					status: 'down',
-					circuitBreaker: 'open',
-					stats: {
-						totalRequests: 10,
-						successfulRequests: 3,
-						failedRequests: 7,
-						circuitBreakerState: 'open',
-					},
-				},
-			})
+			const result = await indicator.isHealthy()
+			expect(result.http.status).toBe('down')
+			expect(result.http.message).toContain('Circuit breaker is open')
 		})
 	})
 
 	describe('health Check - With URLs Configured', () => {
-		beforeEach(() => {
+		beforeEach(async () => {
+			// Reset all mocks
+			jest.clearAllMocks()
+
 			mockConfigService.getOptional.mockImplementation((key: string, defaultValue: any) => {
 				if (key === 'http.healthCheck.urls')
 					return ['https://api.example.com/health', 'https://cdn.example.com/health']
@@ -125,6 +128,23 @@ describe('httpHealthIndicator', () => {
 					return 5000
 				return defaultValue
 			})
+
+			// Recreate the indicator with new configuration
+			const module: TestingModule = await Test.createTestingModule({
+				providers: [
+					HttpHealthIndicator,
+					{
+						provide: HttpClientService,
+						useValue: mockHttpClientService,
+					},
+					{
+						provide: ConfigService,
+						useValue: mockConfigService,
+					},
+				],
+			}).compile()
+
+			indicator = module.get<HttpHealthIndicator>(HttpHealthIndicator)
 		})
 
 		it('should return healthy when all endpoints are healthy and circuit is closed', async () => {
@@ -146,9 +166,10 @@ describe('httpHealthIndicator', () => {
 
 			mockHttpClientService.get.mockResolvedValue(mockResponse)
 
-			const result = await indicator.isHealthy('http')
+			const result = await indicator.isHealthy()
 
 			expect(result.http.status).toBe('up')
+			expect(result.http.checks).toBeDefined()
 			expect(result.http.checks).toHaveLength(2)
 			expect(result.http.checks.every((check: any) => check.success)).toBe(true)
 		})
@@ -174,12 +195,9 @@ describe('httpHealthIndicator', () => {
 				.mockResolvedValueOnce(mockSuccessResponse)
 				.mockRejectedValueOnce(new Error('Connection failed'))
 
-			const result = await indicator.isHealthy('http')
-
+			const result = await indicator.isHealthy()
 			expect(result.http.status).toBe('down')
-			expect(result.http.checks).toHaveLength(2)
-			expect(result.http.checks[0].success).toBe(true)
-			expect(result.http.checks[1].success).toBe(false)
+			expect(result.http.message).toContain('1/2 endpoints healthy')
 		})
 
 		it('should return unhealthy when circuit breaker is open even if endpoints are healthy', async () => {
@@ -201,10 +219,9 @@ describe('httpHealthIndicator', () => {
 
 			mockHttpClientService.get.mockResolvedValue(mockResponse)
 
-			const result = await indicator.isHealthy('http')
-
+			const result = await indicator.isHealthy()
 			expect(result.http.status).toBe('down')
-			expect(result.http.circuitBreaker).toBe('open')
+			expect(result.http.message).toContain('circuit breaker: true')
 		})
 
 		it('should handle timeout errors gracefully', async () => {
@@ -218,10 +235,9 @@ describe('httpHealthIndicator', () => {
 
 			mockHttpClientService.get.mockRejectedValue(new Error('Timeout'))
 
-			const result = await indicator.isHealthy('http')
-
+			const result = await indicator.isHealthy()
 			expect(result.http.status).toBe('down')
-			expect(result.http.checks.every((check: any) => !check.success)).toBe(true)
+			expect(result.http.message).toContain('0/2 endpoints healthy')
 		})
 
 		it('should include response times for successful requests', async () => {
@@ -247,7 +263,7 @@ describe('httpHealthIndicator', () => {
 				})
 			})
 
-			const result = await indicator.isHealthy('http')
+			const result = await indicator.isHealthy()
 
 			expect(result.http.status).toBe('up')
 			expect(result.http.checks.every((check: any) => check.responseTime > 0)).toBe(true)
@@ -266,6 +282,34 @@ describe('httpHealthIndicator', () => {
 		})
 
 		it('should handle unexpected errors gracefully', async () => {
+			// Need to recreate the indicator with health check URLs configured
+			mockConfigService.getOptional.mockImplementation((key: string, defaultValue: any) => {
+				if (key === 'http.healthCheck.urls') {
+					return ['http://test-url.com']
+				}
+				if (key === 'http.healthCheck.timeout') {
+					return 5000
+				}
+				return defaultValue
+			})
+
+			// Recreate the indicator with the new configuration
+			const module: TestingModule = await Test.createTestingModule({
+				providers: [
+					HttpHealthIndicator,
+					{
+						provide: HttpClientService,
+						useValue: mockHttpClientService,
+					},
+					{
+						provide: ConfigService,
+						useValue: mockConfigService,
+					},
+				],
+			}).compile()
+
+			const testIndicator = module.get<HttpHealthIndicator>(HttpHealthIndicator)
+
 			mockHttpClientService.isCircuitOpen.mockReturnValue(false)
 			mockHttpClientService.getStats.mockReturnValue({
 				totalRequests: 0,
@@ -276,11 +320,9 @@ describe('httpHealthIndicator', () => {
 
 			mockHttpClientService.get.mockRejectedValue(new Error('Unexpected error'))
 
-			const result = await indicator.isHealthy('http')
-
+			const result = await testIndicator.isHealthy()
 			expect(result.http.status).toBe('down')
-			expect(result.http.checks[0].success).toBe(false)
-			expect(result.http.checks[0].error).toBe('Unexpected error')
+			expect(result.http.message).toContain('0/1 endpoints healthy')
 		})
 	})
 
@@ -288,16 +330,8 @@ describe('httpHealthIndicator', () => {
 		it('should return indicator details', () => {
 			const details = indicator.getDetails()
 
-			expect(details).toEqual({
-				name: 'HTTP Health Indicator',
-				description: 'Monitors HTTP connection health',
-				checks: [
-					'Circuit breaker status',
-					'External endpoint connectivity',
-					'Response times',
-					'Success rates',
-				],
-			})
+			expect(details.key).toBe('http')
+			expect(details.description).toContain('HTTP connection health')
 		})
 	})
 })

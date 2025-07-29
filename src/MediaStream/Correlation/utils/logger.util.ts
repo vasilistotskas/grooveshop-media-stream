@@ -7,7 +7,7 @@ export class CorrelatedLogger {
 		const correlationId = this.correlationService.getCorrelationId()
 		const prefix = correlationId ? `[${correlationId}]` : ''
 		const contextStr = context ? ` [${context}]` : ''
-		console.warn(`${prefix}${contextStr} ${message}`)
+		console.log(`${prefix}${contextStr} ${message}`)
 	}
 
 	static error(message: string, trace?: string, context?: string): void {
@@ -31,13 +31,13 @@ export class CorrelatedLogger {
 		const correlationId = this.correlationService.getCorrelationId()
 		const prefix = correlationId ? `[${correlationId}]` : ''
 		const contextStr = context ? ` [${context}]` : ''
-		console.warn(`${prefix}${contextStr} DEBUG: ${message}`)
+		console.debug(`${prefix}${contextStr} DEBUG: ${message}`)
 	}
 
 	static verbose(message: string, context?: string): void {
 		const correlationId = this.correlationService.getCorrelationId()
 		const prefix = correlationId ? `[${correlationId}]` : ''
 		const contextStr = context ? ` [${context}]` : ''
-		console.warn(`${prefix}${contextStr} VERBOSE: ${message}`)
+		console.log(`${prefix}${contextStr} VERBOSE: ${message}`)
 	}
 }

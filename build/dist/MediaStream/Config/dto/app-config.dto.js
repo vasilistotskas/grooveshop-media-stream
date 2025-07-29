@@ -14,6 +14,7 @@ const cache_config_dto_1 = require("./cache-config.dto");
 const http_config_dto_1 = require("./http-config.dto");
 const monitoring_config_dto_1 = require("./monitoring-config.dto");
 const processing_config_dto_1 = require("./processing-config.dto");
+const rate_limit_config_dto_1 = require("./rate-limit-config.dto");
 const server_config_dto_1 = require("./server-config.dto");
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
@@ -26,6 +27,7 @@ class AppConfigDto {
         this.monitoring = new monitoring_config_dto_1.MonitoringConfigDto();
         this.externalServices = new external_services_config_dto_1.ExternalServicesConfigDto();
         this.http = new http_config_dto_1.HttpConfigDto();
+        this.rateLimit = new rate_limit_config_dto_1.RateLimitConfigDto();
     }
 }
 exports.AppConfigDto = AppConfigDto;
@@ -59,4 +61,9 @@ __decorate([
     (0, class_transformer_1.Type)(() => http_config_dto_1.HttpConfigDto),
     __metadata("design:type", http_config_dto_1.HttpConfigDto)
 ], AppConfigDto.prototype, "http", void 0);
+__decorate([
+    (0, class_validator_1.ValidateNested)(),
+    (0, class_transformer_1.Type)(() => rate_limit_config_dto_1.RateLimitConfigDto),
+    __metadata("design:type", rate_limit_config_dto_1.RateLimitConfigDto)
+], AppConfigDto.prototype, "rateLimit", void 0);
 //# sourceMappingURL=app-config.dto.js.map

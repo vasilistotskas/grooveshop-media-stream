@@ -124,7 +124,7 @@ let RedisCacheService = RedisCacheService_1 = class RedisCacheService {
             this.stats.operations++;
             const serializedValue = JSON.stringify(value);
             const defaultTtl = this.configService.get('cache.redis.ttl');
-            const effectiveTtl = ttl || defaultTtl;
+            const effectiveTtl = ttl !== undefined ? ttl : defaultTtl;
             if (effectiveTtl > 0) {
                 await this.redis.setex(key, effectiveTtl, serializedValue);
             }
@@ -138,7 +138,6 @@ let RedisCacheService = RedisCacheService_1 = class RedisCacheService {
             this.stats.errors++;
             this.metricsService.recordCacheOperation('set', 'redis', 'error');
             logger_util_1.CorrelatedLogger.error(`Redis cache SET error for key ${key}: ${error.message}`, error.stack, RedisCacheService_1.name);
-            throw error;
         }
     }
     async delete(key) {
@@ -192,6 +191,9 @@ let RedisCacheService = RedisCacheService_1 = class RedisCacheService {
             logger_util_1.CorrelatedLogger.error(`Redis cache HAS error for key ${key}: ${error.message}`, error.stack, RedisCacheService_1.name);
             return false;
         }
+    }
+    async exists(key) {
+        return this.has(key);
     }
     async keys() {
         if (!this.isConnected) {

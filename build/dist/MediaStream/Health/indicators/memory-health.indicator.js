@@ -51,13 +51,13 @@ let MemoryHealthIndicator = class MemoryHealthIndicator extends base_health_indi
     constructor() {
         const options = {
             timeout: 1000,
-            threshold: 0.9,
+            threshold: 0.95,
         };
         super('memory', options);
-        this.warningThreshold = 0.8;
-        this.criticalThreshold = 0.9;
-        this.heapWarningThreshold = 0.8;
-        this.heapCriticalThreshold = 0.9;
+        this.warningThreshold = 0.85;
+        this.criticalThreshold = 0.95;
+        this.heapWarningThreshold = 0.90;
+        this.heapCriticalThreshold = 0.98;
     }
     async performHealthCheck() {
         return this.executeWithTimeout(async () => {

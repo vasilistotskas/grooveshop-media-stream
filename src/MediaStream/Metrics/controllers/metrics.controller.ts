@@ -1,37 +1,34 @@
-import { ConfigService } from '@microservice/Config/config.service'
-import { MetricsService } from '@microservice/Metrics/services/metrics.service'
-import { Controller, Get, Header } from '@nestjs/common'
+import { Controller, Get, Header, HttpCode, HttpStatus } from '@nestjs/common'
+import { MetricsService } from '../services/metrics.service'
 
-@Controller()
+@Controller('metrics')
 export class MetricsController {
-	constructor(
-		private readonly metricsService: MetricsService,
-		private readonly configService: ConfigService,
-	) {}
+	constructor(private readonly metricsService: MetricsService) {}
 
-	@Get('metrics')
+	/**
+	 * Prometheus metrics endpoint
+	 * Returns metrics in Prometheus format for scraping
+	 */
+	@Get()
+	@HttpCode(HttpStatus.OK)
 	@Header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8')
 	async getMetrics(): Promise<string> {
-		if (!this.configService.get('monitoring.enabled')) {
-			return '# Metrics collection is disabled\n'
-		}
-
-		return this.metricsService.getMetrics()
+		return await this.metricsService.getMetrics()
 	}
 
-	@Get('metrics/json')
-	async getMetricsJson(): Promise<{ error: string, timestamp?: undefined, metrics?: undefined, registry?: undefined, format?: undefined } | { timestamp: string, metrics: string, registry: string, format: string, error?: undefined }> {
-		if (!this.configService.get('monitoring.enabled')) {
-			return { error: 'Metrics collection is disabled' }
-		}
-
-		const metricsText = await this.metricsService.getMetrics()
-
+	/**
+	 * Health check for metrics endpoint
+	 */
+	@Get('health')
+	@HttpCode(HttpStatus.OK)
+	getMetricsHealth(): { status: string, timestamp: number, service: string, registry: { metricsCount: number } } {
 		return {
-			timestamp: new Date().toISOString(),
-			metrics: metricsText,
-			registry: 'prometheus',
-			format: 'text/plain',
+			status: 'healthy',
+			timestamp: Date.now(),
+			service: 'metrics',
+			registry: {
+				metricsCount: this.metricsService.getRegistry().getMetricsAsArray().length,
+			},
 		}
 	}
 }

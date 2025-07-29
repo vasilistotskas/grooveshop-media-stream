@@ -103,10 +103,8 @@ describe('configService', () => {
 				return mockEnvVars[key as keyof typeof mockEnvVars]
 			})
 
-			await expect(async () => {
-				const invalidService = new ConfigService(nestConfigService)
-				await invalidService.validate()
-			}).rejects.toThrow('Configuration validation failed')
+			const invalidService = new ConfigService(nestConfigService)
+			await expect(invalidService.validate()).rejects.toThrow('Configuration validation failed')
 		})
 
 		it('should validate cache configuration', async () => {
@@ -116,10 +114,8 @@ describe('configService', () => {
 				return mockEnvVars[key as keyof typeof mockEnvVars]
 			})
 
-			await expect(async () => {
-				const invalidService = new ConfigService(nestConfigService)
-				await invalidService.validate()
-			}).rejects.toThrow('Configuration validation failed')
+			const invalidService = new ConfigService(nestConfigService)
+			await expect(invalidService.validate()).rejects.toThrow('Configuration validation failed')
 		})
 
 		it('should validate processing configuration', async () => {
@@ -129,23 +125,19 @@ describe('configService', () => {
 				return mockEnvVars[key as keyof typeof mockEnvVars]
 			})
 
-			await expect(async () => {
-				const invalidService = new ConfigService(nestConfigService)
-				await invalidService.validate()
-			}).rejects.toThrow('Configuration validation failed')
+			const invalidService = new ConfigService(nestConfigService)
+			await expect(invalidService.validate()).rejects.toThrow('Configuration validation failed')
 		})
 
 		it('should validate external services URLs', async () => {
 			nestConfigService.get.mockImplementation((key: string) => {
 				if (key === 'NEST_PUBLIC_DJANGO_URL')
-					return 'invalid-url'
+					return 'invalid://url with spaces'
 				return mockEnvVars[key as keyof typeof mockEnvVars]
 			})
 
-			await expect(async () => {
-				const invalidService = new ConfigService(nestConfigService)
-				await invalidService.validate()
-			}).rejects.toThrow('Configuration validation failed')
+			const invalidService = new ConfigService(nestConfigService)
+			await expect(invalidService.validate()).rejects.toThrow('Configuration validation failed')
 		})
 	})
 

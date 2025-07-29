@@ -44,36 +44,56 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.HealthController = void 0;
 const process = __importStar(require("node:process"));
+const cache_health_indicator_1 = require("../../Cache/indicators/cache-health.indicator");
 const redis_health_indicator_1 = require("../../Cache/indicators/redis-health.indicator");
 const config_service_1 = require("../../Config/config.service");
 const disk_space_health_indicator_1 = require("../indicators/disk-space-health.indicator");
 const memory_health_indicator_1 = require("../indicators/memory-health.indicator");
 const http_health_indicator_1 = require("../../HTTP/indicators/http-health.indicator");
+const alerting_health_indicator_1 = require("../../Monitoring/indicators/alerting-health.indicator");
+const system_health_indicator_1 = require("../../Monitoring/indicators/system-health.indicator");
+const job_queue_health_indicator_1 = require("../../Queue/indicators/job-queue-health.indicator");
+const storage_health_indicator_1 = require("../../Storage/indicators/storage-health.indicator");
 const common_1 = require("@nestjs/common");
 const terminus_1 = require("@nestjs/terminus");
 let HealthController = class HealthController {
-    constructor(health, diskSpaceIndicator, memoryIndicator, httpHealthIndicator, redisHealthIndicator, configService) {
+    constructor(health, diskSpaceIndicator, memoryIndicator, httpHealthIndicator, cacheHealthIndicator, redisHealthIndicator, alertingHealthIndicator, systemHealthIndicator, jobQueueHealthIndicator, storageHealthIndicator, configService) {
         this.health = health;
         this.diskSpaceIndicator = diskSpaceIndicator;
         this.memoryIndicator = memoryIndicator;
         this.httpHealthIndicator = httpHealthIndicator;
+        this.cacheHealthIndicator = cacheHealthIndicator;
         this.redisHealthIndicator = redisHealthIndicator;
+        this.alertingHealthIndicator = alertingHealthIndicator;
+        this.systemHealthIndicator = systemHealthIndicator;
+        this.jobQueueHealthIndicator = jobQueueHealthIndicator;
+        this.storageHealthIndicator = storageHealthIndicator;
         this.configService = configService;
     }
     async check() {
         return this.health.check([
             () => this.diskSpaceIndicator.isHealthy(),
             () => this.memoryIndicator.isHealthy(),
-            () => this.httpHealthIndicator.isHealthy('http'),
+            () => this.httpHealthIndicator.isHealthy(),
+            () => this.cacheHealthIndicator.isHealthy(),
             () => this.redisHealthIndicator.isHealthy(),
+            () => this.alertingHealthIndicator.isHealthy(),
+            () => this.systemHealthIndicator.isHealthy(),
+            () => this.jobQueueHealthIndicator.isHealthy(),
+            () => this.storageHealthIndicator.isHealthy(),
         ]);
     }
     async getDetailedHealth() {
         const healthResults = await this.health.check([
             () => this.diskSpaceIndicator.isHealthy(),
             () => this.memoryIndicator.isHealthy(),
-            () => this.httpHealthIndicator.isHealthy('http'),
+            () => this.httpHealthIndicator.isHealthy(),
+            () => this.cacheHealthIndicator.isHealthy(),
             () => this.redisHealthIndicator.isHealthy(),
+            () => this.alertingHealthIndicator.isHealthy(),
+            () => this.systemHealthIndicator.isHealthy(),
+            () => this.jobQueueHealthIndicator.isHealthy(),
+            () => this.storageHealthIndicator.isHealthy(),
         ]);
         const diskInfo = await this.diskSpaceIndicator.getCurrentDiskInfo();
         const memoryInfo = this.memoryIndicator.getCurrentMemoryInfo();
@@ -113,8 +133,13 @@ let HealthController = class HealthController {
             const result = await this.health.check([
                 () => this.diskSpaceIndicator.isHealthy(),
                 () => this.memoryIndicator.isHealthy(),
-                () => this.httpHealthIndicator.isHealthy('http'),
+                () => this.httpHealthIndicator.isHealthy(),
+                () => this.cacheHealthIndicator.isHealthy(),
                 () => this.redisHealthIndicator.isHealthy(),
+                () => this.alertingHealthIndicator.isHealthy(),
+                () => this.systemHealthIndicator.isHealthy(),
+                () => this.jobQueueHealthIndicator.isHealthy(),
+                () => this.storageHealthIndicator.isHealthy(),
             ]);
             return {
                 status: 'ready',
@@ -171,7 +196,12 @@ exports.HealthController = HealthController = __decorate([
         disk_space_health_indicator_1.DiskSpaceHealthIndicator,
         memory_health_indicator_1.MemoryHealthIndicator,
         http_health_indicator_1.HttpHealthIndicator,
+        cache_health_indicator_1.CacheHealthIndicator,
         redis_health_indicator_1.RedisHealthIndicator,
+        alerting_health_indicator_1.AlertingHealthIndicator,
+        system_health_indicator_1.SystemHealthIndicator,
+        job_queue_health_indicator_1.JobQueueHealthIndicator,
+        storage_health_indicator_1.StorageHealthIndicator,
         config_service_1.ConfigService])
 ], HealthController);
 //# sourceMappingURL=health.controller.js.map

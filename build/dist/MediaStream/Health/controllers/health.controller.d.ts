@@ -1,17 +1,27 @@
+import { CacheHealthIndicator } from '@microservice/Cache/indicators/cache-health.indicator';
 import { RedisHealthIndicator } from '@microservice/Cache/indicators/redis-health.indicator';
 import { ConfigService } from '@microservice/Config/config.service';
 import { DiskSpaceHealthIndicator, DiskSpaceInfo } from '@microservice/Health/indicators/disk-space-health.indicator';
 import { MemoryHealthIndicator, MemoryInfo } from '@microservice/Health/indicators/memory-health.indicator';
 import { HttpHealthIndicator } from '@microservice/HTTP/indicators/http-health.indicator';
+import { AlertingHealthIndicator } from '@microservice/Monitoring/indicators/alerting-health.indicator';
+import { SystemHealthIndicator } from '@microservice/Monitoring/indicators/system-health.indicator';
+import { JobQueueHealthIndicator } from '@microservice/Queue/indicators/job-queue-health.indicator';
+import { StorageHealthIndicator } from '@microservice/Storage/indicators/storage-health.indicator';
 import { HealthCheckResult, HealthCheckService, HealthCheckStatus, HealthIndicatorResult } from '@nestjs/terminus';
 export declare class HealthController {
     private readonly health;
     private readonly diskSpaceIndicator;
     private readonly memoryIndicator;
     private readonly httpHealthIndicator;
+    private readonly cacheHealthIndicator;
     private readonly redisHealthIndicator;
+    private readonly alertingHealthIndicator;
+    private readonly systemHealthIndicator;
+    private readonly jobQueueHealthIndicator;
+    private readonly storageHealthIndicator;
     private readonly configService;
-    constructor(health: HealthCheckService, diskSpaceIndicator: DiskSpaceHealthIndicator, memoryIndicator: MemoryHealthIndicator, httpHealthIndicator: HttpHealthIndicator, redisHealthIndicator: RedisHealthIndicator, configService: ConfigService);
+    constructor(health: HealthCheckService, diskSpaceIndicator: DiskSpaceHealthIndicator, memoryIndicator: MemoryHealthIndicator, httpHealthIndicator: HttpHealthIndicator, cacheHealthIndicator: CacheHealthIndicator, redisHealthIndicator: RedisHealthIndicator, alertingHealthIndicator: AlertingHealthIndicator, systemHealthIndicator: SystemHealthIndicator, jobQueueHealthIndicator: JobQueueHealthIndicator, storageHealthIndicator: StorageHealthIndicator, configService: ConfigService);
     check(): Promise<HealthCheckResult>;
     getDetailedHealth(): Promise<{
         status: HealthCheckStatus;

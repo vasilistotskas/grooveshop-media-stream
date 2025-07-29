@@ -139,6 +139,9 @@ let MemoryCacheService = MemoryCacheService_1 = class MemoryCacheService {
             return false;
         }
     }
+    async exists(key) {
+        return this.has(key);
+    }
     async keys() {
         try {
             return this.cache.keys();

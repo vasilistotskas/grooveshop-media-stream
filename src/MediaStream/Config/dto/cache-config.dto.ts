@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer'
-import { IsBoolean, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
+import { IsBoolean, IsNumber, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator'
 
 export class MemoryCacheConfigDto {
 	@IsNumber()
@@ -84,12 +84,15 @@ export class FileCacheConfigDto {
 }
 
 export class CacheConfigDto {
+	@ValidateNested()
 	@Type(() => MemoryCacheConfigDto)
 	memory: MemoryCacheConfigDto = new MemoryCacheConfigDto()
 
+	@ValidateNested()
 	@Type(() => RedisConfigDto)
 	redis: RedisConfigDto = new RedisConfigDto()
 
+	@ValidateNested()
 	@Type(() => FileCacheConfigDto)
 	file: FileCacheConfigDto = new FileCacheConfigDto()
 }

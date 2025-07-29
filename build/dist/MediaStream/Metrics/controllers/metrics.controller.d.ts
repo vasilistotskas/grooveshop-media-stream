@@ -1,21 +1,14 @@
-import { ConfigService } from '@microservice/Config/config.service';
-import { MetricsService } from '@microservice/Metrics/services/metrics.service';
+import { MetricsService } from '../services/metrics.service';
 export declare class MetricsController {
     private readonly metricsService;
-    private readonly configService;
-    constructor(metricsService: MetricsService, configService: ConfigService);
+    constructor(metricsService: MetricsService);
     getMetrics(): Promise<string>;
-    getMetricsJson(): Promise<{
-        error: string;
-        timestamp?: undefined;
-        metrics?: undefined;
-        registry?: undefined;
-        format?: undefined;
-    } | {
-        timestamp: string;
-        metrics: string;
-        registry: string;
-        format: string;
-        error?: undefined;
-    }>;
+    getMetricsHealth(): {
+        status: string;
+        timestamp: number;
+        service: string;
+        registry: {
+            metricsCount: number;
+        };
+    };
 }

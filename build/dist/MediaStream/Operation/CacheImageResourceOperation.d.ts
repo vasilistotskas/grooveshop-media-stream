@@ -1,12 +1,17 @@
 import type { ResizeOptions } from '@microservice/API/DTO/CacheImageRequest';
 import type { ResourceIdentifierKP } from '@microservice/Constant/KeyProperties';
+import { Buffer } from 'node:buffer';
 import CacheImageRequest from '@microservice/API/DTO/CacheImageRequest';
+import { MultiLayerCacheManager } from '@microservice/Cache/services/multi-layer-cache.manager';
 import ResourceMetaData from '@microservice/DTO/ResourceMetaData';
 import FetchResourceResponseJob from '@microservice/Job/FetchResourceResponseJob';
 import GenerateResourceIdentityFromRequestJob from '@microservice/Job/GenerateResourceIdentityFromRequestJob';
 import StoreResourceResponseToFileJob from '@microservice/Job/StoreResourceResponseToFileJob';
 import WebpImageManipulationJob from '@microservice/Job/WebpImageManipulationJob';
+import { MetricsService } from '@microservice/Metrics/services/metrics.service';
+import { JobQueueManager } from '@microservice/Queue/services/job-queue.manager';
 import ValidateCacheImageRequestRule from '@microservice/Rule/ValidateCacheImageRequestRule';
+import { InputSanitizationService } from '@microservice/Validation/services/input-sanitization.service';
 import { HttpService } from '@nestjs/axios';
 export default class CacheImageResourceOperation {
     private readonly httpService;
@@ -15,9 +20,13 @@ export default class CacheImageResourceOperation {
     private readonly webpImageManipulationJob;
     private readonly storeResourceResponseToFileJob;
     private readonly generateResourceIdentityFromRequestJob;
+    private readonly cacheManager;
+    private readonly inputSanitizationService;
+    private readonly jobQueueManager;
+    private readonly metricsService;
     private readonly logger;
     private readonly basePath;
-    constructor(httpService: HttpService, validateCacheImageRequest: ValidateCacheImageRequestRule, fetchResourceResponseJob: FetchResourceResponseJob, webpImageManipulationJob: WebpImageManipulationJob, storeResourceResponseToFileJob: StoreResourceResponseToFileJob, generateResourceIdentityFromRequestJob: GenerateResourceIdentityFromRequestJob);
+    constructor(httpService: HttpService, validateCacheImageRequest: ValidateCacheImageRequestRule, fetchResourceResponseJob: FetchResourceResponseJob, webpImageManipulationJob: WebpImageManipulationJob, storeResourceResponseToFileJob: StoreResourceResponseToFileJob, generateResourceIdentityFromRequestJob: GenerateResourceIdentityFromRequestJob, cacheManager: MultiLayerCacheManager, inputSanitizationService: InputSanitizationService, jobQueueManager: JobQueueManager, metricsService: MetricsService);
     request: CacheImageRequest;
     id: ResourceIdentifierKP;
     metaData: ResourceMetaData;
@@ -28,6 +37,17 @@ export default class CacheImageResourceOperation {
     get getHeaders(): Promise<ResourceMetaData>;
     setup(cacheImageRequest: CacheImageRequest): Promise<void>;
     execute(): Promise<void>;
+    shouldUseBackgroundProcessing(): boolean;
+    private queueImageProcessing;
+    private processImageSynchronously;
+    private processSvgImage;
+    private processRasterImage;
+    private processDefaultImage;
+    private getFormatFromUrl;
     optimizeAndServeDefaultImage(resizeOptions: ResizeOptions): Promise<string>;
     private createOptionsString;
+    getCachedResource(): Promise<{
+        data: Buffer;
+        metadata: ResourceMetaData;
+    } | null>;
 }

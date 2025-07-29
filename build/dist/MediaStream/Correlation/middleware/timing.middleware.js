@@ -56,23 +56,27 @@ let TimingMiddleware = TimingMiddleware_1 = class TimingMiddleware {
     use(req, res, next) {
         const startTime = process.hrtime.bigint();
         const startTimestamp = Date.now();
-        res.on('finish', () => {
+        res.setHeader('x-request-start', startTimestamp.toString());
+        const originalEnd = res.end.bind(res);
+        const correlationService = this.correlationService;
+        res.end = function (chunk, encoding, cb) {
             const endTime = process.hrtime.bigint();
             const endTimestamp = Date.now();
             const duration = Number(endTime - startTime) / 1_000_000;
-            res.setHeader('x-response-time', `${duration.toFixed(2)}ms`);
-            res.setHeader('x-request-start', startTimestamp.toString());
-            res.setHeader('x-request-end', endTimestamp.toString());
-            this.correlationService.updateContext({
+            if (!res.headersSent) {
+                res.setHeader('x-response-time', `${duration.toFixed(2)}ms`);
+                res.setHeader('x-request-end', endTimestamp.toString());
+            }
+            correlationService.updateContext({
                 startTime,
                 endTime,
                 duration,
                 startTimestamp,
                 endTimestamp,
             });
-            const context = this.correlationService.getContext();
+            const context = correlationService.getContext();
             if (context) {
-                const logLevel = this.getLogLevel(duration, res.statusCode);
+                const logLevel = TimingMiddleware_1.prototype.getLogLevel(duration, res.statusCode);
                 const message = `${req.method} ${req.url} - ${res.statusCode} - ${duration.toFixed(2)}ms`;
                 if (logLevel === 'warn') {
                     logger_util_1.CorrelatedLogger.warn(`SLOW REQUEST: ${message}`, TimingMiddleware_1.name);
@@ -88,7 +92,8 @@ let TimingMiddleware = TimingMiddleware_1 = class TimingMiddleware {
                 }
                 performance_tracker_util_1.PerformanceTracker.logSummary();
             }
-        });
+            return originalEnd(chunk, encoding, cb);
+        };
         next();
     }
     getLogLevel(duration, statusCode) {

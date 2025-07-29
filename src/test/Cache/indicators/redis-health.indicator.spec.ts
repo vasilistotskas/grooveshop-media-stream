@@ -65,14 +65,27 @@ describe('redisHealthIndicator', () => {
 
 	describe('performHealthCheck', () => {
 		it('should return healthy status when all operations succeed', async () => {
-			const testValue = { timestamp: Date.now(), test: true }
+			let capturedValue: any = null
+			let deleteWasCalled = false
 
 			redisCacheService.ping.mockResolvedValue('PONG')
-			redisCacheService.set.mockResolvedValue(undefined)
-			redisCacheService.get.mockResolvedValue(testValue)
+			redisCacheService.set.mockImplementation(async (key, value) => {
+				capturedValue = value
+				return undefined
+			})
+			redisCacheService.get.mockImplementation(async (key) => {
+				if (key === 'health-check-redis-test' && !deleteWasCalled) {
+					return capturedValue
+				}
+				return null
+			})
 			redisCacheService.getTtl.mockResolvedValue(59)
-			redisCacheService.delete.mockResolvedValue(undefined)
-			redisCacheService.get.mockResolvedValueOnce(testValue).mockResolvedValueOnce(null)
+			redisCacheService.delete.mockImplementation(async (key) => {
+				if (key === 'health-check-redis-test') {
+					deleteWasCalled = true
+				}
+				return undefined
+			})
 			redisCacheService.getStats.mockResolvedValue({
 				hits: 10,
 				misses: 2,
@@ -122,11 +135,14 @@ describe('redisHealthIndicator', () => {
 		})
 
 		it('should return unhealthy status when TTL operation fails', async () => {
-			const testValue = { timestamp: Date.now(), test: true }
+			let storedValue: any = null
 
 			redisCacheService.ping.mockResolvedValue('PONG')
-			redisCacheService.set.mockResolvedValue(undefined)
-			redisCacheService.get.mockResolvedValue(testValue)
+			redisCacheService.set.mockImplementation((key, value) => {
+				storedValue = value
+				return Promise.resolve(undefined)
+			})
+			redisCacheService.get.mockImplementation(() => Promise.resolve(storedValue))
 			redisCacheService.getTtl.mockResolvedValue(-1) // Invalid TTL
 
 			const result = await indicator.isHealthy()
@@ -136,14 +152,27 @@ describe('redisHealthIndicator', () => {
 		})
 
 		it('should return unhealthy status when DELETE operation fails', async () => {
-			const testValue = { timestamp: Date.now(), test: true }
+			let storedValue: any = null
+			let getCallCount = 0
 
 			redisCacheService.ping.mockResolvedValue('PONG')
-			redisCacheService.set.mockResolvedValue(undefined)
-			redisCacheService.get.mockResolvedValue(testValue)
+			redisCacheService.set.mockImplementation(async (key, value) => {
+				storedValue = value
+				return undefined
+			})
+			redisCacheService.get.mockImplementation(async (_key) => {
+				getCallCount++
+				if (getCallCount === 1) {
+					// First GET call: return the stored value (for GET operation test)
+					return storedValue
+				}
+				else {
+					// Second GET call: return the stored value again (should be null after delete, but we return the value to simulate delete failure)
+					return storedValue
+				}
+			})
 			redisCacheService.getTtl.mockResolvedValue(59)
 			redisCacheService.delete.mockResolvedValue(undefined)
-			redisCacheService.get.mockResolvedValueOnce(testValue).mockResolvedValueOnce(testValue) // Still exists after delete
 
 			const result = await indicator.isHealthy()
 

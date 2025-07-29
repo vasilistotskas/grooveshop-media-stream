@@ -1,10 +1,43 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
@@ -20,7 +53,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
         this.hotReloadableKeys = new Set([
             'MONITORING_ENABLED',
             'PROCESSING_MAX_CONCURRENT',
-            'CACHE_MEMORY_DEFAULT_TTL',
+            'CACHE_MEMORY_TTL',
             'CACHE_FILE_CLEANUP_INTERVAL',
         ]);
         this.config = this.loadAndValidateConfig();
@@ -51,17 +84,100 @@ let ConfigService = ConfigService_1 = class ConfigService {
         return { ...this.config };
     }
     async validate() {
-        const config = this.config;
-        if (!config.server.port || config.server.port < 1 || config.server.port > 65535) {
-            throw new Error('Invalid server port configuration');
-        }
-        if (!config.server.host) {
-            throw new Error('Invalid server host configuration');
-        }
-        if (!config.externalServices.djangoUrl || !config.externalServices.nuxtUrl) {
-            throw new Error('Invalid external services configuration');
+        const { plainToClass } = await Promise.resolve().then(() => __importStar(require('class-transformer')));
+        const { validate } = await Promise.resolve().then(() => __importStar(require('class-validator')));
+        const { AppConfigDto } = await Promise.resolve().then(() => __importStar(require('@microservice/Config/dto/app-config.dto')));
+        const rawConfig = this.createRawConfigForValidation();
+        const dto = plainToClass(AppConfigDto, rawConfig, {
+            enableImplicitConversion: true,
+            excludeExtraneousValues: false,
+        });
+        const errors = await validate(dto, {
+            whitelist: false,
+            forbidNonWhitelisted: false,
+        });
+        if (errors.length > 0) {
+            const errorMessages = errors.map(error => Object.values(error.constraints || {}).join(', ')).join('; ');
+            throw new Error(`Configuration validation failed: ${errorMessages}`);
         }
         this.logger.log('Configuration validation passed');
+    }
+    createRawConfigForValidation() {
+        return {
+            server: {
+                port: this.nestConfigService.get('PORT'),
+                host: this.nestConfigService.get('HOST'),
+                cors: {
+                    origin: this.nestConfigService.get('CORS_ORIGIN'),
+                    methods: this.nestConfigService.get('CORS_METHODS'),
+                    maxAge: this.nestConfigService.get('CORS_MAX_AGE'),
+                },
+            },
+            cache: {
+                memory: {
+                    maxSize: this.nestConfigService.get('CACHE_MEMORY_MAX_SIZE'),
+                    defaultTtl: this.nestConfigService.get('CACHE_MEMORY_DEFAULT_TTL'),
+                    checkPeriod: this.nestConfigService.get('CACHE_MEMORY_CHECK_PERIOD'),
+                    maxKeys: this.nestConfigService.get('CACHE_MEMORY_MAX_KEYS'),
+                    warningThreshold: this.nestConfigService.get('CACHE_MEMORY_WARNING_THRESHOLD'),
+                },
+                redis: {
+                    host: this.nestConfigService.get('REDIS_HOST'),
+                    port: this.nestConfigService.get('REDIS_PORT'),
+                    password: this.nestConfigService.get('REDIS_PASSWORD'),
+                    db: this.nestConfigService.get('REDIS_DB'),
+                    ttl: this.nestConfigService.get('REDIS_TTL'),
+                    maxRetries: this.nestConfigService.get('REDIS_MAX_RETRIES'),
+                    retryDelayOnFailover: this.nestConfigService.get('REDIS_RETRY_DELAY'),
+                },
+                file: {
+                    directory: this.nestConfigService.get('CACHE_FILE_DIRECTORY'),
+                    maxSize: this.nestConfigService.get('CACHE_FILE_MAX_SIZE'),
+                    cleanupInterval: this.nestConfigService.get('CACHE_FILE_CLEANUP_INTERVAL'),
+                },
+                warming: {
+                    enabled: this.nestConfigService.get('CACHE_WARMING_ENABLED'),
+                    warmupOnStart: this.nestConfigService.get('CACHE_WARMING_ON_START'),
+                    maxFilesToWarm: this.nestConfigService.get('CACHE_WARMING_MAX_FILES'),
+                    warmupCron: this.nestConfigService.get('CACHE_WARMING_CRON'),
+                    popularImageThreshold: this.nestConfigService.get('CACHE_WARMING_THRESHOLD'),
+                },
+            },
+            processing: {
+                maxConcurrent: this.nestConfigService.get('PROCESSING_MAX_CONCURRENT'),
+                timeout: this.nestConfigService.get('PROCESSING_TIMEOUT'),
+                retries: this.nestConfigService.get('PROCESSING_RETRIES'),
+                maxFileSize: this.nestConfigService.get('PROCESSING_MAX_FILE_SIZE'),
+                allowedFormats: this.nestConfigService.get('PROCESSING_ALLOWED_FORMATS'),
+            },
+            monitoring: {
+                enabled: this.nestConfigService.get('MONITORING_ENABLED'),
+                metricsPort: this.nestConfigService.get('MONITORING_METRICS_PORT'),
+                healthPath: this.nestConfigService.get('MONITORING_HEALTH_PATH'),
+                metricsPath: this.nestConfigService.get('MONITORING_METRICS_PATH'),
+            },
+            externalServices: {
+                djangoUrl: this.nestConfigService.get('NEST_PUBLIC_DJANGO_URL'),
+                nuxtUrl: this.nestConfigService.get('NEST_PUBLIC_NUXT_URL'),
+                requestTimeout: this.nestConfigService.get('EXTERNAL_REQUEST_TIMEOUT'),
+                maxRetries: this.nestConfigService.get('EXTERNAL_MAX_RETRIES'),
+            },
+            http: {
+                timeout: this.nestConfigService.get('HTTP_TIMEOUT'),
+                maxRetries: this.nestConfigService.get('HTTP_MAX_RETRIES'),
+                retryDelay: this.nestConfigService.get('HTTP_RETRY_DELAY'),
+                circuitBreaker: {
+                    enabled: this.nestConfigService.get('HTTP_CIRCUIT_BREAKER_ENABLED'),
+                    failureThreshold: this.nestConfigService.get('HTTP_CIRCUIT_BREAKER_FAILURE_THRESHOLD'),
+                    resetTimeout: this.nestConfigService.get('HTTP_CIRCUIT_BREAKER_RESET_TIMEOUT'),
+                },
+                healthCheck: {
+                    enabled: this.nestConfigService.get('HTTP_HEALTH_CHECK_ENABLED'),
+                    urls: this.nestConfigService.get('HTTP_HEALTH_CHECK_URLS'),
+                    timeout: this.nestConfigService.get('HTTP_HEALTH_CHECK_TIMEOUT'),
+                },
+            },
+        };
     }
     async reload() {
         this.logger.log('Reloading hot-reloadable configuration...');
@@ -194,7 +310,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
         if (this.isHotReloadable('PROCESSING_MAX_CONCURRENT')) {
             this.config.processing.maxConcurrent = newConfig.processing.maxConcurrent;
         }
-        if (this.isHotReloadable('CACHE_MEMORY_DEFAULT_TTL')) {
+        if (this.isHotReloadable('CACHE_MEMORY_TTL')) {
             this.config.cache.memory.defaultTtl = newConfig.cache.memory.defaultTtl;
         }
         if (this.isHotReloadable('CACHE_FILE_CLEANUP_INTERVAL')) {

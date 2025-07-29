@@ -5,6 +5,7 @@ export interface CacheStats {
     ksize: number;
     vsize: number;
     hitRate: number;
+    memoryUsage?: number;
 }
 export interface ICacheManager {
     get: <T>(key: string) => Promise<T | null>;
@@ -15,4 +16,5 @@ export interface ICacheManager {
     has: (key: string) => Promise<boolean>;
     keys: () => Promise<string[]>;
     flushAll: () => Promise<void>;
+    exists: (key: string) => Promise<boolean>;
 }

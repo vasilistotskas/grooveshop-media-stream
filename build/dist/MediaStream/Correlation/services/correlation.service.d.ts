@@ -8,4 +8,6 @@ export declare class CorrelationService implements ICorrelationService {
     clearContext(): void;
     runWithContext<T>(context: RequestContext, fn: () => T): T;
     updateContext(updates: Partial<RequestContext>): void;
+    getClientIp(): string;
+    getUserAgent(): string;
 }

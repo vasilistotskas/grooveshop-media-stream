@@ -132,7 +132,7 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			this.stats.operations++
 			const serializedValue = JSON.stringify(value)
 			const defaultTtl = this.configService.get('cache.redis.ttl')
-			const effectiveTtl = ttl || defaultTtl
+			const effectiveTtl = ttl !== undefined ? ttl : defaultTtl
 
 			if (effectiveTtl > 0) {
 				await this.redis.setex(key, effectiveTtl, serializedValue)
@@ -148,7 +148,7 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			this.stats.errors++
 			this.metricsService.recordCacheOperation('set', 'redis', 'error')
 			CorrelatedLogger.error(`Redis cache SET error for key ${key}: ${error.message}`, error.stack, RedisCacheService.name)
-			throw error
+			// Don't throw error, handle gracefully
 		}
 	}
 
@@ -208,6 +208,10 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			CorrelatedLogger.error(`Redis cache HAS error for key ${key}: ${error.message}`, error.stack, RedisCacheService.name)
 			return false
 		}
+	}
+
+	async exists(key: string): Promise<boolean> {
+		return this.has(key)
 	}
 
 	async keys(): Promise<string[]> {

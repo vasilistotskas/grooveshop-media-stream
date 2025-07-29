@@ -9,7 +9,7 @@ export class ConfigService implements OnModuleInit {
 	private readonly hotReloadableKeys = new Set([
 		'MONITORING_ENABLED',
 		'PROCESSING_MAX_CONCURRENT',
-		'CACHE_MEMORY_DEFAULT_TTL',
+		'CACHE_MEMORY_TTL',
 		'CACHE_FILE_CLEANUP_INTERVAL',
 	])
 
@@ -62,22 +62,113 @@ export class ConfigService implements OnModuleInit {
 	 * Validate the current configuration
 	 */
 	async validate(): Promise<void> {
-		// Basic validation - ensure required values are present and valid
-		const config = this.config
+		// Import validation dependencies
+		const { plainToClass } = await import('class-transformer')
+		const { validate } = await import('class-validator')
+		const { AppConfigDto } = await import('@microservice/Config/dto/app-config.dto')
 
-		if (!config.server.port || config.server.port < 1 || config.server.port > 65535) {
-			throw new Error('Invalid server port configuration')
-		}
+		// Create raw config object from environment variables for validation
+		const rawConfig = this.createRawConfigForValidation()
 
-		if (!config.server.host) {
-			throw new Error('Invalid server host configuration')
-		}
+		// Convert config to DTO and validate
+		const dto = plainToClass(AppConfigDto, rawConfig, {
+			enableImplicitConversion: true,
+			excludeExtraneousValues: false,
+		})
+		const errors = await validate(dto, {
+			whitelist: false,
+			forbidNonWhitelisted: false,
+		})
 
-		if (!config.externalServices.djangoUrl || !config.externalServices.nuxtUrl) {
-			throw new Error('Invalid external services configuration')
+		if (errors.length > 0) {
+			const errorMessages = errors.map(error =>
+				Object.values(error.constraints || {}).join(', '),
+			).join('; ')
+			throw new Error(`Configuration validation failed: ${errorMessages}`)
 		}
 
 		this.logger.log('Configuration validation passed')
+	}
+
+	/**
+	 * Create raw configuration object for validation
+	 */
+	private createRawConfigForValidation(): Record<string, any> {
+		return {
+			server: {
+				port: this.nestConfigService.get('PORT'),
+				host: this.nestConfigService.get('HOST'),
+				cors: {
+					origin: this.nestConfigService.get('CORS_ORIGIN'),
+					methods: this.nestConfigService.get('CORS_METHODS'),
+					maxAge: this.nestConfigService.get('CORS_MAX_AGE'),
+				},
+			},
+			cache: {
+				memory: {
+					maxSize: this.nestConfigService.get('CACHE_MEMORY_MAX_SIZE'),
+					defaultTtl: this.nestConfigService.get('CACHE_MEMORY_DEFAULT_TTL'),
+					checkPeriod: this.nestConfigService.get('CACHE_MEMORY_CHECK_PERIOD'),
+					maxKeys: this.nestConfigService.get('CACHE_MEMORY_MAX_KEYS'),
+					warningThreshold: this.nestConfigService.get('CACHE_MEMORY_WARNING_THRESHOLD'),
+				},
+				redis: {
+					host: this.nestConfigService.get('REDIS_HOST'),
+					port: this.nestConfigService.get('REDIS_PORT'),
+					password: this.nestConfigService.get('REDIS_PASSWORD'),
+					db: this.nestConfigService.get('REDIS_DB'),
+					ttl: this.nestConfigService.get('REDIS_TTL'),
+					maxRetries: this.nestConfigService.get('REDIS_MAX_RETRIES'),
+					retryDelayOnFailover: this.nestConfigService.get('REDIS_RETRY_DELAY'),
+				},
+				file: {
+					directory: this.nestConfigService.get('CACHE_FILE_DIRECTORY'),
+					maxSize: this.nestConfigService.get('CACHE_FILE_MAX_SIZE'),
+					cleanupInterval: this.nestConfigService.get('CACHE_FILE_CLEANUP_INTERVAL'),
+				},
+				warming: {
+					enabled: this.nestConfigService.get('CACHE_WARMING_ENABLED'),
+					warmupOnStart: this.nestConfigService.get('CACHE_WARMING_ON_START'),
+					maxFilesToWarm: this.nestConfigService.get('CACHE_WARMING_MAX_FILES'),
+					warmupCron: this.nestConfigService.get('CACHE_WARMING_CRON'),
+					popularImageThreshold: this.nestConfigService.get('CACHE_WARMING_THRESHOLD'),
+				},
+			},
+			processing: {
+				maxConcurrent: this.nestConfigService.get('PROCESSING_MAX_CONCURRENT'),
+				timeout: this.nestConfigService.get('PROCESSING_TIMEOUT'),
+				retries: this.nestConfigService.get('PROCESSING_RETRIES'),
+				maxFileSize: this.nestConfigService.get('PROCESSING_MAX_FILE_SIZE'),
+				allowedFormats: this.nestConfigService.get('PROCESSING_ALLOWED_FORMATS'),
+			},
+			monitoring: {
+				enabled: this.nestConfigService.get('MONITORING_ENABLED'),
+				metricsPort: this.nestConfigService.get('MONITORING_METRICS_PORT'),
+				healthPath: this.nestConfigService.get('MONITORING_HEALTH_PATH'),
+				metricsPath: this.nestConfigService.get('MONITORING_METRICS_PATH'),
+			},
+			externalServices: {
+				djangoUrl: this.nestConfigService.get('NEST_PUBLIC_DJANGO_URL'),
+				nuxtUrl: this.nestConfigService.get('NEST_PUBLIC_NUXT_URL'),
+				requestTimeout: this.nestConfigService.get('EXTERNAL_REQUEST_TIMEOUT'),
+				maxRetries: this.nestConfigService.get('EXTERNAL_MAX_RETRIES'),
+			},
+			http: {
+				timeout: this.nestConfigService.get('HTTP_TIMEOUT'),
+				maxRetries: this.nestConfigService.get('HTTP_MAX_RETRIES'),
+				retryDelay: this.nestConfigService.get('HTTP_RETRY_DELAY'),
+				circuitBreaker: {
+					enabled: this.nestConfigService.get('HTTP_CIRCUIT_BREAKER_ENABLED'),
+					failureThreshold: this.nestConfigService.get('HTTP_CIRCUIT_BREAKER_FAILURE_THRESHOLD'),
+					resetTimeout: this.nestConfigService.get('HTTP_CIRCUIT_BREAKER_RESET_TIMEOUT'),
+				},
+				healthCheck: {
+					enabled: this.nestConfigService.get('HTTP_HEALTH_CHECK_ENABLED'),
+					urls: this.nestConfigService.get('HTTP_HEALTH_CHECK_URLS'),
+					timeout: this.nestConfigService.get('HTTP_HEALTH_CHECK_TIMEOUT'),
+				},
+			},
+		}
 	}
 
 	/**
@@ -245,7 +336,7 @@ export class ConfigService implements OnModuleInit {
 		}
 
 		// Update cache settings
-		if (this.isHotReloadable('CACHE_MEMORY_DEFAULT_TTL')) {
+		if (this.isHotReloadable('CACHE_MEMORY_TTL')) {
 			this.config.cache.memory.defaultTtl = newConfig.cache.memory.defaultTtl
 		}
 

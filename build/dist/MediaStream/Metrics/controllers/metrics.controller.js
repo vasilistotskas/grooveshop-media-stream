@@ -10,50 +10,44 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MetricsController = void 0;
-const config_service_1 = require("../../Config/config.service");
-const metrics_service_1 = require("../services/metrics.service");
 const common_1 = require("@nestjs/common");
+const metrics_service_1 = require("../services/metrics.service");
 let MetricsController = class MetricsController {
-    constructor(metricsService, configService) {
+    constructor(metricsService) {
         this.metricsService = metricsService;
-        this.configService = configService;
     }
     async getMetrics() {
-        if (!this.configService.get('monitoring.enabled')) {
-            return '# Metrics collection is disabled\n';
-        }
-        return this.metricsService.getMetrics();
+        return await this.metricsService.getMetrics();
     }
-    async getMetricsJson() {
-        if (!this.configService.get('monitoring.enabled')) {
-            return { error: 'Metrics collection is disabled' };
-        }
-        const metricsText = await this.metricsService.getMetrics();
+    getMetricsHealth() {
         return {
-            timestamp: new Date().toISOString(),
-            metrics: metricsText,
-            registry: 'prometheus',
-            format: 'text/plain',
+            status: 'healthy',
+            timestamp: Date.now(),
+            service: 'metrics',
+            registry: {
+                metricsCount: this.metricsService.getRegistry().getMetricsAsArray().length,
+            },
         };
     }
 };
 exports.MetricsController = MetricsController;
 __decorate([
-    (0, common_1.Get)('metrics'),
+    (0, common_1.Get)(),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     (0, common_1.Header)('Content-Type', 'text/plain; version=0.0.4; charset=utf-8'),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], MetricsController.prototype, "getMetrics", null);
 __decorate([
-    (0, common_1.Get)('metrics/json'),
+    (0, common_1.Get)('health'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
-    __metadata("design:returntype", Promise)
-], MetricsController.prototype, "getMetricsJson", null);
+    __metadata("design:returntype", Object)
+], MetricsController.prototype, "getMetricsHealth", null);
 exports.MetricsController = MetricsController = __decorate([
-    (0, common_1.Controller)(),
-    __metadata("design:paramtypes", [metrics_service_1.MetricsService,
-        config_service_1.ConfigService])
+    (0, common_1.Controller)('metrics'),
+    __metadata("design:paramtypes", [metrics_service_1.MetricsService])
 ], MetricsController);
 //# sourceMappingURL=metrics.controller.js.map

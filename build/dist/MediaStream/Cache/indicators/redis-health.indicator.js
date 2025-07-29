@@ -49,7 +49,7 @@ let RedisHealthIndicator = RedisHealthIndicator_1 = class RedisHealthIndicator e
             const memoryUsage = await this.redisCacheService.getMemoryUsage();
             const connectionStatus = this.redisCacheService.getConnectionStatus();
             const responseTime = Date.now() - startTime;
-            const isHealthy = responseTime < 200 && connectionStatus.connected;
+            const isHealthy = connectionStatus.connected && responseTime <= 200;
             const result = {
                 [this.key]: {
                     status: isHealthy ? 'up' : 'down',
@@ -79,7 +79,7 @@ let RedisHealthIndicator = RedisHealthIndicator_1 = class RedisHealthIndicator e
                         hitRate: '70%',
                         memoryFragmentation: '1.5',
                     },
-                    warnings: this.generateWarnings(stats, memoryUsage, responseTime),
+                    warnings: this.generateWarnings(stats, memoryUsage, responseTime, connectionStatus.stats.errors),
                 },
             };
             if (isHealthy) {
@@ -109,7 +109,7 @@ let RedisHealthIndicator = RedisHealthIndicator_1 = class RedisHealthIndicator e
             };
         }
     }
-    generateWarnings(stats, memoryUsage, responseTime) {
+    generateWarnings(stats, memoryUsage, responseTime, errors = 0) {
         const warnings = [];
         if (responseTime > 100) {
             warnings.push(`Response time (${responseTime}ms) is slower than optimal (100ms)`);
@@ -120,8 +120,8 @@ let RedisHealthIndicator = RedisHealthIndicator_1 = class RedisHealthIndicator e
         if (memoryUsage.fragmentation > 1.5) {
             warnings.push(`Memory fragmentation (${memoryUsage.fragmentation}) is high (>1.5)`);
         }
-        if (stats.errors > 0) {
-            warnings.push(`Redis has recorded ${stats.errors} errors`);
+        if (errors > 0) {
+            warnings.push(`Redis has recorded ${errors} errors`);
         }
         const memoryUsageMB = memoryUsage.used / 1024 / 1024;
         if (memoryUsageMB > 100) {

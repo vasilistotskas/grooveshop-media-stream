@@ -12,6 +12,7 @@ export declare class ConfigService implements OnModuleInit {
     getOptional<T = any>(key: string, defaultValue?: T): T;
     getAll(): AppConfig;
     validate(): Promise<void>;
+    private createRawConfigForValidation;
     reload(): Promise<void>;
     isHotReloadable(key: string): boolean;
     private loadAndValidateConfig;

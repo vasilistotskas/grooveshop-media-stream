@@ -60,4 +60,20 @@ export class CorrelationService implements ICorrelationService {
 			this.setContext(updatedContext)
 		}
 	}
+
+	/**
+	 * Get the client IP from the current context
+	 */
+	getClientIp(): string {
+		const context = this.getContext()
+		return context?.clientIp || 'unknown'
+	}
+
+	/**
+	 * Get the user agent from the current context
+	 */
+	getUserAgent(): string {
+		const context = this.getContext()
+		return context?.userAgent || 'unknown'
+	}
 }

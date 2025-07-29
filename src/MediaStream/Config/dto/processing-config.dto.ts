@@ -5,7 +5,10 @@ export class ProcessingConfigDto {
 	@IsNumber()
 	@Min(1)
 	@Max(100)
-	@Transform(({ value }) => Number.parseInt(value) || 10)
+	@Transform(({ value }) => {
+		const parsed = Number.parseInt(value)
+		return Number.isNaN(parsed) ? 10 : parsed
+	})
 	maxConcurrent: number = 10
 
 	@IsNumber()

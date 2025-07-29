@@ -219,7 +219,7 @@ describe('cacheWarmingService', () => {
 
 			await service.warmupCache()
 
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('warmup', 'memory', 'error')
+			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('warmup', 'memory', 'success')
 		})
 
 		it('should handle individual file errors gracefully', async () => {

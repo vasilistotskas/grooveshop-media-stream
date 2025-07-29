@@ -3,12 +3,12 @@ import { IsNumber, IsString, IsUrl, Max, Min } from 'class-validator'
 
 export class ExternalServicesConfigDto {
 	@IsString()
-	@IsUrl({ require_tld: false })
+	@IsUrl({ require_tld: false }, { message: 'Django URL must be a valid URL' })
 	@Transform(({ value }) => value || 'http://localhost:8000')
 	djangoUrl: string = 'http://localhost:8000'
 
 	@IsString()
-	@IsUrl({ require_tld: false })
+	@IsUrl({ require_tld: false }, { message: 'Nuxt URL must be a valid URL' })
 	@Transform(({ value }) => value || 'http://localhost:3000')
 	nuxtUrl: string = 'http://localhost:3000'
 

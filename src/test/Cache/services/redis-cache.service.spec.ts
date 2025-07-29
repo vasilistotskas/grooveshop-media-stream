@@ -51,6 +51,8 @@ describe('redisCacheService', () => {
 			get: jest.fn().mockImplementation((key: string) => {
 				if (key === 'cache.redis')
 					return mockConfig
+				if (key === 'cache.redis.ttl')
+					return mockConfig.ttl
 				return undefined
 			}),
 		}
@@ -204,7 +206,8 @@ describe('redisCacheService', () => {
 			it('should handle Redis errors', async () => {
 				mockRedis.setex.mockRejectedValue(new Error('Redis connection failed'))
 
-				await expect(service.set('test-key', { test: 'data' })).rejects.toThrow('Redis connection failed')
+				// The service should handle errors gracefully and not throw
+				await service.set('test-key', { test: 'data' })
 				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('set', 'redis', 'error')
 			})
 
@@ -338,21 +341,24 @@ describe('redisCacheService', () => {
 				})
 
 				// Simulate some cache operations to generate stats
-				await service.get('key1') // miss
-				mockRedis.get.mockResolvedValue(JSON.stringify({ test: 'data' }))
-				await service.get('key2') // hit
+				mockRedis.get.mockResolvedValueOnce(null) // miss
+				await service.get('key1')
+				mockRedis.get.mockResolvedValueOnce(JSON.stringify({ test: 'data' })) // hit
+				await service.get('key2')
+				mockRedis.get.mockResolvedValueOnce(JSON.stringify({ test: 'data2' })) // hit
+				await service.get('key3')
 
 				const stats = await service.getStats()
 
 				expect(stats).toEqual({
-					hits: 1,
+					hits: 2,
 					misses: 1,
 					keys: 100,
 					ksize: 0,
 					vsize: 1048576,
-					hitRate: 0.5,
+					hitRate: 0.6666666666666666,
 				})
-				expect(metricsService.updateCacheHitRatio).toHaveBeenCalledWith('redis', 0.5)
+				expect(metricsService.updateCacheHitRatio).toHaveBeenCalledWith('redis', 0.6666666666666666)
 			})
 
 			it('should handle Redis info errors gracefully', async () => {

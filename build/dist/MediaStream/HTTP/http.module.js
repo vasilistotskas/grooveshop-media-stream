@@ -28,6 +28,7 @@ exports.HttpModule = HttpModule = __decorate([
         exports: [
             http_client_service_1.HttpClientService,
             http_health_indicator_1.HttpHealthIndicator,
+            axios_1.HttpModule,
         ],
     })
 ], HttpModule);
