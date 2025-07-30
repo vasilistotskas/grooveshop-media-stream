@@ -37,7 +37,6 @@ export interface CacheConfig {
     checkPeriod: number;
     useClones: boolean;
     deleteOnExpire: boolean;
-    enableLegacyCallbacks: boolean;
 }
 export interface CacheMetrics {
     totalHits: number;

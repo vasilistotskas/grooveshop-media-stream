@@ -394,4 +394,80 @@ describe('metricsService', () => {
 			expect(typeof metrics).toBe('string')
 		})
 	})
+
+	describe('error Handling', () => {
+		it('should handle errors gracefully when recording errors', () => {
+			expect(() => {
+				service.recordError('test_operation', 'test_error')
+			}).not.toThrow()
+		})
+	})
+
+	describe('metric Formatting', () => {
+		it('should format metrics correctly', async () => {
+			service.recordHttpRequest('GET', '/test', 200, 150)
+			service.updateMemoryMetrics({
+				rss: 100 * 1024 * 1024,
+				heapTotal: 50 * 1024 * 1024,
+				heapUsed: 30 * 1024 * 1024,
+				external: 10 * 1024 * 1024,
+			})
+
+			const metrics = await service.getMetrics()
+
+			// Check that metrics are properly formatted
+			expect(metrics).toMatch(/^# HELP/)
+			expect(metrics).toMatch(/^# TYPE/m)
+			expect(metrics).toMatch(/mediastream_http_requests_total\{method="GET",route="\/test",status_code="200"\} \d+/)
+		})
+
+		it('should handle special characters in metric labels', async () => {
+			service.recordHttpRequest('POST', '/test-endpoint', 404, 200)
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('route="/test-endpoint"')
+		})
+	})
+
+	describe('response Time Tracking', () => {
+		it('should track response times correctly', async () => {
+			service.recordHttpRequest('GET', '/fast', 200, 50)
+			service.recordHttpRequest('GET', '/slow', 200, 500)
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_http_request_duration_seconds')
+		})
+
+		it('should track cache performance', async () => {
+			service.recordCacheOperation('get', 'memory', 'hit', 10)
+			service.recordCacheOperation('set', 'redis', 'miss', 25)
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_cache_operations_total')
+			expect(metrics).toContain('operation="get"')
+			expect(metrics).toContain('status="hit"')
+		})
+	})
+
+	describe('system Resource Tracking', () => {
+		it('should track system resources over time', async () => {
+			// Simulate multiple metric updates
+			service.updateCpuUsage(10, 5)
+			service.updateCpuUsage(20, 8)
+			service.updateCpuUsage(15, 6)
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_cpu_usage_percent')
+		})
+
+		it('should handle edge cases in resource metrics', async () => {
+			// Test with zero values
+			service.updateCpuUsage(0, 0)
+			service.updateLoadAverage(0, 0, 0)
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_cpu_usage_percent')
+			expect(metrics).toContain('mediastream_load_average')
+		})
+	})
 })

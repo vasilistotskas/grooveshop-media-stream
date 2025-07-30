@@ -4,7 +4,6 @@ export declare class MemoryCacheConfigDto {
     checkPeriod: number;
     useClones: boolean;
     deleteOnExpire: boolean;
-    enableLegacyCallbacks: boolean;
 }
 export declare class RedisConfigDto {
     host: string;

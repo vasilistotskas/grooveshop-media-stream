@@ -36,7 +36,6 @@ export interface CacheConfig {
 	checkPeriod: number // Check period for expired keys in seconds
 	useClones: boolean // Whether to clone objects
 	deleteOnExpire: boolean // Whether to delete expired keys automatically
-	enableLegacyCallbacks: boolean // Enable legacy callback support
 }
 
 export interface CacheMetrics {

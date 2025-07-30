@@ -19,7 +19,6 @@ class MemoryCacheConfigDto {
         this.checkPeriod = 600;
         this.useClones = false;
         this.deleteOnExpire = true;
-        this.enableLegacyCallbacks = false;
     }
 }
 exports.MemoryCacheConfigDto = MemoryCacheConfigDto;
@@ -51,11 +50,6 @@ __decorate([
     (0, class_transformer_1.Transform)(({ value }) => value === 'true' || value === true),
     __metadata("design:type", Boolean)
 ], MemoryCacheConfigDto.prototype, "deleteOnExpire", void 0);
-__decorate([
-    (0, class_validator_1.IsBoolean)(),
-    (0, class_transformer_1.Transform)(({ value }) => value === 'true' || value === true || false),
-    __metadata("design:type", Boolean)
-], MemoryCacheConfigDto.prototype, "enableLegacyCallbacks", void 0);
 class RedisConfigDto {
     constructor() {
         this.host = 'localhost';

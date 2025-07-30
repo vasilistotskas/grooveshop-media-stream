@@ -24,10 +24,6 @@ export class MemoryCacheConfigDto {
 	@IsBoolean()
 	@Transform(({ value }) => value === 'true' || value === true)
 	deleteOnExpire: boolean = true
-
-	@IsBoolean()
-	@Transform(({ value }) => value === 'true' || value === true || false)
-	enableLegacyCallbacks: boolean = false
 }
 
 export class RedisConfigDto {
