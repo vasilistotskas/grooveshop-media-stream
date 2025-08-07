@@ -75,9 +75,21 @@ describe('rate Limiting Integration', () => {
 		})
 
 		await app.init()
+
+		// Clear any existing rate limit data before each test
+		const rateLimitServicePrivate = rateLimitService as any
+		if (rateLimitServicePrivate.requestCounts) {
+			rateLimitServicePrivate.requestCounts.clear()
+		}
 	})
 
 	afterEach(async () => {
+		// Clear rate limit data after each test
+		const rateLimitServicePrivate = rateLimitService as any
+		if (rateLimitServicePrivate.requestCounts) {
+			rateLimitServicePrivate.requestCounts.clear()
+		}
+		
 		await app.close()
 		jest.clearAllMocks()
 	})
@@ -108,6 +120,12 @@ describe('rate Limiting Integration', () => {
 		})
 
 		it('should reset rate limit after window expires', async () => {
+			// Clear any existing rate limits first
+			const rateLimitServicePrivate = rateLimitService as any
+			if (rateLimitServicePrivate.requestCounts) {
+				rateLimitServicePrivate.requestCounts.clear()
+			}
+
 			// Mock short window for testing
 			jest.spyOn(configService, 'getOptional').mockImplementation((key: string, defaultValue?: any) => {
 				if (key === 'rateLimit.default.windowMs')
@@ -134,6 +152,12 @@ describe('rate Limiting Integration', () => {
 
 	describe('request Type Specific Limits', () => {
 		it('should apply different limits for image processing requests', async () => {
+			// Clear any existing rate limits first
+			const rateLimitServicePrivate = rateLimitService as any
+			if (rateLimitServicePrivate.requestCounts) {
+				rateLimitServicePrivate.requestCounts.clear()
+			}
+
 			// Image processing has limit of 5
 			for (let i = 0; i < 5; i++) {
 				const response = await request(app.getHttpServer())
@@ -153,6 +177,12 @@ describe('rate Limiting Integration', () => {
 		})
 
 		it('should track different request types independently', async () => {
+			// Clear any existing rate limits first
+			const rateLimitServicePrivate = rateLimitService as any
+			if (rateLimitServicePrivate.requestCounts) {
+				rateLimitServicePrivate.requestCounts.clear()
+			}
+
 			// Use up image processing limit
 			for (let i = 0; i < 5; i++) {
 				await request(app.getHttpServer())

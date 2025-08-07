@@ -227,14 +227,27 @@ describe('redisHealthIndicator', () => {
 		})
 
 		it('should generate warnings for performance issues', async () => {
-			const testValue = { timestamp: Date.now(), test: true }
+			let capturedValue: any = null
+			let deleteWasCalled = false
 
 			redisCacheService.ping.mockResolvedValue('PONG')
-			redisCacheService.set.mockResolvedValue(undefined)
-			redisCacheService.get.mockResolvedValue(testValue)
+			redisCacheService.set.mockImplementation(async (key, value) => {
+				capturedValue = value
+				return undefined
+			})
+			redisCacheService.get.mockImplementation(async (key) => {
+				if (key === 'health-check-redis-test' && !deleteWasCalled) {
+					return capturedValue
+				}
+				return null
+			})
 			redisCacheService.getTtl.mockResolvedValue(59)
-			redisCacheService.delete.mockResolvedValue(undefined)
-			redisCacheService.get.mockResolvedValueOnce(testValue).mockResolvedValueOnce(null)
+			redisCacheService.delete.mockImplementation(async (key) => {
+				if (key === 'health-check-redis-test') {
+					deleteWasCalled = true
+				}
+				return undefined
+			})
 			redisCacheService.getStats.mockResolvedValue({
 				hits: 5,
 				misses: 10,
