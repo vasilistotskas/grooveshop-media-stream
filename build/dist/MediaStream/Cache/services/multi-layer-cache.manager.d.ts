@@ -13,7 +13,7 @@ export interface MultiLayerCacheStats {
     layerHitDistribution: Record<string, number>;
 }
 export declare class MultiLayerCacheManager implements OnModuleInit {
-    private readonly configService;
+    private readonly _configService;
     private readonly metricsService;
     private readonly memoryCacheLayer;
     private readonly redisCacheLayer;
@@ -22,7 +22,7 @@ export declare class MultiLayerCacheManager implements OnModuleInit {
     private keyStrategy;
     private preloadingEnabled;
     private popularKeys;
-    constructor(configService: ConfigService, metricsService: MetricsService, memoryCacheLayer: MemoryCacheLayer, redisCacheLayer: RedisCacheLayer, fileCacheLayer: FileCacheLayer);
+    constructor(_configService: ConfigService, metricsService: MetricsService, memoryCacheLayer: MemoryCacheLayer, redisCacheLayer: RedisCacheLayer, fileCacheLayer: FileCacheLayer);
     onModuleInit(): Promise<void>;
     get<T>(namespace: string, identifier: string, params?: Record<string, any>): Promise<T | null>;
     set<T>(namespace: string, identifier: string, value: T, ttl?: number, params?: Record<string, any>): Promise<void>;

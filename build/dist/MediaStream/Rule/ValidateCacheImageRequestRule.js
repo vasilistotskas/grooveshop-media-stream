@@ -17,7 +17,6 @@ const common_1 = require("@nestjs/common");
 let ValidateCacheImageRequestRule = class ValidateCacheImageRequestRule {
     constructor(validateCacheImageRequestResizeTargetRule) {
         this.validateCacheImageRequestResizeTargetRule = validateCacheImageRequestResizeTargetRule;
-        this.request = null;
     }
     async setup(request) {
         this.request = request;

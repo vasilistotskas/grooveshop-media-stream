@@ -9,8 +9,8 @@ export interface MemoryInfo {
     heapUsagePercentage: number;
 }
 export declare class MemoryHealthIndicator extends BaseHealthIndicator {
-    private readonly warningThreshold;
-    private readonly criticalThreshold;
+    private readonly _warningThreshold;
+    private readonly _criticalThreshold;
     private readonly heapWarningThreshold;
     private readonly heapCriticalThreshold;
     constructor();

@@ -19,7 +19,7 @@ let AdaptiveRateLimitGuard = AdaptiveRateLimitGuard_1 = class AdaptiveRateLimitG
     constructor(rateLimitService, rateLimitMetricsService) {
         this.rateLimitService = rateLimitService;
         this.rateLimitMetricsService = rateLimitMetricsService;
-        this.logger = new common_1.Logger(AdaptiveRateLimitGuard_1.name);
+        this._logger = new common_1.Logger(AdaptiveRateLimitGuard_1.name);
     }
     async canActivate(context) {
         const request = context.switchToHttp().getRequest();
@@ -40,7 +40,7 @@ let AdaptiveRateLimitGuard = AdaptiveRateLimitGuard_1 = class AdaptiveRateLimitG
             this.rateLimitMetricsService.recordRateLimitAttempt(requestType, clientIp, allowed);
             this.addRateLimitHeaders(response, info);
             if (!allowed) {
-                this.logger.warn(`Rate limit exceeded for ${clientIp} on ${requestType}`, {
+                this._logger.warn(`Rate limit exceeded for ${clientIp} on ${requestType}`, {
                     clientIp,
                     requestType,
                     current: info.current,
@@ -49,7 +49,7 @@ let AdaptiveRateLimitGuard = AdaptiveRateLimitGuard_1 = class AdaptiveRateLimitG
                 });
                 throw new throttler_1.ThrottlerException('Rate limit exceeded');
             }
-            this.logger.debug(`Rate limit check passed for ${clientIp} on ${requestType}`, {
+            this._logger.debug(`Rate limit check passed for ${clientIp} on ${requestType}`, {
                 clientIp,
                 requestType,
                 current: info.current,
@@ -62,7 +62,7 @@ let AdaptiveRateLimitGuard = AdaptiveRateLimitGuard_1 = class AdaptiveRateLimitG
             if (error instanceof throttler_1.ThrottlerException) {
                 throw error;
             }
-            this.logger.error('Error in rate limit guard:', error);
+            this._logger.error('Error in rate limit guard:', error);
             return true;
         }
     }

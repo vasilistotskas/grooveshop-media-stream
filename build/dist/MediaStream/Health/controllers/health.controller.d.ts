@@ -20,8 +20,8 @@ export declare class HealthController {
     private readonly systemHealthIndicator;
     private readonly jobQueueHealthIndicator;
     private readonly storageHealthIndicator;
-    private readonly configService;
-    constructor(health: HealthCheckService, diskSpaceIndicator: DiskSpaceHealthIndicator, memoryIndicator: MemoryHealthIndicator, httpHealthIndicator: HttpHealthIndicator, cacheHealthIndicator: CacheHealthIndicator, redisHealthIndicator: RedisHealthIndicator, alertingHealthIndicator: AlertingHealthIndicator, systemHealthIndicator: SystemHealthIndicator, jobQueueHealthIndicator: JobQueueHealthIndicator, storageHealthIndicator: StorageHealthIndicator, configService: ConfigService);
+    private readonly _configService;
+    constructor(health: HealthCheckService, diskSpaceIndicator: DiskSpaceHealthIndicator, memoryIndicator: MemoryHealthIndicator, httpHealthIndicator: HttpHealthIndicator, cacheHealthIndicator: CacheHealthIndicator, redisHealthIndicator: RedisHealthIndicator, alertingHealthIndicator: AlertingHealthIndicator, systemHealthIndicator: SystemHealthIndicator, jobQueueHealthIndicator: JobQueueHealthIndicator, storageHealthIndicator: StorageHealthIndicator, _configService: ConfigService);
     check(): Promise<HealthCheckResult>;
     getDetailedHealth(): Promise<{
         status: HealthCheckStatus;

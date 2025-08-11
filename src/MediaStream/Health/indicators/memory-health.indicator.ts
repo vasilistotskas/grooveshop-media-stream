@@ -16,8 +16,8 @@ export interface MemoryInfo {
 
 @Injectable()
 export class MemoryHealthIndicator extends BaseHealthIndicator {
-	private readonly warningThreshold: number
-	private readonly criticalThreshold: number
+	private readonly _warningThreshold: number
+	private readonly _criticalThreshold: number
 	private readonly heapWarningThreshold: number
 	private readonly heapCriticalThreshold: number
 
@@ -29,8 +29,8 @@ export class MemoryHealthIndicator extends BaseHealthIndicator {
 
 		super('memory', options)
 
-		this.warningThreshold = 0.85 // 85% system memory warning
-		this.criticalThreshold = 0.95 // 95% system memory critical
+		this._warningThreshold = 0.85 // 85% system memory warning
+		this._criticalThreshold = 0.95 // 95% system memory critical
 		this.heapWarningThreshold = 0.90 // 90% heap warning (more lenient for Node.js)
 		this.heapCriticalThreshold = 0.98 // 98% heap critical (very high threshold)
 	}
@@ -40,7 +40,7 @@ export class MemoryHealthIndicator extends BaseHealthIndicator {
 			const memoryInfo = this.getMemoryInfo()
 
 			// Check system memory
-			if (memoryInfo.memoryUsagePercentage >= this.criticalThreshold) {
+			if (memoryInfo.memoryUsagePercentage >= this._criticalThreshold) {
 				return this.createUnhealthyResult(
 					`System memory critically high: ${(memoryInfo.memoryUsagePercentage * 100).toFixed(1)}% used`,
 					memoryInfo,
@@ -57,7 +57,7 @@ export class MemoryHealthIndicator extends BaseHealthIndicator {
 
 			// Determine warning status for details
 			let detailStatus = 'healthy'
-			if (memoryInfo.memoryUsagePercentage >= this.warningThreshold
+			if (memoryInfo.memoryUsagePercentage >= this._warningThreshold
 				|| memoryInfo.heapUsagePercentage >= this.heapWarningThreshold) {
 				detailStatus = 'warning'
 			}
@@ -66,8 +66,8 @@ export class MemoryHealthIndicator extends BaseHealthIndicator {
 				...memoryInfo,
 				detailStatus,
 				thresholds: {
-					systemMemoryWarning: this.warningThreshold,
-					systemMemoryCritical: this.criticalThreshold,
+					systemMemoryWarning: this._warningThreshold,
+					systemMemoryCritical: this._criticalThreshold,
 					heapMemoryWarning: this.heapWarningThreshold,
 					heapMemoryCritical: this.heapCriticalThreshold,
 				},

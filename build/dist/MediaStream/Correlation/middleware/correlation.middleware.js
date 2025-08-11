@@ -48,11 +48,11 @@ const common_1 = require("@nestjs/common");
 const correlation_service_1 = require("../services/correlation.service");
 exports.CORRELATION_ID_HEADER = 'x-correlation-id';
 let CorrelationMiddleware = class CorrelationMiddleware {
-    constructor(correlationService) {
-        this.correlationService = correlationService;
+    constructor(_correlationService) {
+        this._correlationService = _correlationService;
     }
     use(req, res, next) {
-        const correlationId = req.headers[exports.CORRELATION_ID_HEADER] || this.correlationService.generateCorrelationId();
+        const correlationId = req.headers[exports.CORRELATION_ID_HEADER] || this._correlationService.generateCorrelationId();
         const context = {
             correlationId,
             timestamp: Date.now(),
@@ -63,7 +63,7 @@ let CorrelationMiddleware = class CorrelationMiddleware {
             startTime: process.hrtime.bigint(),
         };
         res.setHeader(exports.CORRELATION_ID_HEADER, correlationId);
-        this.correlationService.runWithContext(context, () => {
+        this._correlationService.runWithContext(context, () => {
             next();
         });
     }

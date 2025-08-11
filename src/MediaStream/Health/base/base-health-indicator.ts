@@ -41,22 +41,22 @@ export abstract class BaseHealthIndicator implements IHealthIndicator {
 			this.logger.debug(`Health check passed for ${this.key} in ${responseTime}ms`)
 			return result
 		}
-		catch (error) {
+		catch (error: unknown) {
 			const responseTime = Date.now() - startTime
 
 			this.lastCheck = {
 				timestamp: Date.now(),
 				status: 'unhealthy',
 				responseTime,
-				details: { error: error instanceof Error ? error.message : 'Unknown error' },
+				details: { error: error instanceof Error ? (error as Error).message : 'Unknown error' },
 			}
 
-			this.logger.warn(`Health check failed for ${this.key}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+			this.logger.warn(`Health check failed for ${this.key}: ${error instanceof Error ? (error as Error).message : 'Unknown error'}`)
 
 			return {
 				[this.key]: {
 					status: 'down',
-					message: error instanceof Error ? error.message : 'Health check failed',
+					message: error instanceof Error ? (error as Error).message : 'Health check failed',
 					timestamp: new Date().toISOString(),
 					responseTime,
 				},

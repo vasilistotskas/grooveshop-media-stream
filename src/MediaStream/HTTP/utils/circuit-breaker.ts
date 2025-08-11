@@ -49,10 +49,10 @@ export class CircuitBreaker {
 			this.recordSuccess()
 			return result
 		}
-		catch (error) {
+		catch (error: unknown) {
 			this.recordFailure()
 			if (fallback) {
-				CorrelatedLogger.warn(`Request failed, using fallback: ${error.message}`, 'CircuitBreaker')
+				CorrelatedLogger.warn(`Request failed, using fallback: ${(error as Error).message}`, 'CircuitBreaker')
 				return fallback()
 			}
 			throw error

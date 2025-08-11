@@ -26,16 +26,16 @@ interface FileAccessInfo {
 
 @Injectable()
 export class CacheWarmingService implements OnModuleInit {
-	private readonly logger = new Logger(CacheWarmingService.name)
+	private readonly _logger = new Logger(CacheWarmingService.name)
 	private readonly config: CacheWarmingConfig
 	private readonly storagePath: string
 
 	constructor(
 		private readonly memoryCacheService: MemoryCacheService,
-		private readonly configService: ConfigService,
+		private readonly _configService: ConfigService,
 		private readonly metricsService: MetricsService,
 	) {
-		this.config = this.configService.get('cache.warming') || {
+		this.config = this._configService.get('cache.warming') || {
 			enabled: true,
 			warmupOnStart: true,
 			maxFilesToWarm: 50,
@@ -82,8 +82,8 @@ export class CacheWarmingService implements OnModuleInit {
 					await this.warmupFile(fileInfo)
 					warmedCount++
 				}
-				catch (error) {
-					CorrelatedLogger.warn(`Failed to warm up file ${fileInfo.path}: ${error.message}`, CacheWarmingService.name)
+				catch (error: unknown) {
+					CorrelatedLogger.warn(`Failed to warm up file ${fileInfo.path}: ${(error as Error).message}`, CacheWarmingService.name)
 				}
 			}
 
@@ -93,8 +93,8 @@ export class CacheWarmingService implements OnModuleInit {
 			// Record metrics
 			this.metricsService.recordCacheOperation('warmup', 'memory', 'success')
 		}
-		catch (error) {
-			CorrelatedLogger.error(`Cache warmup failed: ${error.message}`, error.stack, CacheWarmingService.name)
+		catch (error: unknown) {
+			CorrelatedLogger.error(`Cache warmup failed: ${(error as Error).message}`, (error as Error).stack, CacheWarmingService.name)
 			this.metricsService.recordCacheOperation('warmup', 'memory', 'error')
 		}
 	}
@@ -134,8 +134,8 @@ export class CacheWarmingService implements OnModuleInit {
 							size: fileStat.size,
 						})
 					}
-					catch (error) {
-						CorrelatedLogger.debug(`Skipping file ${entry}: ${error.message}`, CacheWarmingService.name)
+					catch (error: unknown) {
+						CorrelatedLogger.debug(`Skipping file ${entry}: ${(error as Error).message}`, CacheWarmingService.name)
 					}
 				}
 			}
@@ -143,15 +143,15 @@ export class CacheWarmingService implements OnModuleInit {
 			// Sort by access count (descending) and last accessed (recent first)
 			return files
 				.filter(f => f.accessCount >= this.config.popularImageThreshold)
-				.sort((a, b) => {
+				.sort((a: any, b: any) => {
 					if (a.accessCount !== b.accessCount) {
 						return b.accessCount - a.accessCount
 					}
 					return b.lastAccessed.getTime() - a.lastAccessed.getTime()
 				})
 		}
-		catch (error) {
-			CorrelatedLogger.error(`Failed to get popular files: ${error.message}`, error.stack, CacheWarmingService.name)
+		catch (error: unknown) {
+			CorrelatedLogger.error(`Failed to get popular files: ${(error as Error).message}`, (error as Error).stack, CacheWarmingService.name)
 			return []
 		}
 	}
@@ -179,8 +179,8 @@ export class CacheWarmingService implements OnModuleInit {
 
 			CorrelatedLogger.debug(`Warmed up file: ${fileInfo.path} (TTL: ${ttl}s)`, CacheWarmingService.name)
 		}
-		catch (error) {
-			CorrelatedLogger.warn(`Failed to warm up file ${fileInfo.path}: ${error.message}`, CacheWarmingService.name)
+		catch (error: unknown) {
+			CorrelatedLogger.warn(`Failed to warm up file ${fileInfo.path}: ${(error as Error).message}`, CacheWarmingService.name)
 			throw error
 		}
 	}
@@ -197,8 +197,8 @@ export class CacheWarmingService implements OnModuleInit {
 			await this.memoryCacheService.set(cacheKey, content, ttl)
 			CorrelatedLogger.debug(`Manually warmed up resource: ${resourceId}`, CacheWarmingService.name)
 		}
-		catch (error) {
-			CorrelatedLogger.error(`Failed to manually warm up resource ${resourceId}: ${error.message}`, error.stack, CacheWarmingService.name)
+		catch (error: unknown) {
+			CorrelatedLogger.error(`Failed to manually warm up resource ${resourceId}: ${(error as Error).message}`, (error as Error).stack, CacheWarmingService.name)
 			throw error
 		}
 	}

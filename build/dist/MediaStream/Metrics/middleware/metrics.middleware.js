@@ -17,7 +17,7 @@ const metrics_service_1 = require("../services/metrics.service");
 let MetricsMiddleware = MetricsMiddleware_1 = class MetricsMiddleware {
     constructor(metricsService) {
         this.metricsService = metricsService;
-        this.logger = new common_1.Logger(MetricsMiddleware_1.name);
+        this._logger = new common_1.Logger(MetricsMiddleware_1.name);
     }
     use(req, res, next) {
         const startTime = Date.now();
@@ -37,15 +37,15 @@ let MetricsMiddleware = MetricsMiddleware_1 = class MetricsMiddleware {
                 const route = this.getRoute(req);
                 this.metricsService.recordHttpRequest(req.method, route, res.statusCode, duration, requestSize, responseSize);
                 this.metricsService.decrementRequestsInFlight();
-                this.logger.debug(`HTTP ${req.method} ${route} ${res.statusCode} - ${duration}s`);
+                this._logger.debug(`HTTP ${req.method} ${route} ${res.statusCode} - ${duration}s`);
             }
             catch (error) {
-                this.logger.error('Failed to record HTTP metrics:', error);
+                this._logger.error('Failed to record HTTP metrics:', error);
                 this.metricsService.recordError('metrics_middleware', 'http_tracking');
             }
         });
         res.on('error', (error) => {
-            this.logger.error('HTTP request error:', error);
+            this._logger.error('HTTP request error:', error);
             this.metricsService.recordError('http_request', 'response_error');
             this.metricsService.decrementRequestsInFlight();
         });

@@ -2,8 +2,8 @@ import { ConfigService } from '@microservice/Config/config.service';
 import { OnModuleInit } from '@nestjs/common';
 import * as promClient from 'prom-client';
 export declare class MetricsService implements OnModuleInit {
-    private readonly configService;
-    private readonly logger;
+    private readonly _configService;
+    private readonly _logger;
     private readonly register;
     private readonly httpRequestsTotal;
     private readonly httpRequestDuration;
@@ -32,7 +32,7 @@ export declare class MetricsService implements OnModuleInit {
     private readonly eventLoopLag;
     private startTime;
     private requestsInFlightCount;
-    constructor(configService: ConfigService);
+    constructor(_configService: ConfigService);
     onModuleInit(): Promise<void>;
     getMetrics(): Promise<string>;
     getRegistry(): promClient.Registry;

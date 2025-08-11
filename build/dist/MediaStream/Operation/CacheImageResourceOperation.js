@@ -69,8 +69,8 @@ const axios_1 = require("@nestjs/axios");
 const common_1 = require("@nestjs/common");
 const UnableToFetchResourceException_1 = __importDefault(require("../API/Exception/UnableToFetchResourceException"));
 let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheImageResourceOperation {
-    constructor(httpService, validateCacheImageRequest, fetchResourceResponseJob, webpImageManipulationJob, storeResourceResponseToFileJob, generateResourceIdentityFromRequestJob, cacheManager, inputSanitizationService, jobQueueManager, metricsService) {
-        this.httpService = httpService;
+    constructor(_httpService, validateCacheImageRequest, fetchResourceResponseJob, webpImageManipulationJob, storeResourceResponseToFileJob, generateResourceIdentityFromRequestJob, cacheManager, inputSanitizationService, jobQueueManager, metricsService) {
+        this._httpService = _httpService;
         this.validateCacheImageRequest = validateCacheImageRequest;
         this.fetchResourceResponseJob = fetchResourceResponseJob;
         this.webpImageManipulationJob = webpImageManipulationJob;
@@ -80,7 +80,7 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
         this.inputSanitizationService = inputSanitizationService;
         this.jobQueueManager = jobQueueManager;
         this.metricsService = metricsService;
-        this.logger = new common_1.Logger(CacheImageResourceOperation_1.name);
+        this._logger = new common_1.Logger(CacheImageResourceOperation_1.name);
         this.basePath = (0, node_process_1.cwd)();
     }
     get getResourcePath() {

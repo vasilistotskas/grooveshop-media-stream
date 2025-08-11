@@ -30,15 +30,15 @@ export interface FileOptimization {
     strategy: string;
 }
 export declare class StorageOptimizationService implements OnModuleInit {
-    private readonly configService;
+    private readonly _configService;
     private readonly storageMonitoring;
-    private readonly logger;
+    private readonly _logger;
     private readonly storageDirectory;
     private readonly config;
     private readonly strategies;
     private optimizationHistory;
     private isOptimizationRunning;
-    constructor(configService: ConfigService, storageMonitoring: StorageMonitoringService);
+    constructor(_configService: ConfigService, storageMonitoring: StorageMonitoringService);
     onModuleInit(): Promise<void>;
     optimizeFrequentlyAccessedFiles(): Promise<OptimizationResult>;
     scheduledOptimization(): Promise<void>;

@@ -20,10 +20,10 @@ const metrics_service_1 = require("../../Metrics/services/metrics.service");
 const common_1 = require("@nestjs/common");
 const ioredis_1 = __importDefault(require("ioredis"));
 let RedisCacheService = RedisCacheService_1 = class RedisCacheService {
-    constructor(configService, metricsService) {
-        this.configService = configService;
+    constructor(_configService, metricsService) {
+        this._configService = _configService;
         this.metricsService = metricsService;
-        this.logger = new common_1.Logger(RedisCacheService_1.name);
+        this._logger = new common_1.Logger(RedisCacheService_1.name);
         this.isConnected = false;
         this.stats = {
             hits: 0,
@@ -43,7 +43,7 @@ let RedisCacheService = RedisCacheService_1 = class RedisCacheService {
     }
     async initializeRedis() {
         try {
-            const config = this.configService.get('cache.redis');
+            const config = this._configService.get('cache.redis');
             this.redis = new ioredis_1.default({
                 host: config.host,
                 port: config.port,
@@ -123,7 +123,7 @@ let RedisCacheService = RedisCacheService_1 = class RedisCacheService {
         try {
             this.stats.operations++;
             const serializedValue = JSON.stringify(value);
-            const defaultTtl = this.configService.get('cache.redis.ttl');
+            const defaultTtl = this._configService.get('cache.redis.ttl');
             const effectiveTtl = ttl !== undefined ? ttl : defaultTtl;
             if (effectiveTtl > 0) {
                 await this.redis.setex(key, effectiveTtl, serializedValue);
@@ -165,7 +165,7 @@ let RedisCacheService = RedisCacheService_1 = class RedisCacheService {
         }
         try {
             this.stats.operations++;
-            const db = this.configService.get('cache.redis.db');
+            const db = this._configService.get('cache.redis.db');
             await this.redis.flushdb();
             this.metricsService.recordCacheOperation('clear', 'redis', 'success');
             logger_util_1.CorrelatedLogger.debug(`Redis cache CLEARED (DB: ${db})`, RedisCacheService_1.name);

@@ -3,14 +3,14 @@ import { CorrelationService } from '../../Correlation/services/correlation.servi
 import { PerformanceMetrics } from '../interfaces/monitoring.interface';
 import { MonitoringService } from './monitoring.service';
 export declare class PerformanceMonitoringService {
-    private readonly configService;
-    private readonly correlationService;
+    private readonly _configService;
+    private readonly _correlationService;
     private readonly monitoringService;
-    private readonly logger;
+    private readonly _logger;
     private readonly performanceData;
     private readonly config;
     private readonly activeOperations;
-    constructor(configService: ConfigService, correlationService: CorrelationService, monitoringService: MonitoringService);
+    constructor(_configService: ConfigService, _correlationService: CorrelationService, monitoringService: MonitoringService);
     startOperation(operationName: string, metadata?: any): string;
     endOperation(operationId: string, success?: boolean, errorMessage?: string): void;
     trackOperation<T>(operationName: string, operation: () => T, metadata?: any): T;

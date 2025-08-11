@@ -4,10 +4,10 @@ import { HealthIndicatorResult } from '@nestjs/terminus';
 import { HttpClientService } from '../services/http-client.service';
 export declare class HttpHealthIndicator extends BaseHealthIndicator {
     private readonly httpClient;
-    private readonly configService;
+    private readonly _configService;
     private readonly healthCheckUrls;
     private readonly timeout;
-    constructor(httpClient: HttpClientService, configService: ConfigService);
+    constructor(httpClient: HttpClientService, _configService: ConfigService);
     protected performHealthCheck(): Promise<HealthIndicatorResult>;
     protected getDescription(): string;
 }

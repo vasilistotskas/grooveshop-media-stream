@@ -4,7 +4,7 @@ import { IJobQueue, Job, JobOptions, JobProcessor, JobStatus, QueueStats } from 
 export declare class BullQueueService implements IJobQueue, OnModuleDestroy {
     private readonly imageQueue;
     private readonly cacheQueue;
-    private readonly logger;
+    private readonly _logger;
     private readonly processors;
     constructor(imageQueue: Queue, cacheQueue: Queue);
     add<T = any>(name: string, data: T, options?: JobOptions): Promise<Job<T>>;

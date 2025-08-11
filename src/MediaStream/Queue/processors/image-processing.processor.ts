@@ -9,10 +9,10 @@ import { ImageProcessingJobData, JobResult } from '../types/job.types'
 
 @Injectable()
 export class ImageProcessingProcessor {
-	private readonly logger = new Logger(ImageProcessingProcessor.name)
+	private readonly _logger = new Logger(ImageProcessingProcessor.name)
 
 	constructor(
-		private readonly correlationService: CorrelationService,
+		private readonly _correlationService: CorrelationService,
 		private readonly httpClient: HttpClientService,
 		private readonly cacheManager: MultiLayerCacheManager,
 	) {}
@@ -25,12 +25,12 @@ export class ImageProcessingProcessor {
 			// Note: Correlation ID is already set in the job data
 			// The correlation service doesn't have a setCorrelationId method
 
-			this.logger.debug(`Processing image job ${job.id} for URL: ${imageUrl}`)
+			this._logger.debug(`Processing image job ${job.id} for URL: ${imageUrl}`)
 
 			// Check if already cached
 			const cached = await this.cacheManager.get('images', cacheKey)
 			if (cached) {
-				this.logger.debug(`Image already cached for job ${job.id}`)
+				this._logger.debug(`Image already cached for job ${job.id}`)
 				return {
 					success: true,
 					data: cached,
@@ -66,7 +66,7 @@ export class ImageProcessingProcessor {
 			await this.updateProgress(job, 100, 'Completed')
 
 			const processingTime = Date.now() - startTime
-			this.logger.debug(`Image processing completed for job ${job.id} in ${processingTime}ms`)
+			this._logger.debug(`Image processing completed for job ${job.id} in ${processingTime}ms`)
 
 			return {
 				success: true,
@@ -75,13 +75,13 @@ export class ImageProcessingProcessor {
 				cacheHit: false,
 			}
 		}
-		catch (error) {
+		catch (error: unknown) {
 			const processingTime = Date.now() - startTime
-			this.logger.error(`Image processing failed for job ${job.id}:`, error)
+			this._logger.error(`Image processing failed for job ${job.id}:`, error)
 
 			return {
 				success: false,
-				error: error.message,
+				error: (error as Error).message,
 				processingTime,
 				cacheHit: false,
 			}
@@ -97,9 +97,9 @@ export class ImageProcessingProcessor {
 
 			return Buffer.from(response.data)
 		}
-		catch (error) {
-			this.logger.error(`Failed to download image from ${url}:`, error)
-			throw new Error(`Failed to download image: ${error.message}`)
+		catch (error: unknown) {
+			this._logger.error(`Failed to download image from ${url}:`, error)
+			throw new Error(`Failed to download image: ${(error as Error).message}`)
 		}
 	}
 
@@ -141,9 +141,9 @@ export class ImageProcessingProcessor {
 
 			return await pipeline.toBuffer()
 		}
-		catch (error) {
-			this.logger.error('Failed to process image:', error)
-			throw new Error(`Image processing failed: ${error.message}`)
+		catch (error: unknown) {
+			this._logger.error('Failed to process image:', error)
+			throw new Error(`Image processing failed: ${(error as Error).message}`)
 		}
 	}
 
@@ -151,10 +151,10 @@ export class ImageProcessingProcessor {
 		try {
 			// Note: This would need to be implemented based on the actual Bull job instance
 			// For now, we'll just log the progress
-			this.logger.debug(`Job ${job.id} progress: ${progress}% - ${message}`)
+			this._logger.debug(`Job ${job.id} progress: ${progress}% - ${message}`)
 		}
-		catch (error) {
-			this.logger.warn(`Failed to update job progress: ${error.message}`)
+		catch (error: unknown) {
+			this._logger.warn(`Failed to update job progress: ${(error as Error).message}`)
 		}
 	}
 }

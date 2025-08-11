@@ -48,9 +48,9 @@ const config_service_1 = require("../../Config/config.service");
 const common_1 = require("@nestjs/common");
 const promClient = __importStar(require("prom-client"));
 let RateLimitMetricsService = RateLimitMetricsService_1 = class RateLimitMetricsService {
-    constructor(configService) {
-        this.configService = configService;
-        this.logger = new common_1.Logger(RateLimitMetricsService_1.name);
+    constructor(_configService) {
+        this._configService = _configService;
+        this._logger = new common_1.Logger(RateLimitMetricsService_1.name);
         this.register = new promClient.Registry();
         this.rateLimitAttemptsTotal = new promClient.Counter({
             name: 'mediastream_rate_limit_attempts_total',
@@ -84,8 +84,8 @@ let RateLimitMetricsService = RateLimitMetricsService_1 = class RateLimitMetrics
         });
     }
     async onModuleInit() {
-        if (this.configService.get('monitoring.enabled')) {
-            this.logger.log('Rate limit metrics service initialized');
+        if (this._configService.get('monitoring.enabled')) {
+            this._logger.log('Rate limit metrics service initialized');
         }
     }
     recordRateLimitAttempt(requestType, clientIp, allowed) {
@@ -131,16 +131,16 @@ let RateLimitMetricsService = RateLimitMetricsService_1 = class RateLimitMetrics
             };
         }
         catch (error) {
-            this.logger.error('Failed to get rate limit stats:', error);
+            this._logger.error('Failed to get rate limit stats:', error);
             throw error;
         }
     }
     getCurrentRateLimitConfig() {
         return {
-            defaultLimit: this.configService.getOptional('rateLimit.default.max', 100),
-            imageProcessingLimit: this.configService.getOptional('rateLimit.imageProcessing.max', 50),
-            healthCheckLimit: this.configService.getOptional('rateLimit.healthCheck.max', 1000),
-            windowMs: this.configService.getOptional('rateLimit.default.windowMs', 60000),
+            defaultLimit: this._configService.getOptional('rateLimit.default.max', 100),
+            imageProcessingLimit: this._configService.getOptional('rateLimit.imageProcessing.max', 50),
+            healthCheckLimit: this._configService.getOptional('rateLimit.healthCheck.max', 1000),
+            windowMs: this._configService.getOptional('rateLimit.default.windowMs', 60000),
         };
     }
     hashIp(ip) {

@@ -17,10 +17,10 @@ const base_health_indicator_1 = require("../../Health/base/base-health-indicator
 const common_1 = require("@nestjs/common");
 const redis_cache_service_1 = require("../services/redis-cache.service");
 let RedisHealthIndicator = RedisHealthIndicator_1 = class RedisHealthIndicator extends base_health_indicator_1.BaseHealthIndicator {
-    constructor(redisCacheService, configService) {
+    constructor(redisCacheService, _configService) {
         super('redis');
         this.redisCacheService = redisCacheService;
-        this.configService = configService;
+        this._configService = _configService;
     }
     async performHealthCheck() {
         const startTime = Date.now();
@@ -56,9 +56,9 @@ let RedisHealthIndicator = RedisHealthIndicator_1 = class RedisHealthIndicator e
                     responseTime: `${responseTime}ms`,
                     connection: {
                         connected: connectionStatus.connected,
-                        host: this.configService.get('cache.redis.host'),
-                        port: this.configService.get('cache.redis.port'),
-                        db: this.configService.get('cache.redis.db'),
+                        host: this._configService.get('cache.redis.host'),
+                        port: this._configService.get('cache.redis.port'),
+                        db: this._configService.get('cache.redis.db'),
                     },
                     statistics: {
                         hits: stats.hits,
@@ -100,9 +100,9 @@ let RedisHealthIndicator = RedisHealthIndicator_1 = class RedisHealthIndicator e
                     responseTime: `${responseTime}ms`,
                     connection: {
                         connected: false,
-                        host: this.configService.get('cache.redis.host'),
-                        port: this.configService.get('cache.redis.port'),
-                        db: this.configService.get('cache.redis.db'),
+                        host: this._configService.get('cache.redis.host'),
+                        port: this._configService.get('cache.redis.port'),
+                        db: this._configService.get('cache.redis.db'),
                     },
                     lastCheck: new Date().toISOString(),
                 },
@@ -140,9 +140,9 @@ let RedisHealthIndicator = RedisHealthIndicator_1 = class RedisHealthIndicator e
                 status: connectionStatus.connected ? 'operational' : 'disconnected',
                 connection: {
                     connected: connectionStatus.connected,
-                    host: this.configService.get('cache.redis.host'),
-                    port: this.configService.get('cache.redis.port'),
-                    db: this.configService.get('cache.redis.db'),
+                    host: this._configService.get('cache.redis.host'),
+                    port: this._configService.get('cache.redis.port'),
+                    db: this._configService.get('cache.redis.db'),
                 },
                 statistics: {
                     ...stats,
@@ -155,11 +155,11 @@ let RedisHealthIndicator = RedisHealthIndicator_1 = class RedisHealthIndicator e
                     peakMB: Math.round(memoryUsage.peak / 1024 / 1024 * 100) / 100,
                 },
                 configuration: {
-                    host: this.configService.get('cache.redis.host'),
-                    port: this.configService.get('cache.redis.port'),
-                    db: this.configService.get('cache.redis.db'),
-                    ttl: this.configService.get('cache.redis.ttl'),
-                    maxRetries: this.configService.get('cache.redis.maxRetries'),
+                    host: this._configService.get('cache.redis.host'),
+                    port: this._configService.get('cache.redis.port'),
+                    db: this._configService.get('cache.redis.db'),
+                    ttl: this._configService.get('cache.redis.ttl'),
+                    maxRetries: this._configService.get('cache.redis.maxRetries'),
                 },
                 recentKeys: keys.slice(0, 10),
                 lastUpdated: new Date().toISOString(),

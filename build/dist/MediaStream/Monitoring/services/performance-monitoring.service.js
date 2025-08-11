@@ -16,14 +16,14 @@ const config_1 = require("@nestjs/config");
 const correlation_service_1 = require("../../Correlation/services/correlation.service");
 const monitoring_service_1 = require("./monitoring.service");
 let PerformanceMonitoringService = PerformanceMonitoringService_1 = class PerformanceMonitoringService {
-    constructor(configService, correlationService, monitoringService) {
-        this.configService = configService;
-        this.correlationService = correlationService;
+    constructor(_configService, _correlationService, monitoringService) {
+        this._configService = _configService;
+        this._correlationService = _correlationService;
         this.monitoringService = monitoringService;
-        this.logger = new common_1.Logger(PerformanceMonitoringService_1.name);
+        this._logger = new common_1.Logger(PerformanceMonitoringService_1.name);
         this.performanceData = new Map();
         this.activeOperations = new Map();
-        this.config = this.configService.get('monitoring', {
+        this.config = this._configService.get('monitoring', {
             enabled: true,
             metricsRetentionMs: 24 * 60 * 60 * 1000,
             alertsRetentionMs: 7 * 24 * 60 * 60 * 1000,
@@ -37,7 +37,7 @@ let PerformanceMonitoringService = PerformanceMonitoringService_1 = class Perfor
         });
         if (this.config.enabled) {
             this.startPerformanceCleanup();
-            this.logger.log('Performance monitoring service initialized');
+            this._logger.log('Performance monitoring service initialized');
         }
     }
     startOperation(operationName, metadata) {
@@ -48,8 +48,8 @@ let PerformanceMonitoringService = PerformanceMonitoringService_1 = class Perfor
             startTime: Date.now(),
             metadata,
         });
-        this.logger.debug(`Started tracking operation: ${operationName}`, {
-            correlationId: this.correlationService.getCorrelationId(),
+        this._logger.debug(`Started tracking operation: ${operationName}`, {
+            correlationId: this._correlationService.getCorrelationId(),
             operationId,
             operationName,
         });
@@ -60,7 +60,7 @@ let PerformanceMonitoringService = PerformanceMonitoringService_1 = class Perfor
             return;
         const operation = this.activeOperations.get(operationId);
         if (!operation) {
-            this.logger.warn(`Operation not found: ${operationId}`);
+            this._logger.warn(`Operation not found: ${operationId}`);
             return;
         }
         const duration = Date.now() - operation.startTime;
@@ -83,8 +83,8 @@ let PerformanceMonitoringService = PerformanceMonitoringService_1 = class Perfor
         else {
             this.monitoringService.incrementCounter(`performance.${operationName}.error`);
         }
-        this.logger.debug(`Completed operation: ${operationName}`, {
-            correlationId: this.correlationService.getCorrelationId(),
+        this._logger.debug(`Completed operation: ${operationName}`, {
+            correlationId: this._correlationService.getCorrelationId(),
             operationId,
             duration,
             success,
@@ -247,7 +247,7 @@ let PerformanceMonitoringService = PerformanceMonitoringService_1 = class Perfor
             }
         }
         if (removedCount > 0) {
-            this.logger.debug(`Cleaned up ${removedCount} old performance metrics`);
+            this._logger.debug(`Cleaned up ${removedCount} old performance metrics`);
         }
     }
 };

@@ -14,7 +14,6 @@ const common_1 = require("@nestjs/common");
 let ValidateCacheImageRequestResizeTargetRule = class ValidateCacheImageRequestResizeTargetRule {
     constructor() {
         this.allowedPixelCount = 7680 * 4320;
-        this.request = null;
     }
     async setup(request) {
         this.request = request;

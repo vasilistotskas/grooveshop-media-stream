@@ -13,11 +13,11 @@ export interface SimpleValidationResult {
 
 @Injectable()
 export class SimpleValidationService {
-	private readonly logger = new Logger(SimpleValidationService.name)
+	private readonly _logger = new Logger(SimpleValidationService.name)
 
 	constructor(
-		private readonly configService: ConfigService,
-		private readonly correlationService: CorrelationService,
+		private readonly _configService: ConfigService,
+		private readonly _correlationService: CorrelationService,
 		private readonly sanitizationService: InputSanitizationService,
 		private readonly securityChecker: SecurityCheckerService,
 	) {}
@@ -60,8 +60,8 @@ export class SimpleValidationService {
 				sanitizedInput,
 			}
 		}
-		catch (error) {
-			this.logger.error('Validation error', error)
+		catch (error: unknown) {
+			this._logger.error('Validation error', error)
 			return {
 				isValid: false,
 				errors: ['Validation service error'],
@@ -88,8 +88,8 @@ export class SimpleValidationService {
 				sanitizedInput,
 			}
 		}
-		catch (error) {
-			this.logger.error('Input validation error', error)
+		catch (error: unknown) {
+			this._logger.error('Input validation error', error)
 			return {
 				isValid: false,
 				errors: ['Input validation service error'],

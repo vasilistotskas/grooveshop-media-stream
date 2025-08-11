@@ -57,7 +57,7 @@ const storage_health_indicator_1 = require("../../Storage/indicators/storage-hea
 const common_1 = require("@nestjs/common");
 const terminus_1 = require("@nestjs/terminus");
 let HealthController = class HealthController {
-    constructor(health, diskSpaceIndicator, memoryIndicator, httpHealthIndicator, cacheHealthIndicator, redisHealthIndicator, alertingHealthIndicator, systemHealthIndicator, jobQueueHealthIndicator, storageHealthIndicator, configService) {
+    constructor(health, diskSpaceIndicator, memoryIndicator, httpHealthIndicator, cacheHealthIndicator, redisHealthIndicator, alertingHealthIndicator, systemHealthIndicator, jobQueueHealthIndicator, storageHealthIndicator, _configService) {
         this.health = health;
         this.diskSpaceIndicator = diskSpaceIndicator;
         this.memoryIndicator = memoryIndicator;
@@ -68,7 +68,7 @@ let HealthController = class HealthController {
         this.systemHealthIndicator = systemHealthIndicator;
         this.jobQueueHealthIndicator = jobQueueHealthIndicator;
         this.storageHealthIndicator = storageHealthIndicator;
-        this.configService = configService;
+        this._configService = _configService;
     }
     async check() {
         return this.health.check([
@@ -118,12 +118,12 @@ let HealthController = class HealthController {
             },
             configuration: {
                 monitoring: {
-                    enabled: this.configService.get('monitoring.enabled'),
-                    metricsPort: this.configService.get('monitoring.metricsPort'),
+                    enabled: this._configService.get('monitoring.enabled'),
+                    metricsPort: this._configService.get('monitoring.metricsPort'),
                 },
                 cache: {
-                    fileDirectory: this.configService.get('cache.file.directory'),
-                    memoryMaxSize: this.configService.get('cache.memory.maxSize'),
+                    fileDirectory: this._configService.get('cache.file.directory'),
+                    memoryMaxSize: this._configService.get('cache.memory.maxSize'),
                 },
             },
         };

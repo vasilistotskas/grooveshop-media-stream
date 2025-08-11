@@ -22,8 +22,8 @@ export class FileCacheLayer implements CacheLayer {
 		errors: 0,
 	}
 
-	constructor(private readonly configService: ConfigService) {
-		this.cacheDirectory = this.configService.get('cache.file.directory')
+	constructor(private readonly _configService: ConfigService) {
+		this.cacheDirectory = this._configService.get('cache.file.directory')
 		this.ensureCacheDirectory()
 	}
 
@@ -61,11 +61,11 @@ export class FileCacheLayer implements CacheLayer {
 			await fs.writeFile(filePath, JSON.stringify(entry), 'utf8')
 			CorrelatedLogger.debug(`File cache SET: ${key}`, FileCacheLayer.name)
 		}
-		catch (error) {
+		catch (error: unknown) {
 			this.stats.errors++
 			CorrelatedLogger.error(
-				`File cache SET failed: ${error.message}`,
-				error.stack,
+				`File cache SET failed: ${(error as Error).message}`,
+				(error as Error).stack,
 				FileCacheLayer.name,
 			)
 		}
@@ -77,12 +77,12 @@ export class FileCacheLayer implements CacheLayer {
 			await fs.unlink(filePath)
 			CorrelatedLogger.debug(`File cache DELETE: ${key}`, FileCacheLayer.name)
 		}
-		catch (error) {
-			if (error.code !== 'ENOENT') {
+		catch (error: unknown) {
+			if ((error as any).code !== 'ENOENT') {
 				this.stats.errors++
 				CorrelatedLogger.error(
-					`File cache DELETE failed: ${error.message}`,
-					error.stack,
+					`File cache DELETE failed: ${(error as Error).message}`,
+					(error as Error).stack,
 					FileCacheLayer.name,
 				)
 			}
@@ -108,11 +108,11 @@ export class FileCacheLayer implements CacheLayer {
 			)
 			CorrelatedLogger.debug('File cache CLEARED', FileCacheLayer.name)
 		}
-		catch (error) {
+		catch (error: unknown) {
 			this.stats.errors++
 			CorrelatedLogger.error(
-				`File cache CLEAR failed: ${error.message}`,
-				error.stack,
+				`File cache CLEAR failed: ${(error as Error).message}`,
+				(error as Error).stack,
 				FileCacheLayer.name,
 			)
 		}
@@ -159,10 +159,10 @@ export class FileCacheLayer implements CacheLayer {
 		try {
 			await fs.mkdir(this.cacheDirectory, { recursive: true })
 		}
-		catch (error) {
+		catch (error: unknown) {
 			CorrelatedLogger.error(
-				`Failed to create cache directory: ${error.message}`,
-				error.stack,
+				`Failed to create cache directory: ${(error as Error).message}`,
+				(error as Error).stack,
 				FileCacheLayer.name,
 			)
 		}

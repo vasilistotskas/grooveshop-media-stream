@@ -33,27 +33,27 @@ export interface StorageThresholds {
 
 @Injectable()
 export class StorageMonitoringService implements OnModuleInit {
-	private readonly logger = new Logger(StorageMonitoringService.name)
+	private readonly _logger = new Logger(StorageMonitoringService.name)
 	private readonly storageDirectory: string
 	private readonly thresholds: StorageThresholds
 	private accessPatterns = new Map<string, AccessPattern>()
 	private lastScanTime: Date = new Date()
 
-	constructor(private readonly configService: ConfigService) {
-		this.storageDirectory = this.configService.getOptional('cache.file.directory', './storage')
+	constructor(private readonly _configService: ConfigService) {
+		this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage')
 		this.thresholds = {
-			warningSize: this.configService.getOptional('storage.warningSize', 800 * 1024 * 1024), // 800MB
-			criticalSize: this.configService.getOptional('storage.criticalSize', 1024 * 1024 * 1024), // 1GB
-			warningFileCount: this.configService.getOptional('storage.warningFileCount', 5000),
-			criticalFileCount: this.configService.getOptional('storage.criticalFileCount', 10000),
-			maxFileAge: this.configService.getOptional('storage.maxFileAge', 30), // 30 days
+			warningSize: this._configService.getOptional('storage.warningSize', 800 * 1024 * 1024), // 800MB
+			criticalSize: this._configService.getOptional('storage.criticalSize', 1024 * 1024 * 1024), // 1GB
+			warningFileCount: this._configService.getOptional('storage.warningFileCount', 5000),
+			criticalFileCount: this._configService.getOptional('storage.criticalFileCount', 10000),
+			maxFileAge: this._configService.getOptional('storage.maxFileAge', 30), // 30 days
 		}
 	}
 
 	async onModuleInit(): Promise<void> {
 		await this.ensureStorageDirectory()
 		await this.scanStorageDirectory()
-		this.logger.log('Storage monitoring service initialized')
+		this._logger.log('Storage monitoring service initialized')
 	}
 
 	/**
@@ -64,8 +64,8 @@ export class StorageMonitoringService implements OnModuleInit {
 			const files = await fs.readdir(this.storageDirectory)
 			let totalSize = 0
 			let processedFileCount = 0
-			let oldestFile: Date | null = null
-			let newestFile: Date | null = null
+			let oldestFile: Date | null = null as any
+			let newestFile: Date | null = null as any
 			const fileTypes: Record<string, number> = {}
 
 			for (const file of files) {
@@ -104,14 +104,14 @@ export class StorageMonitoringService implements OnModuleInit {
 				newestFile,
 				fileTypes,
 				accessPatterns: Array.from(this.accessPatterns.values())
-					.sort((a, b) => b.accessCount - a.accessCount)
+					.sort((a: any, b: any) => b.accessCount - a.accessCount)
 					.slice(0, 100), // Top 100 most accessed files
 			}
 		}
-		catch (error) {
+		catch (error: unknown) {
 			CorrelatedLogger.error(
-				`Failed to get storage stats: ${error.message}`,
-				error.stack,
+				`Failed to get storage stats: ${(error as Error).message}`,
+				(error as Error).stack,
 				StorageMonitoringService.name,
 			)
 			throw error
@@ -181,7 +181,7 @@ export class StorageMonitoringService implements OnModuleInit {
 				...pattern,
 				score: this.calculateEvictionScore(pattern),
 			}))
-			.sort((a, b) => a.score - b.score) // Lower score = better candidate for eviction
+			.sort((a: any, b: any) => a.score - b.score) // Lower score = better candidate for eviction
 
 		// Select candidates until we reach target size
 		const selected: AccessPattern[] = []
@@ -246,10 +246,10 @@ export class StorageMonitoringService implements OnModuleInit {
 				StorageMonitoringService.name,
 			)
 		}
-		catch (error) {
+		catch (error: unknown) {
 			CorrelatedLogger.error(
-				`Storage directory scan failed: ${error.message}`,
-				error.stack,
+				`Storage directory scan failed: ${(error as Error).message}`,
+				(error as Error).stack,
 				StorageMonitoringService.name,
 			)
 		}
@@ -313,10 +313,10 @@ export class StorageMonitoringService implements OnModuleInit {
 		try {
 			await fs.mkdir(this.storageDirectory, { recursive: true })
 		}
-		catch (error) {
+		catch (error: unknown) {
 			CorrelatedLogger.error(
-				`Failed to create storage directory: ${error.message}`,
-				error.stack,
+				`Failed to create storage directory: ${(error as Error).message}`,
+				(error as Error).stack,
 				StorageMonitoringService.name,
 			)
 			throw error

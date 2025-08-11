@@ -55,9 +55,9 @@ const rxjs_1 = require("rxjs");
 const operators_1 = require("rxjs/operators");
 const circuit_breaker_1 = require("../utils/circuit-breaker");
 let HttpClientService = HttpClientService_1 = class HttpClientService {
-    constructor(httpService, configService) {
-        this.httpService = httpService;
-        this.configService = configService;
+    constructor(_httpService, _configService) {
+        this._httpService = _httpService;
+        this._configService = _configService;
         this.stats = {
             totalRequests: 0,
             successfulRequests: 0,
@@ -69,18 +69,18 @@ let HttpClientService = HttpClientService_1 = class HttpClientService {
             queueSize: 0,
         };
         this.totalResponseTime = 0;
-        this.maxRetries = this.configService.getOptional('http.retry.retries', 3);
-        this.retryDelay = this.configService.getOptional('http.retry.retryDelay', 1000);
-        this.maxRetryDelay = this.configService.getOptional('http.retry.maxRetryDelay', 10000);
-        this.timeout = this.configService.getOptional('http.connectionPool.timeout', 30000);
+        this.maxRetries = this._configService.getOptional('http.retry.retries', 3);
+        this.retryDelay = this._configService.getOptional('http.retry.retryDelay', 1000);
+        this.maxRetryDelay = this._configService.getOptional('http.retry.maxRetryDelay', 10000);
+        this.timeout = this._configService.getOptional('http.connectionPool.timeout', 30000);
         this.circuitBreaker = new circuit_breaker_1.CircuitBreaker({
-            failureThreshold: this.configService.getOptional('http.circuitBreaker.failureThreshold', 5),
-            resetTimeout: this.configService.getOptional('http.circuitBreaker.resetTimeout', 60000),
-            rollingWindow: this.configService.getOptional('http.circuitBreaker.monitoringPeriod', 30000),
+            failureThreshold: this._configService.getOptional('http.circuitBreaker.failureThreshold', 5),
+            resetTimeout: this._configService.getOptional('http.circuitBreaker.resetTimeout', 60000),
+            rollingWindow: this._configService.getOptional('http.circuitBreaker.monitoringPeriod', 30000),
             minimumRequests: 5,
         });
-        const maxSockets = this.configService.getOptional('http.connectionPool.maxSockets', 50);
-        const keepAliveMsecs = this.configService.getOptional('http.connectionPool.keepAliveMsecs', 1000);
+        const maxSockets = this._configService.getOptional('http.connectionPool.maxSockets', 50);
+        const keepAliveMsecs = this._configService.getOptional('http.connectionPool.keepAliveMsecs', 1000);
         this.httpAgent = new http.Agent({
             keepAlive: true,
             keepAliveMsecs,
@@ -102,25 +102,25 @@ let HttpClientService = HttpClientService_1 = class HttpClientService {
         logger_util_1.CorrelatedLogger.log('HTTP client service destroyed', HttpClientService_1.name);
     }
     async get(url, config) {
-        return this.executeRequest(() => this.httpService.get(url, this.prepareConfig(config)));
+        return this.executeRequest(() => this._httpService.get(url, this.prepareConfig(config)));
     }
     async post(url, data, config) {
-        return this.executeRequest(() => this.httpService.post(url, data, this.prepareConfig(config)));
+        return this.executeRequest(() => this._httpService.post(url, data, this.prepareConfig(config)));
     }
     async put(url, data, config) {
-        return this.executeRequest(() => this.httpService.put(url, data, this.prepareConfig(config)));
+        return this.executeRequest(() => this._httpService.put(url, data, this.prepareConfig(config)));
     }
     async delete(url, config) {
-        return this.executeRequest(() => this.httpService.delete(url, this.prepareConfig(config)));
+        return this.executeRequest(() => this._httpService.delete(url, this.prepareConfig(config)));
     }
     async head(url, config) {
-        return this.executeRequest(() => this.httpService.head(url, this.prepareConfig(config)));
+        return this.executeRequest(() => this._httpService.head(url, this.prepareConfig(config)));
     }
     async patch(url, data, config) {
-        return this.executeRequest(() => this.httpService.patch(url, data, this.prepareConfig(config)));
+        return this.executeRequest(() => this._httpService.patch(url, data, this.prepareConfig(config)));
     }
     async request(config) {
-        return this.executeRequest(() => this.httpService.request(this.prepareConfig(config)));
+        return this.executeRequest(() => this._httpService.request(this.prepareConfig(config)));
     }
     getStats() {
         return {
@@ -151,18 +151,18 @@ let HttpClientService = HttpClientService_1 = class HttpClientService {
         this.stats.activeRequests++;
         this.stats.totalRequests++;
         try {
-            const response = await (0, rxjs_1.lastValueFrom)(requestFn().pipe((0, operators_1.retryWhen)(errors => errors.pipe((0, operators_1.mergeMap)((error, attempt) => {
-                if (!this.isRetryableError(error)) {
-                    return (0, rxjs_1.throwError)(() => error);
-                }
-                if (attempt >= this.maxRetries) {
-                    return (0, rxjs_1.throwError)(() => error);
-                }
-                this.stats.retriedRequests++;
-                const delay = Math.min(this.retryDelay * 2 ** attempt, this.maxRetryDelay);
-                logger_util_1.CorrelatedLogger.warn(`Retrying request (attempt ${attempt + 1}/${this.maxRetries}) after ${delay}ms: ${error.message}`, HttpClientService_1.name);
-                return (0, rxjs_1.timer)(delay);
-            }))), (0, operators_1.tap)({
+            const response = await (0, rxjs_1.lastValueFrom)(requestFn().pipe((0, operators_1.retry)({
+                count: this.maxRetries,
+                delay: (error, retryCount) => {
+                    if (!this.isRetryableError(error)) {
+                        return (0, rxjs_1.throwError)(() => error);
+                    }
+                    this.stats.retriedRequests++;
+                    const delayMs = Math.min(this.retryDelay * 2 ** (retryCount - 1), this.maxRetryDelay);
+                    logger_util_1.CorrelatedLogger.warn(`Retrying request (attempt ${retryCount}/${this.maxRetries}) after ${delayMs}ms: ${error.message}`, HttpClientService_1.name);
+                    return (0, rxjs_1.timer)(delayMs);
+                },
+            }), (0, operators_1.tap)({
                 error: (error) => {
                     this.stats.failedRequests++;
                     this.circuitBreaker.recordFailure();
@@ -206,7 +206,7 @@ let HttpClientService = HttpClientService_1 = class HttpClientService {
         };
     }
     configureAxios() {
-        this.httpService.axiosRef.defaults.timeout = this.timeout;
+        this._httpService.axiosRef.defaults.timeout = this.timeout;
     }
 };
 exports.HttpClientService = HttpClientService;

@@ -20,8 +20,8 @@ const memory_cache_layer_1 = require("../layers/memory-cache.layer");
 const redis_cache_layer_1 = require("../layers/redis-cache.layer");
 const cache_key_strategy_1 = require("../strategies/cache-key.strategy");
 let MultiLayerCacheManager = MultiLayerCacheManager_1 = class MultiLayerCacheManager {
-    constructor(configService, metricsService, memoryCacheLayer, redisCacheLayer, fileCacheLayer) {
-        this.configService = configService;
+    constructor(_configService, metricsService, memoryCacheLayer, redisCacheLayer, fileCacheLayer) {
+        this._configService = _configService;
         this.metricsService = metricsService;
         this.memoryCacheLayer = memoryCacheLayer;
         this.redisCacheLayer = redisCacheLayer;
@@ -29,7 +29,7 @@ let MultiLayerCacheManager = MultiLayerCacheManager_1 = class MultiLayerCacheMan
         this.layers = [];
         this.popularKeys = new Map();
         this.keyStrategy = new cache_key_strategy_1.DefaultCacheKeyStrategy();
-        this.preloadingEnabled = this.configService.getOptional('cache.preloading.enabled', false);
+        this.preloadingEnabled = this._configService.getOptional('cache.preloading.enabled', false);
     }
     async onModuleInit() {
         this.layers = [
@@ -216,7 +216,7 @@ let MultiLayerCacheManager = MultiLayerCacheManager_1 = class MultiLayerCacheMan
         }
     }
     startPreloading() {
-        const interval = this.configService.getOptional('cache.preloading.interval', 300000);
+        const interval = this._configService.getOptional('cache.preloading.interval', 300000);
         setInterval(async () => {
             try {
                 await this.preloadPopularKeys();

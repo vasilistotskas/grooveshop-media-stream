@@ -31,7 +31,7 @@ export class HealthController {
 		private readonly systemHealthIndicator: SystemHealthIndicator,
 		private readonly jobQueueHealthIndicator: JobQueueHealthIndicator,
 		private readonly storageHealthIndicator: StorageHealthIndicator,
-		private readonly configService: ConfigService,
+		private readonly _configService: ConfigService,
 	) {}
 
 	@Get()
@@ -117,12 +117,12 @@ export class HealthController {
 			},
 			configuration: {
 				monitoring: {
-					enabled: this.configService.get('monitoring.enabled'),
-					metricsPort: this.configService.get('monitoring.metricsPort'),
+					enabled: this._configService.get('monitoring.enabled'),
+					metricsPort: this._configService.get('monitoring.metricsPort'),
 				},
 				cache: {
-					fileDirectory: this.configService.get('cache.file.directory'),
-					memoryMaxSize: this.configService.get('cache.memory.maxSize'),
+					fileDirectory: this._configService.get('cache.file.directory'),
+					memoryMaxSize: this._configService.get('cache.memory.maxSize'),
 				},
 			},
 		}
@@ -149,11 +149,11 @@ export class HealthController {
 				checks: result.details,
 			}
 		}
-		catch (error) {
+		catch (error: unknown) {
 			return {
 				status: 'not ready',
 				timestamp: new Date().toISOString(),
-				error: error instanceof Error ? error.message : 'Unknown error',
+				error: error instanceof Error ? (error as Error).message : 'Unknown error',
 			}
 		}
 	}

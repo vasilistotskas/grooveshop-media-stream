@@ -17,10 +17,10 @@ const MediaStreamErrors_1 = require("./MediaStreamErrors");
 const common_1 = require("@nestjs/common");
 const core_1 = require("@nestjs/core");
 let MediaStreamExceptionFilter = MediaStreamExceptionFilter_1 = class MediaStreamExceptionFilter {
-    constructor(httpAdapterHost, correlationService) {
+    constructor(httpAdapterHost, _correlationService) {
         this.httpAdapterHost = httpAdapterHost;
-        this.correlationService = correlationService;
-        this.logger = new common_1.Logger(MediaStreamExceptionFilter_1.name);
+        this._correlationService = _correlationService;
+        this._logger = new common_1.Logger(MediaStreamExceptionFilter_1.name);
     }
     catch(exception, host) {
         const { httpAdapter } = this.httpAdapterHost;
@@ -72,7 +72,7 @@ let MediaStreamExceptionFilter = MediaStreamExceptionFilter_1 = class MediaStrea
         const timestamp = new Date().toISOString();
         const path = request.url;
         const method = request.method;
-        const correlationId = this.correlationService.getCorrelationId();
+        const correlationId = this._correlationService.getCorrelationId();
         if (error instanceof MediaStreamErrors_1.MediaStreamError) {
             const { stack, ...errorDetails } = error.toJSON();
             return {

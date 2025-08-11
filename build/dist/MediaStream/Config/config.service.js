@@ -49,7 +49,7 @@ const config_1 = require("@nestjs/config");
 let ConfigService = ConfigService_1 = class ConfigService {
     constructor(nestConfigService) {
         this.nestConfigService = nestConfigService;
-        this.logger = new common_1.Logger(ConfigService_1.name);
+        this._logger = new common_1.Logger(ConfigService_1.name);
         this.hotReloadableKeys = new Set([
             'MONITORING_ENABLED',
             'PROCESSING_MAX_CONCURRENT',
@@ -59,7 +59,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
         this.config = this.loadAndValidateConfig();
     }
     async onModuleInit() {
-        this.logger.log('Configuration loaded and validated successfully');
+        this._logger.log('Configuration loaded and validated successfully');
     }
     get(key) {
         const keys = key.split('.');
@@ -100,7 +100,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
             const errorMessages = errors.map(error => Object.values(error.constraints || {}).join(', ')).join('; ');
             throw new Error(`Configuration validation failed: ${errorMessages}`);
         }
-        this.logger.log('Configuration validation passed');
+        this._logger.log('Configuration validation passed');
     }
     createRawConfigForValidation() {
         return {
@@ -180,10 +180,10 @@ let ConfigService = ConfigService_1 = class ConfigService {
         };
     }
     async reload() {
-        this.logger.log('Reloading hot-reloadable configuration...');
+        this._logger.log('Reloading hot-reloadable configuration...');
         const newConfig = this.loadConfig();
         this.updateHotReloadableSettings(newConfig);
-        this.logger.log('Hot-reloadable configuration updated successfully');
+        this._logger.log('Hot-reloadable configuration updated successfully');
     }
     isHotReloadable(key) {
         return this.hotReloadableKeys.has(key);
@@ -258,7 +258,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
                     defaultTtl: memoryDefaultTtl,
                     checkPeriod: memoryCheckPeriod,
                     maxKeys: memoryMaxKeys,
-                    warningThreshold: memoryWarningThreshold,
+                    _warningThreshold: memoryWarningThreshold,
                 },
                 redis: {
                     host: redisHost,

@@ -5,12 +5,12 @@ import { MetricsService } from '@microservice/Metrics/services/metrics.service';
 import { OnModuleInit } from '@nestjs/common';
 export declare class CacheWarmingService implements OnModuleInit {
     private readonly memoryCacheService;
-    private readonly configService;
+    private readonly _configService;
     private readonly metricsService;
-    private readonly logger;
+    private readonly _logger;
     private readonly config;
     private readonly storagePath;
-    constructor(memoryCacheService: MemoryCacheService, configService: ConfigService, metricsService: MetricsService);
+    constructor(memoryCacheService: MemoryCacheService, _configService: ConfigService, metricsService: MetricsService);
     onModuleInit(): Promise<void>;
     scheduledWarmup(): Promise<void>;
     warmupCache(): Promise<void>;

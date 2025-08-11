@@ -32,11 +32,11 @@ import UnableToFetchResourceException from '../API/Exception/UnableToFetchResour
 
 @Injectable({ scope: Scope.REQUEST })
 export default class CacheImageResourceOperation {
-	private readonly logger = new Logger(CacheImageResourceOperation.name)
+	private readonly _logger = new Logger(CacheImageResourceOperation.name)
 	private readonly basePath = cwd()
 
 	constructor(
-		private readonly httpService: HttpService,
+		private readonly _httpService: HttpService,
 		private readonly validateCacheImageRequest: ValidateCacheImageRequestRule,
 		private readonly fetchResourceResponseJob: FetchResourceResponseJob,
 		private readonly webpImageManipulationJob: WebpImageManipulationJob,
@@ -48,11 +48,11 @@ export default class CacheImageResourceOperation {
 		private readonly metricsService: MetricsService,
 	) {}
 
-	request: CacheImageRequest
+	request!: CacheImageRequest
 
-	id: ResourceIdentifierKP
+	id!: ResourceIdentifierKP
 
-	metaData: ResourceMetaData
+	metaData!: ResourceMetaData
 
 	get getResourcePath(): string {
 		return path.join(this.basePath, 'storage', `${this.id}.rsc`)
@@ -128,8 +128,8 @@ export default class CacheImageResourceOperation {
 				this.metricsService.recordCacheOperation('get', 'multi-layer', isValid ? 'hit' : 'miss', duration || 0)
 				return isValid
 			}
-			catch (error) {
-				CorrelatedLogger.warn(`Error checking resource existence: ${error.message}`, CacheImageResourceOperation.name)
+			catch (error: unknown) {
+				CorrelatedLogger.warn(`Error checking resource existence: ${(error as Error).message}`, CacheImageResourceOperation.name)
 				this.metricsService.recordError('cache_check', 'resource_exists')
 				const duration = PerformanceTracker.endPhase('resource_exists_check')
 				this.metricsService.recordCacheOperation('get', 'multi-layer', 'error', duration || 0)
@@ -139,7 +139,7 @@ export default class CacheImageResourceOperation {
 	}
 
 	get getHeaders(): Promise<ResourceMetaData> {
-		return (async () => {
+		return (async (): Promise<ResourceMetaData> => {
 			if (!this.metaData) {
 				try {
 					// First check if we have cached resource data
@@ -160,7 +160,7 @@ export default class CacheImageResourceOperation {
 						return null
 					}
 				}
-				catch (error) {
+				catch (error: unknown) {
 					CorrelatedLogger.error(`Failed to read or parse resource metadata: ${error}`, '', CacheImageResourceOperation.name)
 					return null
 				}
@@ -196,12 +196,12 @@ export default class CacheImageResourceOperation {
 
 			// Generate resource identity
 			this.id = await this.generateResourceIdentityFromRequestJob.handle(this.request)
-			this.metaData = null
+			this.metaData = null as any
 
 			CorrelatedLogger.debug(`Resource ID generated: ${this.id}`, CacheImageResourceOperation.name)
 		}
-		catch (error) {
-			CorrelatedLogger.error(`Setup failed: ${error.message}`, error.stack, CacheImageResourceOperation.name)
+		catch (error: unknown) {
+			CorrelatedLogger.error(`Setup failed: ${(error as Error).message}`, (error as Error).stack, CacheImageResourceOperation.name)
 			this.metricsService.recordError('validation', 'setup')
 			throw error
 		}
@@ -236,8 +236,8 @@ export default class CacheImageResourceOperation {
 			// Process synchronously for smaller images
 			await this.processImageSynchronously()
 		}
-		catch (error) {
-			CorrelatedLogger.error(`Failed to execute CacheImageResourceOperation: ${error.message}`, error.stack, CacheImageResourceOperation.name)
+		catch (error: unknown) {
+			CorrelatedLogger.error(`Failed to execute CacheImageResourceOperation: ${(error as Error).message}`, (error as Error).stack, CacheImageResourceOperation.name)
 			this.metricsService.recordError('image_processing', 'execute')
 			const duration = PerformanceTracker.endPhase('execute')
 			this.metricsService.recordImageProcessing('execute', 'unknown', 'error', duration || 0)
@@ -304,7 +304,7 @@ export default class CacheImageResourceOperation {
 			await this.storeResourceResponseToFileJob.handle(this.request.resourceTarget, this.getResourceTempPath, response)
 
 			let processedData: Buffer
-			let metadata: ResourceMetaData
+			let metadata!: ResourceMetaData
 
 			if (this.request.resourceTarget.toLowerCase().endsWith('.svg')) {
 				const result = await this.processSvgImage()
@@ -331,8 +331,8 @@ export default class CacheImageResourceOperation {
 			try {
 				await unlink(this.getResourceTempPath)
 			}
-			catch (error) {
-				CorrelatedLogger.warn(`Failed to delete temporary file: ${error.message}`, CacheImageResourceOperation.name)
+			catch (error: unknown) {
+				CorrelatedLogger.warn(`Failed to delete temporary file: ${(error as Error).message}`, CacheImageResourceOperation.name)
 			}
 
 			const format = metadata.format || 'unknown'
@@ -340,7 +340,7 @@ export default class CacheImageResourceOperation {
 			this.metricsService.recordImageProcessing('process', format, 'success', duration || 0)
 			CorrelatedLogger.debug(`Image processed successfully: ${this.id}`, CacheImageResourceOperation.name)
 		}
-		catch (error) {
+		catch (error: unknown) {
 			const duration = PerformanceTracker.endPhase('sync_processing')
 			this.metricsService.recordImageProcessing('process', 'unknown', 'error', duration || 0)
 			throw error
@@ -428,8 +428,8 @@ export default class CacheImageResourceOperation {
 			await access(optimizedPath)
 			return optimizedPath
 		}
-		catch (error) {
-			if (error.code === 'ENOENT') {
+		catch (error: unknown) {
+			if ((error as any).code === 'ENOENT') {
 				const result = await this.webpImageManipulationJob.handle(
 					path.join(this.basePath, 'public', 'default.png'),
 					optimizedPath,
@@ -513,8 +513,8 @@ export default class CacheImageResourceOperation {
 			this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
 			return null
 		}
-		catch (error) {
-			CorrelatedLogger.error(`Failed to get cached resource: ${error.message}`, error.stack, CacheImageResourceOperation.name)
+		catch (error: unknown) {
+			CorrelatedLogger.error(`Failed to get cached resource: ${(error as Error).message}`, (error as Error).stack, CacheImageResourceOperation.name)
 			this.metricsService.recordError('cache_retrieval', 'get_cached_resource')
 			const duration = PerformanceTracker.endPhase('get_cached_resource')
 			this.metricsService.recordCacheOperation('get', 'multi-layer', 'error', duration || 0)

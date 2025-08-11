@@ -70,8 +70,8 @@ const rules = [ValidateCacheImageRequestRule, ValidateCacheImageRequestResizeTar
 		...operations,
 		{
 			provide: APP_FILTER,
-			useFactory: (httpAdapterHost: HttpAdapterHost, correlationService: CorrelationService) => {
-				return new MediaStreamExceptionFilter(httpAdapterHost, correlationService)
+			useFactory: (httpAdapterHost: HttpAdapterHost, _correlationService: CorrelationService) => {
+				return new MediaStreamExceptionFilter(httpAdapterHost, _correlationService)
 			},
 			inject: [HttpAdapterHost, CorrelationService],
 		},

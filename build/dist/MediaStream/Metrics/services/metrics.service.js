@@ -51,9 +51,9 @@ const config_service_1 = require("../../Config/config.service");
 const common_1 = require("@nestjs/common");
 const promClient = __importStar(require("prom-client"));
 let MetricsService = MetricsService_1 = class MetricsService {
-    constructor(configService) {
-        this.configService = configService;
-        this.logger = new common_1.Logger(MetricsService_1.name);
+    constructor(_configService) {
+        this._configService = _configService;
+        this._logger = new common_1.Logger(MetricsService_1.name);
         this.startTime = Date.now();
         this.requestsInFlightCount = 0;
         this.register = new promClient.Registry();
@@ -216,12 +216,12 @@ let MetricsService = MetricsService_1 = class MetricsService {
         });
     }
     async onModuleInit() {
-        if (this.configService.get('monitoring.enabled')) {
-            this.logger.log('Metrics collection initialized');
+        if (this._configService.get('monitoring.enabled')) {
+            this._logger.log('Metrics collection initialized');
             this.startPeriodicMetricsCollection();
         }
         else {
-            this.logger.log('Metrics collection disabled');
+            this._logger.log('Metrics collection disabled');
         }
     }
     async getMetrics() {
@@ -329,7 +329,7 @@ let MetricsService = MetricsService_1 = class MetricsService {
         setInterval(() => {
             this.collectPerformanceMetrics();
         }, 10000);
-        this.logger.log('Started periodic metrics collection');
+        this._logger.log('Started periodic metrics collection');
     }
     collectSystemMetrics() {
         try {
@@ -350,10 +350,10 @@ let MetricsService = MetricsService_1 = class MetricsService {
             const uptimeSeconds = (Date.now() - this.startTime) / 1000;
             this.uptime.set(uptimeSeconds);
             this.collectDiskSpaceMetrics();
-            this.logger.debug('System metrics collected');
+            this._logger.debug('System metrics collected');
         }
         catch (error) {
-            this.logger.error('Failed to collect system metrics:', error);
+            this._logger.error('Failed to collect system metrics:', error);
             this.recordError('metrics_collection', 'system_metrics');
         }
     }
@@ -366,7 +366,7 @@ let MetricsService = MetricsService_1 = class MetricsService {
             });
         }
         catch (error) {
-            this.logger.error('Failed to collect performance metrics:', error);
+            this._logger.error('Failed to collect performance metrics:', error);
             this.recordError('metrics_collection', 'performance_metrics');
         }
     }
@@ -386,7 +386,7 @@ let MetricsService = MetricsService_1 = class MetricsService {
             }
         }
         catch (error) {
-            this.logger.error('Failed to collect disk space metrics:', error);
+            this._logger.error('Failed to collect disk space metrics:', error);
             this.recordError('metrics_collection', 'disk_space');
         }
     }

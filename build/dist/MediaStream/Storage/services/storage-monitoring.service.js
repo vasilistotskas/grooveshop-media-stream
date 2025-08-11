@@ -18,24 +18,24 @@ const logger_util_1 = require("../../Correlation/utils/logger.util");
 const common_1 = require("@nestjs/common");
 const schedule_1 = require("@nestjs/schedule");
 let StorageMonitoringService = StorageMonitoringService_1 = class StorageMonitoringService {
-    constructor(configService) {
-        this.configService = configService;
-        this.logger = new common_1.Logger(StorageMonitoringService_1.name);
+    constructor(_configService) {
+        this._configService = _configService;
+        this._logger = new common_1.Logger(StorageMonitoringService_1.name);
         this.accessPatterns = new Map();
         this.lastScanTime = new Date();
-        this.storageDirectory = this.configService.getOptional('cache.file.directory', './storage');
+        this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage');
         this.thresholds = {
-            warningSize: this.configService.getOptional('storage.warningSize', 800 * 1024 * 1024),
-            criticalSize: this.configService.getOptional('storage.criticalSize', 1024 * 1024 * 1024),
-            warningFileCount: this.configService.getOptional('storage.warningFileCount', 5000),
-            criticalFileCount: this.configService.getOptional('storage.criticalFileCount', 10000),
-            maxFileAge: this.configService.getOptional('storage.maxFileAge', 30),
+            warningSize: this._configService.getOptional('storage.warningSize', 800 * 1024 * 1024),
+            criticalSize: this._configService.getOptional('storage.criticalSize', 1024 * 1024 * 1024),
+            warningFileCount: this._configService.getOptional('storage.warningFileCount', 5000),
+            criticalFileCount: this._configService.getOptional('storage.criticalFileCount', 10000),
+            maxFileAge: this._configService.getOptional('storage.maxFileAge', 30),
         };
     }
     async onModuleInit() {
         await this.ensureStorageDirectory();
         await this.scanStorageDirectory();
-        this.logger.log('Storage monitoring service initialized');
+        this._logger.log('Storage monitoring service initialized');
     }
     async getStorageStats() {
         try {

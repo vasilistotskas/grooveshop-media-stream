@@ -89,7 +89,7 @@ describe('rate Limiting Integration', () => {
 		if (rateLimitServicePrivate.requestCounts) {
 			rateLimitServicePrivate.requestCounts.clear()
 		}
-		
+
 		await app.close()
 		jest.clearAllMocks()
 	})

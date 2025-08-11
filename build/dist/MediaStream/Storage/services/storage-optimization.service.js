@@ -52,30 +52,30 @@ const common_1 = require("@nestjs/common");
 const schedule_1 = require("@nestjs/schedule");
 const storage_monitoring_service_1 = require("./storage-monitoring.service");
 let StorageOptimizationService = StorageOptimizationService_1 = class StorageOptimizationService {
-    constructor(configService, storageMonitoring) {
-        this.configService = configService;
+    constructor(_configService, storageMonitoring) {
+        this._configService = _configService;
         this.storageMonitoring = storageMonitoring;
-        this.logger = new common_1.Logger(StorageOptimizationService_1.name);
+        this._logger = new common_1.Logger(StorageOptimizationService_1.name);
         this.strategies = new Map();
         this.optimizationHistory = new Map();
         this.isOptimizationRunning = false;
-        this.storageDirectory = this.configService.getOptional('cache.file.directory', './storage');
+        this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage');
         this.config = {
-            enabled: this.configService.getOptional('storage.optimization.enabled', true),
-            strategies: this.configService.getOptional('storage.optimization.strategies', ['compression', 'deduplication']),
-            popularFileThreshold: this.configService.getOptional('storage.optimization.popularThreshold', 10),
-            compressionLevel: this.configService.getOptional('storage.optimization.compressionLevel', 6),
-            createBackups: this.configService.getOptional('storage.optimization.createBackups', false),
-            maxOptimizationTime: this.configService.getOptional('storage.optimization.maxTime', 600000),
+            enabled: this._configService.getOptional('storage.optimization.enabled', true),
+            strategies: this._configService.getOptional('storage.optimization.strategies', ['compression', 'deduplication']),
+            popularFileThreshold: this._configService.getOptional('storage.optimization.popularThreshold', 10),
+            compressionLevel: this._configService.getOptional('storage.optimization.compressionLevel', 6),
+            createBackups: this._configService.getOptional('storage.optimization.createBackups', false),
+            maxOptimizationTime: this._configService.getOptional('storage.optimization.maxTime', 600000),
         };
         this.initializeStrategies();
     }
     async onModuleInit() {
         if (this.config.enabled) {
-            this.logger.log(`Storage optimization enabled with strategies: ${this.config.strategies.join(', ')}`);
+            this._logger.log(`Storage optimization enabled with strategies: ${this.config.strategies.join(', ')}`);
         }
         else {
-            this.logger.log('Storage optimization disabled');
+            this._logger.log('Storage optimization disabled');
         }
     }
     async optimizeFrequentlyAccessedFiles() {

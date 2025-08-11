@@ -9,7 +9,7 @@ import { HttpService } from '@nestjs/axios'
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import { AxiosRequestConfig, AxiosResponse } from 'axios'
 import { lastValueFrom, throwError, timer } from 'rxjs'
-import { mergeMap, retryWhen, tap } from 'rxjs/operators'
+import { retry, tap } from 'rxjs/operators'
 import { HttpClientStats, IHttpClient } from '../interfaces/http-client.interface'
 import { CircuitBreaker } from '../utils/circuit-breaker'
 
@@ -36,26 +36,26 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	private readonly timeout: number
 
 	constructor(
-		private readonly httpService: HttpService,
-		private readonly configService: ConfigService,
+		private readonly _httpService: HttpService,
+		private readonly _configService: ConfigService,
 	) {
 		// Load configuration with fallbacks
-		this.maxRetries = this.configService.getOptional('http.retry.retries', 3)
-		this.retryDelay = this.configService.getOptional('http.retry.retryDelay', 1000)
-		this.maxRetryDelay = this.configService.getOptional('http.retry.maxRetryDelay', 10000)
-		this.timeout = this.configService.getOptional('http.connectionPool.timeout', 30000)
+		this.maxRetries = this._configService.getOptional('http.retry.retries', 3)
+		this.retryDelay = this._configService.getOptional('http.retry.retryDelay', 1000)
+		this.maxRetryDelay = this._configService.getOptional('http.retry.maxRetryDelay', 10000)
+		this.timeout = this._configService.getOptional('http.connectionPool.timeout', 30000)
 
 		// Create circuit breaker
 		this.circuitBreaker = new CircuitBreaker({
-			failureThreshold: this.configService.getOptional('http.circuitBreaker.failureThreshold', 5),
-			resetTimeout: this.configService.getOptional('http.circuitBreaker.resetTimeout', 60000),
-			rollingWindow: this.configService.getOptional('http.circuitBreaker.monitoringPeriod', 30000),
+			failureThreshold: this._configService.getOptional('http.circuitBreaker.failureThreshold', 5),
+			resetTimeout: this._configService.getOptional('http.circuitBreaker.resetTimeout', 60000),
+			rollingWindow: this._configService.getOptional('http.circuitBreaker.monitoringPeriod', 30000),
 			minimumRequests: 5,
 		})
 
 		// Create HTTP agents with keep-alive
-		const maxSockets = this.configService.getOptional('http.connectionPool.maxSockets', 50)
-		const keepAliveMsecs = this.configService.getOptional('http.connectionPool.keepAliveMsecs', 1000)
+		const maxSockets = this._configService.getOptional('http.connectionPool.maxSockets', 50)
+		const keepAliveMsecs = this._configService.getOptional('http.connectionPool.keepAliveMsecs', 1000)
 
 		this.httpAgent = new http.Agent({
 			keepAlive: true,
@@ -88,49 +88,49 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	 * Send a GET request
 	 */
 	async get<T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
-		return this.executeRequest(() => this.httpService.get<T>(url, this.prepareConfig(config)))
+		return this.executeRequest(() => this._httpService.get<T>(url, this.prepareConfig(config)))
 	}
 
 	/**
 	 * Send a POST request
 	 */
 	async post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
-		return this.executeRequest(() => this.httpService.post<T>(url, data, this.prepareConfig(config)))
+		return this.executeRequest(() => this._httpService.post<T>(url, data, this.prepareConfig(config)))
 	}
 
 	/**
 	 * Send a PUT request
 	 */
 	async put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
-		return this.executeRequest(() => this.httpService.put<T>(url, data, this.prepareConfig(config)))
+		return this.executeRequest(() => this._httpService.put<T>(url, data, this.prepareConfig(config)))
 	}
 
 	/**
 	 * Send a DELETE request
 	 */
 	async delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
-		return this.executeRequest(() => this.httpService.delete<T>(url, this.prepareConfig(config)))
+		return this.executeRequest(() => this._httpService.delete<T>(url, this.prepareConfig(config)))
 	}
 
 	/**
 	 * Send a HEAD request
 	 */
 	async head<T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
-		return this.executeRequest(() => this.httpService.head<T>(url, this.prepareConfig(config)))
+		return this.executeRequest(() => this._httpService.head<T>(url, this.prepareConfig(config)))
 	}
 
 	/**
 	 * Send a PATCH request
 	 */
 	async patch<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
-		return this.executeRequest(() => this.httpService.patch<T>(url, data, this.prepareConfig(config)))
+		return this.executeRequest(() => this._httpService.patch<T>(url, data, this.prepareConfig(config)))
 	}
 
 	/**
 	 * Send a request with custom config
 	 */
 	async request<T = any>(config: AxiosRequestConfig): Promise<AxiosResponse<T>> {
-		return this.executeRequest(() => this.httpService.request<T>(this.prepareConfig(config)))
+		return this.executeRequest(() => this._httpService.request<T>(this.prepareConfig(config)))
 	}
 
 	/**
@@ -187,45 +187,39 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 			// Execute request with retry logic
 			const response: AxiosResponse<T> = await lastValueFrom(
 				requestFn().pipe(
-					retryWhen(errors =>
-						errors.pipe(
-							mergeMap((error, attempt) => {
-								// Don't retry if not a retryable error
-								if (!this.isRetryableError(error)) {
-									return throwError(() => error)
-								}
+					retry({
+						count: this.maxRetries,
+						delay: (error, retryCount) => {
+							// Don't retry if not a retryable error
+							if (!this.isRetryableError(error)) {
+								return throwError(() => error)
+							}
 
-								// Don't retry if max retries reached
-								if (attempt >= this.maxRetries) {
-									return throwError(() => error)
-								}
+							// Increment retry counter
+							this.stats.retriedRequests++
 
-								// Increment retry counter
-								this.stats.retriedRequests++
+							// Calculate exponential backoff delay
+							const delayMs = Math.min(
+								this.retryDelay * 2 ** (retryCount - 1),
+								this.maxRetryDelay,
+							)
 
-								// Calculate exponential backoff delay
-								const delay = Math.min(
-									this.retryDelay * 2 ** attempt,
-									this.maxRetryDelay,
-								)
+							CorrelatedLogger.warn(
+								`Retrying request (attempt ${retryCount}/${this.maxRetries}) after ${delayMs}ms: ${(error as Error).message}`,
+								HttpClientService.name,
+							)
 
-								CorrelatedLogger.warn(
-									`Retrying request (attempt ${attempt + 1}/${this.maxRetries}) after ${delay}ms: ${error.message}`,
-									HttpClientService.name,
-								)
-
-								// Retry after delay
-								return timer(delay)
-							}),
-						),
-					),
+							// Return a timer observable for the delay
+							return timer(delayMs)
+						},
+					}),
 					tap({
-						error: (error) => {
+						error: (error: unknown) => {
 							this.stats.failedRequests++
 							this.circuitBreaker.recordFailure()
 							CorrelatedLogger.error(
-								`HTTP request failed: ${error.message}`,
-								error.stack,
+								`HTTP request failed: ${(error as Error).message}`,
+								(error as Error).stack,
 								HttpClientService.name,
 							)
 						},
@@ -248,7 +242,7 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 
 			return response
 		}
-		catch (error) {
+		catch (error: unknown) {
 			// Update response time for failed requests too
 			const responseTime = performance.now() - startTime
 			this.totalResponseTime += responseTime
@@ -265,7 +259,7 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	 */
 	private isRetryableError(error: any): boolean {
 		// Network errors are always retryable
-		if (error.code && ['ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'ENOTFOUND'].includes(error.code)) {
+		if ((error as any).code && ['ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'ENOTFOUND'].includes((error as any).code)) {
 			return true
 		}
 
@@ -294,6 +288,6 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	 */
 	private configureAxios(): void {
 		// Set default timeout
-		this.httpService.axiosRef.defaults.timeout = this.timeout
+		this._httpService.axiosRef.defaults.timeout = this.timeout
 	}
 }

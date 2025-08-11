@@ -20,22 +20,22 @@ const schedule_1 = require("@nestjs/schedule");
 const intelligent_eviction_service_1 = require("./intelligent-eviction.service");
 const storage_monitoring_service_1 = require("./storage-monitoring.service");
 let StorageCleanupService = StorageCleanupService_1 = class StorageCleanupService {
-    constructor(configService, storageMonitoring, intelligentEviction) {
-        this.configService = configService;
+    constructor(_configService, storageMonitoring, intelligentEviction) {
+        this._configService = _configService;
         this.storageMonitoring = storageMonitoring;
         this.intelligentEviction = intelligentEviction;
-        this.logger = new common_1.Logger(StorageCleanupService_1.name);
+        this._logger = new common_1.Logger(StorageCleanupService_1.name);
         this.lastCleanup = new Date();
         this.isCleanupRunning = false;
-        this.storageDirectory = this.configService.getOptional('cache.file.directory', './storage');
+        this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage');
         this.config = this.loadCleanupConfig();
     }
     async onModuleInit() {
         if (this.config.enabled) {
-            this.logger.log('Storage cleanup service initialized with policies:', this.config.policies.map(p => p.name));
+            this._logger.log('Storage cleanup service initialized with policies:', this.config.policies.map(p => p.name));
         }
         else {
-            this.logger.log('Storage cleanup service disabled');
+            this._logger.log('Storage cleanup service disabled');
         }
     }
     async performCleanup(policyNames, dryRun) {
@@ -100,7 +100,7 @@ let StorageCleanupService = StorageCleanupService_1 = class StorageCleanupServic
         }
     }
     async scheduledCleanup() {
-        const currentlyEnabled = this.configService.getOptional('storage.cleanup.enabled', true);
+        const currentlyEnabled = this._configService.getOptional('storage.cleanup.enabled', true);
         if (!currentlyEnabled || this.isCleanupRunning) {
             return;
         }
@@ -194,10 +194,10 @@ let StorageCleanupService = StorageCleanupService_1 = class StorageCleanupServic
         return { filesRemoved, sizeFreed, errors };
     }
     loadCleanupConfig() {
-        const enabled = this.configService.getOptional('storage.cleanup.enabled', true);
-        const cronSchedule = this.configService.getOptional('storage.cleanup.cronSchedule', '0 2 * * *');
-        const dryRun = this.configService.getOptional('storage.cleanup.dryRun', false);
-        const maxCleanupDuration = this.configService.getOptional('storage.cleanup.maxDuration', 300000);
+        const enabled = this._configService.getOptional('storage.cleanup.enabled', true);
+        const cronSchedule = this._configService.getOptional('storage.cleanup.cronSchedule', '0 2 * * *');
+        const dryRun = this._configService.getOptional('storage.cleanup.dryRun', false);
+        const maxCleanupDuration = this._configService.getOptional('storage.cleanup.maxDuration', 300000);
         const defaultPolicies = [
             {
                 name: 'old-cache-files',

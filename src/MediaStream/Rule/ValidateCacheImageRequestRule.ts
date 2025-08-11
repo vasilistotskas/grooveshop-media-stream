@@ -6,7 +6,7 @@ import { Injectable, Scope } from '@nestjs/common'
 export default class ValidateCacheImageRequestRule {
 	constructor(private readonly validateCacheImageRequestResizeTargetRule: ValidateCacheImageRequestResizeTargetRule) {}
 
-	request: CacheImageRequest = null
+	request!: CacheImageRequest
 
 	public async setup(request: CacheImageRequest): Promise<void> {
 		this.request = request

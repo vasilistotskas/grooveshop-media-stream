@@ -4,8 +4,8 @@ import { OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { HttpClientStats, IHttpClient } from '../interfaces/http-client.interface';
 export declare class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDestroy {
-    private readonly httpService;
-    private readonly configService;
+    private readonly _httpService;
+    private readonly _configService;
     private readonly circuitBreaker;
     private readonly httpAgent;
     private readonly httpsAgent;
@@ -15,7 +15,7 @@ export declare class HttpClientService implements IHttpClient, OnModuleInit, OnM
     private readonly retryDelay;
     private readonly maxRetryDelay;
     private readonly timeout;
-    constructor(httpService: HttpService, configService: ConfigService);
+    constructor(_httpService: HttpService, _configService: ConfigService);
     onModuleInit(): Promise<void>;
     onModuleDestroy(): Promise<void>;
     get<T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>;

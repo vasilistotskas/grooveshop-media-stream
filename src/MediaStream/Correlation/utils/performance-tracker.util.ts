@@ -113,8 +113,8 @@ export class PerformanceTracker {
 	} {
 		const phases = this.getPhases()
 		const completedPhases = phases.filter(p => p.duration !== undefined)
-		const totalDuration = completedPhases.reduce((sum, p) => sum + (p.duration || 0), 0)
-		const slowestPhase = completedPhases.reduce((slowest, current) =>
+		const totalDuration = completedPhases.reduce((sum: any, p: any) => sum + (p.duration || 0), 0)
+		const slowestPhase = completedPhases.reduce((slowest: any, current: any) =>
 			!slowest || (current.duration || 0) > (slowest.duration || 0) ? current : slowest, undefined as PerformancePhase | undefined)
 
 		return {
@@ -150,10 +150,10 @@ export class PerformanceTracker {
 			this.endPhase(phaseName, { success: true })
 			return result
 		}
-		catch (error) {
+		catch (error: unknown) {
 			this.endPhase(phaseName, {
 				success: false,
-				error: error instanceof Error ? error.message : 'Unknown error',
+				error: error instanceof Error ? (error as Error).message : 'Unknown error',
 			})
 			throw error
 		}

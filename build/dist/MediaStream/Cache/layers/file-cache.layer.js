@@ -17,8 +17,8 @@ const config_service_1 = require("../../Config/config.service");
 const logger_util_1 = require("../../Correlation/utils/logger.util");
 const common_1 = require("@nestjs/common");
 let FileCacheLayer = FileCacheLayer_1 = class FileCacheLayer {
-    constructor(configService) {
-        this.configService = configService;
+    constructor(_configService) {
+        this._configService = _configService;
         this.layerName = 'file';
         this.priority = 3;
         this.stats = {
@@ -26,7 +26,7 @@ let FileCacheLayer = FileCacheLayer_1 = class FileCacheLayer {
             misses: 0,
             errors: 0,
         };
-        this.cacheDirectory = this.configService.get('cache.file.directory');
+        this.cacheDirectory = this._configService.get('cache.file.directory');
         this.ensureCacheDirectory();
     }
     async get(key) {

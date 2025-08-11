@@ -5,7 +5,7 @@ import { RateLimitService } from '../services/rate-limit.service'
 
 @Injectable()
 export class AdaptiveRateLimitGuard implements CanActivate {
-	private readonly logger = new Logger(AdaptiveRateLimitGuard.name)
+	private readonly _logger = new Logger(AdaptiveRateLimitGuard.name)
 
 	constructor(
 		private readonly rateLimitService: RateLimitService,
@@ -48,7 +48,7 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 			this.addRateLimitHeaders(response, info)
 
 			if (!allowed) {
-				this.logger.warn(`Rate limit exceeded for ${clientIp} on ${requestType}`, {
+				this._logger.warn(`Rate limit exceeded for ${clientIp} on ${requestType}`, {
 					clientIp,
 					requestType,
 					current: info.current,
@@ -59,7 +59,7 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 				throw new ThrottlerException('Rate limit exceeded')
 			}
 
-			this.logger.debug(`Rate limit check passed for ${clientIp} on ${requestType}`, {
+			this._logger.debug(`Rate limit check passed for ${clientIp} on ${requestType}`, {
 				clientIp,
 				requestType,
 				current: info.current,
@@ -69,12 +69,12 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 
 			return true
 		}
-		catch (error) {
+		catch (error: unknown) {
 			if (error instanceof ThrottlerException) {
 				throw error
 			}
 
-			this.logger.error('Error in rate limit guard:', error)
+			this._logger.error('Error in rate limit guard:', error)
 			// In case of error, allow the request to proceed to avoid blocking legitimate traffic
 			return true
 		}

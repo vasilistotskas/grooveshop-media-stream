@@ -27,15 +27,15 @@ export interface CleanupConfig {
     maxCleanupDuration: number;
 }
 export declare class StorageCleanupService implements OnModuleInit {
-    private readonly configService;
+    private readonly _configService;
     private readonly storageMonitoring;
     private readonly intelligentEviction;
-    private readonly logger;
+    private readonly _logger;
     private readonly storageDirectory;
     private readonly config;
     private lastCleanup;
     private isCleanupRunning;
-    constructor(configService: ConfigService, storageMonitoring: StorageMonitoringService, intelligentEviction: IntelligentEvictionService);
+    constructor(_configService: ConfigService, storageMonitoring: StorageMonitoringService, intelligentEviction: IntelligentEvictionService);
     onModuleInit(): Promise<void>;
     performCleanup(policyNames?: string[], dryRun?: boolean): Promise<CleanupResult>;
     scheduledCleanup(): Promise<void>;

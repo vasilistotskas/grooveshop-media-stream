@@ -66,18 +66,18 @@ const security_checker_service_1 = require("../../Validation/services/security-c
 const axios_1 = require("@nestjs/axios");
 const common_1 = require("@nestjs/common");
 let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class MediaStreamImageRESTController {
-    constructor(httpService, generateResourceIdentityFromRequestJob, cacheImageResourceOperation, inputSanitizationService, securityCheckerService, correlationService, metricsService) {
-        this.httpService = httpService;
+    constructor(_httpService, generateResourceIdentityFromRequestJob, cacheImageResourceOperation, inputSanitizationService, securityCheckerService, _correlationService, metricsService) {
+        this._httpService = _httpService;
         this.generateResourceIdentityFromRequestJob = generateResourceIdentityFromRequestJob;
         this.cacheImageResourceOperation = cacheImageResourceOperation;
         this.inputSanitizationService = inputSanitizationService;
         this.securityCheckerService = securityCheckerService;
-        this.correlationService = correlationService;
+        this._correlationService = _correlationService;
         this.metricsService = metricsService;
-        this.logger = new common_1.Logger(MediaStreamImageRESTController_1.name);
+        this._logger = new common_1.Logger(MediaStreamImageRESTController_1.name);
     }
     async validateRequestParameters(params) {
-        const correlationId = this.correlationService.getCorrelationId();
+        const correlationId = this._correlationService.getCorrelationId();
         if (params.imageType) {
             const isMalicious = await this.securityCheckerService.checkForMaliciousContent(params.imageType);
             if (isMalicious) {
@@ -135,7 +135,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
     }
     addHeadersToRequest(res, headers) {
         if (!headers) {
-            const correlationId = this.correlationService.getCorrelationId();
+            const correlationId = this._correlationService.getCorrelationId();
             throw new MediaStreamErrors_1.InvalidRequestError('Headers object is undefined', {
                 headers,
                 correlationId,
@@ -145,7 +145,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
         const format = headers.format || 'png';
         const publicTTL = headers.publicTTL || 0;
         const expiresAt = Date.now() + publicTTL;
-        const correlationId = this.correlationService.getCorrelationId();
+        const correlationId = this._correlationService.getCorrelationId();
         res
             .header('Content-Length', size)
             .header('Cache-Control', `max-age=${publicTTL / 1000}, public`)
@@ -160,20 +160,20 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
         return res;
     }
     async handleStreamOrFallback(request, res) {
-        const correlationId = this.correlationService.getCorrelationId();
+        const correlationId = this._correlationService.getCorrelationId();
         performance_tracker_util_1.PerformanceTracker.startPhase('image_request_processing');
         try {
             this.metricsService.recordError('image_requests', 'total');
             await this.cacheImageResourceOperation.setup(request);
             if (await this.cacheImageResourceOperation.resourceExists) {
-                this.logger.debug('Resource exists, attempting to stream.', {
+                this._logger.debug('Resource exists, attempting to stream.', {
                     request,
                     correlationId,
                 });
                 await this.streamResource(request, res);
             }
             else {
-                this.logger.debug('Resource does not exist, attempting to fetch or fallback to default.', {
+                this._logger.debug('Resource does not exist, attempting to fetch or fallback to default.', {
                     request,
                     correlationId,
                 });
@@ -182,7 +182,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
         }
         catch (error) {
             const context = { request, error, correlationId };
-            this.logger.error(`Error while processing the image request: ${error.message || error}`, error, context);
+            this._logger.error(`Error while processing the image request: ${error.message || error}`, error, context);
             this.metricsService.recordError('image_request', error.constructor.name);
             await this.defaultImageFallback(request, res);
         }
@@ -191,11 +191,11 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
         }
     }
     async streamFileToResponse(filePath, headers, res) {
-        const correlationId = this.correlationService.getCorrelationId();
+        const correlationId = this._correlationService.getCorrelationId();
         performance_tracker_util_1.PerformanceTracker.startPhase('file_streaming');
         let fd = null;
         try {
-            this.logger.debug(`Streaming file: ${filePath}`, {
+            this._logger.debug(`Streaming file: ${filePath}`, {
                 filePath,
                 headers,
                 correlationId,
@@ -211,7 +211,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                     });
                     fileStream.on('error', (error) => {
                         const context = { filePath, headers, error, correlationId };
-                        this.logger.error(`Stream error: ${error.message || error}`, error, context);
+                        this._logger.error(`Stream error: ${error.message || error}`, error, context);
                         this.metricsService.recordError('file_stream', 'stream_error');
                         reject(new MediaStreamErrors_1.ResourceStreamingError('Error streaming file', context));
                     });
@@ -243,7 +243,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
             performance_tracker_util_1.PerformanceTracker.endPhase('file_streaming');
             if (fd) {
                 await fd.close().catch((err) => {
-                    this.logger.error(`Error closing file descriptor: ${err.message || err}`, err, {
+                    this._logger.error(`Error closing file descriptor: ${err.message || err}`, err, {
                         filePath,
                         correlationId,
                     });
@@ -252,10 +252,10 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
         }
     }
     async streamResource(request, res) {
-        const correlationId = this.correlationService.getCorrelationId();
+        const correlationId = this._correlationService.getCorrelationId();
         const headers = await this.cacheImageResourceOperation.getHeaders;
         if (!headers) {
-            this.logger.warn('Resource metadata is missing or invalid.', {
+            this._logger.warn('Resource metadata is missing or invalid.', {
                 request,
                 correlationId,
             });
@@ -281,7 +281,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                 error: error.message || error,
                 correlationId,
             };
-            this.logger.error(`Error while streaming resource: ${error.message || error}`, error, context);
+            this._logger.error(`Error while streaming resource: ${error.message || error}`, error, context);
             await this.defaultImageFallback(request, res);
         }
         finally {
@@ -289,7 +289,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
         }
     }
     async fetchAndStreamResource(request, res) {
-        const correlationId = this.correlationService.getCorrelationId();
+        const correlationId = this._correlationService.getCorrelationId();
         try {
             await this.cacheImageResourceOperation.execute();
             if (this.cacheImageResourceOperation.shouldUseBackgroundProcessing && this.cacheImageResourceOperation.shouldUseBackgroundProcessing()) {
@@ -297,7 +297,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
             }
             const headers = await this.cacheImageResourceOperation.getHeaders;
             if (!headers) {
-                this.logger.warn('Failed to fetch resource or generate headers.', {
+                this._logger.warn('Failed to fetch resource or generate headers.', {
                     request,
                     correlationId,
                 });
@@ -322,12 +322,12 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                 error: error.message || error,
                 correlationId,
             };
-            this.logger.error(`Error during resource fetch and stream: ${error.message || error}`, error, context);
+            this._logger.error(`Error during resource fetch and stream: ${error.message || error}`, error, context);
             await this.defaultImageFallback(request, res);
         }
     }
     async defaultImageFallback(request, res) {
-        const correlationId = this.correlationService.getCorrelationId();
+        const correlationId = this._correlationService.getCorrelationId();
         try {
             const optimizedDefaultImagePath = await this.cacheImageResourceOperation.optimizeAndServeDefaultImage(request.resizeOptions);
             res.header('X-Correlation-ID', correlationId);
@@ -340,7 +340,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                 error: defaultImageError.message || defaultImageError,
                 correlationId,
             };
-            this.logger.error(`Failed to serve default image: ${defaultImageError.message || defaultImageError}`, defaultImageError, context);
+            this._logger.error(`Failed to serve default image: ${defaultImageError.message || defaultImageError}`, defaultImageError, context);
             this.metricsService.recordError('default_image_fallback', 'fallback_error');
             throw new MediaStreamErrors_1.DefaultImageFallbackError('Failed to process the image request', context);
         }
@@ -349,7 +349,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
         return resourceTarget;
     }
     async uploadedImage(imageType, image, width = null, height = null, fit = CacheImageRequest_1.FitOptions.contain, position = CacheImageRequest_1.PositionOptions.entropy, background = CacheImageRequest_1.BackgroundOptions.transparent, trimThreshold = 5, format = CacheImageRequest_1.SupportedResizeFormats.webp, quality = 100, req, res) {
-        const correlationId = this.correlationService.getCorrelationId();
+        const correlationId = this._correlationService.getCorrelationId();
         performance_tracker_util_1.PerformanceTracker.startPhase('uploaded_image_request');
         try {
             await this.validateRequestParameters({
@@ -383,7 +383,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                 resourceTarget: MediaStreamImageRESTController_1.resourceTargetPrepare(resourceUrl),
                 resizeOptions,
             });
-            this.logger.debug(`Uploaded image request`, {
+            this._logger.debug(`Uploaded image request`, {
                 request: {
                     imageType,
                     image,
@@ -407,7 +407,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                 correlationId,
                 error: error.message || error,
             };
-            this.logger.error(`Error in uploadedImage: ${error.message || error}`, error, context);
+            this._logger.error(`Error in uploadedImage: ${error.message || error}`, error, context);
             this.metricsService.recordError('uploaded_image_request', error.constructor.name);
             throw error;
         }
@@ -416,7 +416,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
         }
     }
     async staticImage(image, width = null, height = null, fit = CacheImageRequest_1.FitOptions.contain, position = CacheImageRequest_1.PositionOptions.entropy, background = CacheImageRequest_1.BackgroundOptions.transparent, trimThreshold = 5, format = CacheImageRequest_1.SupportedResizeFormats.webp, quality = 100, req, res) {
-        const correlationId = this.correlationService.getCorrelationId();
+        const correlationId = this._correlationService.getCorrelationId();
         performance_tracker_util_1.PerformanceTracker.startPhase('static_image_request');
         try {
             await this.validateRequestParameters({
@@ -448,7 +448,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                     quality: Number(quality),
                 }),
             });
-            this.logger.debug(`Static image request`, {
+            this._logger.debug(`Static image request`, {
                 request: {
                     image,
                     width,
@@ -470,7 +470,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                 correlationId,
                 error: error.message || error,
             };
-            this.logger.error(`Error in staticImage: ${error.message || error}`, error, context);
+            this._logger.error(`Error in staticImage: ${error.message || error}`, error, context);
             this.metricsService.recordError('static_image_request', error.constructor.name);
             throw error;
         }

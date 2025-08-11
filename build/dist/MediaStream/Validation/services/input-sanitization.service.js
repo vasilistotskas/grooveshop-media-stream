@@ -14,14 +14,14 @@ exports.InputSanitizationService = void 0;
 const common_1 = require("@nestjs/common");
 const config_service_1 = require("../../../MediaStream/Config/config.service");
 let InputSanitizationService = InputSanitizationService_1 = class InputSanitizationService {
-    constructor(configService) {
-        this.configService = configService;
-        this.logger = new common_1.Logger(InputSanitizationService_1.name);
+    constructor(_configService) {
+        this._configService = _configService;
+        this._logger = new common_1.Logger(InputSanitizationService_1.name);
         this.allowedDomains = null;
     }
     getAllowedDomains() {
         if (this.allowedDomains === null) {
-            this.allowedDomains = this.configService.getOptional('validation.allowedDomains', [
+            this.allowedDomains = this._configService.getOptional('validation.allowedDomains', [
                 'localhost',
                 '127.0.0.1',
                 'example.com',
@@ -67,7 +67,7 @@ let InputSanitizationService = InputSanitizationService_1 = class InputSanitizat
         const maxLength = 2048;
         if (sanitized.length > maxLength) {
             sanitized = sanitized.substring(0, maxLength);
-            this.logger.warn(`String truncated to ${maxLength} characters for security`);
+            this._logger.warn(`String truncated to ${maxLength} characters for security`);
         }
         return sanitized;
     }
@@ -88,18 +88,18 @@ let InputSanitizationService = InputSanitizationService_1 = class InputSanitizat
             const allowedDomains = this.getAllowedDomains();
             const isAllowed = allowedDomains.some(domain => urlObj.hostname === domain || urlObj.hostname.endsWith(`.${domain}`));
             if (!isAllowed) {
-                this.logger.warn(`URL blocked - not in whitelist: ${urlObj.hostname}`);
+                this._logger.warn(`URL blocked - not in whitelist: ${urlObj.hostname}`);
                 return false;
             }
             return true;
         }
         catch (error) {
-            this.logger.warn(`Invalid URL format: ${url}, error: ${error}`);
+            this._logger.warn(`Invalid URL format: ${url}, error: ${error}`);
             return false;
         }
     }
     validateFileSize(sizeBytes, format) {
-        const maxSizes = this.configService.getOptional('validation.maxFileSizes', {
+        const maxSizes = this._configService.getOptional('validation.maxFileSizes', {
             default: 10 * 1024 * 1024,
             jpeg: 5 * 1024 * 1024,
             jpg: 5 * 1024 * 1024,

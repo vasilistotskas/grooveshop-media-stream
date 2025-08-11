@@ -29,11 +29,11 @@ export interface StorageHealthDetails {
 
 @Injectable()
 export class StorageHealthIndicator extends BaseHealthIndicator {
-	private readonly warningThreshold: number
-	private readonly criticalThreshold: number
+	private readonly _warningThreshold: number
+	private readonly _criticalThreshold: number
 
 	constructor(
-		private readonly configService: ConfigService,
+		private readonly _configService: ConfigService,
 		private readonly storageMonitoring: StorageMonitoringService,
 		private readonly storageCleanup: StorageCleanupService,
 	) {
@@ -44,8 +44,8 @@ export class StorageHealthIndicator extends BaseHealthIndicator {
 
 		super('storage', options)
 
-		this.warningThreshold = this.configService.getOptional('storage.health.warningThreshold', 0.8)
-		this.criticalThreshold = this.configService.getOptional('storage.health.criticalThreshold', 0.9)
+		this._warningThreshold = this._configService.getOptional('storage.health.warningThreshold', 0.8)
+		this._criticalThreshold = this._configService.getOptional('storage.health.criticalThreshold', 0.9)
 	}
 
 	protected async performHealthCheck(): Promise<HealthIndicatorResult> {
@@ -55,7 +55,7 @@ export class StorageHealthIndicator extends BaseHealthIndicator {
 			const cleanupStatus = this.storageCleanup.getCleanupStatus()
 
 			// Calculate usage percentage (approximation based on file count and size)
-			const maxSize = this.configService.getOptional('storage.maxSize', 1024 * 1024 * 1024) // 1GB default
+			const maxSize = this._configService.getOptional('storage.maxSize', 1024 * 1024 * 1024) // 1GB default
 			const usagePercentage = stats.totalSize / maxSize
 
 			// Generate recommendations
@@ -70,7 +70,7 @@ export class StorageHealthIndicator extends BaseHealthIndicator {
 				newestFile: stats.newestFile ? stats.newestFile.toISOString() : null,
 				topFileTypes: Object.entries(stats.fileTypes)
 					.map(([extension, count]) => ({ extension, count }))
-					.sort((a, b) => b.count - a.count)
+					.sort((a: any, b: any) => b.count - a.count)
 					.slice(0, 5),
 				cleanupStatus: {
 					enabled: cleanupStatus.enabled,
@@ -78,10 +78,10 @@ export class StorageHealthIndicator extends BaseHealthIndicator {
 					nextCleanup: cleanupStatus.nextCleanup.toISOString(),
 				},
 				thresholds: {
-					warningSize: this.formatBytes(this.configService.getOptional('storage.warningSize', 800 * 1024 * 1024)),
-					criticalSize: this.formatBytes(this.configService.getOptional('storage.criticalSize', 1024 * 1024 * 1024)),
-					warningFileCount: this.configService.getOptional('storage.warningFileCount', 5000),
-					criticalFileCount: this.configService.getOptional('storage.criticalFileCount', 10000),
+					warningSize: this.formatBytes(this._configService.getOptional('storage.warningSize', 800 * 1024 * 1024)),
+					criticalSize: this.formatBytes(this._configService.getOptional('storage.criticalSize', 1024 * 1024 * 1024)),
+					warningFileCount: this._configService.getOptional('storage.warningFileCount', 5000),
+					criticalFileCount: this._configService.getOptional('storage.criticalFileCount', 10000),
 				},
 				recommendations,
 			}
@@ -182,20 +182,20 @@ export class StorageHealthIndicator extends BaseHealthIndicator {
 		const recommendations: string[] = []
 
 		// Age-based recommendations
-		const oldFiles = stats.accessPatterns.filter((p) => {
+		const oldFiles = stats.accessPatterns.filter((p: any) => {
 			const ageInDays = (Date.now() - p.lastAccessed.getTime()) / (1000 * 60 * 60 * 24)
 			return ageInDays > 30
 		})
 
 		if (oldFiles.length > 0) {
-			const totalOldSize = oldFiles.reduce((sum, f) => sum + f.size, 0)
+			const totalOldSize = oldFiles.reduce((sum: any, f: any) => sum + f.size, 0)
 			recommendations.push(`${oldFiles.length} files older than 30 days (${this.formatBytes(totalOldSize)})`)
 		}
 
 		// Size-based recommendations
 		const largeFiles = stats.accessPatterns
 			.filter(p => p.size > 1024 * 1024) // Files larger than 1MB
-			.sort((a, b) => b.size - a.size)
+			.sort((a: any, b: any) => b.size - a.size)
 			.slice(0, 10)
 
 		if (largeFiles.length > 0) {
@@ -205,7 +205,7 @@ export class StorageHealthIndicator extends BaseHealthIndicator {
 		// Access pattern recommendations
 		const neverAccessedFiles = stats.accessPatterns.filter(p => p.accessCount === 1)
 		if (neverAccessedFiles.length > 0) {
-			const totalNeverAccessedSize = neverAccessedFiles.reduce((sum, f) => sum + f.size, 0)
+			const totalNeverAccessedSize = neverAccessedFiles.reduce((sum: any, f: any) => sum + f.size, 0)
 			recommendations.push(`${neverAccessedFiles.length} files accessed only once (${this.formatBytes(totalNeverAccessedSize)})`)
 		}
 

@@ -5,7 +5,7 @@ import { MetricsService } from '../services/metrics.service'
 
 @Injectable()
 export class MetricsMiddleware implements NestMiddleware {
-	private readonly logger = new Logger(MetricsMiddleware.name)
+	private readonly _logger = new Logger(MetricsMiddleware.name)
 
 	constructor(private readonly metricsService: MetricsService) {}
 
@@ -50,17 +50,17 @@ export class MetricsMiddleware implements NestMiddleware {
 				// Track request completion
 				this.metricsService.decrementRequestsInFlight()
 
-				this.logger.debug(`HTTP ${req.method} ${route} ${res.statusCode} - ${duration}s`)
+				this._logger.debug(`HTTP ${req.method} ${route} ${res.statusCode} - ${duration}s`)
 			}
-			catch (error) {
-				this.logger.error('Failed to record HTTP metrics:', error)
+			catch (error: unknown) {
+				this._logger.error('Failed to record HTTP metrics:', error)
 				this.metricsService.recordError('metrics_middleware', 'http_tracking')
 			}
 		})
 
 		// Handle request errors
-		res.on('error', (error) => {
-			this.logger.error('HTTP request error:', error)
+		res.on('error', (error: unknown) => {
+			this._logger.error('HTTP request error:', error)
 			this.metricsService.recordError('http_request', 'response_error')
 			this.metricsService.decrementRequestsInFlight()
 		})

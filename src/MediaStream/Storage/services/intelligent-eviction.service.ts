@@ -29,22 +29,22 @@ export interface EvictionConfig {
 
 @Injectable()
 export class IntelligentEvictionService {
-	private readonly logger = new Logger(IntelligentEvictionService.name)
+	private readonly _logger = new Logger(IntelligentEvictionService.name)
 	private readonly storageDirectory: string
 	private readonly config: EvictionConfig
 	private readonly strategies = new Map<string, EvictionStrategy>()
 
 	constructor(
-		private readonly configService: ConfigService,
+		private readonly _configService: ConfigService,
 		private readonly storageMonitoring: StorageMonitoringService,
 	) {
-		this.storageDirectory = this.configService.getOptional('cache.file.directory', './storage')
+		this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage')
 		this.config = {
-			strategy: this.configService.getOptional('storage.eviction.strategy', 'intelligent'),
-			aggressiveness: this.configService.getOptional('storage.eviction.aggressiveness', 'moderate'),
-			preservePopular: this.configService.getOptional('storage.eviction.preservePopular', true),
-			minAccessCount: this.configService.getOptional('storage.eviction.minAccessCount', 5),
-			maxFileAge: this.configService.getOptional('storage.eviction.maxFileAge', 7),
+			strategy: this._configService.getOptional('storage.eviction.strategy', 'intelligent'),
+			aggressiveness: this._configService.getOptional('storage.eviction.aggressiveness', 'moderate'),
+			preservePopular: this._configService.getOptional('storage.eviction.preservePopular', true),
+			minAccessCount: this._configService.getOptional('storage.eviction.minAccessCount', 5),
+			maxFileAge: this._configService.getOptional('storage.eviction.maxFileAge', 7),
 		}
 
 		this.initializeStrategies()
@@ -96,17 +96,17 @@ export class IntelligentEvictionService {
 
 			return result
 		}
-		catch (error) {
+		catch (error: unknown) {
 			CorrelatedLogger.error(
-				`Eviction failed: ${error.message}`,
-				error.stack,
+				`Eviction failed: ${(error as Error).message}`,
+				(error as Error).stack,
 				IntelligentEvictionService.name,
 			)
 
 			return {
 				filesEvicted: 0,
 				sizeFreed: 0,
-				errors: [error.message],
+				errors: [(error as Error).message],
 				strategy: this.config.strategy,
 				duration: Date.now() - startTime,
 			}
@@ -161,7 +161,7 @@ export class IntelligentEvictionService {
 		}
 
 		const finalCandidates = await strategy.execute(candidates, targetSize || 0)
-		const totalSize = finalCandidates.reduce((sum, candidate) => sum + candidate.size, 0)
+		const totalSize = finalCandidates.reduce((sum: any, candidate: any) => sum + candidate.size, 0)
 
 		const reasoning = this.generateEvictionReasoning(finalCandidates)
 
@@ -180,7 +180,7 @@ export class IntelligentEvictionService {
 			description: 'Evict least recently used files',
 			execute: async (candidates: AccessPattern[], targetSize: number) => {
 				return candidates
-					.sort((a, b) => a.lastAccessed.getTime() - b.lastAccessed.getTime())
+					.sort((a: any, b: any) => a.lastAccessed.getTime() - b.lastAccessed.getTime())
 					.slice(0, this.calculateFileCount(candidates, targetSize))
 			},
 		})
@@ -191,7 +191,7 @@ export class IntelligentEvictionService {
 			description: 'Evict least frequently used files',
 			execute: async (candidates: AccessPattern[], targetSize: number) => {
 				return candidates
-					.sort((a, b) => a.accessCount - b.accessCount)
+					.sort((a: any, b: any) => a.accessCount - b.accessCount)
 					.slice(0, this.calculateFileCount(candidates, targetSize))
 			},
 		})
@@ -202,7 +202,7 @@ export class IntelligentEvictionService {
 			description: 'Evict largest files first',
 			execute: async (candidates: AccessPattern[], targetSize: number) => {
 				return candidates
-					.sort((a, b) => b.size - a.size)
+					.sort((a: any, b: any) => b.size - a.size)
 					.slice(0, this.calculateFileCount(candidates, targetSize))
 			},
 		})
@@ -217,7 +217,7 @@ export class IntelligentEvictionService {
 
 				return candidates
 					.filter(candidate => candidate.lastAccessed < cutoffDate)
-					.sort((a, b) => a.lastAccessed.getTime() - b.lastAccessed.getTime())
+					.sort((a: any, b: any) => a.lastAccessed.getTime() - b.lastAccessed.getTime())
 					.slice(0, this.calculateFileCount(candidates, targetSize))
 			},
 		})
@@ -263,8 +263,8 @@ export class IntelligentEvictionService {
 					IntelligentEvictionService.name,
 				)
 			}
-			catch (error) {
-				const errorMsg = `Failed to evict ${candidate.file}: ${error.message}`
+			catch (error: unknown) {
+				const errorMsg = `Failed to evict ${candidate.file}: ${(error as Error).message}`
 				errors.push(errorMsg)
 				CorrelatedLogger.warn(errorMsg, IntelligentEvictionService.name)
 			}
@@ -319,8 +319,8 @@ export class IntelligentEvictionService {
 			return reasoning
 		}
 
-		const totalSize = candidates.reduce((sum, c) => sum + c.size, 0)
-		const avgAccessCount = candidates.reduce((sum, c) => sum + c.accessCount, 0) / candidates.length
+		const totalSize = candidates.reduce((sum: any, c: any) => sum + c.size, 0)
+		const avgAccessCount = candidates.reduce((sum: any, c: any) => sum + c.accessCount, 0) / candidates.length
 		const oldestAccess = Math.min(...candidates.map(c => c.lastAccessed.getTime()))
 		const daysSinceOldest = (Date.now() - oldestAccess) / (1000 * 60 * 60 * 24)
 

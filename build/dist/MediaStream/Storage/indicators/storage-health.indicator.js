@@ -16,24 +16,24 @@ const common_1 = require("@nestjs/common");
 const storage_cleanup_service_1 = require("../services/storage-cleanup.service");
 const storage_monitoring_service_1 = require("../services/storage-monitoring.service");
 let StorageHealthIndicator = class StorageHealthIndicator extends base_health_indicator_1.BaseHealthIndicator {
-    constructor(configService, storageMonitoring, storageCleanup) {
+    constructor(_configService, storageMonitoring, storageCleanup) {
         const options = {
             timeout: 5000,
             threshold: 0.9,
         };
         super('storage', options);
-        this.configService = configService;
+        this._configService = _configService;
         this.storageMonitoring = storageMonitoring;
         this.storageCleanup = storageCleanup;
-        this.warningThreshold = this.configService.getOptional('storage.health.warningThreshold', 0.8);
-        this.criticalThreshold = this.configService.getOptional('storage.health.criticalThreshold', 0.9);
+        this._warningThreshold = this._configService.getOptional('storage.health.warningThreshold', 0.8);
+        this._criticalThreshold = this._configService.getOptional('storage.health.criticalThreshold', 0.9);
     }
     async performHealthCheck() {
         return this.executeWithTimeout(async () => {
             const thresholdCheck = await this.storageMonitoring.checkThresholds();
             const stats = thresholdCheck.stats;
             const cleanupStatus = this.storageCleanup.getCleanupStatus();
-            const maxSize = this.configService.getOptional('storage.maxSize', 1024 * 1024 * 1024);
+            const maxSize = this._configService.getOptional('storage.maxSize', 1024 * 1024 * 1024);
             const usagePercentage = stats.totalSize / maxSize;
             const recommendations = this.generateRecommendations(thresholdCheck, cleanupStatus);
             const details = {
@@ -52,10 +52,10 @@ let StorageHealthIndicator = class StorageHealthIndicator extends base_health_in
                     nextCleanup: cleanupStatus.nextCleanup.toISOString(),
                 },
                 thresholds: {
-                    warningSize: this.formatBytes(this.configService.getOptional('storage.warningSize', 800 * 1024 * 1024)),
-                    criticalSize: this.formatBytes(this.configService.getOptional('storage.criticalSize', 1024 * 1024 * 1024)),
-                    warningFileCount: this.configService.getOptional('storage.warningFileCount', 5000),
-                    criticalFileCount: this.configService.getOptional('storage.criticalFileCount', 10000),
+                    warningSize: this.formatBytes(this._configService.getOptional('storage.warningSize', 800 * 1024 * 1024)),
+                    criticalSize: this.formatBytes(this._configService.getOptional('storage.criticalSize', 1024 * 1024 * 1024)),
+                    warningFileCount: this._configService.getOptional('storage.warningFileCount', 5000),
+                    criticalFileCount: this._configService.getOptional('storage.criticalFileCount', 10000),
                 },
                 recommendations,
             };

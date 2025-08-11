@@ -41,9 +41,9 @@ export class JobQueueHealthIndicator extends BaseHealthIndicator {
 
 			return this.createHealthyResult(details)
 		}
-		catch (error) {
+		catch (error: unknown) {
 			return this.createUnhealthyResult('Job queue health check failed', {
-				error: error.message,
+				error: (error as Error).message,
 			})
 		}
 	}

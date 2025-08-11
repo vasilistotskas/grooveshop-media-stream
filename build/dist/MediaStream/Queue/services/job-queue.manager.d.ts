@@ -9,10 +9,10 @@ export declare class JobQueueManager implements OnModuleInit {
     private readonly queueService;
     private readonly imageProcessor;
     private readonly cacheProcessor;
-    private readonly correlationService;
-    private readonly logger;
+    private readonly _correlationService;
+    private readonly _logger;
     private readonly metrics;
-    constructor(queueService: BullQueueService, imageProcessor: ImageProcessingProcessor, cacheProcessor: CacheOperationsProcessor, correlationService: CorrelationService);
+    constructor(queueService: BullQueueService, imageProcessor: ImageProcessingProcessor, cacheProcessor: CacheOperationsProcessor, _correlationService: CorrelationService);
     onModuleInit(): Promise<void>;
     addImageProcessingJob(data: Omit<ImageProcessingJobData, 'correlationId'>, options?: Partial<JobOptions>): Promise<Job<ImageProcessingJobData>>;
     addCacheWarmingJob(data: Omit<CacheWarmingJobData, 'correlationId'>, options?: Partial<JobOptions>): Promise<Job<CacheWarmingJobData>>;

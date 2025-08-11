@@ -7,7 +7,7 @@ import { PerformanceTracker } from '../utils/performance-tracker.util'
 
 @Injectable()
 export class TimingMiddleware implements NestMiddleware {
-	constructor(private readonly correlationService: CorrelationService) {}
+	constructor(private readonly _correlationService: CorrelationService) {}
 
 	use(req: Request, res: Response, next: NextFunction): void {
 		const startTime = process.hrtime.bigint()
@@ -18,7 +18,7 @@ export class TimingMiddleware implements NestMiddleware {
 
 		// Override res.end to capture final timing
 		const originalEnd = res.end.bind(res)
-		const correlationService = this.correlationService
+		const correlationService = this._correlationService
 		res.end = function (chunk?: any, encoding?: any, cb?: any): Response {
 			const endTime = process.hrtime.bigint()
 			const endTimestamp = Date.now()

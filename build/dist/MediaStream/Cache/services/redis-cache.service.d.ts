@@ -3,13 +3,13 @@ import { MetricsService } from '@microservice/Metrics/services/metrics.service';
 import { OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { CacheStats, ICacheManager } from '../interfaces/cache-manager.interface';
 export declare class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleDestroy {
-    private readonly configService;
+    private readonly _configService;
     private readonly metricsService;
-    private readonly logger;
+    private readonly _logger;
     private redis;
     private isConnected;
     private stats;
-    constructor(configService: ConfigService, metricsService: MetricsService);
+    constructor(_configService: ConfigService, metricsService: MetricsService);
     onModuleInit(): Promise<void>;
     onModuleDestroy(): Promise<void>;
     private initializeRedis;

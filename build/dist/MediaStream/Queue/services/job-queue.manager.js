@@ -18,12 +18,12 @@ const image_processing_processor_1 = require("../processors/image-processing.pro
 const job_types_1 = require("../types/job.types");
 const bull_queue_service_1 = require("./bull-queue.service");
 let JobQueueManager = JobQueueManager_1 = class JobQueueManager {
-    constructor(queueService, imageProcessor, cacheProcessor, correlationService) {
+    constructor(queueService, imageProcessor, cacheProcessor, _correlationService) {
         this.queueService = queueService;
         this.imageProcessor = imageProcessor;
         this.cacheProcessor = cacheProcessor;
-        this.correlationService = correlationService;
-        this.logger = new common_1.Logger(JobQueueManager_1.name);
+        this._correlationService = _correlationService;
+        this._logger = new common_1.Logger(JobQueueManager_1.name);
         this.metrics = {
             totalJobs: 0,
             completedJobs: 0,
@@ -33,10 +33,10 @@ let JobQueueManager = JobQueueManager_1 = class JobQueueManager {
     }
     async onModuleInit() {
         this.setupJobProcessors();
-        this.logger.log('Job queue manager initialized');
+        this._logger.log('Job queue manager initialized');
     }
     async addImageProcessingJob(data, options = {}) {
-        const correlationId = this.correlationService.getCorrelationId();
+        const correlationId = this._correlationService.getCorrelationId();
         const jobData = {
             ...data,
             correlationId,
@@ -50,11 +50,11 @@ let JobQueueManager = JobQueueManager_1 = class JobQueueManager {
             ...options,
         };
         this.metrics.totalJobs++;
-        this.logger.debug(`Adding image processing job for URL: ${data.imageUrl}`);
+        this._logger.debug(`Adding image processing job for URL: ${data.imageUrl}`);
         return await this.queueService.add(job_types_1.JobType.IMAGE_PROCESSING, jobData, jobOptions);
     }
     async addCacheWarmingJob(data, options = {}) {
-        const correlationId = this.correlationService.getCorrelationId();
+        const correlationId = this._correlationService.getCorrelationId();
         const jobData = {
             ...data,
             correlationId,
@@ -68,11 +68,11 @@ let JobQueueManager = JobQueueManager_1 = class JobQueueManager {
             ...options,
         };
         this.metrics.totalJobs++;
-        this.logger.debug(`Adding cache warming job for ${data.imageUrls.length} images`);
+        this._logger.debug(`Adding cache warming job for ${data.imageUrls.length} images`);
         return await this.queueService.add(job_types_1.JobType.CACHE_WARMING, jobData, jobOptions);
     }
     async addCacheCleanupJob(data, options = {}) {
-        const correlationId = this.correlationService.getCorrelationId();
+        const correlationId = this._correlationService.getCorrelationId();
         const jobData = {
             ...data,
             correlationId,
@@ -85,7 +85,7 @@ let JobQueueManager = JobQueueManager_1 = class JobQueueManager {
             ...options,
         };
         this.metrics.totalJobs++;
-        this.logger.debug('Adding cache cleanup job');
+        this._logger.debug('Adding cache cleanup job');
         return await this.queueService.add(job_types_1.JobType.CACHE_CLEANUP, jobData, jobOptions);
     }
     async getJobById(jobId) {
@@ -96,11 +96,11 @@ let JobQueueManager = JobQueueManager_1 = class JobQueueManager {
     }
     async pauseQueues() {
         await this.queueService.pause();
-        this.logger.log('All queues paused');
+        this._logger.log('All queues paused');
     }
     async resumeQueues() {
         await this.queueService.resume();
-        this.logger.log('All queues resumed');
+        this._logger.log('All queues resumed');
     }
     async getQueueStats() {
         const queueStats = await this.queueService.getStats();
@@ -118,11 +118,11 @@ let JobQueueManager = JobQueueManager_1 = class JobQueueManager {
     }
     async cleanCompletedJobs(olderThan = 24 * 60 * 60 * 1000) {
         await this.queueService.clean(olderThan, 'completed');
-        this.logger.debug(`Cleaned completed jobs older than ${olderThan}ms`);
+        this._logger.debug(`Cleaned completed jobs older than ${olderThan}ms`);
     }
     async cleanFailedJobs(olderThan = 7 * 24 * 60 * 60 * 1000) {
         await this.queueService.clean(olderThan, 'failed');
-        this.logger.debug(`Cleaned failed jobs older than ${olderThan}ms`);
+        this._logger.debug(`Cleaned failed jobs older than ${olderThan}ms`);
     }
     setupJobProcessors() {
         this.queueService.process(job_types_1.JobType.IMAGE_PROCESSING, async (job) => {
@@ -167,7 +167,7 @@ let JobQueueManager = JobQueueManager_1 = class JobQueueManager {
                 throw error;
             }
         });
-        this.logger.debug('Job processors configured');
+        this._logger.debug('Job processors configured');
     }
     updateMetrics(success, processingTime) {
         if (success) {

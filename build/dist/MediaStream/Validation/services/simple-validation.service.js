@@ -17,12 +17,12 @@ const correlation_service_1 = require("../../Correlation/services/correlation.se
 const input_sanitization_service_1 = require("./input-sanitization.service");
 const security_checker_service_1 = require("./security-checker.service");
 let SimpleValidationService = SimpleValidationService_1 = class SimpleValidationService {
-    constructor(configService, correlationService, sanitizationService, securityChecker) {
-        this.configService = configService;
-        this.correlationService = correlationService;
+    constructor(_configService, _correlationService, sanitizationService, securityChecker) {
+        this._configService = _configService;
+        this._correlationService = _correlationService;
         this.sanitizationService = sanitizationService;
         this.securityChecker = securityChecker;
-        this.logger = new common_1.Logger(SimpleValidationService_1.name);
+        this._logger = new common_1.Logger(SimpleValidationService_1.name);
     }
     async validateCacheImageRequest(request) {
         const errors = [];
@@ -54,7 +54,7 @@ let SimpleValidationService = SimpleValidationService_1 = class SimpleValidation
             };
         }
         catch (error) {
-            this.logger.error('Validation error', error);
+            this._logger.error('Validation error', error);
             return {
                 isValid: false,
                 errors: ['Validation service error'],
@@ -76,7 +76,7 @@ let SimpleValidationService = SimpleValidationService_1 = class SimpleValidation
             };
         }
         catch (error) {
-            this.logger.error('Input validation error', error);
+            this._logger.error('Input validation error', error);
             return {
                 isValid: false,
                 errors: ['Input validation service error'],

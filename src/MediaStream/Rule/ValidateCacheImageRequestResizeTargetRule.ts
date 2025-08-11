@@ -7,7 +7,7 @@ export default class ValidateCacheImageRequestResizeTargetRule {
 	// 8K Squared
 	allowedPixelCount = 7680 * 4320
 
-	request: CacheImageRequest = null
+	request!: CacheImageRequest
 
 	public async setup(request: CacheImageRequest): Promise<void> {
 		this.request = request

@@ -32,9 +32,9 @@ export class SystemHealthIndicator extends BaseHealthIndicator {
 
 			return this.createHealthyResult(details)
 		}
-		catch (error) {
+		catch (error: unknown) {
 			return this.createUnhealthyResult('System health check failed', {
-				error: error.message,
+				error: (error as Error).message,
 				timestamp: Date.now(),
 			})
 		}
@@ -60,8 +60,8 @@ export class SystemHealthIndicator extends BaseHealthIndicator {
 				monitoringStats,
 			}
 		}
-		catch (error) {
-			this.logger.error(`Failed to get system status: ${error.message}`, error)
+		catch (error: unknown) {
+			this.logger.error(`Failed to get system status: ${(error as Error).message}`, error)
 			return {
 				healthy: false,
 				systemHealth: null,

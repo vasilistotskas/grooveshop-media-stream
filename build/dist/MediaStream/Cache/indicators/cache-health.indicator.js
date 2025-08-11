@@ -18,11 +18,11 @@ const common_1 = require("@nestjs/common");
 const cache_warming_service_1 = require("../services/cache-warming.service");
 const memory_cache_service_1 = require("../services/memory-cache.service");
 let CacheHealthIndicator = CacheHealthIndicator_1 = class CacheHealthIndicator extends base_health_indicator_1.BaseHealthIndicator {
-    constructor(memoryCacheService, cacheWarmingService, configService) {
+    constructor(memoryCacheService, cacheWarmingService, _configService) {
         super('cache');
         this.memoryCacheService = memoryCacheService;
         this.cacheWarmingService = cacheWarmingService;
-        this.configService = configService;
+        this._configService = _configService;
     }
     async performHealthCheck() {
         const startTime = Date.now();
@@ -43,7 +43,7 @@ let CacheHealthIndicator = CacheHealthIndicator_1 = class CacheHealthIndicator e
             const memoryUsage = this.memoryCacheService.getMemoryUsage();
             const warmupStats = await this.cacheWarmingService.getWarmupStats();
             const memoryUsagePercent = (memoryUsage.used / memoryUsage.total) * 100;
-            const memoryThreshold = this.configService.get('cache.memory.warningThreshold') || 80;
+            const memoryThreshold = this._configService.get('cache.memory.warningThreshold') || 80;
             const responseTime = Date.now() - startTime;
             const isHealthy = responseTime < 100 && memoryUsagePercent < 90;
             const result = {
@@ -124,9 +124,9 @@ let CacheHealthIndicator = CacheHealthIndicator_1 = class CacheHealthIndicator e
                 memory: memoryUsage,
                 warming: warmupStats,
                 configuration: {
-                    maxKeys: this.configService.get('cache.memory.maxKeys') || 1000,
-                    defaultTtl: this.configService.get('cache.memory.defaultTtl') || 3600,
-                    checkPeriod: this.configService.get('cache.memory.checkPeriod') || 600,
+                    maxKeys: this._configService.get('cache.memory.maxKeys') || 1000,
+                    defaultTtl: this._configService.get('cache.memory.defaultTtl') || 3600,
+                    checkPeriod: this._configService.get('cache.memory.checkPeriod') || 600,
                 },
                 recentKeys: keys.slice(0, 10),
                 lastUpdated: new Date().toISOString(),

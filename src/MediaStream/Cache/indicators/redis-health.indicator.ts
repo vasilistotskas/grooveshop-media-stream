@@ -9,7 +9,7 @@ import { RedisCacheService } from '../services/redis-cache.service'
 export class RedisHealthIndicator extends BaseHealthIndicator {
 	constructor(
 		private readonly redisCacheService: RedisCacheService,
-		private readonly configService: ConfigService,
+		private readonly _configService: ConfigService,
 	) {
 		super('redis')
 	}
@@ -66,9 +66,9 @@ export class RedisHealthIndicator extends BaseHealthIndicator {
 					responseTime: `${responseTime}ms`,
 					connection: {
 						connected: connectionStatus.connected,
-						host: this.configService.get('cache.redis.host'),
-						port: this.configService.get('cache.redis.port'),
-						db: this.configService.get('cache.redis.db'),
+						host: this._configService.get('cache.redis.host'),
+						port: this._configService.get('cache.redis.port'),
+						db: this._configService.get('cache.redis.db'),
 					},
 					statistics: {
 						hits: stats.hits,
@@ -102,20 +102,20 @@ export class RedisHealthIndicator extends BaseHealthIndicator {
 
 			return result
 		}
-		catch (error) {
+		catch (error: unknown) {
 			const responseTime = Date.now() - startTime
-			CorrelatedLogger.error(`Redis health check failed: ${error.message}`, error.stack, RedisHealthIndicator.name)
+			CorrelatedLogger.error(`Redis health check failed: ${(error as Error).message}`, (error as Error).stack, RedisHealthIndicator.name)
 
 			return {
 				[this.key]: {
 					status: 'down',
-					error: error.message,
+					error: (error as Error).message,
 					responseTime: `${responseTime}ms`,
 					connection: {
 						connected: false,
-						host: this.configService.get('cache.redis.host'),
-						port: this.configService.get('cache.redis.port'),
-						db: this.configService.get('cache.redis.db'),
+						host: this._configService.get('cache.redis.host'),
+						port: this._configService.get('cache.redis.port'),
+						db: this._configService.get('cache.redis.db'),
 					},
 					lastCheck: new Date().toISOString(),
 				},
@@ -162,9 +162,9 @@ export class RedisHealthIndicator extends BaseHealthIndicator {
 				status: connectionStatus.connected ? 'operational' : 'disconnected',
 				connection: {
 					connected: connectionStatus.connected,
-					host: this.configService.get('cache.redis.host'),
-					port: this.configService.get('cache.redis.port'),
-					db: this.configService.get('cache.redis.db'),
+					host: this._configService.get('cache.redis.host'),
+					port: this._configService.get('cache.redis.port'),
+					db: this._configService.get('cache.redis.db'),
 				},
 				statistics: {
 					...stats,
@@ -177,21 +177,21 @@ export class RedisHealthIndicator extends BaseHealthIndicator {
 					peakMB: Math.round(memoryUsage.peak / 1024 / 1024 * 100) / 100,
 				},
 				configuration: {
-					host: this.configService.get('cache.redis.host'),
-					port: this.configService.get('cache.redis.port'),
-					db: this.configService.get('cache.redis.db'),
-					ttl: this.configService.get('cache.redis.ttl'),
-					maxRetries: this.configService.get('cache.redis.maxRetries'),
+					host: this._configService.get('cache.redis.host'),
+					port: this._configService.get('cache.redis.port'),
+					db: this._configService.get('cache.redis.db'),
+					ttl: this._configService.get('cache.redis.ttl'),
+					maxRetries: this._configService.get('cache.redis.maxRetries'),
 				},
 				recentKeys: keys.slice(0, 10), // Show first 10 keys for debugging
 				lastUpdated: new Date().toISOString(),
 			}
 		}
-		catch (error) {
+		catch (error: unknown) {
 			return {
 				type: 'redis-cache',
 				status: 'error',
-				error: error.message,
+				error: (error as Error).message,
 				lastUpdated: new Date().toISOString(),
 			}
 		}

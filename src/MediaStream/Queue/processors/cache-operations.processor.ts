@@ -11,10 +11,10 @@ import { CacheCleanupJobData, CacheWarmingJobData, JobResult } from '../types/jo
 
 @Injectable()
 export class CacheOperationsProcessor {
-	private readonly logger = new Logger(CacheOperationsProcessor.name)
+	private readonly _logger = new Logger(CacheOperationsProcessor.name)
 
 	constructor(
-		private readonly correlationService: CorrelationService,
+		private readonly _correlationService: CorrelationService,
 		private readonly cacheManager: MultiLayerCacheManager,
 		private readonly httpClient: HttpClientService,
 	) {}
@@ -26,7 +26,7 @@ export class CacheOperationsProcessor {
 		try {
 			// Note: Correlation ID is already set in the job data
 
-			this.logger.debug(`Starting cache warming job ${job.id} for ${imageUrls.length} images`)
+			this._logger.debug(`Starting cache warming job ${job.id} for ${imageUrls.length} images`)
 
 			let processed = 0
 			let successful = 0
@@ -42,8 +42,8 @@ export class CacheOperationsProcessor {
 						successful++
 						return true
 					}
-					catch (error) {
-						this.logger.warn(`Failed to warm cache for ${url}:`, error)
+					catch (error: unknown) {
+						this._logger.warn(`Failed to warm cache for ${url}:`, error)
 						failed++
 						return false
 					}
@@ -54,11 +54,11 @@ export class CacheOperationsProcessor {
 
 				// Update progress
 				const progress = Math.round((processed / imageUrls.length) * 100)
-				this.logger.debug(`Cache warming progress: ${progress}% (${processed}/${imageUrls.length})`)
+				this._logger.debug(`Cache warming progress: ${progress}% (${processed}/${imageUrls.length})`)
 			}
 
 			const processingTime = Date.now() - startTime
-			this.logger.log(`Cache warming completed: ${successful} successful, ${failed} failed in ${processingTime}ms`)
+			this._logger.log(`Cache warming completed: ${successful} successful, ${failed} failed in ${processingTime}ms`)
 
 			return {
 				success: true,
@@ -66,13 +66,13 @@ export class CacheOperationsProcessor {
 				processingTime,
 			}
 		}
-		catch (error) {
+		catch (error: unknown) {
 			const processingTime = Date.now() - startTime
-			this.logger.error(`Cache warming job ${job.id} failed:`, error)
+			this._logger.error(`Cache warming job ${job.id} failed:`, error)
 
 			return {
 				success: false,
-				error: error.message,
+				error: (error as Error).message,
 				processingTime,
 			}
 		}
@@ -85,7 +85,7 @@ export class CacheOperationsProcessor {
 		try {
 			// Note: Correlation ID is already set in the job data
 
-			this.logger.debug(`Starting cache cleanup job ${job.id}`)
+			this._logger.debug(`Starting cache cleanup job ${job.id}`)
 
 			const cleanupResults = await Promise.allSettled([
 				this.cleanupMemoryCache(),
@@ -108,10 +108,10 @@ export class CacheOperationsProcessor {
 			const processingTime = Date.now() - startTime
 
 			if (errors.length > 0) {
-				this.logger.warn(`Cache cleanup completed with errors: ${errors.join(', ')}`)
+				this._logger.warn(`Cache cleanup completed with errors: ${errors.join(', ')}`)
 			}
 			else {
-				this.logger.log(`Cache cleanup completed: ${totalCleaned} items cleaned in ${processingTime}ms`)
+				this._logger.log(`Cache cleanup completed: ${totalCleaned} items cleaned in ${processingTime}ms`)
 			}
 
 			return {
@@ -120,13 +120,13 @@ export class CacheOperationsProcessor {
 				processingTime,
 			}
 		}
-		catch (error) {
+		catch (error: unknown) {
 			const processingTime = Date.now() - startTime
-			this.logger.error(`Cache cleanup job ${job.id} failed:`, error)
+			this._logger.error(`Cache cleanup job ${job.id} failed:`, error)
 
 			return {
 				success: false,
-				error: error.message,
+				error: (error as Error).message,
 				processingTime,
 			}
 		}
@@ -140,7 +140,7 @@ export class CacheOperationsProcessor {
 			// Check if already cached
 			const cached = await this.cacheManager.get('images', cacheKey)
 			if (cached) {
-				this.logger.debug(`Image already cached: ${imageUrl}`)
+				this._logger.debug(`Image already cached: ${imageUrl}`)
 				return
 			}
 
@@ -153,10 +153,10 @@ export class CacheOperationsProcessor {
 			const buffer = Buffer.from(response.data)
 			await this.cacheManager.set('images', cacheKey, buffer.toString('base64'), 3600) // 1 hour TTL
 
-			this.logger.debug(`Cached image: ${imageUrl}`)
+			this._logger.debug(`Cached image: ${imageUrl}`)
 		}
-		catch (error) {
-			throw new Error(`Failed to warm cache for ${imageUrl}: ${error.message}`)
+		catch (error: unknown) {
+			throw new Error(`Failed to warm cache for ${imageUrl}: ${(error as Error).message}`)
 		}
 	}
 
@@ -169,11 +169,11 @@ export class CacheOperationsProcessor {
 			// In a real implementation, this would be more sophisticated
 			const cleaned = 0
 
-			this.logger.debug(`Memory cache cleanup completed: ${cleaned} items cleaned`)
+			this._logger.debug(`Memory cache cleanup completed: ${cleaned} items cleaned`)
 			return { cleaned }
 		}
-		catch (error) {
-			throw new Error(`Memory cache cleanup failed: ${error.message}`)
+		catch (error: unknown) {
+			throw new Error(`Memory cache cleanup failed: ${(error as Error).message}`)
 		}
 	}
 
@@ -207,21 +207,21 @@ export class CacheOperationsProcessor {
 						}
 					}
 					catch (fileError) {
-						this.logger.warn(`Failed to process file ${file}:`, fileError)
+						this._logger.warn(`Failed to process file ${file}:`, fileError)
 					}
 				}
 			}
 			catch (dirError) {
-				if (dirError.code !== 'ENOENT') {
+				if ((dirError as any).code !== 'ENOENT') {
 					throw dirError
 				}
 			}
 
-			this.logger.debug(`File cache cleanup completed: ${cleaned} files cleaned`)
+			this._logger.debug(`File cache cleanup completed: ${cleaned} files cleaned`)
 			return { cleaned }
 		}
-		catch (error) {
-			throw new Error(`File cache cleanup failed: ${error.message}`)
+		catch (error: unknown) {
+			throw new Error(`File cache cleanup failed: ${(error as Error).message}`)
 		}
 	}
 

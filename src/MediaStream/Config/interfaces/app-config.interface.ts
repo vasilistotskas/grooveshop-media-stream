@@ -15,7 +15,7 @@ export interface MemoryCacheConfig {
 	defaultTtl: number
 	checkPeriod: number
 	maxKeys: number
-	warningThreshold: number
+	_warningThreshold: number
 }
 
 export interface RedisConfig {

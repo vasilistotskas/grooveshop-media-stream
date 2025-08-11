@@ -20,13 +20,13 @@ export interface EvictionConfig {
     maxFileAge: number;
 }
 export declare class IntelligentEvictionService {
-    private readonly configService;
+    private readonly _configService;
     private readonly storageMonitoring;
-    private readonly logger;
+    private readonly _logger;
     private readonly storageDirectory;
     private readonly config;
     private readonly strategies;
-    constructor(configService: ConfigService, storageMonitoring: StorageMonitoringService);
+    constructor(_configService: ConfigService, storageMonitoring: StorageMonitoringService);
     performEviction(targetSize?: number): Promise<EvictionResult>;
     performThresholdBasedEviction(): Promise<EvictionResult>;
     getEvictionRecommendations(targetSize?: number): Promise<{

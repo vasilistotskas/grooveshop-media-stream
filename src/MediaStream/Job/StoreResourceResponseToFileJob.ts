@@ -5,11 +5,11 @@ import { Injectable, Logger, Scope } from '@nestjs/common'
 
 @Injectable({ scope: Scope.REQUEST })
 export default class StoreResourceResponseToFileJob {
-	private readonly logger = new Logger(StoreResourceResponseToFileJob.name)
+	private readonly _logger = new Logger(StoreResourceResponseToFileJob.name)
 
 	async handle(resourceName: string, path: string, response: AxiosResponse): Promise<void> {
 		if (!response.data || typeof response.data.pipe !== 'function') {
-			this.logger.error('No data found in response or data is not streamable')
+			this._logger.error('No data found in response or data is not streamable')
 			throw new UnableToStoreFetchedResourceException(resourceName)
 		}
 
@@ -25,7 +25,7 @@ export default class StoreResourceResponseToFileJob {
 			})
 		}
 		catch (e) {
-			this.logger.error(e)
+			this._logger.error(e)
 			throw new UnableToStoreFetchedResourceException(resourceName)
 		}
 	}

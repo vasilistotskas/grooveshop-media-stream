@@ -4,7 +4,7 @@ import * as promClient from 'prom-client'
 
 @Injectable()
 export class RateLimitMetricsService implements OnModuleInit {
-	private readonly logger = new Logger(RateLimitMetricsService.name)
+	private readonly _logger = new Logger(RateLimitMetricsService.name)
 	private readonly register: promClient.Registry
 
 	// Rate limiting metrics
@@ -15,7 +15,7 @@ export class RateLimitMetricsService implements OnModuleInit {
 	private readonly rateLimitSystemLoad: promClient.Gauge
 
 	constructor(
-		private readonly configService: ConfigService,
+		private readonly _configService: ConfigService,
 	) {
 		// Create a separate registry for rate limit metrics to avoid conflicts
 		this.register = new promClient.Registry()
@@ -62,8 +62,8 @@ export class RateLimitMetricsService implements OnModuleInit {
 	}
 
 	async onModuleInit(): Promise<void> {
-		if (this.configService.get('monitoring.enabled')) {
-			this.logger.log('Rate limit metrics service initialized')
+		if (this._configService.get('monitoring.enabled')) {
+			this._logger.log('Rate limit metrics service initialized')
 		}
 	}
 
@@ -138,8 +138,8 @@ export class RateLimitMetricsService implements OnModuleInit {
 				topRequestTypes: [],
 			}
 		}
-		catch (error) {
-			this.logger.error('Failed to get rate limit stats:', error)
+		catch (error: unknown) {
+			this._logger.error('Failed to get rate limit stats:', error)
 			throw error
 		}
 	}
@@ -154,10 +154,10 @@ export class RateLimitMetricsService implements OnModuleInit {
 		windowMs: number
 	} {
 		return {
-			defaultLimit: this.configService.getOptional('rateLimit.default.max', 100),
-			imageProcessingLimit: this.configService.getOptional('rateLimit.imageProcessing.max', 50),
-			healthCheckLimit: this.configService.getOptional('rateLimit.healthCheck.max', 1000),
-			windowMs: this.configService.getOptional('rateLimit.default.windowMs', 60000),
+			defaultLimit: this._configService.getOptional('rateLimit.default.max', 100),
+			imageProcessingLimit: this._configService.getOptional('rateLimit.imageProcessing.max', 50),
+			healthCheckLimit: this._configService.getOptional('rateLimit.healthCheck.max', 1000),
+			windowMs: this._configService.getOptional('rateLimit.default.windowMs', 60000),
 		}
 	}
 

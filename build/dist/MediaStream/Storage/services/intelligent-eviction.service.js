@@ -18,18 +18,18 @@ const logger_util_1 = require("../../Correlation/utils/logger.util");
 const common_1 = require("@nestjs/common");
 const storage_monitoring_service_1 = require("./storage-monitoring.service");
 let IntelligentEvictionService = IntelligentEvictionService_1 = class IntelligentEvictionService {
-    constructor(configService, storageMonitoring) {
-        this.configService = configService;
+    constructor(_configService, storageMonitoring) {
+        this._configService = _configService;
         this.storageMonitoring = storageMonitoring;
-        this.logger = new common_1.Logger(IntelligentEvictionService_1.name);
+        this._logger = new common_1.Logger(IntelligentEvictionService_1.name);
         this.strategies = new Map();
-        this.storageDirectory = this.configService.getOptional('cache.file.directory', './storage');
+        this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage');
         this.config = {
-            strategy: this.configService.getOptional('storage.eviction.strategy', 'intelligent'),
-            aggressiveness: this.configService.getOptional('storage.eviction.aggressiveness', 'moderate'),
-            preservePopular: this.configService.getOptional('storage.eviction.preservePopular', true),
-            minAccessCount: this.configService.getOptional('storage.eviction.minAccessCount', 5),
-            maxFileAge: this.configService.getOptional('storage.eviction.maxFileAge', 7),
+            strategy: this._configService.getOptional('storage.eviction.strategy', 'intelligent'),
+            aggressiveness: this._configService.getOptional('storage.eviction.aggressiveness', 'moderate'),
+            preservePopular: this._configService.getOptional('storage.eviction.preservePopular', true),
+            minAccessCount: this._configService.getOptional('storage.eviction.minAccessCount', 5),
+            maxFileAge: this._configService.getOptional('storage.eviction.maxFileAge', 7),
         };
         this.initializeStrategies();
     }

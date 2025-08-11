@@ -80,13 +80,13 @@ function parseColor(color: string): RGBA {
 }
 
 export class ResizeOptions {
-	width: number | null = null
-	height: number | null = null
+	width: number | null = null as any
+	height: number | null = null as any
 	fit = FitOptions.contain
 	position: PositionOptions | string = PositionOptions.entropy
 	format = SupportedResizeFormats.webp
 	background: Color = BackgroundOptions.white
-	trimThreshold: null | number = null
+	trimThreshold: null | number = null as any
 	quality = 100
 
 	constructor(data?: Partial<ResizeOptions>) {
@@ -102,7 +102,7 @@ export class ResizeOptions {
 
 		Object.assign(this, rest);
 
-		['width', 'height'].forEach((sizeOption: keyof ResizeOptions) => {
+		['width', 'height'].forEach((sizeOption: string) => {
 			if (data && data[sizeOption] === null) {
 				delete this[sizeOption]
 			}

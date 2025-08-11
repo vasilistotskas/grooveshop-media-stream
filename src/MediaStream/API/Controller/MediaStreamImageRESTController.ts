@@ -34,15 +34,15 @@ import { Controller, Get, Logger, Param, Req, Res, Scope, UseGuards } from '@nes
 })
 @UseGuards(AdaptiveRateLimitGuard)
 export default class MediaStreamImageRESTController {
-	private readonly logger = new Logger(MediaStreamImageRESTController.name)
+	private readonly _logger = new Logger(MediaStreamImageRESTController.name)
 
 	constructor(
-		private readonly httpService: HttpService,
+		private readonly _httpService: HttpService,
 		private readonly generateResourceIdentityFromRequestJob: GenerateResourceIdentityFromRequestJob,
 		private readonly cacheImageResourceOperation: CacheImageResourceOperation,
 		private readonly inputSanitizationService: InputSanitizationService,
 		private readonly securityCheckerService: SecurityCheckerService,
-		private readonly correlationService: CorrelationService,
+		private readonly _correlationService: CorrelationService,
 		private readonly metricsService: MetricsService,
 	) {}
 
@@ -50,7 +50,7 @@ export default class MediaStreamImageRESTController {
 	 * Validates request parameters using the new validation infrastructure
 	 */
 	private async validateRequestParameters(params: any): Promise<void> {
-		const correlationId = this.correlationService.getCorrelationId()
+		const correlationId = this._correlationService.getCorrelationId()
 
 		// Security validation
 		if (params.imageType) {
@@ -123,7 +123,7 @@ export default class MediaStreamImageRESTController {
 	 */
 	protected addHeadersToRequest(res: Response, headers: ResourceMetaData): Response {
 		if (!headers) {
-			const correlationId = this.correlationService.getCorrelationId()
+			const correlationId = this._correlationService.getCorrelationId()
 			throw new InvalidRequestError('Headers object is undefined', {
 				headers,
 				correlationId,
@@ -134,7 +134,7 @@ export default class MediaStreamImageRESTController {
 		const format = headers.format || 'png'
 		const publicTTL = headers.publicTTL || 0
 		const expiresAt = Date.now() + publicTTL
-		const correlationId = this.correlationService.getCorrelationId()
+		const correlationId = this._correlationService.getCorrelationId()
 
 		res
 			.header('Content-Length', size)
@@ -160,7 +160,7 @@ export default class MediaStreamImageRESTController {
 	 * @protected
 	 */
 	private async handleStreamOrFallback(request: CacheImageRequest, res: Response): Promise<void> {
-		const correlationId = this.correlationService.getCorrelationId()
+		const correlationId = this._correlationService.getCorrelationId()
 		PerformanceTracker.startPhase('image_request_processing')
 
 		try {
@@ -169,24 +169,24 @@ export default class MediaStreamImageRESTController {
 			await this.cacheImageResourceOperation.setup(request)
 
 			if (await this.cacheImageResourceOperation.resourceExists) {
-				this.logger.debug('Resource exists, attempting to stream.', {
+				this._logger.debug('Resource exists, attempting to stream.', {
 					request,
 					correlationId,
 				})
 				await this.streamResource(request, res)
 			}
 			else {
-				this.logger.debug('Resource does not exist, attempting to fetch or fallback to default.', {
+				this._logger.debug('Resource does not exist, attempting to fetch or fallback to default.', {
 					request,
 					correlationId,
 				})
 				await this.fetchAndStreamResource(request, res)
 			}
 		}
-		catch (error) {
+		catch (error: unknown) {
 			const context = { request, error, correlationId }
-			this.logger.error(
-				`Error while processing the image request: ${error.message || error}`,
+			this._logger.error(
+				`Error while processing the image request: ${(error as Error).message || error}`,
 				error,
 				context,
 			)
@@ -215,12 +215,12 @@ export default class MediaStreamImageRESTController {
 	 * @private
 	 */
 	private async streamFileToResponse(filePath: string, headers: ResourceMetaData, res: Response): Promise<void> {
-		const correlationId = this.correlationService.getCorrelationId()
+		const correlationId = this._correlationService.getCorrelationId()
 		PerformanceTracker.startPhase('file_streaming')
-		let fd = null
+		let fd = null as any
 
 		try {
-			this.logger.debug(`Streaming file: ${filePath}`, {
+			this._logger.debug(`Streaming file: ${filePath}`, {
 				filePath,
 				headers,
 				correlationId,
@@ -238,9 +238,9 @@ export default class MediaStreamImageRESTController {
 					fileStream.on('end', () => {
 						resolve()
 					})
-					fileStream.on('error', (error) => {
+					fileStream.on('error', (error: unknown) => {
 						const context = { filePath, headers, error, correlationId }
-						this.logger.error(`Stream error: ${error.message || error}`, error, context)
+						this._logger.error(`Stream error: ${(error as Error).message || error}`, error, context)
 						this.metricsService.recordError('file_stream', 'stream_error')
 						reject(new ResourceStreamingError('Error streaming file', context))
 					})
@@ -258,11 +258,11 @@ export default class MediaStreamImageRESTController {
 				})
 			}
 		}
-		catch (error) {
-			if (error.name !== 'ResourceStreamingError') {
+		catch (error: unknown) {
+			if ((error as any).name !== 'ResourceStreamingError') {
 				throw new ResourceStreamingError('Failed to stream file', {
 					filePath,
-					error: error.message || error,
+					error: (error as Error).message || error,
 					correlationId,
 				})
 			}
@@ -272,8 +272,8 @@ export default class MediaStreamImageRESTController {
 			PerformanceTracker.endPhase('file_streaming')
 
 			if (fd) {
-				await fd.close().catch((err) => {
-					this.logger.error(`Error closing file descriptor: ${err.message || err}`, err, {
+				await fd.close().catch((err: unknown) => {
+					this._logger.error(`Error closing file descriptor: ${(err as Error).message || err}`, err, {
 						filePath,
 						correlationId,
 					})
@@ -283,11 +283,11 @@ export default class MediaStreamImageRESTController {
 	}
 
 	private async streamResource(request: CacheImageRequest, res: Response): Promise<void> {
-		const correlationId = this.correlationService.getCorrelationId()
+		const correlationId = this._correlationService.getCorrelationId()
 		const headers = await this.cacheImageResourceOperation.getHeaders
 
 		if (!headers) {
-			this.logger.warn('Resource metadata is missing or invalid.', {
+			this._logger.warn('Resource metadata is missing or invalid.', {
 				request,
 				correlationId,
 			})
@@ -315,14 +315,14 @@ export default class MediaStreamImageRESTController {
 				res,
 			)
 		}
-		catch (error) {
+		catch (error: unknown) {
 			const context = {
 				request,
 				resourcePath: this.cacheImageResourceOperation.getResourcePath,
-				error: error.message || error,
+				error: (error as Error).message || error,
 				correlationId,
 			}
-			this.logger.error(`Error while streaming resource: ${error.message || error}`, error, context)
+			this._logger.error(`Error while streaming resource: ${(error as Error).message || error}`, error, context)
 			await this.defaultImageFallback(request, res)
 		}
 		finally {
@@ -338,7 +338,7 @@ export default class MediaStreamImageRESTController {
 	 * @protected
 	 */
 	private async fetchAndStreamResource(request: CacheImageRequest, res: Response): Promise<void> {
-		const correlationId = this.correlationService.getCorrelationId()
+		const correlationId = this._correlationService.getCorrelationId()
 
 		try {
 			await this.cacheImageResourceOperation.execute()
@@ -352,7 +352,7 @@ export default class MediaStreamImageRESTController {
 			const headers = await this.cacheImageResourceOperation.getHeaders
 
 			if (!headers) {
-				this.logger.warn('Failed to fetch resource or generate headers.', {
+				this._logger.warn('Failed to fetch resource or generate headers.', {
 					request,
 					correlationId,
 				})
@@ -379,14 +379,14 @@ export default class MediaStreamImageRESTController {
 				res,
 			)
 		}
-		catch (error) {
+		catch (error: unknown) {
 			const context = {
 				request,
 				resourcePath: this.cacheImageResourceOperation.getResourcePath,
-				error: error.message || error,
+				error: (error as Error).message || error,
 				correlationId,
 			}
-			this.logger.error(`Error during resource fetch and stream: ${error.message || error}`, error, context)
+			this._logger.error(`Error during resource fetch and stream: ${(error as Error).message || error}`, error, context)
 			await this.defaultImageFallback(request, res)
 		}
 	}
@@ -399,7 +399,7 @@ export default class MediaStreamImageRESTController {
 	 * @protected
 	 */
 	private async defaultImageFallback(request: CacheImageRequest, res: Response): Promise<void> {
-		const correlationId = this.correlationService.getCorrelationId()
+		const correlationId = this._correlationService.getCorrelationId()
 
 		try {
 			const optimizedDefaultImagePath = await this.cacheImageResourceOperation.optimizeAndServeDefaultImage(
@@ -417,7 +417,7 @@ export default class MediaStreamImageRESTController {
 				error: defaultImageError.message || defaultImageError,
 				correlationId,
 			}
-			this.logger.error(`Failed to serve default image: ${defaultImageError.message || defaultImageError}`, defaultImageError, context)
+			this._logger.error(`Failed to serve default image: ${defaultImageError.message || defaultImageError}`, defaultImageError, context)
 			this.metricsService.recordError('default_image_fallback', 'fallback_error')
 			throw new DefaultImageFallbackError('Failed to process the image request', context)
 		}
@@ -444,7 +444,7 @@ export default class MediaStreamImageRESTController {
     @Req() req: Request,
     @Res() res: Response,
 	): Promise<void> {
-		const correlationId = this.correlationService.getCorrelationId()
+		const correlationId = this._correlationService.getCorrelationId()
 		PerformanceTracker.startPhase('uploaded_image_request')
 
 		try {
@@ -486,7 +486,7 @@ export default class MediaStreamImageRESTController {
 				resizeOptions,
 			})
 
-			this.logger.debug(`Uploaded image request`, {
+			this._logger.debug(`Uploaded image request`, {
 				request: {
 					imageType,
 					image,
@@ -500,7 +500,7 @@ export default class MediaStreamImageRESTController {
 
 			await this.handleStreamOrFallback(request, res)
 		}
-		catch (error) {
+		catch (error: unknown) {
 			const context = {
 				imageType,
 				image,
@@ -509,9 +509,9 @@ export default class MediaStreamImageRESTController {
 				format,
 				quality,
 				correlationId,
-				error: error.message || error,
+				error: (error as Error).message || error,
 			}
-			this.logger.error(`Error in uploadedImage: ${error.message || error}`, error, context)
+			this._logger.error(`Error in uploadedImage: ${(error as Error).message || error}`, error, context)
 			this.metricsService.recordError('uploaded_image_request', error.constructor.name)
 			throw error
 		}
@@ -534,7 +534,7 @@ export default class MediaStreamImageRESTController {
 		@Req() req: Request,
 		@Res() res: Response,
 	): Promise<void> {
-		const correlationId = this.correlationService.getCorrelationId()
+		const correlationId = this._correlationService.getCorrelationId()
 		PerformanceTracker.startPhase('static_image_request')
 
 		try {
@@ -573,7 +573,7 @@ export default class MediaStreamImageRESTController {
 				}),
 			})
 
-			this.logger.debug(`Static image request`, {
+			this._logger.debug(`Static image request`, {
 				request: {
 					image,
 					width,
@@ -586,7 +586,7 @@ export default class MediaStreamImageRESTController {
 
 			await this.handleStreamOrFallback(request, res)
 		}
-		catch (error) {
+		catch (error: unknown) {
 			const context = {
 				image,
 				width,
@@ -594,9 +594,9 @@ export default class MediaStreamImageRESTController {
 				format,
 				quality,
 				correlationId,
-				error: error.message || error,
+				error: (error as Error).message || error,
 			}
-			this.logger.error(`Error in staticImage: ${error.message || error}`, error, context)
+			this._logger.error(`Error in staticImage: ${(error as Error).message || error}`, error, context)
 			this.metricsService.recordError('static_image_request', error.constructor.name)
 			throw error
 		}

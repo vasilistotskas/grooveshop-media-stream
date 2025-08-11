@@ -6,17 +6,17 @@ import { MonitoringService } from './monitoring.service'
 
 @Injectable()
 export class PerformanceMonitoringService {
-	private readonly logger = new Logger(PerformanceMonitoringService.name)
+	private readonly _logger = new Logger(PerformanceMonitoringService.name)
 	private readonly performanceData = new Map<string, PerformanceMetrics[]>()
 	private readonly config: MonitoringConfig
 	private readonly activeOperations = new Map<string, { startTime: number, metadata?: any }>()
 
 	constructor(
-		private readonly configService: ConfigService,
-		private readonly correlationService: CorrelationService,
+		private readonly _configService: ConfigService,
+		private readonly _correlationService: CorrelationService,
 		private readonly monitoringService: MonitoringService,
 	) {
-		this.config = this.configService.get<MonitoringConfig>('monitoring', {
+		this.config = this._configService.get<MonitoringConfig>('monitoring', {
 			enabled: true,
 			metricsRetentionMs: 24 * 60 * 60 * 1000,
 			alertsRetentionMs: 7 * 24 * 60 * 60 * 1000,
@@ -31,7 +31,7 @@ export class PerformanceMonitoringService {
 
 		if (this.config.enabled) {
 			this.startPerformanceCleanup()
-			this.logger.log('Performance monitoring service initialized')
+			this._logger.log('Performance monitoring service initialized')
 		}
 	}
 
@@ -48,8 +48,8 @@ export class PerformanceMonitoringService {
 			metadata,
 		})
 
-		this.logger.debug(`Started tracking operation: ${operationName}`, {
-			correlationId: this.correlationService.getCorrelationId(),
+		this._logger.debug(`Started tracking operation: ${operationName}`, {
+			correlationId: this._correlationService.getCorrelationId(),
 			operationId,
 			operationName,
 		})
@@ -66,7 +66,7 @@ export class PerformanceMonitoringService {
 
 		const operation = this.activeOperations.get(operationId)
 		if (!operation) {
-			this.logger.warn(`Operation not found: ${operationId}`)
+			this._logger.warn(`Operation not found: ${operationId}`)
 			return
 		}
 
@@ -96,8 +96,8 @@ export class PerformanceMonitoringService {
 			this.monitoringService.incrementCounter(`performance.${operationName}.error`)
 		}
 
-		this.logger.debug(`Completed operation: ${operationName}`, {
-			correlationId: this.correlationService.getCorrelationId(),
+		this._logger.debug(`Completed operation: ${operationName}`, {
+			correlationId: this._correlationService.getCorrelationId(),
 			operationId,
 			duration,
 			success,
@@ -114,8 +114,8 @@ export class PerformanceMonitoringService {
 			this.endOperation(operationId, true)
 			return result
 		}
-		catch (error) {
-			this.endOperation(operationId, false, error.message || error.toString())
+		catch (error: unknown) {
+			this.endOperation(operationId, false, (error as Error).message || error.toString())
 			throw error
 		}
 	}
@@ -134,8 +134,8 @@ export class PerformanceMonitoringService {
 			this.endOperation(operationId, true)
 			return result
 		}
-		catch (error) {
-			this.endOperation(operationId, false, error.message || error.toString())
+		catch (error: unknown) {
+			this.endOperation(operationId, false, (error as Error).message || error.toString())
 			throw error
 		}
 	}
@@ -184,8 +184,8 @@ export class PerformanceMonitoringService {
 
 		const successful = metrics.filter(m => m.success)
 		const failed = metrics.filter(m => !m.success)
-		const durations = metrics.map(m => m.duration).sort((a, b) => a - b)
-		const totalDuration = durations.reduce((sum, d) => sum + d, 0)
+		const durations = metrics.map(m => m.duration).sort((a: any, b: any) => a - b)
+		const totalDuration = durations.reduce((sum: any, d: any) => sum + d, 0)
 
 		return {
 			totalOperations: metrics.length,
@@ -280,18 +280,18 @@ export class PerformanceMonitoringService {
 
 		// Sort for top lists
 		const slowestOperations = [...operationStats]
-			.sort((a, b) => b.avgDuration - a.avgDuration)
+			.sort((a: any, b: any) => b.avgDuration - a.avgDuration)
 			.slice(0, 5)
 			.map(op => ({ name: op.name, avgDuration: op.avgDuration }))
 
 		const mostFrequentOperations = [...operationStats]
-			.sort((a, b) => b.count - a.count)
+			.sort((a: any, b: any) => b.count - a.count)
 			.slice(0, 5)
 			.map(op => ({ name: op.name, count: op.count }))
 
 		const errorRates = [...operationStats]
 			.filter(op => op.errorRate > 0)
-			.sort((a, b) => b.errorRate - a.errorRate)
+			.sort((a: any, b: any) => b.errorRate - a.errorRate)
 			.slice(0, 5)
 			.map(op => ({ name: op.name, errorRate: op.errorRate }))
 
@@ -360,7 +360,7 @@ export class PerformanceMonitoringService {
 		}
 
 		if (removedCount > 0) {
-			this.logger.debug(`Cleaned up ${removedCount} old performance metrics`)
+			this._logger.debug(`Cleaned up ${removedCount} old performance metrics`)
 		}
 	}
 }

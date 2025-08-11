@@ -12,11 +12,11 @@ export class HttpHealthIndicator extends BaseHealthIndicator {
 
 	constructor(
 		private readonly httpClient: HttpClientService,
-		private readonly configService: ConfigService,
+		private readonly _configService: ConfigService,
 	) {
 		super('http')
-		this.healthCheckUrls = this.configService.getOptional('http.healthCheck.urls', [])
-		this.timeout = this.configService.getOptional('http.healthCheck.timeout', 5000)
+		this.healthCheckUrls = this._configService.getOptional('http.healthCheck.urls', [])
+		this.timeout = this._configService.getOptional('http.healthCheck.timeout', 5000)
 	}
 
 	protected async performHealthCheck(): Promise<HealthIndicatorResult> {
@@ -55,10 +55,10 @@ export class HttpHealthIndicator extends BaseHealthIndicator {
 							success: response.status >= 200 && response.status < 300,
 						}
 					}
-					catch (error) {
+					catch (error: unknown) {
 						return {
 							url,
-							error: error.message,
+							error: (error as Error).message,
 							success: false,
 						}
 					}
@@ -103,18 +103,18 @@ export class HttpHealthIndicator extends BaseHealthIndicator {
 				stats,
 			})
 		}
-		catch (error) {
+		catch (error: unknown) {
 			CorrelatedLogger.error(
-				`HTTP health check error: ${error.message}`,
-				error.stack,
+				`HTTP health check error: ${(error as Error).message}`,
+				(error as Error).stack,
 				HttpHealthIndicator.name,
 			)
 
-			return this.createUnhealthyResult(error.message, {
+			return this.createUnhealthyResult((error as Error).message, {
 				circuitBreaker: circuitBreakerOpen ? 'open' : 'closed',
 				checks: [{
 					url: 'unknown',
-					error: error.message,
+					error: (error as Error).message,
 					success: false,
 				}],
 				stats,

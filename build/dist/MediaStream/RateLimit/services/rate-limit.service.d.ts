@@ -19,12 +19,12 @@ export interface SystemLoadInfo {
     activeConnections: number;
 }
 export declare class RateLimitService {
-    private readonly configService;
+    private readonly _configService;
     private readonly metricsService;
-    private readonly logger;
+    private readonly _logger;
     private readonly requestCounts;
     private readonly systemLoadThresholds;
-    constructor(configService: ConfigService, metricsService: MetricsService);
+    constructor(_configService: ConfigService, metricsService: MetricsService);
     generateKey(ip: string, requestType: string): string;
     generateAdvancedKey(ip: string, userAgent: string, requestType: string): string;
     getRateLimitConfig(requestType: string): RateLimitConfig;

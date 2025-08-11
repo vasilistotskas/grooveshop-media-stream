@@ -3,16 +3,16 @@ import { CorrelationService } from '../../Correlation/services/correlation.servi
 import { Alert, AlertRule, AlertSeverity } from '../interfaces/monitoring.interface';
 import { MonitoringService } from './monitoring.service';
 export declare class AlertService {
-    private readonly configService;
-    private readonly correlationService;
+    private readonly _configService;
+    private readonly _correlationService;
     private readonly monitoringService;
-    private readonly logger;
+    private readonly _logger;
     private readonly alertRules;
     private readonly activeAlerts;
     private readonly alertHistory;
     private readonly config;
     private readonly alertCooldowns;
-    constructor(configService: ConfigService, correlationService: CorrelationService, monitoringService: MonitoringService);
+    constructor(_configService: ConfigService, _correlationService: CorrelationService, monitoringService: MonitoringService);
     addAlertRule(rule: AlertRule): void;
     removeAlertRule(ruleId: string): boolean;
     getAlertRules(): AlertRule[];

@@ -5,22 +5,22 @@ import { AxiosResponse, isAxiosError } from 'axios'
 
 @Injectable({ scope: Scope.REQUEST })
 export default class FetchResourceResponseJob {
-	private readonly logger = new Logger(FetchResourceResponseJob.name)
-	constructor(private readonly httpService: HttpService) {
-		this.logger.debug('HttpService has been injected successfully')
+	private readonly _logger = new Logger(FetchResourceResponseJob.name)
+	constructor(private readonly _httpService: HttpService) {
+		this._logger.debug('HttpService has been injected successfully')
 	}
 
 	async handle(request: CacheImageRequest): Promise<AxiosResponse> {
 		try {
-			return await this.httpService.axiosRef({
+			return await this._httpService.axiosRef({
 				url: request.resourceTarget,
 				method: 'GET',
 				responseType: 'stream',
 			})
 		}
-		catch (error) {
+		catch (error: unknown) {
 			if (isAxiosError(error)) {
-				this.logger.error(error.toJSON())
+				this._logger.error(error.toJSON())
 				return {
 					status: error.response?.status ?? 404,
 					statusText: error.response?.statusText ?? 'Bad Request',
@@ -30,7 +30,7 @@ export default class FetchResourceResponseJob {
 				}
 			}
 			else {
-				this.logger.error('Unknown error occurred while fetching resource')
+				this._logger.error('Unknown error occurred while fetching resource')
 				throw error
 			}
 		}

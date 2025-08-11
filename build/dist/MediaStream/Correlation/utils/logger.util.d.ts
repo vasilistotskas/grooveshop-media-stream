@@ -1,5 +1,8 @@
+import { CorrelationService } from '../services/correlation.service';
 export declare class CorrelatedLogger {
-    private static correlationService;
+    private static _correlationService;
+    static setCorrelationService(service: CorrelationService): void;
+    private static getCorrelationService;
     static log(message: string, context?: string): void;
     static error(message: string, trace?: string, context?: string): void;
     static warn(message: string, context?: string): void;

@@ -11,7 +11,7 @@ export class CacheHealthIndicator extends BaseHealthIndicator {
 	constructor(
 		private readonly memoryCacheService: MemoryCacheService,
 		private readonly cacheWarmingService: CacheWarmingService,
-		private readonly configService: ConfigService,
+		private readonly _configService: ConfigService,
 	) {
 		super('cache')
 	}
@@ -49,7 +49,7 @@ export class CacheHealthIndicator extends BaseHealthIndicator {
 
 			// Check memory usage thresholds
 			const memoryUsagePercent = (memoryUsage.used / memoryUsage.total) * 100
-			const memoryThreshold = this.configService.get('cache.memory.warningThreshold') || 80
+			const memoryThreshold = this._configService.get('cache.memory.warningThreshold') || 80
 
 			const responseTime = Date.now() - startTime
 			const isHealthy = responseTime < 100 && memoryUsagePercent < 90
@@ -95,14 +95,14 @@ export class CacheHealthIndicator extends BaseHealthIndicator {
 
 			return result
 		}
-		catch (error) {
+		catch (error: unknown) {
 			const responseTime = Date.now() - startTime
-			CorrelatedLogger.error(`Cache health check failed: ${error.message}`, error.stack, CacheHealthIndicator.name)
+			CorrelatedLogger.error(`Cache health check failed: ${(error as Error).message}`, (error as Error).stack, CacheHealthIndicator.name)
 
 			return {
 				[this.key]: {
 					status: 'down',
-					error: error.message,
+					error: (error as Error).message,
 					responseTime: `${responseTime}ms`,
 					lastCheck: new Date().toISOString(),
 				},
@@ -142,19 +142,19 @@ export class CacheHealthIndicator extends BaseHealthIndicator {
 				memory: memoryUsage,
 				warming: warmupStats,
 				configuration: {
-					maxKeys: this.configService.get('cache.memory.maxKeys') || 1000,
-					defaultTtl: this.configService.get('cache.memory.defaultTtl') || 3600,
-					checkPeriod: this.configService.get('cache.memory.checkPeriod') || 600,
+					maxKeys: this._configService.get('cache.memory.maxKeys') || 1000,
+					defaultTtl: this._configService.get('cache.memory.defaultTtl') || 3600,
+					checkPeriod: this._configService.get('cache.memory.checkPeriod') || 600,
 				},
 				recentKeys: keys.slice(0, 10), // Show first 10 keys for debugging
 				lastUpdated: new Date().toISOString(),
 			}
 		}
-		catch (error) {
+		catch (error: unknown) {
 			return {
 				type: 'memory-cache',
 				status: 'error',
-				error: error.message,
+				error: (error as Error).message,
 				lastUpdated: new Date().toISOString(),
 			}
 		}

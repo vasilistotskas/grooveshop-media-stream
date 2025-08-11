@@ -15,11 +15,11 @@ const UnableToStoreFetchedResourceException_1 = __importDefault(require("../API/
 const common_1 = require("@nestjs/common");
 let StoreResourceResponseToFileJob = StoreResourceResponseToFileJob_1 = class StoreResourceResponseToFileJob {
     constructor() {
-        this.logger = new common_1.Logger(StoreResourceResponseToFileJob_1.name);
+        this._logger = new common_1.Logger(StoreResourceResponseToFileJob_1.name);
     }
     async handle(resourceName, path, response) {
         if (!response.data || typeof response.data.pipe !== 'function') {
-            this.logger.error('No data found in response or data is not streamable');
+            this._logger.error('No data found in response or data is not streamable');
             throw new UnableToStoreFetchedResourceException_1.default(resourceName);
         }
         const fd = await (0, promises_1.open)(path, 'w');
@@ -33,7 +33,7 @@ let StoreResourceResponseToFileJob = StoreResourceResponseToFileJob_1 = class St
             });
         }
         catch (e) {
-            this.logger.error(e);
+            this._logger.error(e);
             throw new UnableToStoreFetchedResourceException_1.default(resourceName);
         }
     }

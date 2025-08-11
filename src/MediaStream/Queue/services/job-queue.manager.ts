@@ -15,7 +15,7 @@ import { BullQueueService } from './bull-queue.service'
 
 @Injectable()
 export class JobQueueManager implements OnModuleInit {
-	private readonly logger = new Logger(JobQueueManager.name)
+	private readonly _logger = new Logger(JobQueueManager.name)
 	private readonly metrics = {
 		totalJobs: 0,
 		completedJobs: 0,
@@ -27,19 +27,19 @@ export class JobQueueManager implements OnModuleInit {
 		private readonly queueService: BullQueueService,
 		private readonly imageProcessor: ImageProcessingProcessor,
 		private readonly cacheProcessor: CacheOperationsProcessor,
-		private readonly correlationService: CorrelationService,
+		private readonly _correlationService: CorrelationService,
 	) {}
 
 	async onModuleInit(): Promise<void> {
 		this.setupJobProcessors()
-		this.logger.log('Job queue manager initialized')
+		this._logger.log('Job queue manager initialized')
 	}
 
 	async addImageProcessingJob(
 		data: Omit<ImageProcessingJobData, 'correlationId'>,
 		options: Partial<JobOptions> = {},
 	): Promise<Job<ImageProcessingJobData>> {
-		const correlationId = this.correlationService.getCorrelationId()
+		const correlationId = this._correlationService.getCorrelationId()
 
 		const jobData: ImageProcessingJobData = {
 			...data,
@@ -57,7 +57,7 @@ export class JobQueueManager implements OnModuleInit {
 
 		this.metrics.totalJobs++
 
-		this.logger.debug(`Adding image processing job for URL: ${data.imageUrl}`)
+		this._logger.debug(`Adding image processing job for URL: ${data.imageUrl}`)
 
 		return await this.queueService.add(JobType.IMAGE_PROCESSING, jobData, jobOptions)
 	}
@@ -66,7 +66,7 @@ export class JobQueueManager implements OnModuleInit {
 		data: Omit<CacheWarmingJobData, 'correlationId'>,
 		options: Partial<JobOptions> = {},
 	): Promise<Job<CacheWarmingJobData>> {
-		const correlationId = this.correlationService.getCorrelationId()
+		const correlationId = this._correlationService.getCorrelationId()
 
 		const jobData: CacheWarmingJobData = {
 			...data,
@@ -84,7 +84,7 @@ export class JobQueueManager implements OnModuleInit {
 
 		this.metrics.totalJobs++
 
-		this.logger.debug(`Adding cache warming job for ${data.imageUrls.length} images`)
+		this._logger.debug(`Adding cache warming job for ${data.imageUrls.length} images`)
 
 		return await this.queueService.add(JobType.CACHE_WARMING, jobData, jobOptions)
 	}
@@ -93,7 +93,7 @@ export class JobQueueManager implements OnModuleInit {
 		data: Omit<CacheCleanupJobData, 'correlationId'>,
 		options: Partial<JobOptions> = {},
 	): Promise<Job<CacheCleanupJobData>> {
-		const correlationId = this.correlationService.getCorrelationId()
+		const correlationId = this._correlationService.getCorrelationId()
 
 		const jobData: CacheCleanupJobData = {
 			...data,
@@ -110,7 +110,7 @@ export class JobQueueManager implements OnModuleInit {
 
 		this.metrics.totalJobs++
 
-		this.logger.debug('Adding cache cleanup job')
+		this._logger.debug('Adding cache cleanup job')
 
 		return await this.queueService.add(JobType.CACHE_CLEANUP, jobData, jobOptions)
 	}
@@ -125,19 +125,19 @@ export class JobQueueManager implements OnModuleInit {
 
 	async pauseQueues(): Promise<void> {
 		await this.queueService.pause()
-		this.logger.log('All queues paused')
+		this._logger.log('All queues paused')
 	}
 
 	async resumeQueues(): Promise<void> {
 		await this.queueService.resume()
-		this.logger.log('All queues resumed')
+		this._logger.log('All queues resumed')
 	}
 
 	async getQueueStats(): Promise<JobMetrics> {
 		const queueStats = await this.queueService.getStats()
 
 		const averageProcessingTime = this.metrics.processingTimes.length > 0
-			? this.metrics.processingTimes.reduce((a, b) => a + b, 0) / this.metrics.processingTimes.length
+			? this.metrics.processingTimes.reduce((a: any, b: any) => a + b, 0) / this.metrics.processingTimes.length
 			: 0
 
 		return {
@@ -152,12 +152,12 @@ export class JobQueueManager implements OnModuleInit {
 
 	async cleanCompletedJobs(olderThan: number = 24 * 60 * 60 * 1000): Promise<void> {
 		await this.queueService.clean(olderThan, 'completed')
-		this.logger.debug(`Cleaned completed jobs older than ${olderThan}ms`)
+		this._logger.debug(`Cleaned completed jobs older than ${olderThan}ms`)
 	}
 
 	async cleanFailedJobs(olderThan: number = 7 * 24 * 60 * 60 * 1000): Promise<void> {
 		await this.queueService.clean(olderThan, 'failed')
-		this.logger.debug(`Cleaned failed jobs older than ${olderThan}ms`)
+		this._logger.debug(`Cleaned failed jobs older than ${olderThan}ms`)
 	}
 
 	private setupJobProcessors(): void {
@@ -173,7 +173,7 @@ export class JobQueueManager implements OnModuleInit {
 
 				return result
 			}
-			catch (error) {
+			catch (error: unknown) {
 				const processingTime = Date.now() - startTime
 				this.updateMetrics(false, processingTime)
 
@@ -193,7 +193,7 @@ export class JobQueueManager implements OnModuleInit {
 
 				return result
 			}
-			catch (error) {
+			catch (error: unknown) {
 				const processingTime = Date.now() - startTime
 				this.updateMetrics(false, processingTime)
 
@@ -213,7 +213,7 @@ export class JobQueueManager implements OnModuleInit {
 
 				return result
 			}
-			catch (error) {
+			catch (error: unknown) {
 				const processingTime = Date.now() - startTime
 				this.updateMetrics(false, processingTime)
 
@@ -221,7 +221,7 @@ export class JobQueueManager implements OnModuleInit {
 			}
 		})
 
-		this.logger.debug('Job processors configured')
+		this._logger.debug('Job processors configured')
 	}
 
 	private updateMetrics(success: boolean, processingTime: number): void {

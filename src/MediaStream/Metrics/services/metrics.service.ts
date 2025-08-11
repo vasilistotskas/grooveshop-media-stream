@@ -7,7 +7,7 @@ import * as promClient from 'prom-client'
 
 @Injectable()
 export class MetricsService implements OnModuleInit {
-	private readonly logger = new Logger(MetricsService.name)
+	private readonly _logger = new Logger(MetricsService.name)
 	private readonly register: promClient.Registry
 
 	// HTTP metrics
@@ -51,7 +51,7 @@ export class MetricsService implements OnModuleInit {
 	private startTime: number = Date.now()
 	private requestsInFlightCount: number = 0
 
-	constructor(private readonly configService: ConfigService) {
+	constructor(private readonly _configService: ConfigService) {
 		this.register = new promClient.Registry()
 
 		// Add default metrics (CPU, memory, etc.)
@@ -246,12 +246,12 @@ export class MetricsService implements OnModuleInit {
 	}
 
 	async onModuleInit(): Promise<void> {
-		if (this.configService.get('monitoring.enabled')) {
-			this.logger.log('Metrics collection initialized')
+		if (this._configService.get('monitoring.enabled')) {
+			this._logger.log('Metrics collection initialized')
 			this.startPeriodicMetricsCollection()
 		}
 		else {
-			this.logger.log('Metrics collection disabled')
+			this._logger.log('Metrics collection disabled')
 		}
 	}
 
@@ -460,7 +460,7 @@ export class MetricsService implements OnModuleInit {
 			this.collectPerformanceMetrics()
 		}, 10000)
 
-		this.logger.log('Started periodic metrics collection')
+		this._logger.log('Started periodic metrics collection')
 	}
 
 	private collectSystemMetrics(): void {
@@ -492,10 +492,10 @@ export class MetricsService implements OnModuleInit {
 			// Collect disk space for storage directory
 			this.collectDiskSpaceMetrics()
 
-			this.logger.debug('System metrics collected')
+			this._logger.debug('System metrics collected')
 		}
-		catch (error) {
-			this.logger.error('Failed to collect system metrics:', error)
+		catch (error: unknown) {
+			this._logger.error('Failed to collect system metrics:', error)
 			this.recordError('metrics_collection', 'system_metrics')
 		}
 	}
@@ -509,8 +509,8 @@ export class MetricsService implements OnModuleInit {
 				this.recordEventLoopLag(lag)
 			})
 		}
-		catch (error) {
-			this.logger.error('Failed to collect performance metrics:', error)
+		catch (error: unknown) {
+			this._logger.error('Failed to collect performance metrics:', error)
 			this.recordError('metrics_collection', 'performance_metrics')
 		}
 	}
@@ -532,8 +532,8 @@ export class MetricsService implements OnModuleInit {
 				}
 			}
 		}
-		catch (error) {
-			this.logger.error('Failed to collect disk space metrics:', error)
+		catch (error: unknown) {
+			this._logger.error('Failed to collect disk space metrics:', error)
 			this.recordError('metrics_collection', 'disk_space')
 		}
 	}

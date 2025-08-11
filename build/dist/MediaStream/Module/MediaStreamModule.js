@@ -80,8 +80,8 @@ MediaStreamModule = __decorate([
             ...operations,
             {
                 provide: core_1.APP_FILTER,
-                useFactory: (httpAdapterHost, correlationService) => {
-                    return new MediaStreamExceptionFilter_1.MediaStreamExceptionFilter(httpAdapterHost, correlationService);
+                useFactory: (httpAdapterHost, _correlationService) => {
+                    return new MediaStreamExceptionFilter_1.MediaStreamExceptionFilter(httpAdapterHost, _correlationService);
                 },
                 inject: [core_1.HttpAdapterHost, correlation_service_1.CorrelationService],
             },

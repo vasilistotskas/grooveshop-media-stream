@@ -11,11 +11,11 @@ import { Request, Response } from 'express'
  */
 @Catch()
 export class MediaStreamExceptionFilter implements ExceptionFilter {
-	private readonly logger = new Logger(MediaStreamExceptionFilter.name)
+	private readonly _logger = new Logger(MediaStreamExceptionFilter.name)
 
 	constructor(
 		private readonly httpAdapterHost: HttpAdapterHost,
-		private readonly correlationService: CorrelationService,
+		private readonly _correlationService: CorrelationService,
 	) {}
 
 	catch(exception: Error, host: ArgumentsHost): void {
@@ -81,7 +81,7 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 		const timestamp = new Date().toISOString()
 		const path = request.url
 		const method = request.method
-		const correlationId = this.correlationService.getCorrelationId()
+		const correlationId = this._correlationService.getCorrelationId()
 
 		if (error instanceof MediaStreamError) {
 			const { stack, ...errorDetails } = error.toJSON()
@@ -96,8 +96,8 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 
 		return {
 			name: error.name,
-			message: error.message,
-			code: error.code,
+			message: (error as Error).message,
+			code: (error as any).code,
 			status: error.status,
 			timestamp,
 			path,

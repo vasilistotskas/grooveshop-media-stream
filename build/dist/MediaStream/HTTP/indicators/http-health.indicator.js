@@ -17,12 +17,12 @@ const base_health_indicator_1 = require("../../Health/base/base-health-indicator
 const common_1 = require("@nestjs/common");
 const http_client_service_1 = require("../services/http-client.service");
 let HttpHealthIndicator = HttpHealthIndicator_1 = class HttpHealthIndicator extends base_health_indicator_1.BaseHealthIndicator {
-    constructor(httpClient, configService) {
+    constructor(httpClient, _configService) {
         super('http');
         this.httpClient = httpClient;
-        this.configService = configService;
-        this.healthCheckUrls = this.configService.getOptional('http.healthCheck.urls', []);
-        this.timeout = this.configService.getOptional('http.healthCheck.timeout', 5000);
+        this._configService = _configService;
+        this.healthCheckUrls = this._configService.getOptional('http.healthCheck.urls', []);
+        this.timeout = this._configService.getOptional('http.healthCheck.timeout', 5000);
     }
     async performHealthCheck() {
         const stats = this.httpClient.getStats();

@@ -12,16 +12,16 @@ import {
 
 @Injectable()
 export class MonitoringService {
-	private readonly logger = new Logger(MonitoringService.name)
+	private readonly _logger = new Logger(MonitoringService.name)
 	private readonly metrics = new Map<string, CustomMetric[]>()
 	private readonly config: MonitoringConfig
 	private readonly maxMetricsPerType = 10000
 
 	constructor(
-		private readonly configService: ConfigService,
-		private readonly correlationService: CorrelationService,
+		private readonly _configService: ConfigService,
+		private readonly _correlationService: CorrelationService,
 	) {
-		this.config = this.configService.get<MonitoringConfig>('monitoring', {
+		this.config = this._configService.get<MonitoringConfig>('monitoring', {
 			enabled: true,
 			metricsRetentionMs: 24 * 60 * 60 * 1000, // 24 hours
 			alertsRetentionMs: 7 * 24 * 60 * 60 * 1000, // 7 days
@@ -36,7 +36,7 @@ export class MonitoringService {
 
 		if (this.config.enabled) {
 			this.startMetricsCleanup()
-			this.logger.log('Monitoring service initialized')
+			this._logger.log('Monitoring service initialized')
 		}
 	}
 
@@ -67,8 +67,8 @@ export class MonitoringService {
 			metricsList.splice(0, metricsList.length - this.maxMetricsPerType)
 		}
 
-		this.logger.debug(`Recorded metric: ${name} = ${value}`, {
-			correlationId: this.correlationService.getCorrelationId(),
+		this._logger.debug(`Recorded metric: ${name} = ${value}`, {
+			correlationId: this._correlationService.getCorrelationId(),
 			metric,
 		})
 	}
@@ -143,7 +143,7 @@ export class MonitoringService {
 		}
 
 		const values = metrics.map(m => m.value)
-		const sum = values.reduce((a, b) => a + b, 0)
+		const sum = values.reduce((a: any, b: any) => a + b, 0)
 
 		return {
 			count: metrics.length,
@@ -171,7 +171,7 @@ export class MonitoringService {
 		components.push(memoryHealth, diskHealth, networkHealth, cacheHealth)
 
 		// Calculate overall score
-		totalScore = components.reduce((sum, comp) => sum + comp.score, 0) / components.length
+		totalScore = components.reduce((sum: any, comp: any) => sum + comp.score, 0) / components.length
 
 		// More lenient overall health scoring
 		let status: 'healthy' | 'degraded' | 'unhealthy'
@@ -254,7 +254,7 @@ export class MonitoringService {
 		}
 
 		if (removedCount > 0) {
-			this.logger.debug(`Cleaned up ${removedCount} old metrics`)
+			this._logger.debug(`Cleaned up ${removedCount} old metrics`)
 		}
 	}
 

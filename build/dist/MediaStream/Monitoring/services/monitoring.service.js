@@ -50,13 +50,13 @@ const config_1 = require("@nestjs/config");
 const correlation_service_1 = require("../../Correlation/services/correlation.service");
 const monitoring_interface_1 = require("../interfaces/monitoring.interface");
 let MonitoringService = MonitoringService_1 = class MonitoringService {
-    constructor(configService, correlationService) {
-        this.configService = configService;
-        this.correlationService = correlationService;
-        this.logger = new common_1.Logger(MonitoringService_1.name);
+    constructor(_configService, _correlationService) {
+        this._configService = _configService;
+        this._correlationService = _correlationService;
+        this._logger = new common_1.Logger(MonitoringService_1.name);
         this.metrics = new Map();
         this.maxMetricsPerType = 10000;
-        this.config = this.configService.get('monitoring', {
+        this.config = this._configService.get('monitoring', {
             enabled: true,
             metricsRetentionMs: 24 * 60 * 60 * 1000,
             alertsRetentionMs: 7 * 24 * 60 * 60 * 1000,
@@ -70,7 +70,7 @@ let MonitoringService = MonitoringService_1 = class MonitoringService {
         });
         if (this.config.enabled) {
             this.startMetricsCleanup();
-            this.logger.log('Monitoring service initialized');
+            this._logger.log('Monitoring service initialized');
         }
     }
     recordMetric(name, value, type, tags) {
@@ -91,8 +91,8 @@ let MonitoringService = MonitoringService_1 = class MonitoringService {
         if (metricsList.length > this.maxMetricsPerType) {
             metricsList.splice(0, metricsList.length - this.maxMetricsPerType);
         }
-        this.logger.debug(`Recorded metric: ${name} = ${value}`, {
-            correlationId: this.correlationService.getCorrelationId(),
+        this._logger.debug(`Recorded metric: ${name} = ${value}`, {
+            correlationId: this._correlationService.getCorrelationId(),
             metric,
         });
     }
@@ -208,7 +208,7 @@ let MonitoringService = MonitoringService_1 = class MonitoringService {
             }
         }
         if (removedCount > 0) {
-            this.logger.debug(`Cleaned up ${removedCount} old metrics`);
+            this._logger.debug(`Cleaned up ${removedCount} old metrics`);
         }
     }
     async checkMemoryHealth() {

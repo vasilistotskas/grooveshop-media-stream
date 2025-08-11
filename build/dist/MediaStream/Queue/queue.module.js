@@ -27,12 +27,12 @@ exports.QueueModule = QueueModule = __decorate([
         imports: [
             bull_1.BullModule.forRootAsync({
                 imports: [config_1.ConfigModule],
-                useFactory: async (configService) => ({
+                useFactory: async (_configService) => ({
                     redis: {
-                        host: configService.get('REDIS_HOST', 'localhost'),
-                        port: configService.get('REDIS_PORT', 6379),
-                        password: configService.get('REDIS_PASSWORD'),
-                        db: configService.get('REDIS_DB', 0),
+                        host: _configService.get('REDIS_HOST', 'localhost'),
+                        port: _configService.get('REDIS_PORT', 6379),
+                        password: _configService.get('REDIS_PASSWORD'),
+                        db: _configService.get('REDIS_DB', 0),
                         retryDelayOnFailover: 100,
                         enableReadyCheck: false,
                         maxRetriesPerRequest: 3,

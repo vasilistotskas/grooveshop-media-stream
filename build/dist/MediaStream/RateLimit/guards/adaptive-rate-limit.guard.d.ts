@@ -4,7 +4,7 @@ import { RateLimitService } from '../services/rate-limit.service';
 export declare class AdaptiveRateLimitGuard implements CanActivate {
     private readonly rateLimitService;
     private readonly rateLimitMetricsService;
-    private readonly logger;
+    private readonly _logger;
     constructor(rateLimitService: RateLimitService, rateLimitMetricsService: RateLimitMetricsService);
     canActivate(context: ExecutionContext): Promise<boolean>;
     private shouldSkipRateLimit;

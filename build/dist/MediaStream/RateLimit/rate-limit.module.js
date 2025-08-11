@@ -26,17 +26,17 @@ exports.RateLimitModule = RateLimitModule = __decorate([
             throttler_1.ThrottlerModule.forRootAsync({
                 imports: [config_module_1.ConfigModule],
                 inject: [config_service_1.ConfigService],
-                useFactory: (configService) => ({
+                useFactory: (_configService) => ({
                     throttlers: [
                         {
                             name: 'default',
-                            ttl: configService.getOptional('rateLimit.default.windowMs', 60000),
-                            limit: configService.getOptional('rateLimit.default.max', 100),
+                            ttl: _configService.getOptional('rateLimit.default.windowMs', 60000),
+                            limit: _configService.getOptional('rateLimit.default.max', 100),
                         },
                         {
                             name: 'image-processing',
-                            ttl: configService.getOptional('rateLimit.imageProcessing.windowMs', 60000),
-                            limit: configService.getOptional('rateLimit.imageProcessing.max', 50),
+                            ttl: _configService.getOptional('rateLimit.imageProcessing.windowMs', 60000),
+                            limit: _configService.getOptional('rateLimit.imageProcessing.max', 50),
                         },
                     ],
                     skipIf: (context) => {

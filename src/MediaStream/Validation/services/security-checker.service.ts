@@ -4,11 +4,11 @@ import { ISecurityChecker, SecurityEvent } from '../interfaces/validator.interfa
 
 @Injectable()
 export class SecurityCheckerService implements ISecurityChecker {
-	private readonly logger = new Logger(SecurityCheckerService.name)
+	private readonly _logger = new Logger(SecurityCheckerService.name)
 	private readonly suspiciousPatterns: RegExp[]
 	private readonly securityEvents: SecurityEvent[] = []
 
-	constructor(private readonly configService: ConfigService) {
+	constructor(private readonly _configService: ConfigService) {
 		// Define patterns that might indicate malicious content
 		this.suspiciousPatterns = [
 			// Script injection patterns
@@ -81,21 +81,21 @@ export class SecurityCheckerService implements ISecurityChecker {
 		// Check against suspicious patterns
 		for (const pattern of this.suspiciousPatterns) {
 			if (pattern.test(str)) {
-				this.logger.warn(`Suspicious pattern detected: ${pattern.source}`)
+				this._logger.warn(`Suspicious pattern detected: ${pattern.source}`)
 				return true
 			}
 		}
 
 		// Check for excessive length (potential DoS)
-		const maxLength = this.configService.getOptional('validation.maxStringLength', 10000)
+		const maxLength = this._configService.getOptional('validation.maxStringLength', 10000)
 		if (str.length > maxLength) {
-			this.logger.warn(`Excessively long string detected: ${str.length} characters`)
+			this._logger.warn(`Excessively long string detected: ${str.length} characters`)
 			return true
 		}
 
 		// Check for high entropy (potential encoded payload)
 		if (this.hasHighEntropy(str)) {
-			this.logger.warn('High entropy string detected (potential encoded payload)')
+			this._logger.warn('High entropy string detected (potential encoded payload)')
 			return true
 		}
 
@@ -107,7 +107,7 @@ export class SecurityCheckerService implements ISecurityChecker {
 		const dangerousKeys = ['__proto__', 'constructor', 'prototype']
 		for (const key of Object.keys(obj)) {
 			if (dangerousKeys.includes(key)) {
-				this.logger.warn(`Dangerous object key detected: ${key}`)
+				this._logger.warn(`Dangerous object key detected: ${key}`)
 				return true
 			}
 
@@ -119,7 +119,7 @@ export class SecurityCheckerService implements ISecurityChecker {
 
 		// Check for excessive object depth
 		if (this.getObjectDepth(obj) > 10) {
-			this.logger.warn('Excessively deep object detected (potential DoS)')
+			this._logger.warn('Excessively deep object detected (potential DoS)')
 			return true
 		}
 
@@ -177,7 +177,7 @@ export class SecurityCheckerService implements ISecurityChecker {
 		this.securityEvents.push(event)
 
 		// Log the event
-		this.logger.warn(`Security event: ${event.type}`, {
+		this._logger.warn(`Security event: ${event.type}`, {
 			source: event.source,
 			details: event.details,
 			clientIp: event.clientIp,
@@ -200,7 +200,7 @@ export class SecurityCheckerService implements ISecurityChecker {
 	getSecurityEvents(limit = 100): SecurityEvent[] {
 		return this.securityEvents
 			.slice(-limit)
-			.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+			.sort((a: any, b: any) => b.timestamp.getTime() - a.timestamp.getTime())
 	}
 
 	getSecurityStats(): {

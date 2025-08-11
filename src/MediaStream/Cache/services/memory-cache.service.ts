@@ -7,14 +7,14 @@ import { CacheStats, ICacheManager } from '../interfaces/cache-manager.interface
 
 @Injectable()
 export class MemoryCacheService implements ICacheManager {
-	private readonly logger = new Logger(MemoryCacheService.name)
+	private readonly _logger = new Logger(MemoryCacheService.name)
 	protected readonly cache: NodeCache
 
 	constructor(
-		private readonly configService: ConfigService,
+		private readonly _configService: ConfigService,
 		private readonly metricsService: MetricsService,
 	) {
-		const config = this.configService.get('cache.memory') || {}
+		const config = this._configService.get('cache.memory') || {}
 
 		this.cache = new NodeCache({
 			stdTTL: config.defaultTtl || 3600, // 1 hour default
@@ -62,9 +62,9 @@ export class MemoryCacheService implements ICacheManager {
 			const value = this.cache.get<T>(key)
 			return value !== undefined ? value : null
 		}
-		catch (error) {
+		catch (error: unknown) {
 			this.metricsService.recordCacheOperation('get', 'memory', 'error')
-			CorrelatedLogger.error(`Memory cache GET error for key ${key}: ${error.message}`, error.stack, MemoryCacheService.name)
+			CorrelatedLogger.error(`Memory cache GET error for key ${key}: ${(error as Error).message}`, (error as Error).stack, MemoryCacheService.name)
 			return null
 		}
 	}
@@ -77,9 +77,9 @@ export class MemoryCacheService implements ICacheManager {
 				CorrelatedLogger.warn(`Failed to set memory cache key: ${key}`, MemoryCacheService.name)
 			}
 		}
-		catch (error) {
+		catch (error: unknown) {
 			this.metricsService.recordCacheOperation('set', 'memory', 'error')
-			CorrelatedLogger.error(`Memory cache SET error for key ${key}: ${error.message}`, error.stack, MemoryCacheService.name)
+			CorrelatedLogger.error(`Memory cache SET error for key ${key}: ${(error as Error).message}`, (error as Error).stack, MemoryCacheService.name)
 			throw error
 		}
 	}
@@ -88,9 +88,9 @@ export class MemoryCacheService implements ICacheManager {
 		try {
 			this.cache.del(key)
 		}
-		catch (error) {
+		catch (error: unknown) {
 			this.metricsService.recordCacheOperation('delete', 'memory', 'error')
-			CorrelatedLogger.error(`Memory cache DELETE error for key ${key}: ${error.message}`, error.stack, MemoryCacheService.name)
+			CorrelatedLogger.error(`Memory cache DELETE error for key ${key}: ${(error as Error).message}`, (error as Error).stack, MemoryCacheService.name)
 			throw error
 		}
 	}
@@ -99,9 +99,9 @@ export class MemoryCacheService implements ICacheManager {
 		try {
 			this.cache.flushAll()
 		}
-		catch (error) {
+		catch (error: unknown) {
 			this.metricsService.recordCacheOperation('clear', 'memory', 'error')
-			CorrelatedLogger.error(`Memory cache CLEAR error: ${error.message}`, error.stack, MemoryCacheService.name)
+			CorrelatedLogger.error(`Memory cache CLEAR error: ${(error as Error).message}`, (error as Error).stack, MemoryCacheService.name)
 			throw error
 		}
 	}
@@ -123,8 +123,8 @@ export class MemoryCacheService implements ICacheManager {
 				hitRate,
 			}
 		}
-		catch (error) {
-			CorrelatedLogger.error(`Memory cache STATS error: ${error.message}`, error.stack, MemoryCacheService.name)
+		catch (error: unknown) {
+			CorrelatedLogger.error(`Memory cache STATS error: ${(error as Error).message}`, (error as Error).stack, MemoryCacheService.name)
 			return {
 				hits: 0,
 				misses: 0,
@@ -140,8 +140,8 @@ export class MemoryCacheService implements ICacheManager {
 		try {
 			return this.cache.has(key)
 		}
-		catch (error) {
-			CorrelatedLogger.error(`Memory cache HAS error for key ${key}: ${error.message}`, error.stack, MemoryCacheService.name)
+		catch (error: unknown) {
+			CorrelatedLogger.error(`Memory cache HAS error for key ${key}: ${(error as Error).message}`, (error as Error).stack, MemoryCacheService.name)
 			return false
 		}
 	}
@@ -154,8 +154,8 @@ export class MemoryCacheService implements ICacheManager {
 		try {
 			return this.cache.keys()
 		}
-		catch (error) {
-			CorrelatedLogger.error(`Memory cache KEYS error: ${error.message}`, error.stack, MemoryCacheService.name)
+		catch (error: unknown) {
+			CorrelatedLogger.error(`Memory cache KEYS error: ${(error as Error).message}`, (error as Error).stack, MemoryCacheService.name)
 			return []
 		}
 	}
@@ -164,9 +164,9 @@ export class MemoryCacheService implements ICacheManager {
 		try {
 			this.cache.flushAll()
 		}
-		catch (error) {
+		catch (error: unknown) {
 			this.metricsService.recordCacheOperation('flush', 'memory', 'error')
-			CorrelatedLogger.error(`Memory cache FLUSH error: ${error.message}`, error.stack, MemoryCacheService.name)
+			CorrelatedLogger.error(`Memory cache FLUSH error: ${(error as Error).message}`, (error as Error).stack, MemoryCacheService.name)
 			throw error
 		}
 	}
@@ -184,7 +184,7 @@ export class MemoryCacheService implements ICacheManager {
 		const stats = this.cache.getStats()
 		return {
 			used: stats.vsize + stats.ksize,
-			total: this.configService.get('cache.memory.maxSize') || 100 * 1024 * 1024, // 100MB default
+			total: this._configService.get('cache.memory.maxSize') || 100 * 1024 * 1024, // 100MB default
 		}
 	}
 }

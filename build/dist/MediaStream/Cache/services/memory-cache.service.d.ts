@@ -3,11 +3,11 @@ import { MetricsService } from '@microservice/Metrics/services/metrics.service';
 import NodeCache from 'node-cache';
 import { CacheStats, ICacheManager } from '../interfaces/cache-manager.interface';
 export declare class MemoryCacheService implements ICacheManager {
-    private readonly configService;
+    private readonly _configService;
     private readonly metricsService;
-    private readonly logger;
+    private readonly _logger;
     protected readonly cache: NodeCache;
-    constructor(configService: ConfigService, metricsService: MetricsService);
+    constructor(_configService: ConfigService, metricsService: MetricsService);
     get<T>(key: string): Promise<T | null>;
     set<T>(key: string, value: T, ttl?: number): Promise<void>;
     delete(key: string): Promise<void>;

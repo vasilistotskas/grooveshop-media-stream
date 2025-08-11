@@ -4,7 +4,7 @@ import { ConfigService as NestConfigService } from '@nestjs/config'
 
 @Injectable()
 export class ConfigService implements OnModuleInit {
-	private readonly logger = new Logger(ConfigService.name)
+	private readonly _logger = new Logger(ConfigService.name)
 	private config: AppConfig
 	private readonly hotReloadableKeys = new Set([
 		'MONITORING_ENABLED',
@@ -18,7 +18,7 @@ export class ConfigService implements OnModuleInit {
 	}
 
 	async onModuleInit(): Promise<void> {
-		this.logger.log('Configuration loaded and validated successfully')
+		this._logger.log('Configuration loaded and validated successfully')
 	}
 
 	/**
@@ -87,7 +87,7 @@ export class ConfigService implements OnModuleInit {
 			throw new Error(`Configuration validation failed: ${errorMessages}`)
 		}
 
-		this.logger.log('Configuration validation passed')
+		this._logger.log('Configuration validation passed')
 	}
 
 	/**
@@ -175,14 +175,14 @@ export class ConfigService implements OnModuleInit {
 	 * Reload configuration for hot-reloadable settings
 	 */
 	async reload(): Promise<void> {
-		this.logger.log('Reloading hot-reloadable configuration...')
+		this._logger.log('Reloading hot-reloadable configuration...')
 
 		const newConfig = this.loadConfig()
 
 		// Only update hot-reloadable settings
 		this.updateHotReloadableSettings(newConfig)
 
-		this.logger.log('Hot-reloadable configuration updated successfully')
+		this._logger.log('Hot-reloadable configuration updated successfully')
 	}
 
 	/**
@@ -278,7 +278,7 @@ export class ConfigService implements OnModuleInit {
 					defaultTtl: memoryDefaultTtl,
 					checkPeriod: memoryCheckPeriod,
 					maxKeys: memoryMaxKeys,
-					warningThreshold: memoryWarningThreshold,
+					_warningThreshold: memoryWarningThreshold,
 				},
 				redis: {
 					host: redisHost,

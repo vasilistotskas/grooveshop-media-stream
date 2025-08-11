@@ -50,9 +50,9 @@ export class AlertingHealthIndicator {
 
 			return this.healthIndicatorService.check(key).up(details)
 		}
-		catch (error) {
+		catch (error: unknown) {
 			return this.healthIndicatorService.check(key).down({
-				error: error.message,
+				error: (error as Error).message,
 				timestamp: Date.now(),
 				message: 'Alerting health check failed',
 			})
@@ -83,7 +83,7 @@ export class AlertingHealthIndicator {
 				recentAlerts: recentAlerts.slice(0, 10), // Last 10 alerts
 			}
 		}
-		catch (error) {
+		catch (error: unknown) {
 			console.error('Alerting health check failed', error)
 			return {
 				healthy: false,

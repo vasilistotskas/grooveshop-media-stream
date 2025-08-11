@@ -24,7 +24,7 @@ describe('correlatedLogger', () => {
 
 		// Mock the static correlation service instance
 		mockCorrelationService = new CorrelationService() as jest.Mocked<CorrelationService>
-		;(CorrelatedLogger as any).correlationService = mockCorrelationService
+		CorrelatedLogger.setCorrelationService(mockCorrelationService)
 	})
 
 	afterEach(() => {

@@ -9,11 +9,11 @@ export interface DiskSpaceInfo {
     path: string;
 }
 export declare class DiskSpaceHealthIndicator extends BaseHealthIndicator {
-    private readonly configService;
+    private readonly _configService;
     private readonly storagePath;
-    private readonly warningThreshold;
-    private readonly criticalThreshold;
-    constructor(configService: ConfigService);
+    private readonly _warningThreshold;
+    private readonly _criticalThreshold;
+    constructor(_configService: ConfigService);
     protected performHealthCheck(): Promise<HealthIndicatorResult>;
     protected getDescription(): string;
     private getDiskSpaceInfo;

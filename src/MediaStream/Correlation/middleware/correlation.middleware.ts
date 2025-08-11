@@ -8,12 +8,12 @@ export const CORRELATION_ID_HEADER = 'x-correlation-id'
 
 @Injectable()
 export class CorrelationMiddleware implements NestMiddleware {
-	constructor(private readonly correlationService: CorrelationService) {}
+	constructor(private readonly _correlationService: CorrelationService) {}
 
 	use(req: Request, res: Response, next: NextFunction): void {
 		// Get correlation ID from header or generate new one
 		const correlationId
-      = (req.headers[CORRELATION_ID_HEADER] as string) || this.correlationService.generateCorrelationId()
+      = (req.headers[CORRELATION_ID_HEADER] as string) || this._correlationService.generateCorrelationId()
 
 		// Create request context
 		const context: RequestContext = {
@@ -30,7 +30,7 @@ export class CorrelationMiddleware implements NestMiddleware {
 		res.setHeader(CORRELATION_ID_HEADER, correlationId)
 
 		// Run the request within the correlation context
-		this.correlationService.runWithContext(context, () => {
+		this._correlationService.runWithContext(context, () => {
 			next()
 		})
 	}

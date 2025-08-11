@@ -16,10 +16,10 @@ export interface DiskSpaceInfo {
 @Injectable()
 export class DiskSpaceHealthIndicator extends BaseHealthIndicator {
 	private readonly storagePath: string
-	private readonly warningThreshold: number
-	private readonly criticalThreshold: number
+	private readonly _warningThreshold: number
+	private readonly _criticalThreshold: number
 
-	constructor(private readonly configService: ConfigService) {
+	constructor(private readonly _configService: ConfigService) {
 		const options: HealthCheckOptions = {
 			timeout: 3000,
 			threshold: 0.9, // 90% disk usage threshold
@@ -27,29 +27,29 @@ export class DiskSpaceHealthIndicator extends BaseHealthIndicator {
 
 		super('disk_space', options)
 
-		this.storagePath = this.configService.get('cache.file.directory')
-		this.warningThreshold = 0.8 // 80% warning threshold
-		this.criticalThreshold = 0.9 // 90% critical threshold
+		this.storagePath = this._configService.get('cache.file.directory')
+		this._warningThreshold = 0.8 // 80% warning threshold
+		this._criticalThreshold = 0.9 // 90% critical threshold
 	}
 
 	protected async performHealthCheck(): Promise<HealthIndicatorResult> {
 		return this.executeWithTimeout(async () => {
 			const diskInfo = await this.getDiskSpaceInfo()
 
-			if (diskInfo.usedPercentage >= this.criticalThreshold) {
+			if (diskInfo.usedPercentage >= this._criticalThreshold) {
 				return this.createUnhealthyResult(
 					`Disk space critically low: ${(diskInfo.usedPercentage * 100).toFixed(1)}% used`,
 					diskInfo,
 				)
 			}
 
-			const detailStatus = diskInfo.usedPercentage >= this.warningThreshold ? 'warning' : 'healthy'
+			const detailStatus = diskInfo.usedPercentage >= this._warningThreshold ? 'warning' : 'healthy'
 
 			return this.createHealthyResult({
 				...diskInfo,
 				detailStatus,
-				warningThreshold: this.warningThreshold,
-				criticalThreshold: this.criticalThreshold,
+				warningThreshold: this._warningThreshold,
+				criticalThreshold: this._criticalThreshold,
 			})
 		})
 	}
@@ -78,7 +78,7 @@ export class DiskSpaceHealthIndicator extends BaseHealthIndicator {
 				path: this.storagePath,
 			}
 		}
-		catch (error) {
+		catch (error: unknown) {
 			// Fallback for systems that don't support statvfs
 			console.error(error)
 			return this.getFallbackDiskInfo()
@@ -97,7 +97,7 @@ export class DiskSpaceHealthIndicator extends BaseHealthIndicator {
 				path: this.storagePath,
 			}
 		}
-		catch (error) {
+		catch (error: unknown) {
 			console.error(error)
 			throw new Error(`Unable to access storage directory: ${this.storagePath}`)
 		}

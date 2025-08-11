@@ -3,7 +3,7 @@ import { OnModuleInit } from '@nestjs/common';
 import { ConfigService as NestConfigService } from '@nestjs/config';
 export declare class ConfigService implements OnModuleInit {
     private readonly nestConfigService;
-    private readonly logger;
+    private readonly _logger;
     private config;
     private readonly hotReloadableKeys;
     constructor(nestConfigService: NestConfigService);

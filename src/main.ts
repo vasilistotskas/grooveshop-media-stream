@@ -26,7 +26,7 @@ export async function bootstrap(exitProcess = true): Promise<void> {
 		await app.listen(serverConfig.port, serverConfig.host)
 		console.warn(`Application is running on: http://${serverConfig.host}:${serverConfig.port}`)
 	}
-	catch (error) {
+	catch (error: unknown) {
 		console.error('Failed to start application:', error)
 		if (exitProcess) {
 			process.exit(1)
@@ -38,7 +38,7 @@ export async function bootstrap(exitProcess = true): Promise<void> {
 }
 
 if (require.main === module) {
-	bootstrap(true).catch((error) => {
+	bootstrap(true).catch((error: unknown) => {
 		console.error('Unhandled error during bootstrap:', error)
 		process.exit(1)
 	})

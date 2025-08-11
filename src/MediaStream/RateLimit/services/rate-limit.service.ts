@@ -26,7 +26,7 @@ export interface SystemLoadInfo {
 
 @Injectable()
 export class RateLimitService {
-	private readonly logger = new Logger(RateLimitService.name)
+	private readonly _logger = new Logger(RateLimitService.name)
 	private readonly requestCounts = new Map<string, { count: number, resetTime: number }>()
 	private readonly systemLoadThresholds = {
 		cpu: 80, // 80% CPU usage
@@ -35,7 +35,7 @@ export class RateLimitService {
 	}
 
 	constructor(
-		private readonly configService: ConfigService,
+		private readonly _configService: ConfigService,
 		private readonly metricsService: MetricsService,
 	) {}
 
@@ -60,8 +60,8 @@ export class RateLimitService {
 	 */
 	getRateLimitConfig(requestType: string): RateLimitConfig {
 		const baseConfig = {
-			windowMs: this.configService.getOptional('rateLimit.default.windowMs', 60000),
-			max: this.configService.getOptional('rateLimit.default.max', 100),
+			windowMs: this._configService.getOptional('rateLimit.default.windowMs', 60000),
+			max: this._configService.getOptional('rateLimit.default.max', 100),
 			skipSuccessfulRequests: false,
 			skipFailedRequests: false,
 		}
@@ -70,14 +70,14 @@ export class RateLimitService {
 			case 'image-processing':
 				return {
 					...baseConfig,
-					windowMs: this.configService.getOptional('rateLimit.imageProcessing.windowMs', 60000),
-					max: this.configService.getOptional('rateLimit.imageProcessing.max', 50),
+					windowMs: this._configService.getOptional('rateLimit.imageProcessing.windowMs', 60000),
+					max: this._configService.getOptional('rateLimit.imageProcessing.max', 50),
 				}
 			case 'health-check':
 				return {
 					...baseConfig,
-					windowMs: this.configService.getOptional('rateLimit.healthCheck.windowMs', 10000),
-					max: this.configService.getOptional('rateLimit.healthCheck.max', 1000),
+					windowMs: this._configService.getOptional('rateLimit.healthCheck.windowMs', 10000),
+					max: this._configService.getOptional('rateLimit.healthCheck.max', 1000),
 				}
 			default:
 				return baseConfig
@@ -183,7 +183,7 @@ export class RateLimitService {
 			this.metricsService.getRegistry()
 
 			// This would be implemented with custom Prometheus metrics
-			this.logger.debug('Rate limit metrics recorded', {
+			this._logger.debug('Rate limit metrics recorded', {
 				requestType,
 				allowed,
 				current: info.current,
@@ -191,8 +191,8 @@ export class RateLimitService {
 				remaining: info.remaining,
 			})
 		}
-		catch (error) {
-			this.logger.error('Failed to record rate limit metrics:', error)
+		catch (error: unknown) {
+			this._logger.error('Failed to record rate limit metrics:', error)
 		}
 	}
 

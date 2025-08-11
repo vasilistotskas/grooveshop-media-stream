@@ -14,9 +14,9 @@ exports.SecurityCheckerService = void 0;
 const common_1 = require("@nestjs/common");
 const config_service_1 = require("../../../MediaStream/Config/config.service");
 let SecurityCheckerService = SecurityCheckerService_1 = class SecurityCheckerService {
-    constructor(configService) {
-        this.configService = configService;
-        this.logger = new common_1.Logger(SecurityCheckerService_1.name);
+    constructor(_configService) {
+        this._configService = _configService;
+        this._logger = new common_1.Logger(SecurityCheckerService_1.name);
         this.securityEvents = [];
         this.suspiciousPatterns = [
             /<script[^>]*>/i,
@@ -69,17 +69,17 @@ let SecurityCheckerService = SecurityCheckerService_1 = class SecurityCheckerSer
     checkString(str) {
         for (const pattern of this.suspiciousPatterns) {
             if (pattern.test(str)) {
-                this.logger.warn(`Suspicious pattern detected: ${pattern.source}`);
+                this._logger.warn(`Suspicious pattern detected: ${pattern.source}`);
                 return true;
             }
         }
-        const maxLength = this.configService.getOptional('validation.maxStringLength', 10000);
+        const maxLength = this._configService.getOptional('validation.maxStringLength', 10000);
         if (str.length > maxLength) {
-            this.logger.warn(`Excessively long string detected: ${str.length} characters`);
+            this._logger.warn(`Excessively long string detected: ${str.length} characters`);
             return true;
         }
         if (this.hasHighEntropy(str)) {
-            this.logger.warn('High entropy string detected (potential encoded payload)');
+            this._logger.warn('High entropy string detected (potential encoded payload)');
             return true;
         }
         return false;
@@ -88,7 +88,7 @@ let SecurityCheckerService = SecurityCheckerService_1 = class SecurityCheckerSer
         const dangerousKeys = ['__proto__', 'constructor', 'prototype'];
         for (const key of Object.keys(obj)) {
             if (dangerousKeys.includes(key)) {
-                this.logger.warn(`Dangerous object key detected: ${key}`);
+                this._logger.warn(`Dangerous object key detected: ${key}`);
                 return true;
             }
             if (await this.checkForMaliciousContent(obj[key])) {
@@ -96,7 +96,7 @@ let SecurityCheckerService = SecurityCheckerService_1 = class SecurityCheckerSer
             }
         }
         if (this.getObjectDepth(obj) > 10) {
-            this.logger.warn('Excessively deep object detected (potential DoS)');
+            this._logger.warn('Excessively deep object detected (potential DoS)');
             return true;
         }
         return false;
@@ -136,7 +136,7 @@ let SecurityCheckerService = SecurityCheckerService_1 = class SecurityCheckerSer
             event.timestamp = new Date();
         }
         this.securityEvents.push(event);
-        this.logger.warn(`Security event: ${event.type}`, {
+        this._logger.warn(`Security event: ${event.type}`, {
             source: event.source,
             details: event.details,
             clientIp: event.clientIp,

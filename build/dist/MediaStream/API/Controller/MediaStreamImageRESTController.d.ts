@@ -9,15 +9,15 @@ import { InputSanitizationService } from '@microservice/Validation/services/inpu
 import { SecurityCheckerService } from '@microservice/Validation/services/security-checker.service';
 import { HttpService } from '@nestjs/axios';
 export default class MediaStreamImageRESTController {
-    private readonly httpService;
+    private readonly _httpService;
     private readonly generateResourceIdentityFromRequestJob;
     private readonly cacheImageResourceOperation;
     private readonly inputSanitizationService;
     private readonly securityCheckerService;
-    private readonly correlationService;
+    private readonly _correlationService;
     private readonly metricsService;
-    private readonly logger;
-    constructor(httpService: HttpService, generateResourceIdentityFromRequestJob: GenerateResourceIdentityFromRequestJob, cacheImageResourceOperation: CacheImageResourceOperation, inputSanitizationService: InputSanitizationService, securityCheckerService: SecurityCheckerService, correlationService: CorrelationService, metricsService: MetricsService);
+    private readonly _logger;
+    constructor(_httpService: HttpService, generateResourceIdentityFromRequestJob: GenerateResourceIdentityFromRequestJob, cacheImageResourceOperation: CacheImageResourceOperation, inputSanitizationService: InputSanitizationService, securityCheckerService: SecurityCheckerService, _correlationService: CorrelationService, metricsService: MetricsService);
     private validateRequestParameters;
     protected addHeadersToRequest(res: Response, headers: ResourceMetaData): Response;
     private handleStreamOrFallback;

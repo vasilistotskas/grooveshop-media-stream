@@ -15,29 +15,29 @@ const config_service_1 = require("../../Config/config.service");
 const common_1 = require("@nestjs/common");
 const base_health_indicator_1 = require("../base/base-health-indicator");
 let DiskSpaceHealthIndicator = class DiskSpaceHealthIndicator extends base_health_indicator_1.BaseHealthIndicator {
-    constructor(configService) {
+    constructor(_configService) {
         const options = {
             timeout: 3000,
             threshold: 0.9,
         };
         super('disk_space', options);
-        this.configService = configService;
-        this.storagePath = this.configService.get('cache.file.directory');
-        this.warningThreshold = 0.8;
-        this.criticalThreshold = 0.9;
+        this._configService = _configService;
+        this.storagePath = this._configService.get('cache.file.directory');
+        this._warningThreshold = 0.8;
+        this._criticalThreshold = 0.9;
     }
     async performHealthCheck() {
         return this.executeWithTimeout(async () => {
             const diskInfo = await this.getDiskSpaceInfo();
-            if (diskInfo.usedPercentage >= this.criticalThreshold) {
+            if (diskInfo.usedPercentage >= this._criticalThreshold) {
                 return this.createUnhealthyResult(`Disk space critically low: ${(diskInfo.usedPercentage * 100).toFixed(1)}% used`, diskInfo);
             }
-            const detailStatus = diskInfo.usedPercentage >= this.warningThreshold ? 'warning' : 'healthy';
+            const detailStatus = diskInfo.usedPercentage >= this._warningThreshold ? 'warning' : 'healthy';
             return this.createHealthyResult({
                 ...diskInfo,
                 detailStatus,
-                warningThreshold: this.warningThreshold,
-                criticalThreshold: this.criticalThreshold,
+                warningThreshold: this._warningThreshold,
+                criticalThreshold: this._criticalThreshold,
             });
         });
     }

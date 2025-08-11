@@ -14,14 +14,14 @@ const axios_1 = require("@nestjs/axios");
 const common_1 = require("@nestjs/common");
 const axios_2 = require("axios");
 let FetchResourceResponseJob = FetchResourceResponseJob_1 = class FetchResourceResponseJob {
-    constructor(httpService) {
-        this.httpService = httpService;
-        this.logger = new common_1.Logger(FetchResourceResponseJob_1.name);
-        this.logger.debug('HttpService has been injected successfully');
+    constructor(_httpService) {
+        this._httpService = _httpService;
+        this._logger = new common_1.Logger(FetchResourceResponseJob_1.name);
+        this._logger.debug('HttpService has been injected successfully');
     }
     async handle(request) {
         try {
-            return await this.httpService.axiosRef({
+            return await this._httpService.axiosRef({
                 url: request.resourceTarget,
                 method: 'GET',
                 responseType: 'stream',
@@ -29,7 +29,7 @@ let FetchResourceResponseJob = FetchResourceResponseJob_1 = class FetchResourceR
         }
         catch (error) {
             if ((0, axios_2.isAxiosError)(error)) {
-                this.logger.error(error.toJSON());
+                this._logger.error(error.toJSON());
                 return {
                     status: error.response?.status ?? 404,
                     statusText: error.response?.statusText ?? 'Bad Request',
@@ -39,7 +39,7 @@ let FetchResourceResponseJob = FetchResourceResponseJob_1 = class FetchResourceR
                 };
             }
             else {
-                this.logger.error('Unknown error occurred while fetching resource');
+                this._logger.error('Unknown error occurred while fetching resource');
                 throw error;
             }
         }

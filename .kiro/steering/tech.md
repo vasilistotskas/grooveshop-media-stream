@@ -1,87 +1,77 @@
 # Technology Stack
 
-## Core Framework
-- **NestJS**: Node.js framework with TypeScript support
+## Framework & Runtime
+- **NestJS**: TypeScript-first Node.js framework with decorators and dependency injection
+- **Node.js**: v24+ (Alpine Linux in containers)
+- **TypeScript**: v5.9+ with ES2021 target
 - **Express**: Underlying HTTP server
-- **TypeScript**: Primary language (ES2021 target)
 
-## Key Dependencies
-- **Sharp**: High-performance image processing library
+## Package Management
+- **pnpm**: Primary package manager (v10.14.0+)
+- **Module Aliases**: `@microservice/*` maps to `src/MediaStream/*`
+
+## Core Dependencies
+- **Sharp**: High-performance image processing
+- **Bull**: Redis-based job queue for background processing
+- **IORedis**: Redis client for caching
 - **Axios**: HTTP client for external requests
-- **RxJS**: Reactive programming support
-- **Reflect-metadata**: Decorator metadata support
+- **Class Validator/Transformer**: Request validation and transformation
 
 ## Development Tools
-- **pnpm**: Package manager (v10.13.1+)
-- **ESLint**: Code linting with @antfu/eslint-config
-- **Jest**: Testing framework with coverage reporting
+- **ESLint**: Antfu config with tab indentation and single quotes
+- **Jest**: Testing framework with ts-jest transformer
 - **SWC**: Fast TypeScript/JavaScript compiler
 - **Semantic Release**: Automated versioning and publishing
-
-## Build System
-- **Nest CLI**: Primary build tool
-- **TypeScript Compiler**: Code compilation
-- **Rimraf**: Clean build directories
 
 ## Common Commands
 
 ### Development
 ```bash
-# Start development server with watch mode
+# Install dependencies
+pnpm install
+
+# Development with watch mode
 pnpm run dev
 
-# Start with TypeScript compilation watching
-pnpm run dev:all  # Updates deps, builds, lints, then starts dev
+# Development with all updates
+pnpm run dev:all
 
-# Debug mode with inspector
+# Debug mode
 pnpm run debug
 
-# REPL mode for interactive development
+# REPL mode
 pnpm run repl
 ```
 
-### Building
+### Building & Production
 ```bash
-# Clean and build for production
+# Clean and build
 pnpm run build
 
-# Start production server
+# Production start
 pnpm run prod
+
+# Docker build
+docker build -f docker/Dockerfile .
 ```
 
-### Testing
+### Testing & Quality
 ```bash
-# Run all tests with coverage
+# Run tests with coverage
 pnpm run test
 
-# Watch mode for development
+# Watch mode testing
 pnpm run test:watch
 
-# End-to-end tests
+# E2E tests
 pnpm run test:e2e
 
-# Coverage only
-pnpm run test:cov
-```
-
-### Code Quality
-```bash
-# Fix linting issues
+# Lint and fix
 pnpm run lint:fix
 ```
 
-## Path Aliases
-- `@microservice/*` → `src/MediaStream/*`
-- `@storage/*` → `var/*`
-
-## Environment Variables
-- `PORT`: Application port (default: 3003)
-- `NEST_PUBLIC_DJANGO_URL`: Django backend URL
-- `NEST_PUBLIC_NUXT_URL`: Nuxt frontend URL
-- `LAUNCH_AS`: Launch mode (HYBRID)
-- `COMPOSE_PROJECT_NAME`: Docker project name
-
-## Docker Support
-- Multi-stage Dockerfile with Alpine Linux
-- Docker Compose configuration available
-- Production-ready container setup
+## Build Configuration
+- **Output**: `build/dist/` directory
+- **Source Maps**: Enabled for debugging
+- **Incremental**: TypeScript incremental compilation
+- **Module System**: CommonJS with ES module interop

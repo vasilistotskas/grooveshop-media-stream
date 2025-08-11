@@ -20,11 +20,11 @@ const metrics_service_1 = require("../../Metrics/services/metrics.service");
 const common_1 = require("@nestjs/common");
 const node_cache_1 = __importDefault(require("node-cache"));
 let MemoryCacheService = MemoryCacheService_1 = class MemoryCacheService {
-    constructor(configService, metricsService) {
-        this.configService = configService;
+    constructor(_configService, metricsService) {
+        this._configService = _configService;
         this.metricsService = metricsService;
-        this.logger = new common_1.Logger(MemoryCacheService_1.name);
-        const config = this.configService.get('cache.memory') || {};
+        this._logger = new common_1.Logger(MemoryCacheService_1.name);
+        const config = this._configService.get('cache.memory') || {};
         this.cache = new node_cache_1.default({
             stdTTL: config.defaultTtl || 3600,
             checkperiod: config.checkPeriod || 600,
@@ -171,7 +171,7 @@ let MemoryCacheService = MemoryCacheService_1 = class MemoryCacheService {
         const stats = this.cache.getStats();
         return {
             used: stats.vsize + stats.ksize,
-            total: this.configService.get('cache.memory.maxSize') || 100 * 1024 * 1024,
+            total: this._configService.get('cache.memory.maxSize') || 100 * 1024 * 1024,
         };
     }
 };

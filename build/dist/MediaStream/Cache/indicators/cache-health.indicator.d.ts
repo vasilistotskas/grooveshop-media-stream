@@ -6,8 +6,8 @@ import { MemoryCacheService } from '../services/memory-cache.service';
 export declare class CacheHealthIndicator extends BaseHealthIndicator {
     private readonly memoryCacheService;
     private readonly cacheWarmingService;
-    private readonly configService;
-    constructor(memoryCacheService: MemoryCacheService, cacheWarmingService: CacheWarmingService, configService: ConfigService);
+    private readonly _configService;
+    constructor(memoryCacheService: MemoryCacheService, cacheWarmingService: CacheWarmingService, _configService: ConfigService);
     protected performHealthCheck(): Promise<HealthIndicatorResult>;
     private generateWarnings;
     getDetailedStatus(): Promise<any>;

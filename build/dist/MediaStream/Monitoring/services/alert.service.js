@@ -51,16 +51,16 @@ const correlation_service_1 = require("../../Correlation/services/correlation.se
 const monitoring_interface_1 = require("../interfaces/monitoring.interface");
 const monitoring_service_1 = require("./monitoring.service");
 let AlertService = AlertService_1 = class AlertService {
-    constructor(configService, correlationService, monitoringService) {
-        this.configService = configService;
-        this.correlationService = correlationService;
+    constructor(_configService, _correlationService, monitoringService) {
+        this._configService = _configService;
+        this._correlationService = _correlationService;
         this.monitoringService = monitoringService;
-        this.logger = new common_1.Logger(AlertService_1.name);
+        this._logger = new common_1.Logger(AlertService_1.name);
         this.alertRules = new Map();
         this.activeAlerts = new Map();
         this.alertHistory = [];
         this.alertCooldowns = new Map();
-        this.config = this.configService.get('monitoring', {
+        this.config = this._configService.get('monitoring', {
             enabled: true,
             metricsRetentionMs: 24 * 60 * 60 * 1000,
             alertsRetentionMs: 7 * 24 * 60 * 60 * 1000,
@@ -78,20 +78,20 @@ let AlertService = AlertService_1 = class AlertService {
                 this.startAlertEvaluation();
             }
             this.startAlertCleanup();
-            this.logger.log('Alert service initialized');
+            this._logger.log('Alert service initialized');
         }
     }
     addAlertRule(rule) {
         this.alertRules.set(rule.id, rule);
-        this.logger.log(`Alert rule added: ${rule.name}`, {
-            correlationId: this.correlationService.getCorrelationId(),
+        this._logger.log(`Alert rule added: ${rule.name}`, {
+            correlationId: this._correlationService.getCorrelationId(),
             ruleId: rule.id,
         });
     }
     removeAlertRule(ruleId) {
         const removed = this.alertRules.delete(ruleId);
         if (removed) {
-            this.logger.log(`Alert rule removed: ${ruleId}`);
+            this._logger.log(`Alert rule removed: ${ruleId}`);
         }
         return removed;
     }
@@ -131,8 +131,8 @@ let AlertService = AlertService_1 = class AlertService {
                 historyAlert.resolved = true;
                 historyAlert.resolvedAt = alert.resolvedAt;
             }
-            this.logger.log(`Alert resolved: ${alert.ruleName}`, {
-                correlationId: this.correlationService.getCorrelationId(),
+            this._logger.log(`Alert resolved: ${alert.ruleName}`, {
+                correlationId: this._correlationService.getCorrelationId(),
                 alertId,
                 duration: alert.resolvedAt - alert.timestamp,
             });
@@ -222,7 +222,7 @@ let AlertService = AlertService_1 = class AlertService {
                 }
             }
             catch (error) {
-                this.logger.error(`Error evaluating alert rule ${rule.name}:`, error);
+                this._logger.error(`Error evaluating alert rule ${rule.name}:`, error);
             }
         }
     }
@@ -271,8 +271,8 @@ let AlertService = AlertService_1 = class AlertService {
     processAlert(alert) {
         this.activeAlerts.set(alert.id, alert);
         this.alertHistory.push(alert);
-        this.logger.warn(`Alert triggered: ${alert.ruleName}`, {
-            correlationId: this.correlationService.getCorrelationId(),
+        this._logger.warn(`Alert triggered: ${alert.ruleName}`, {
+            correlationId: this._correlationService.getCorrelationId(),
             alert,
         });
     }
@@ -289,7 +289,7 @@ let AlertService = AlertService_1 = class AlertService {
         this.alertHistory.splice(0, this.alertHistory.length, ...filteredHistory);
         const removedCount = originalLength - this.alertHistory.length;
         if (removedCount > 0) {
-            this.logger.debug(`Cleaned up ${removedCount} old alerts`);
+            this._logger.debug(`Cleaned up ${removedCount} old alerts`);
         }
     }
 };

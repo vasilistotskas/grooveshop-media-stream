@@ -4,8 +4,8 @@ import { HealthIndicatorResult } from '@nestjs/terminus';
 import { RedisCacheService } from '../services/redis-cache.service';
 export declare class RedisHealthIndicator extends BaseHealthIndicator {
     private readonly redisCacheService;
-    private readonly configService;
-    constructor(redisCacheService: RedisCacheService, configService: ConfigService);
+    private readonly _configService;
+    constructor(redisCacheService: RedisCacheService, _configService: ConfigService);
     protected performHealthCheck(): Promise<HealthIndicatorResult>;
     private generateWarnings;
     getDetailedStatus(): Promise<any>;

@@ -13,7 +13,7 @@ import { MonitoringService } from './monitoring.service'
 
 @Injectable()
 export class AlertService {
-	private readonly logger = new Logger(AlertService.name)
+	private readonly _logger = new Logger(AlertService.name)
 	private readonly alertRules = new Map<string, AlertRule>()
 	private readonly activeAlerts = new Map<string, Alert>()
 	private readonly alertHistory: Alert[] = []
@@ -21,11 +21,11 @@ export class AlertService {
 	private readonly alertCooldowns = new Map<string, number>()
 
 	constructor(
-		private readonly configService: ConfigService,
-		private readonly correlationService: CorrelationService,
+		private readonly _configService: ConfigService,
+		private readonly _correlationService: CorrelationService,
 		private readonly monitoringService: MonitoringService,
 	) {
-		this.config = this.configService.get<MonitoringConfig>('monitoring', {
+		this.config = this._configService.get<MonitoringConfig>('monitoring', {
 			enabled: true,
 			metricsRetentionMs: 24 * 60 * 60 * 1000,
 			alertsRetentionMs: 7 * 24 * 60 * 60 * 1000,
@@ -45,7 +45,7 @@ export class AlertService {
 				this.startAlertEvaluation()
 			}
 			this.startAlertCleanup()
-			this.logger.log('Alert service initialized')
+			this._logger.log('Alert service initialized')
 		}
 	}
 
@@ -54,8 +54,8 @@ export class AlertService {
 	 */
 	addAlertRule(rule: AlertRule): void {
 		this.alertRules.set(rule.id, rule)
-		this.logger.log(`Alert rule added: ${rule.name}`, {
-			correlationId: this.correlationService.getCorrelationId(),
+		this._logger.log(`Alert rule added: ${rule.name}`, {
+			correlationId: this._correlationService.getCorrelationId(),
 			ruleId: rule.id,
 		})
 	}
@@ -66,7 +66,7 @@ export class AlertService {
 	removeAlertRule(ruleId: string): boolean {
 		const removed = this.alertRules.delete(ruleId)
 		if (removed) {
-			this.logger.log(`Alert rule removed: ${ruleId}`)
+			this._logger.log(`Alert rule removed: ${ruleId}`)
 		}
 		return removed
 	}
@@ -135,8 +135,8 @@ export class AlertService {
 				historyAlert.resolvedAt = alert.resolvedAt
 			}
 
-			this.logger.log(`Alert resolved: ${alert.ruleName}`, {
-				correlationId: this.correlationService.getCorrelationId(),
+			this._logger.log(`Alert resolved: ${alert.ruleName}`, {
+				correlationId: this._correlationService.getCorrelationId(),
 				alertId,
 				duration: alert.resolvedAt - alert.timestamp,
 			})
@@ -179,7 +179,7 @@ export class AlertService {
 
 		// Calculate average resolution time for resolved alerts
 		const resolvedAlerts = this.alertHistory.filter(a => a.resolved && a.resolvedAt)
-		const totalResolutionTime = resolvedAlerts.reduce((sum, alert) => {
+		const totalResolutionTime = resolvedAlerts.reduce((sum: any, alert: any) => {
 			return sum + (alert.resolvedAt! - alert.timestamp)
 		}, 0)
 		const averageResolutionTime = resolvedAlerts.length > 0
@@ -261,8 +261,8 @@ export class AlertService {
 					this.alertCooldowns.set(rule.id, now)
 				}
 			}
-			catch (error) {
-				this.logger.error(`Error evaluating alert rule ${rule.name}:`, error)
+			catch (error: unknown) {
+				this._logger.error(`Error evaluating alert rule ${rule.name}:`, error)
 			}
 		}
 	}
@@ -329,8 +329,8 @@ export class AlertService {
 		this.activeAlerts.set(alert.id, alert)
 		this.alertHistory.push(alert)
 
-		this.logger.warn(`Alert triggered: ${alert.ruleName}`, {
-			correlationId: this.correlationService.getCorrelationId(),
+		this._logger.warn(`Alert triggered: ${alert.ruleName}`, {
+			correlationId: this._correlationService.getCorrelationId(),
 			alert,
 		})
 	}
@@ -358,7 +358,7 @@ export class AlertService {
 
 		const removedCount = originalLength - this.alertHistory.length
 		if (removedCount > 0) {
-			this.logger.debug(`Cleaned up ${removedCount} old alerts`)
+			this._logger.debug(`Cleaned up ${removedCount} old alerts`)
 		}
 	}
 }

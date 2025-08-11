@@ -41,7 +41,7 @@ export interface FileOptimization {
 
 @Injectable()
 export class StorageOptimizationService implements OnModuleInit {
-	private readonly logger = new Logger(StorageOptimizationService.name)
+	private readonly _logger = new Logger(StorageOptimizationService.name)
 	private readonly storageDirectory: string
 	private readonly config: OptimizationConfig
 	private readonly strategies = new Map<string, OptimizationStrategy>()
@@ -49,17 +49,17 @@ export class StorageOptimizationService implements OnModuleInit {
 	private isOptimizationRunning = false
 
 	constructor(
-		private readonly configService: ConfigService,
+		private readonly _configService: ConfigService,
 		private readonly storageMonitoring: StorageMonitoringService,
 	) {
-		this.storageDirectory = this.configService.getOptional('cache.file.directory', './storage')
+		this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage')
 		this.config = {
-			enabled: this.configService.getOptional('storage.optimization.enabled', true),
-			strategies: this.configService.getOptional('storage.optimization.strategies', ['compression', 'deduplication']),
-			popularFileThreshold: this.configService.getOptional('storage.optimization.popularThreshold', 10),
-			compressionLevel: this.configService.getOptional('storage.optimization.compressionLevel', 6),
-			createBackups: this.configService.getOptional('storage.optimization.createBackups', false),
-			maxOptimizationTime: this.configService.getOptional('storage.optimization.maxTime', 600000), // 10 minutes
+			enabled: this._configService.getOptional('storage.optimization.enabled', true),
+			strategies: this._configService.getOptional('storage.optimization.strategies', ['compression', 'deduplication']),
+			popularFileThreshold: this._configService.getOptional('storage.optimization.popularThreshold', 10),
+			compressionLevel: this._configService.getOptional('storage.optimization.compressionLevel', 6),
+			createBackups: this._configService.getOptional('storage.optimization.createBackups', false),
+			maxOptimizationTime: this._configService.getOptional('storage.optimization.maxTime', 600000), // 10 minutes
 		}
 
 		this.initializeStrategies()
@@ -67,10 +67,10 @@ export class StorageOptimizationService implements OnModuleInit {
 
 	async onModuleInit(): Promise<void> {
 		if (this.config.enabled) {
-			this.logger.log(`Storage optimization enabled with strategies: ${this.config.strategies.join(', ')}`)
+			this._logger.log(`Storage optimization enabled with strategies: ${this.config.strategies.join(', ')}`)
 		}
 		else {
-			this.logger.log('Storage optimization disabled')
+			this._logger.log('Storage optimization disabled')
 		}
 	}
 
@@ -92,11 +92,11 @@ export class StorageOptimizationService implements OnModuleInit {
 			try {
 				stats = await this.storageMonitoring.getStorageStats()
 			}
-			catch (error) {
+			catch (error: unknown) {
 				return {
 					filesOptimized: 0,
 					sizeReduced: 0,
-					errors: [`Storage monitoring error: ${error.message}`],
+					errors: [`Storage monitoring error: ${(error as Error).message}`],
 					strategy: 'none',
 					duration: Date.now() - startTime,
 				}
@@ -142,10 +142,10 @@ export class StorageOptimizationService implements OnModuleInit {
 						StorageOptimizationService.name,
 					)
 				}
-				catch (error) {
-					const errorMsg = `Strategy '${strategyName}' failed: ${error.message}`
+				catch (error: unknown) {
+					const errorMsg = `Strategy '${strategyName}' failed: ${(error as Error).message}`
 					allErrors.push(errorMsg)
-					CorrelatedLogger.error(errorMsg, error.stack, StorageOptimizationService.name)
+					CorrelatedLogger.error(errorMsg, (error as Error).stack, StorageOptimizationService.name)
 				}
 			}
 
@@ -181,10 +181,10 @@ export class StorageOptimizationService implements OnModuleInit {
 		try {
 			await this.optimizeFrequentlyAccessedFiles()
 		}
-		catch (error) {
+		catch (error: unknown) {
 			CorrelatedLogger.error(
-				`Scheduled optimization failed: ${error.message}`,
-				error.stack,
+				`Scheduled optimization failed: ${(error as Error).message}`,
+				(error as Error).stack,
 				StorageOptimizationService.name,
 			)
 		}
@@ -202,9 +202,9 @@ export class StorageOptimizationService implements OnModuleInit {
 		strategies: string[]
 	} {
 		const optimizations = Array.from(this.optimizationHistory.values())
-		const totalSizeSaved = optimizations.reduce((sum, opt) => sum + (opt.originalSize - opt.optimizedSize), 0)
+		const totalSizeSaved = optimizations.reduce((sum: any, opt: any) => sum + (opt.originalSize - opt.optimizedSize), 0)
 		const averageCompressionRatio = optimizations.length > 0
-			? optimizations.reduce((sum, opt) => sum + opt.compressionRatio, 0) / optimizations.length
+			? optimizations.reduce((sum: any, opt: any) => sum + opt.compressionRatio, 0) / optimizations.length
 			: 0
 
 		return {
@@ -243,8 +243,8 @@ export class StorageOptimizationService implements OnModuleInit {
 							this.optimizationHistory.set(file.file, result)
 						}
 					}
-					catch (error) {
-						errors.push(`Compression failed for ${file.file}: ${error.message}`)
+					catch (error: unknown) {
+						errors.push(`Compression failed for ${file.file}: ${(error as Error).message}`)
 					}
 				}
 
@@ -275,8 +275,8 @@ export class StorageOptimizationService implements OnModuleInit {
 						filesOptimized += result.filesProcessed
 						sizeReduced += result.sizeReduced
 					}
-					catch (error) {
-						errors.push(`Deduplication failed: ${error.message}`)
+					catch (error: unknown) {
+						errors.push(`Deduplication failed: ${(error as Error).message}`)
 					}
 				}
 
@@ -348,9 +348,9 @@ export class StorageOptimizationService implements OnModuleInit {
 				}
 			}
 		}
-		catch (error) {
+		catch (error: unknown) {
 			CorrelatedLogger.warn(
-				`Failed to compress ${file.file}: ${error.message}`,
+				`Failed to compress ${file.file}: ${(error as Error).message}`,
 				StorageOptimizationService.name,
 			)
 			throw error // Rethrow so compression strategy can catch it
@@ -374,9 +374,9 @@ export class StorageOptimizationService implements OnModuleInit {
 				}
 				hashMap.get(hash)!.push(file)
 			}
-			catch (error) {
+			catch (error: unknown) {
 				CorrelatedLogger.warn(
-					`Failed to hash ${file.file}: ${error.message}`,
+					`Failed to hash ${file.file}: ${(error as Error).message}`,
 					StorageOptimizationService.name,
 				)
 			}
@@ -395,7 +395,7 @@ export class StorageOptimizationService implements OnModuleInit {
 		}
 
 		// Keep the most frequently accessed file as the original
-		const sortedFiles = duplicateGroup.sort((a, b) => b.accessCount - a.accessCount)
+		const sortedFiles = duplicateGroup.sort((a: any, b: any) => b.accessCount - a.accessCount)
 		const originalFile = sortedFiles[0]
 		const duplicates = sortedFiles.slice(1)
 
@@ -414,9 +414,9 @@ export class StorageOptimizationService implements OnModuleInit {
 				filesProcessed++
 				sizeReduced += duplicate.size
 			}
-			catch (error) {
+			catch (error: unknown) {
 				CorrelatedLogger.warn(
-					`Failed to deduplicate ${duplicate.file}: ${error.message}`,
+					`Failed to deduplicate ${duplicate.file}: ${(error as Error).message}`,
 					StorageOptimizationService.name,
 				)
 			}

@@ -21,12 +21,12 @@ const metrics_service_1 = require("../../Metrics/services/metrics.service");
 const common_1 = require("@nestjs/common");
 const schedule_1 = require("@nestjs/schedule");
 let CacheWarmingService = CacheWarmingService_1 = class CacheWarmingService {
-    constructor(memoryCacheService, configService, metricsService) {
+    constructor(memoryCacheService, _configService, metricsService) {
         this.memoryCacheService = memoryCacheService;
-        this.configService = configService;
+        this._configService = _configService;
         this.metricsService = metricsService;
-        this.logger = new common_1.Logger(CacheWarmingService_1.name);
-        this.config = this.configService.get('cache.warming') || {
+        this._logger = new common_1.Logger(CacheWarmingService_1.name);
+        this.config = this._configService.get('cache.warming') || {
             enabled: true,
             warmupOnStart: true,
             maxFilesToWarm: 50,

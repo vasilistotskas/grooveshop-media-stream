@@ -49,10 +49,10 @@ const config_service_1 = require("../../Config/config.service");
 const metrics_service_1 = require("../../Metrics/services/metrics.service");
 const common_1 = require("@nestjs/common");
 let RateLimitService = RateLimitService_1 = class RateLimitService {
-    constructor(configService, metricsService) {
-        this.configService = configService;
+    constructor(_configService, metricsService) {
+        this._configService = _configService;
         this.metricsService = metricsService;
-        this.logger = new common_1.Logger(RateLimitService_1.name);
+        this._logger = new common_1.Logger(RateLimitService_1.name);
         this.requestCounts = new Map();
         this.systemLoadThresholds = {
             cpu: 80,
@@ -69,8 +69,8 @@ let RateLimitService = RateLimitService_1 = class RateLimitService {
     }
     getRateLimitConfig(requestType) {
         const baseConfig = {
-            windowMs: this.configService.getOptional('rateLimit.default.windowMs', 60000),
-            max: this.configService.getOptional('rateLimit.default.max', 100),
+            windowMs: this._configService.getOptional('rateLimit.default.windowMs', 60000),
+            max: this._configService.getOptional('rateLimit.default.max', 100),
             skipSuccessfulRequests: false,
             skipFailedRequests: false,
         };
@@ -78,14 +78,14 @@ let RateLimitService = RateLimitService_1 = class RateLimitService {
             case 'image-processing':
                 return {
                     ...baseConfig,
-                    windowMs: this.configService.getOptional('rateLimit.imageProcessing.windowMs', 60000),
-                    max: this.configService.getOptional('rateLimit.imageProcessing.max', 50),
+                    windowMs: this._configService.getOptional('rateLimit.imageProcessing.windowMs', 60000),
+                    max: this._configService.getOptional('rateLimit.imageProcessing.max', 50),
                 };
             case 'health-check':
                 return {
                     ...baseConfig,
-                    windowMs: this.configService.getOptional('rateLimit.healthCheck.windowMs', 10000),
-                    max: this.configService.getOptional('rateLimit.healthCheck.max', 1000),
+                    windowMs: this._configService.getOptional('rateLimit.healthCheck.windowMs', 10000),
+                    max: this._configService.getOptional('rateLimit.healthCheck.max', 1000),
                 };
             default:
                 return baseConfig;
@@ -150,7 +150,7 @@ let RateLimitService = RateLimitService_1 = class RateLimitService {
         }
         try {
             this.metricsService.getRegistry();
-            this.logger.debug('Rate limit metrics recorded', {
+            this._logger.debug('Rate limit metrics recorded', {
                 requestType,
                 allowed,
                 current: info.current,
@@ -159,7 +159,7 @@ let RateLimitService = RateLimitService_1 = class RateLimitService {
             });
         }
         catch (error) {
-            this.logger.error('Failed to record rate limit metrics:', error);
+            this._logger.error('Failed to record rate limit metrics:', error);
         }
     }
     cleanupOldEntries(windowStart) {

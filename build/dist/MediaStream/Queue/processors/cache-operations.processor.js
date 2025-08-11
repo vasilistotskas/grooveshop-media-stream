@@ -53,17 +53,17 @@ const multi_layer_cache_manager_1 = require("../../Cache/services/multi-layer-ca
 const correlation_service_1 = require("../../Correlation/services/correlation.service");
 const http_client_service_1 = require("../../HTTP/services/http-client.service");
 let CacheOperationsProcessor = CacheOperationsProcessor_1 = class CacheOperationsProcessor {
-    constructor(correlationService, cacheManager, httpClient) {
-        this.correlationService = correlationService;
+    constructor(_correlationService, cacheManager, httpClient) {
+        this._correlationService = _correlationService;
         this.cacheManager = cacheManager;
         this.httpClient = httpClient;
-        this.logger = new common_1.Logger(CacheOperationsProcessor_1.name);
+        this._logger = new common_1.Logger(CacheOperationsProcessor_1.name);
     }
     async processCacheWarming(job) {
         const startTime = Date.now();
         const { imageUrls, batchSize = 5 } = job.data;
         try {
-            this.logger.debug(`Starting cache warming job ${job.id} for ${imageUrls.length} images`);
+            this._logger.debug(`Starting cache warming job ${job.id} for ${imageUrls.length} images`);
             let processed = 0;
             let successful = 0;
             let failed = 0;
@@ -76,7 +76,7 @@ let CacheOperationsProcessor = CacheOperationsProcessor_1 = class CacheOperation
                         return true;
                     }
                     catch (error) {
-                        this.logger.warn(`Failed to warm cache for ${url}:`, error);
+                        this._logger.warn(`Failed to warm cache for ${url}:`, error);
                         failed++;
                         return false;
                     }
@@ -84,10 +84,10 @@ let CacheOperationsProcessor = CacheOperationsProcessor_1 = class CacheOperation
                 await Promise.allSettled(batchPromises);
                 processed += batch.length;
                 const progress = Math.round((processed / imageUrls.length) * 100);
-                this.logger.debug(`Cache warming progress: ${progress}% (${processed}/${imageUrls.length})`);
+                this._logger.debug(`Cache warming progress: ${progress}% (${processed}/${imageUrls.length})`);
             }
             const processingTime = Date.now() - startTime;
-            this.logger.log(`Cache warming completed: ${successful} successful, ${failed} failed in ${processingTime}ms`);
+            this._logger.log(`Cache warming completed: ${successful} successful, ${failed} failed in ${processingTime}ms`);
             return {
                 success: true,
                 data: { successful, failed, total: imageUrls.length },
@@ -96,7 +96,7 @@ let CacheOperationsProcessor = CacheOperationsProcessor_1 = class CacheOperation
         }
         catch (error) {
             const processingTime = Date.now() - startTime;
-            this.logger.error(`Cache warming job ${job.id} failed:`, error);
+            this._logger.error(`Cache warming job ${job.id} failed:`, error);
             return {
                 success: false,
                 error: error.message,
@@ -108,7 +108,7 @@ let CacheOperationsProcessor = CacheOperationsProcessor_1 = class CacheOperation
         const startTime = Date.now();
         const { maxAge, maxSize } = job.data;
         try {
-            this.logger.debug(`Starting cache cleanup job ${job.id}`);
+            this._logger.debug(`Starting cache cleanup job ${job.id}`);
             const cleanupResults = await Promise.allSettled([
                 this.cleanupMemoryCache(),
                 this.cleanupFileCache(maxAge, maxSize),
@@ -126,10 +126,10 @@ let CacheOperationsProcessor = CacheOperationsProcessor_1 = class CacheOperation
             });
             const processingTime = Date.now() - startTime;
             if (errors.length > 0) {
-                this.logger.warn(`Cache cleanup completed with errors: ${errors.join(', ')}`);
+                this._logger.warn(`Cache cleanup completed with errors: ${errors.join(', ')}`);
             }
             else {
-                this.logger.log(`Cache cleanup completed: ${totalCleaned} items cleaned in ${processingTime}ms`);
+                this._logger.log(`Cache cleanup completed: ${totalCleaned} items cleaned in ${processingTime}ms`);
             }
             return {
                 success: errors.length === 0,
@@ -139,7 +139,7 @@ let CacheOperationsProcessor = CacheOperationsProcessor_1 = class CacheOperation
         }
         catch (error) {
             const processingTime = Date.now() - startTime;
-            this.logger.error(`Cache cleanup job ${job.id} failed:`, error);
+            this._logger.error(`Cache cleanup job ${job.id} failed:`, error);
             return {
                 success: false,
                 error: error.message,
@@ -152,7 +152,7 @@ let CacheOperationsProcessor = CacheOperationsProcessor_1 = class CacheOperation
             const cacheKey = this.generateCacheKey(imageUrl);
             const cached = await this.cacheManager.get('images', cacheKey);
             if (cached) {
-                this.logger.debug(`Image already cached: ${imageUrl}`);
+                this._logger.debug(`Image already cached: ${imageUrl}`);
                 return;
             }
             const response = await this.httpClient.get(imageUrl, {
@@ -161,7 +161,7 @@ let CacheOperationsProcessor = CacheOperationsProcessor_1 = class CacheOperation
             });
             const buffer = node_buffer_1.Buffer.from(response.data);
             await this.cacheManager.set('images', cacheKey, buffer.toString('base64'), 3600);
-            this.logger.debug(`Cached image: ${imageUrl}`);
+            this._logger.debug(`Cached image: ${imageUrl}`);
         }
         catch (error) {
             throw new Error(`Failed to warm cache for ${imageUrl}: ${error.message}`);
@@ -171,7 +171,7 @@ let CacheOperationsProcessor = CacheOperationsProcessor_1 = class CacheOperation
         try {
             await this.cacheManager.getStats();
             const cleaned = 0;
-            this.logger.debug(`Memory cache cleanup completed: ${cleaned} items cleaned`);
+            this._logger.debug(`Memory cache cleanup completed: ${cleaned} items cleaned`);
             return { cleaned };
         }
         catch (error) {
@@ -201,7 +201,7 @@ let CacheOperationsProcessor = CacheOperationsProcessor_1 = class CacheOperation
                         }
                     }
                     catch (fileError) {
-                        this.logger.warn(`Failed to process file ${file}:`, fileError);
+                        this._logger.warn(`Failed to process file ${file}:`, fileError);
                     }
                 }
             }
@@ -210,7 +210,7 @@ let CacheOperationsProcessor = CacheOperationsProcessor_1 = class CacheOperation
                     throw dirError;
                 }
             }
-            this.logger.debug(`File cache cleanup completed: ${cleaned} files cleaned`);
+            this._logger.debug(`File cache cleanup completed: ${cleaned} files cleaned`);
             return { cleaned };
         }
         catch (error) {

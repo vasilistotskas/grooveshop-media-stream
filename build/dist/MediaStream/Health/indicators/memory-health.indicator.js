@@ -54,22 +54,22 @@ let MemoryHealthIndicator = class MemoryHealthIndicator extends base_health_indi
             threshold: 0.95,
         };
         super('memory', options);
-        this.warningThreshold = 0.85;
-        this.criticalThreshold = 0.95;
+        this._warningThreshold = 0.85;
+        this._criticalThreshold = 0.95;
         this.heapWarningThreshold = 0.90;
         this.heapCriticalThreshold = 0.98;
     }
     async performHealthCheck() {
         return this.executeWithTimeout(async () => {
             const memoryInfo = this.getMemoryInfo();
-            if (memoryInfo.memoryUsagePercentage >= this.criticalThreshold) {
+            if (memoryInfo.memoryUsagePercentage >= this._criticalThreshold) {
                 return this.createUnhealthyResult(`System memory critically high: ${(memoryInfo.memoryUsagePercentage * 100).toFixed(1)}% used`, memoryInfo);
             }
             if (memoryInfo.heapUsagePercentage >= this.heapCriticalThreshold) {
                 return this.createUnhealthyResult(`Heap memory critically high: ${(memoryInfo.heapUsagePercentage * 100).toFixed(1)}% used`, memoryInfo);
             }
             let detailStatus = 'healthy';
-            if (memoryInfo.memoryUsagePercentage >= this.warningThreshold
+            if (memoryInfo.memoryUsagePercentage >= this._warningThreshold
                 || memoryInfo.heapUsagePercentage >= this.heapWarningThreshold) {
                 detailStatus = 'warning';
             }
@@ -77,8 +77,8 @@ let MemoryHealthIndicator = class MemoryHealthIndicator extends base_health_indi
                 ...memoryInfo,
                 detailStatus,
                 thresholds: {
-                    systemMemoryWarning: this.warningThreshold,
-                    systemMemoryCritical: this.criticalThreshold,
+                    systemMemoryWarning: this._warningThreshold,
+                    systemMemoryCritical: this._criticalThreshold,
                     heapMemoryWarning: this.heapWarningThreshold,
                     heapMemoryCritical: this.heapCriticalThreshold,
                 },

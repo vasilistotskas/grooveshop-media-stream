@@ -2,13 +2,13 @@ import { ConfigService } from '@nestjs/config';
 import { CorrelationService } from '../../Correlation/services/correlation.service';
 import { CustomMetric, MetricType, SystemHealth } from '../interfaces/monitoring.interface';
 export declare class MonitoringService {
-    private readonly configService;
-    private readonly correlationService;
-    private readonly logger;
+    private readonly _configService;
+    private readonly _correlationService;
+    private readonly _logger;
     private readonly metrics;
     private readonly config;
     private readonly maxMetricsPerType;
-    constructor(configService: ConfigService, correlationService: CorrelationService);
+    constructor(_configService: ConfigService, _correlationService: CorrelationService);
     recordMetric(name: string, value: number, type: MetricType, tags?: Record<string, string>): void;
     incrementCounter(name: string, value?: number, tags?: Record<string, string>): void;
     recordGauge(name: string, value: number, tags?: Record<string, string>): void;

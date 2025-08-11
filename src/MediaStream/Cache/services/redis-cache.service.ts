@@ -7,7 +7,7 @@ import { CacheStats, ICacheManager } from '../interfaces/cache-manager.interface
 
 @Injectable()
 export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleDestroy {
-	private readonly logger = new Logger(RedisCacheService.name)
+	private readonly _logger = new Logger(RedisCacheService.name)
 	private redis: Redis
 	private isConnected = false
 	private stats = {
@@ -18,7 +18,7 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 	}
 
 	constructor(
-		private readonly configService: ConfigService,
+		private readonly _configService: ConfigService,
 		private readonly metricsService: MetricsService,
 	) { }
 
@@ -35,7 +35,7 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 
 	private async initializeRedis(): Promise<void> {
 		try {
-			const config = this.configService.get('cache.redis')
+			const config = this._configService.get('cache.redis')
 
 			this.redis = new Redis({
 				host: config.host,
@@ -61,10 +61,10 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 				this.metricsService.updateActiveConnections('redis', 1)
 			})
 
-			this.redis.on('error', (error) => {
+			this.redis.on('error', (error: unknown) => {
 				this.isConnected = false
 				this.stats.errors++
-				CorrelatedLogger.error(`Redis connection error: ${error.message}`, error.stack, RedisCacheService.name)
+				CorrelatedLogger.error(`Redis connection error: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
 				this.metricsService.updateActiveConnections('redis', 0)
 			})
 
@@ -81,9 +81,9 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			// Connect to Redis
 			await this.redis.connect()
 		}
-		catch (error) {
+		catch (error: unknown) {
 			this.isConnected = false
-			CorrelatedLogger.error(`Failed to initialize Redis: ${error.message}`, error.stack, RedisCacheService.name)
+			CorrelatedLogger.error(`Failed to initialize Redis: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
 			throw error
 		}
 	}
@@ -113,11 +113,11 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 
 			return JSON.parse(value) as T
 		}
-		catch (error) {
+		catch (error: unknown) {
 			this.stats.errors++
 			this.stats.misses++
 			this.metricsService.recordCacheOperation('get', 'redis', 'error')
-			CorrelatedLogger.error(`Redis cache GET error for key ${key}: ${error.message}`, error.stack, RedisCacheService.name)
+			CorrelatedLogger.error(`Redis cache GET error for key ${key}: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
 			return null
 		}
 	}
@@ -131,7 +131,7 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 		try {
 			this.stats.operations++
 			const serializedValue = JSON.stringify(value)
-			const defaultTtl = this.configService.get('cache.redis.ttl')
+			const defaultTtl = this._configService.get('cache.redis.ttl')
 			const effectiveTtl = ttl !== undefined ? ttl : defaultTtl
 
 			if (effectiveTtl > 0) {
@@ -144,10 +144,10 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			this.metricsService.recordCacheOperation('set', 'redis', 'success')
 			CorrelatedLogger.debug(`Redis cache SET: ${key} (TTL: ${effectiveTtl}s)`, RedisCacheService.name)
 		}
-		catch (error) {
+		catch (error: unknown) {
 			this.stats.errors++
 			this.metricsService.recordCacheOperation('set', 'redis', 'error')
-			CorrelatedLogger.error(`Redis cache SET error for key ${key}: ${error.message}`, error.stack, RedisCacheService.name)
+			CorrelatedLogger.error(`Redis cache SET error for key ${key}: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
 			// Don't throw error, handle gracefully
 		}
 	}
@@ -164,10 +164,10 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			this.metricsService.recordCacheOperation('delete', 'redis', 'success')
 			CorrelatedLogger.debug(`Redis cache DELETE: ${key}`, RedisCacheService.name)
 		}
-		catch (error) {
+		catch (error: unknown) {
 			this.stats.errors++
 			this.metricsService.recordCacheOperation('delete', 'redis', 'error')
-			CorrelatedLogger.error(`Redis cache DELETE error for key ${key}: ${error.message}`, error.stack, RedisCacheService.name)
+			CorrelatedLogger.error(`Redis cache DELETE error for key ${key}: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
 			throw error
 		}
 	}
@@ -180,15 +180,15 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 
 		try {
 			this.stats.operations++
-			const db = this.configService.get('cache.redis.db')
+			const db = this._configService.get('cache.redis.db')
 			await this.redis.flushdb()
 			this.metricsService.recordCacheOperation('clear', 'redis', 'success')
 			CorrelatedLogger.debug(`Redis cache CLEARED (DB: ${db})`, RedisCacheService.name)
 		}
-		catch (error) {
+		catch (error: unknown) {
 			this.stats.errors++
 			this.metricsService.recordCacheOperation('clear', 'redis', 'error')
-			CorrelatedLogger.error(`Redis cache CLEAR error: ${error.message}`, error.stack, RedisCacheService.name)
+			CorrelatedLogger.error(`Redis cache CLEAR error: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
 			throw error
 		}
 	}
@@ -203,9 +203,9 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			const exists = await this.redis.exists(key)
 			return exists === 1
 		}
-		catch (error) {
+		catch (error: unknown) {
 			this.stats.errors++
-			CorrelatedLogger.error(`Redis cache HAS error for key ${key}: ${error.message}`, error.stack, RedisCacheService.name)
+			CorrelatedLogger.error(`Redis cache HAS error for key ${key}: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
 			return false
 		}
 	}
@@ -223,9 +223,9 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			this.stats.operations++
 			return await this.redis.keys('*')
 		}
-		catch (error) {
+		catch (error: unknown) {
 			this.stats.errors++
-			CorrelatedLogger.error(`Redis cache KEYS error: ${error.message}`, error.stack, RedisCacheService.name)
+			CorrelatedLogger.error(`Redis cache KEYS error: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
 			return []
 		}
 	}
@@ -242,10 +242,10 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			this.metricsService.recordCacheOperation('flush', 'redis', 'success')
 			CorrelatedLogger.debug('Redis cache FLUSHED ALL', RedisCacheService.name)
 		}
-		catch (error) {
+		catch (error: unknown) {
 			this.stats.errors++
 			this.metricsService.recordCacheOperation('flush', 'redis', 'error')
-			CorrelatedLogger.error(`Redis cache FLUSH error: ${error.message}`, error.stack, RedisCacheService.name)
+			CorrelatedLogger.error(`Redis cache FLUSH error: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
 			throw error
 		}
 	}
@@ -272,8 +272,8 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 					const memMatch = memInfo.match(/used_memory:(\d+)/)
 					memoryUsage = memMatch ? Number.parseInt(memMatch[1]) : 0
 				}
-				catch (error) {
-					CorrelatedLogger.warn(`Failed to get Redis info: ${error.message}`, RedisCacheService.name)
+				catch (error: unknown) {
+					CorrelatedLogger.warn(`Failed to get Redis info: ${(error as Error).message}`, RedisCacheService.name)
 				}
 			}
 
@@ -286,8 +286,8 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 				hitRate,
 			}
 		}
-		catch (error) {
-			CorrelatedLogger.error(`Redis cache STATS error: ${error.message}`, error.stack, RedisCacheService.name)
+		catch (error: unknown) {
+			CorrelatedLogger.error(`Redis cache STATS error: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
 			return {
 				hits: this.stats.hits,
 				misses: this.stats.misses,
@@ -315,8 +315,8 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 		try {
 			return await this.redis.ttl(key)
 		}
-		catch (error) {
-			CorrelatedLogger.error(`Redis TTL error for key ${key}: ${error.message}`, error.stack, RedisCacheService.name)
+		catch (error: unknown) {
+			CorrelatedLogger.error(`Redis TTL error for key ${key}: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
 			return -1
 		}
 	}
@@ -330,8 +330,8 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			const result = await this.redis.expire(key, ttl)
 			return result === 1
 		}
-		catch (error) {
-			CorrelatedLogger.error(`Redis EXPIRE error for key ${key}: ${error.message}`, error.stack, RedisCacheService.name)
+		catch (error: unknown) {
+			CorrelatedLogger.error(`Redis EXPIRE error for key ${key}: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
 			return false
 		}
 	}
@@ -356,8 +356,8 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 
 			return { used, peak, fragmentation }
 		}
-		catch (error) {
-			CorrelatedLogger.error(`Redis memory info error: ${error.message}`, error.stack, RedisCacheService.name)
+		catch (error: unknown) {
+			CorrelatedLogger.error(`Redis memory info error: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
 			return { used: 0, peak: 0, fragmentation: 0 }
 		}
 	}

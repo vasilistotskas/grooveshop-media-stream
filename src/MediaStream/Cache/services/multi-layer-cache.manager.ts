@@ -24,14 +24,14 @@ export class MultiLayerCacheManager implements OnModuleInit {
 	private popularKeys: Map<string, number> = new Map()
 
 	constructor(
-		private readonly configService: ConfigService,
+		private readonly _configService: ConfigService,
 		private readonly metricsService: MetricsService,
 		private readonly memoryCacheLayer: MemoryCacheLayer,
 		private readonly redisCacheLayer: RedisCacheLayer,
 		private readonly fileCacheLayer: FileCacheLayer,
 	) {
 		this.keyStrategy = new DefaultCacheKeyStrategy()
-		this.preloadingEnabled = this.configService.getOptional('cache.preloading.enabled', false)
+		this.preloadingEnabled = this._configService.getOptional('cache.preloading.enabled', false)
 	}
 
 	async onModuleInit(): Promise<void> {
@@ -40,7 +40,7 @@ export class MultiLayerCacheManager implements OnModuleInit {
 			this.memoryCacheLayer,
 			this.redisCacheLayer,
 			this.fileCacheLayer,
-		].sort((a, b) => a.getPriority() - b.getPriority())
+		].sort((a: any, b: any) => a.getPriority() - b.getPriority())
 
 		CorrelatedLogger.debug(
 			`Multi-layer cache initialized with ${this.layers.length} layers: ${this.layers.map(l => l.getLayerName()).join(', ')}`,
@@ -79,9 +79,9 @@ export class MultiLayerCacheManager implements OnModuleInit {
 					return value
 				}
 			}
-			catch (error) {
+			catch (error: unknown) {
 				CorrelatedLogger.warn(
-					`Cache layer ${layer.getLayerName()} failed for key ${key}: ${error.message}`,
+					`Cache layer ${layer.getLayerName()} failed for key ${key}: ${(error as Error).message}`,
 					MultiLayerCacheManager.name,
 				)
 			}
@@ -115,9 +115,9 @@ export class MultiLayerCacheManager implements OnModuleInit {
 					MultiLayerCacheManager.name,
 				)
 			}
-			catch (error) {
+			catch (error: unknown) {
 				CorrelatedLogger.warn(
-					`Cache SET failed in ${layer.getLayerName()} layer for key ${key}: ${error.message}`,
+					`Cache SET failed in ${layer.getLayerName()} layer for key ${key}: ${(error as Error).message}`,
 					MultiLayerCacheManager.name,
 				)
 			}
@@ -142,9 +142,9 @@ export class MultiLayerCacheManager implements OnModuleInit {
 					MultiLayerCacheManager.name,
 				)
 			}
-			catch (error) {
+			catch (error: unknown) {
 				CorrelatedLogger.warn(
-					`Cache DELETE failed in ${layer.getLayerName()} layer for key ${key}: ${error.message}`,
+					`Cache DELETE failed in ${layer.getLayerName()} layer for key ${key}: ${(error as Error).message}`,
 					MultiLayerCacheManager.name,
 				)
 			}
@@ -168,9 +168,9 @@ export class MultiLayerCacheManager implements OnModuleInit {
 					return true
 				}
 			}
-			catch (error) {
+			catch (error: unknown) {
 				CorrelatedLogger.warn(
-					`Cache EXISTS check failed in ${layer.getLayerName()} layer for key ${key}: ${error.message}`,
+					`Cache EXISTS check failed in ${layer.getLayerName()} layer for key ${key}: ${(error as Error).message}`,
 					MultiLayerCacheManager.name,
 				)
 			}
@@ -191,9 +191,9 @@ export class MultiLayerCacheManager implements OnModuleInit {
 					MultiLayerCacheManager.name,
 				)
 			}
-			catch (error) {
+			catch (error: unknown) {
 				CorrelatedLogger.warn(
-					`Cache CLEAR failed in ${layer.getLayerName()} layer: ${error.message}`,
+					`Cache CLEAR failed in ${layer.getLayerName()} layer: ${(error as Error).message}`,
 					MultiLayerCacheManager.name,
 				)
 			}
@@ -238,9 +238,9 @@ export class MultiLayerCacheManager implements OnModuleInit {
 				totalMisses += stats.misses
 				layerHitDistribution[layer.getLayerName()] = stats.hits
 			}
-			catch (error) {
+			catch (error: unknown) {
 				CorrelatedLogger.warn(
-					`Failed to get stats from ${layer.getLayerName()} layer: ${error.message}`,
+					`Failed to get stats from ${layer.getLayerName()} layer: ${(error as Error).message}`,
 					MultiLayerCacheManager.name,
 				)
 				layerStats[layer.getLayerName()] = {
@@ -297,9 +297,9 @@ export class MultiLayerCacheManager implements OnModuleInit {
 					}
 				}
 			}
-			catch (error) {
+			catch (error: unknown) {
 				CorrelatedLogger.warn(
-					`Failed to preload key ${key}: ${error.message}`,
+					`Failed to preload key ${key}: ${(error as Error).message}`,
 					MultiLayerCacheManager.name,
 				)
 			}
@@ -324,9 +324,9 @@ export class MultiLayerCacheManager implements OnModuleInit {
 					MultiLayerCacheManager.name,
 				)
 			}
-			catch (error) {
+			catch (error: unknown) {
 				CorrelatedLogger.warn(
-					`Failed to backfill ${layer.getLayerName()} layer for key ${key}: ${error.message}`,
+					`Failed to backfill ${layer.getLayerName()} layer for key ${key}: ${(error as Error).message}`,
 					MultiLayerCacheManager.name,
 				)
 			}
@@ -362,16 +362,16 @@ export class MultiLayerCacheManager implements OnModuleInit {
 	 * Start periodic preloading
 	 */
 	private startPreloading(): void {
-		const interval = this.configService.getOptional('cache.preloading.interval', 300000) // 5 minutes
+		const interval = this._configService.getOptional('cache.preloading.interval', 300000) // 5 minutes
 
 		setInterval(async () => {
 			try {
 				await this.preloadPopularKeys()
 			}
-			catch (error) {
+			catch (error: unknown) {
 				CorrelatedLogger.error(
-					`Preloading failed: ${error.message}`,
-					error.stack,
+					`Preloading failed: ${(error as Error).message}`,
+					(error as Error).stack,
 					MultiLayerCacheManager.name,
 				)
 			}

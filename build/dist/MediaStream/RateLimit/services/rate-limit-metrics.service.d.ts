@@ -1,15 +1,15 @@
 import { ConfigService } from '@microservice/Config/config.service';
 import { OnModuleInit } from '@nestjs/common';
 export declare class RateLimitMetricsService implements OnModuleInit {
-    private readonly configService;
-    private readonly logger;
+    private readonly _configService;
+    private readonly _logger;
     private readonly register;
     private readonly rateLimitAttemptsTotal;
     private readonly rateLimitBlockedTotal;
     private readonly rateLimitCurrentRequests;
     private readonly rateLimitAdaptiveAdjustments;
     private readonly rateLimitSystemLoad;
-    constructor(configService: ConfigService);
+    constructor(_configService: ConfigService);
     onModuleInit(): Promise<void>;
     recordRateLimitAttempt(requestType: string, clientIp: string, allowed: boolean): void;
     updateCurrentRequests(requestType: string, clientIp: string, count: number): void;

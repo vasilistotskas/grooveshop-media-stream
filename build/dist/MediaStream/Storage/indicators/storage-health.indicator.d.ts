@@ -27,12 +27,12 @@ export interface StorageHealthDetails {
     recommendations: string[];
 }
 export declare class StorageHealthIndicator extends BaseHealthIndicator {
-    private readonly configService;
+    private readonly _configService;
     private readonly storageMonitoring;
     private readonly storageCleanup;
-    private readonly warningThreshold;
-    private readonly criticalThreshold;
-    constructor(configService: ConfigService, storageMonitoring: StorageMonitoringService, storageCleanup: StorageCleanupService);
+    private readonly _warningThreshold;
+    private readonly _criticalThreshold;
+    constructor(_configService: ConfigService, storageMonitoring: StorageMonitoringService, storageCleanup: StorageCleanupService);
     protected performHealthCheck(): Promise<HealthIndicatorResult>;
     protected getDescription(): string;
     getStorageAnalysis(): Promise<{

@@ -24,13 +24,13 @@ export interface StorageThresholds {
     maxFileAge: number;
 }
 export declare class StorageMonitoringService implements OnModuleInit {
-    private readonly configService;
-    private readonly logger;
+    private readonly _configService;
+    private readonly _logger;
     private readonly storageDirectory;
     private readonly thresholds;
     private accessPatterns;
     private lastScanTime;
-    constructor(configService: ConfigService);
+    constructor(_configService: ConfigService);
     onModuleInit(): Promise<void>;
     getStorageStats(): Promise<StorageStats>;
     checkThresholds(): Promise<{

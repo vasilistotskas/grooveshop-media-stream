@@ -4,15 +4,15 @@ import { ISanitizer } from '../interfaces/validator.interface'
 
 @Injectable()
 export class InputSanitizationService implements ISanitizer<any> {
-	private readonly logger = new Logger(InputSanitizationService.name)
-	private allowedDomains: string[] | null = null
+	private readonly _logger = new Logger(InputSanitizationService.name)
+	private allowedDomains: string[] | null = null as any
 
-	constructor(private readonly configService: ConfigService) {
+	constructor(private readonly _configService: ConfigService) {
 	}
 
 	private getAllowedDomains(): string[] {
 		if (this.allowedDomains === null) {
-			this.allowedDomains = this.configService.getOptional<string[]>('validation.allowedDomains', [
+			this.allowedDomains = this._configService.getOptional<string[]>('validation.allowedDomains', [
 				'localhost',
 				'127.0.0.1',
 				'example.com',
@@ -75,7 +75,7 @@ export class InputSanitizationService implements ISanitizer<any> {
 		const maxLength = 2048
 		if (sanitized.length > maxLength) {
 			sanitized = sanitized.substring(0, maxLength)
-			this.logger.warn(`String truncated to ${maxLength} characters for security`)
+			this._logger.warn(`String truncated to ${maxLength} characters for security`)
 		}
 
 		return sanitized
@@ -111,20 +111,20 @@ export class InputSanitizationService implements ISanitizer<any> {
 			)
 
 			if (!isAllowed) {
-				this.logger.warn(`URL blocked - not in whitelist: ${urlObj.hostname}`)
+				this._logger.warn(`URL blocked - not in whitelist: ${urlObj.hostname}`)
 				return false
 			}
 
 			return true
 		}
-		catch (error) {
-			this.logger.warn(`Invalid URL format: ${url}, error: ${error}`)
+		catch (error: unknown) {
+			this._logger.warn(`Invalid URL format: ${url}, error: ${error}`)
 			return false
 		}
 	}
 
 	validateFileSize(sizeBytes: number, format?: string): boolean {
-		const maxSizes = this.configService.getOptional('validation.maxFileSizes', {
+		const maxSizes = this._configService.getOptional('validation.maxFileSizes', {
 			default: 10 * 1024 * 1024, // 10MB
 			jpeg: 5 * 1024 * 1024, // 5MB
 			jpg: 5 * 1024 * 1024, // 5MB

@@ -50,15 +50,15 @@ const correlation_service_1 = require("../services/correlation.service");
 const logger_util_1 = require("../utils/logger.util");
 const performance_tracker_util_1 = require("../utils/performance-tracker.util");
 let TimingMiddleware = TimingMiddleware_1 = class TimingMiddleware {
-    constructor(correlationService) {
-        this.correlationService = correlationService;
+    constructor(_correlationService) {
+        this._correlationService = _correlationService;
     }
     use(req, res, next) {
         const startTime = process.hrtime.bigint();
         const startTimestamp = Date.now();
         res.setHeader('x-request-start', startTimestamp.toString());
         const originalEnd = res.end.bind(res);
-        const correlationService = this.correlationService;
+        const correlationService = this._correlationService;
         res.end = function (chunk, encoding, cb) {
             const endTime = process.hrtime.bigint();
             const endTimestamp = Date.now();

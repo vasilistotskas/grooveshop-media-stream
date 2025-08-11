@@ -14,17 +14,17 @@ import { RateLimitService } from './services/rate-limit.service'
 		ThrottlerModule.forRootAsync({
 			imports: [ConfigModule],
 			inject: [ConfigService],
-			useFactory: (configService: ConfigService) => ({
+			useFactory: (_configService: ConfigService) => ({
 				throttlers: [
 					{
 						name: 'default',
-						ttl: configService.getOptional('rateLimit.default.windowMs', 60000), // 1 minute default
-						limit: configService.getOptional('rateLimit.default.max', 100), // 100 requests per minute default
+						ttl: _configService.getOptional('rateLimit.default.windowMs', 60000), // 1 minute default
+						limit: _configService.getOptional('rateLimit.default.max', 100), // 100 requests per minute default
 					},
 					{
 						name: 'image-processing',
-						ttl: configService.getOptional('rateLimit.imageProcessing.windowMs', 60000),
-						limit: configService.getOptional('rateLimit.imageProcessing.max', 50),
+						ttl: _configService.getOptional('rateLimit.imageProcessing.windowMs', 60000),
+						limit: _configService.getOptional('rateLimit.imageProcessing.max', 50),
 					},
 				],
 				skipIf: (context) => {

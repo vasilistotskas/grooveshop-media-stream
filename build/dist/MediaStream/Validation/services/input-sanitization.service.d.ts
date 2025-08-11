@@ -1,10 +1,10 @@
 import { ConfigService } from '../../../MediaStream/Config/config.service';
 import { ISanitizer } from '../interfaces/validator.interface';
 export declare class InputSanitizationService implements ISanitizer<any> {
-    private readonly configService;
-    private readonly logger;
+    private readonly _configService;
+    private readonly _logger;
     private allowedDomains;
-    constructor(configService: ConfigService);
+    constructor(_configService: ConfigService);
     private getAllowedDomains;
     sanitize(input: any): Promise<any>;
     private sanitizeString;

@@ -21,7 +21,7 @@ let BullQueueService = BullQueueService_1 = class BullQueueService {
     constructor(imageQueue, cacheQueue) {
         this.imageQueue = imageQueue;
         this.cacheQueue = cacheQueue;
-        this.logger = new common_1.Logger(BullQueueService_1.name);
+        this._logger = new common_1.Logger(BullQueueService_1.name);
         this.processors = new Map();
     }
     async add(name, data, options = {}) {
@@ -29,11 +29,11 @@ let BullQueueService = BullQueueService_1 = class BullQueueService {
             const queue = this.getQueueForJobType(name);
             const bullOptions = this.convertToBullOptions(options);
             const bullJob = await queue.add(name, data, bullOptions);
-            this.logger.debug(`Job ${name} added to queue with ID: ${bullJob.id}`);
+            this._logger.debug(`Job ${name} added to queue with ID: ${bullJob.id}`);
             return this.convertFromBullJob(bullJob);
         }
         catch (error) {
-            this.logger.error(`Failed to add job ${name} to queue:`, error);
+            this._logger.error(`Failed to add job ${name} to queue:`, error);
             throw error;
         }
     }
@@ -43,13 +43,13 @@ let BullQueueService = BullQueueService_1 = class BullQueueService {
         queue.process(name, async (bullJob) => {
             const job = this.convertFromBullJob(bullJob);
             try {
-                this.logger.debug(`Processing job ${name} with ID: ${job.id}`);
+                this._logger.debug(`Processing job ${name} with ID: ${job.id}`);
                 const result = await processor(job);
-                this.logger.debug(`Job ${name} completed successfully`);
+                this._logger.debug(`Job ${name} completed successfully`);
                 return result;
             }
             catch (error) {
-                this.logger.error(`Job ${name} failed:`, error);
+                this._logger.error(`Job ${name} failed:`, error);
                 throw error;
             }
         });
@@ -70,7 +70,7 @@ let BullQueueService = BullQueueService_1 = class BullQueueService {
             };
         }
         catch (error) {
-            this.logger.error('Failed to get queue stats:', error);
+            this._logger.error('Failed to get queue stats:', error);
             throw error;
         }
     }
@@ -84,7 +84,7 @@ let BullQueueService = BullQueueService_1 = class BullQueueService {
             return bullJob ? this.convertFromBullJob(bullJob) : null;
         }
         catch (error) {
-            this.logger.error(`Failed to get job ${jobId}:`, error);
+            this._logger.error(`Failed to get job ${jobId}:`, error);
             return null;
         }
     }
@@ -98,11 +98,11 @@ let BullQueueService = BullQueueService_1 = class BullQueueService {
             const bullJob = await queue.getJob(jobId);
             if (bullJob) {
                 await bullJob.remove();
-                this.logger.debug(`Job ${jobId} removed from queue`);
+                this._logger.debug(`Job ${jobId} removed from queue`);
             }
         }
         catch (error) {
-            this.logger.error(`Failed to remove job ${jobId}:`, error);
+            this._logger.error(`Failed to remove job ${jobId}:`, error);
             throw error;
         }
     }
@@ -112,10 +112,10 @@ let BullQueueService = BullQueueService_1 = class BullQueueService {
                 this.imageQueue.pause(),
                 this.cacheQueue.pause(),
             ]);
-            this.logger.log('All queues paused');
+            this._logger.log('All queues paused');
         }
         catch (error) {
-            this.logger.error('Failed to pause queues:', error);
+            this._logger.error('Failed to pause queues:', error);
             throw error;
         }
     }
@@ -125,10 +125,10 @@ let BullQueueService = BullQueueService_1 = class BullQueueService {
                 this.imageQueue.resume(),
                 this.cacheQueue.resume(),
             ]);
-            this.logger.log('All queues resumed');
+            this._logger.log('All queues resumed');
         }
         catch (error) {
-            this.logger.error('Failed to resume queues:', error);
+            this._logger.error('Failed to resume queues:', error);
             throw error;
         }
     }
@@ -139,10 +139,10 @@ let BullQueueService = BullQueueService_1 = class BullQueueService {
                 this.imageQueue.clean(grace, bullStatus),
                 this.cacheQueue.clean(grace, bullStatus),
             ]);
-            this.logger.debug(`Cleaned ${status} jobs older than ${grace}ms`);
+            this._logger.debug(`Cleaned ${status} jobs older than ${grace}ms`);
         }
         catch (error) {
-            this.logger.error(`Failed to clean ${status} jobs:`, error);
+            this._logger.error(`Failed to clean ${status} jobs:`, error);
             throw error;
         }
     }
@@ -152,10 +152,10 @@ let BullQueueService = BullQueueService_1 = class BullQueueService {
                 this.imageQueue.close(),
                 this.cacheQueue.close(),
             ]);
-            this.logger.log('Queue connections closed');
+            this._logger.log('Queue connections closed');
         }
         catch (error) {
-            this.logger.error('Failed to close queue connections:', error);
+            this._logger.error('Failed to close queue connections:', error);
         }
     }
     getQueueForJobType(jobType) {

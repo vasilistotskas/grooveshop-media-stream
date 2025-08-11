@@ -36,27 +36,27 @@ export interface CleanupConfig {
 
 @Injectable()
 export class StorageCleanupService implements OnModuleInit {
-	private readonly logger = new Logger(StorageCleanupService.name)
+	private readonly _logger = new Logger(StorageCleanupService.name)
 	private readonly storageDirectory: string
 	private readonly config: CleanupConfig
 	private lastCleanup: Date = new Date()
 	private isCleanupRunning = false
 
 	constructor(
-		private readonly configService: ConfigService,
+		private readonly _configService: ConfigService,
 		private readonly storageMonitoring: StorageMonitoringService,
 		private readonly intelligentEviction: IntelligentEvictionService,
 	) {
-		this.storageDirectory = this.configService.getOptional('cache.file.directory', './storage')
+		this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage')
 		this.config = this.loadCleanupConfig()
 	}
 
 	async onModuleInit(): Promise<void> {
 		if (this.config.enabled) {
-			this.logger.log('Storage cleanup service initialized with policies:', this.config.policies.map(p => p.name))
+			this._logger.log('Storage cleanup service initialized with policies:', this.config.policies.map(p => p.name))
 		}
 		else {
-			this.logger.log('Storage cleanup service disabled')
+			this._logger.log('Storage cleanup service disabled')
 		}
 	}
 
@@ -99,10 +99,10 @@ export class StorageCleanupService implements OnModuleInit {
 						StorageCleanupService.name,
 					)
 				}
-				catch (error) {
-					const errorMsg = `Policy '${policy.name}' failed: ${error.message}`
+				catch (error: unknown) {
+					const errorMsg = `Policy '${policy.name}' failed: ${(error as Error).message}`
 					allErrors.push(errorMsg)
-					CorrelatedLogger.error(errorMsg, error.stack, StorageCleanupService.name)
+					CorrelatedLogger.error(errorMsg, (error as Error).stack, StorageCleanupService.name)
 				}
 			}
 
@@ -116,8 +116,8 @@ export class StorageCleanupService implements OnModuleInit {
 					allErrors.push(...evictionResult.errors)
 					appliedPolicies.push('intelligent-eviction')
 				}
-				catch (error) {
-					allErrors.push(`Intelligent eviction failed: ${error.message}`)
+				catch (error: unknown) {
+					allErrors.push(`Intelligent eviction failed: ${(error as Error).message}`)
 				}
 			}
 
@@ -151,7 +151,7 @@ export class StorageCleanupService implements OnModuleInit {
 	@Cron('0 2 * * *') // Default: 2 AM daily
 	async scheduledCleanup(): Promise<void> {
 		// Check current enabled status (not cached config)
-		const currentlyEnabled = this.configService.getOptional('storage.cleanup.enabled', true)
+		const currentlyEnabled = this._configService.getOptional('storage.cleanup.enabled', true)
 		if (!currentlyEnabled || this.isCleanupRunning) {
 			return
 		}
@@ -159,10 +159,10 @@ export class StorageCleanupService implements OnModuleInit {
 		try {
 			await this.performCleanup()
 		}
-		catch (error) {
+		catch (error: unknown) {
 			CorrelatedLogger.error(
-				`Scheduled cleanup failed: ${error.message}`,
-				error.stack,
+				`Scheduled cleanup failed: ${(error as Error).message}`,
+				(error as Error).stack,
 				StorageCleanupService.name,
 			)
 		}
@@ -249,7 +249,7 @@ export class StorageCleanupService implements OnModuleInit {
 		}
 
 		// Sort by modification time (oldest first)
-		candidates.sort((a, b) => a.stats.mtime.getTime() - b.stats.mtime.getTime())
+		candidates.sort((a: any, b: any) => a.stats.mtime.getTime() - b.stats.mtime.getTime())
 
 		// Apply preserve count if specified
 		if (policy.preserveCount && candidates.length <= policy.preserveCount) {
@@ -292,8 +292,8 @@ export class StorageCleanupService implements OnModuleInit {
 					StorageCleanupService.name,
 				)
 			}
-			catch (error) {
-				const errorMsg = `Failed to remove ${file}: ${error.message}`
+			catch (error: unknown) {
+				const errorMsg = `Failed to remove ${file}: ${(error as Error).message}`
 				errors.push(errorMsg)
 				CorrelatedLogger.warn(errorMsg, StorageCleanupService.name)
 			}
@@ -303,10 +303,10 @@ export class StorageCleanupService implements OnModuleInit {
 	}
 
 	private loadCleanupConfig(): CleanupConfig {
-		const enabled = this.configService.getOptional('storage.cleanup.enabled', true)
-		const cronSchedule = this.configService.getOptional('storage.cleanup.cronSchedule', '0 2 * * *')
-		const dryRun = this.configService.getOptional('storage.cleanup.dryRun', false)
-		const maxCleanupDuration = this.configService.getOptional('storage.cleanup.maxDuration', 300000) // 5 minutes
+		const enabled = this._configService.getOptional('storage.cleanup.enabled', true)
+		const cronSchedule = this._configService.getOptional('storage.cleanup.cronSchedule', '0 2 * * *')
+		const dryRun = this._configService.getOptional('storage.cleanup.dryRun', false)
+		const maxCleanupDuration = this._configService.getOptional('storage.cleanup.maxDuration', 300000) // 5 minutes
 
 		// Default retention policies
 		const defaultPolicies: RetentionPolicy[] = [

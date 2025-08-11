@@ -14,7 +14,7 @@ import ValidateCacheImageRequestRule from '@microservice/Rule/ValidateCacheImage
 import { InputSanitizationService } from '@microservice/Validation/services/input-sanitization.service';
 import { HttpService } from '@nestjs/axios';
 export default class CacheImageResourceOperation {
-    private readonly httpService;
+    private readonly _httpService;
     private readonly validateCacheImageRequest;
     private readonly fetchResourceResponseJob;
     private readonly webpImageManipulationJob;
@@ -24,9 +24,9 @@ export default class CacheImageResourceOperation {
     private readonly inputSanitizationService;
     private readonly jobQueueManager;
     private readonly metricsService;
-    private readonly logger;
+    private readonly _logger;
     private readonly basePath;
-    constructor(httpService: HttpService, validateCacheImageRequest: ValidateCacheImageRequestRule, fetchResourceResponseJob: FetchResourceResponseJob, webpImageManipulationJob: WebpImageManipulationJob, storeResourceResponseToFileJob: StoreResourceResponseToFileJob, generateResourceIdentityFromRequestJob: GenerateResourceIdentityFromRequestJob, cacheManager: MultiLayerCacheManager, inputSanitizationService: InputSanitizationService, jobQueueManager: JobQueueManager, metricsService: MetricsService);
+    constructor(_httpService: HttpService, validateCacheImageRequest: ValidateCacheImageRequestRule, fetchResourceResponseJob: FetchResourceResponseJob, webpImageManipulationJob: WebpImageManipulationJob, storeResourceResponseToFileJob: StoreResourceResponseToFileJob, generateResourceIdentityFromRequestJob: GenerateResourceIdentityFromRequestJob, cacheManager: MultiLayerCacheManager, inputSanitizationService: InputSanitizationService, jobQueueManager: JobQueueManager, metricsService: MetricsService);
     request: CacheImageRequest;
     id: ResourceIdentifierKP;
     metaData: ResourceMetaData;

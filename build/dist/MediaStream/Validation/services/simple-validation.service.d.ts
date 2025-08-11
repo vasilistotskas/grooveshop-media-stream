@@ -9,12 +9,12 @@ export interface SimpleValidationResult {
     sanitizedInput?: any;
 }
 export declare class SimpleValidationService {
-    private readonly configService;
-    private readonly correlationService;
+    private readonly _configService;
+    private readonly _correlationService;
     private readonly sanitizationService;
     private readonly securityChecker;
-    private readonly logger;
-    constructor(configService: ConfigService, correlationService: CorrelationService, sanitizationService: InputSanitizationService, securityChecker: SecurityCheckerService);
+    private readonly _logger;
+    constructor(_configService: ConfigService, _correlationService: CorrelationService, sanitizationService: InputSanitizationService, securityChecker: SecurityCheckerService);
     validateCacheImageRequest(request: CacheImageRequest): Promise<SimpleValidationResult>;
     validateInput(input: any): Promise<SimpleValidationResult>;
 }

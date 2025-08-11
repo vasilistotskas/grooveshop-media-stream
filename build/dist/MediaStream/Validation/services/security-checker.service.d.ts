@@ -1,11 +1,11 @@
 import { ConfigService } from '../../../MediaStream/Config/config.service';
 import { ISecurityChecker, SecurityEvent } from '../interfaces/validator.interface';
 export declare class SecurityCheckerService implements ISecurityChecker {
-    private readonly configService;
-    private readonly logger;
+    private readonly _configService;
+    private readonly _logger;
     private readonly suspiciousPatterns;
     private readonly securityEvents;
-    constructor(configService: ConfigService);
+    constructor(_configService: ConfigService);
     checkForMaliciousContent(input: any): Promise<boolean>;
     private checkString;
     private checkObject;
