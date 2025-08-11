@@ -215,78 +215,84 @@ export class InputSanitizationService implements ISanitizer<any> {
 	}
 
 	private removeHtmlTags(input: string): string {
-		// Comprehensive HTML tag removal that handles incomplete and malformed tags
-		let result = input
-		let previousResult = ''
+		// Use character-by-character filtering to completely eliminate HTML injection risks
+		// This approach is more secure than regex-based sanitization
+		const result: string[] = []
+		let insideTag = false
+		let i = 0
 
-		// Keep removing until no more changes occur
-		while (result !== previousResult) {
-			previousResult = result
-
-			// Remove complete HTML tags
-			result = result.replace(/<[^>]*>/g, '')
-
-			// Remove incomplete opening tags (handles < without closing >)
-			result = result.replace(/<[^<]*$/g, '')
-
-			// Remove incomplete closing tags (handles > without opening <)
-			result = result.replace(/^[^>]*>/g, '')
-
-			// Remove any remaining < or > characters that could be used for injection
-			result = result.replace(/[<>]/g, '')
+		while (i < input.length) {
+			const char = input[i]
+			
+			if (char === '<') {
+				// Start of potential HTML tag - skip everything until >
+				insideTag = true
+				i++
+				continue
+			}
+			
+			if (char === '>') {
+				// End of potential HTML tag
+				insideTag = false
+				i++
+				continue
+			}
+			
+			if (!insideTag) {
+				// Only include characters that are outside of HTML tags
+				result.push(char)
+			}
+			
+			i++
 		}
 
-		return result
+		return result.join('')
 	}
 
 	private removeEventHandlers(input: string): string {
-		// Comprehensive event handler removal that prevents bypass attempts
-		let result = input
-		let previousResult = ''
+		// Use character-by-character analysis to remove event handlers completely
+		const result: string[] = []
+		let i = 0
 
-		// Keep removing until no more changes occur
-		while (result !== previousResult) {
-			previousResult = result
-
-			// Remove complete event handlers with quoted values
-			result = result.replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, '')
-
-			// Remove complete event handlers with unquoted values
-			result = result.replace(/\bon\w+\s*=\s*[^\s"'<>]+/gi, '')
-
-			// Remove incomplete event handlers (just the attribute name)
-			result = result.replace(/\bon\w+\s*=/gi, '')
-
-			// Remove any remaining 'on' followed by word characters (potential incomplete handlers)
-			result = result.replace(/\bon\w+/gi, '')
+		while (i < input.length) {
+			// Look for 'on' followed by word characters and '='
+			if (i <= input.length - 2 && 
+				input.substring(i, i + 2).toLowerCase() === 'on' &&
+				this.isWordBoundary(input, i)) {
+				
+				// Found potential event handler, skip it entirely
+				i = this.skipEventHandler(input, i)
+				continue
+			}
+			
+			result.push(input[i])
+			i++
 		}
 
-		return result
+		return result.join('')
 	}
 
 	private removeStyleAttributes(input: string): string {
-		// Comprehensive style attribute removal that prevents bypass attempts
-		let result = input
-		let previousResult = ''
+		// Use character-by-character analysis to remove style attributes completely
+		const result: string[] = []
+		let i = 0
 
-		// Keep removing until no more changes occur
-		while (result !== previousResult) {
-			previousResult = result
-
-			// Remove complete style attributes with quoted values
-			result = result.replace(/\bstyle\s*=\s*["'][^"']*["']/gi, '')
-
-			// Remove complete style attributes with unquoted values
-			result = result.replace(/\bstyle\s*=\s*[^\s"'<>]+/gi, '')
-
-			// Remove incomplete style attributes (just the attribute name)
-			result = result.replace(/\bstyle\s*=/gi, '')
-
-			// Remove any remaining 'style' that could be part of an incomplete attribute
-			result = result.replace(/\bstyle\b/gi, '')
+		while (i < input.length) {
+			// Look for 'style' followed by optional whitespace and '='
+			if (i <= input.length - 5 && 
+				input.substring(i, i + 5).toLowerCase() === 'style' &&
+				this.isWordBoundary(input, i)) {
+				
+				// Found potential style attribute, skip it entirely
+				i = this.skipStyleAttribute(input, i)
+				continue
+			}
+			
+			result.push(input[i])
+			i++
 		}
 
-		return result
+		return result.join('')
 	}
 
 	private removeDangerousProtocols(input: string): string {
@@ -337,23 +343,121 @@ export class InputSanitizationService implements ISanitizer<any> {
 	}
 
 	private removeHtmlEntities(input: string): string {
-		// Comprehensive HTML entity removal
-		let result = input
-		let previousResult = ''
+		// Use character-by-character analysis to remove HTML entities completely
+		const result: string[] = []
+		let i = 0
 
-		// Keep removing until no more changes occur
-		while (result !== previousResult) {
-			previousResult = result
-
-			// Remove complete HTML entities
-			result = result.replace(/&[#\w]+;/g, '')
-			result = result.replace(/&#x?[0-9a-f]+;?/gi, '')
-
-			// Remove incomplete HTML entities (& without closing ;)
-			result = result.replace(/&[#\w]*$/g, '')
-			result = result.replace(/&#x?[0-9a-f]*$/gi, '')
+		while (i < input.length) {
+			if (input[i] === '&') {
+				// Found potential HTML entity, skip it entirely
+				i = this.skipHtmlEntity(input, i)
+				continue
+			}
+			
+			result.push(input[i])
+			i++
 		}
 
-		return result
+		return result.join('')
+	}
+
+	private isWordBoundary(input: string, index: number): boolean {
+		// Check if the position is at a word boundary (start of word)
+		if (index === 0) return true
+		const prevChar = input[index - 1]
+		return !(/\w/.test(prevChar))
+	}
+
+	private skipEventHandler(input: string, startIndex: number): number {
+		let i = startIndex
+		
+		// Skip 'on' and any following word characters
+		while (i < input.length && /\w/.test(input[i])) {
+			i++
+		}
+		
+		// Skip whitespace
+		while (i < input.length && /\s/.test(input[i])) {
+			i++
+		}
+		
+		// If we find '=', skip the entire value
+		if (i < input.length && input[i] === '=') {
+			i++ // skip '='
+			
+			// Skip whitespace after '='
+			while (i < input.length && /\s/.test(input[i])) {
+				i++
+			}
+			
+			// Skip the value (quoted or unquoted)
+			if (i < input.length && (input[i] === '"' || input[i] === "'")) {
+				const quote = input[i]
+				i++ // skip opening quote
+				while (i < input.length && input[i] !== quote) {
+					i++
+				}
+				if (i < input.length) i++ // skip closing quote
+			} else {
+				// Skip unquoted value
+				while (i < input.length && !/\s/.test(input[i]) && input[i] !== '>' && input[i] !== '<') {
+					i++
+				}
+			}
+		}
+		
+		return i
+	}
+
+	private skipStyleAttribute(input: string, startIndex: number): number {
+		let i = startIndex + 5 // skip 'style'
+		
+		// Skip whitespace
+		while (i < input.length && /\s/.test(input[i])) {
+			i++
+		}
+		
+		// If we find '=', skip the entire value
+		if (i < input.length && input[i] === '=') {
+			i++ // skip '='
+			
+			// Skip whitespace after '='
+			while (i < input.length && /\s/.test(input[i])) {
+				i++
+			}
+			
+			// Skip the value (quoted or unquoted)
+			if (i < input.length && (input[i] === '"' || input[i] === "'")) {
+				const quote = input[i]
+				i++ // skip opening quote
+				while (i < input.length && input[i] !== quote) {
+					i++
+				}
+				if (i < input.length) i++ // skip closing quote
+			} else {
+				// Skip unquoted value
+				while (i < input.length && !/\s/.test(input[i]) && input[i] !== '>' && input[i] !== '<') {
+					i++
+				}
+			}
+		}
+		
+		return i
+	}
+
+	private skipHtmlEntity(input: string, startIndex: number): number {
+		let i = startIndex + 1 // skip '&'
+		
+		// Skip until we find ';' or reach end of potential entity
+		while (i < input.length && input[i] !== ';' && /[#\w]/.test(input[i])) {
+			i++
+		}
+		
+		// If we found ';', skip it too
+		if (i < input.length && input[i] === ';') {
+			i++
+		}
+		
+		return i
 	}
 }

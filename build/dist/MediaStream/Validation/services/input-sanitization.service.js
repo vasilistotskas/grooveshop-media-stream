@@ -165,40 +165,57 @@ let InputSanitizationService = InputSanitizationService_1 = class InputSanitizat
         return true;
     }
     removeHtmlTags(input) {
-        let result = input;
-        let previousResult = '';
-        while (result !== previousResult) {
-            previousResult = result;
-            result = result.replace(/<[^>]*>/g, '');
-            result = result.replace(/<[^<]*$/g, '');
-            result = result.replace(/^[^>]*>/g, '');
-            result = result.replace(/[<>]/g, '');
+        const result = [];
+        let insideTag = false;
+        let i = 0;
+        while (i < input.length) {
+            const char = input[i];
+            if (char === '<') {
+                insideTag = true;
+                i++;
+                continue;
+            }
+            if (char === '>') {
+                insideTag = false;
+                i++;
+                continue;
+            }
+            if (!insideTag) {
+                result.push(char);
+            }
+            i++;
         }
-        return result;
+        return result.join('');
     }
     removeEventHandlers(input) {
-        let result = input;
-        let previousResult = '';
-        while (result !== previousResult) {
-            previousResult = result;
-            result = result.replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, '');
-            result = result.replace(/\bon\w+\s*=\s*[^\s"'<>]+/gi, '');
-            result = result.replace(/\bon\w+\s*=/gi, '');
-            result = result.replace(/\bon\w+/gi, '');
+        const result = [];
+        let i = 0;
+        while (i < input.length) {
+            if (i <= input.length - 2 &&
+                input.substring(i, i + 2).toLowerCase() === 'on' &&
+                this.isWordBoundary(input, i)) {
+                i = this.skipEventHandler(input, i);
+                continue;
+            }
+            result.push(input[i]);
+            i++;
         }
-        return result;
+        return result.join('');
     }
     removeStyleAttributes(input) {
-        let result = input;
-        let previousResult = '';
-        while (result !== previousResult) {
-            previousResult = result;
-            result = result.replace(/\bstyle\s*=\s*["'][^"']*["']/gi, '');
-            result = result.replace(/\bstyle\s*=\s*[^\s"'<>]+/gi, '');
-            result = result.replace(/\bstyle\s*=/gi, '');
-            result = result.replace(/\bstyle\b/gi, '');
+        const result = [];
+        let i = 0;
+        while (i < input.length) {
+            if (i <= input.length - 5 &&
+                input.substring(i, i + 5).toLowerCase() === 'style' &&
+                this.isWordBoundary(input, i)) {
+                i = this.skipStyleAttribute(input, i);
+                continue;
+            }
+            result.push(input[i]);
+            i++;
         }
-        return result;
+        return result.join('');
     }
     removeDangerousProtocols(input) {
         let result = input;
@@ -223,16 +240,90 @@ let InputSanitizationService = InputSanitizationService_1 = class InputSanitizat
         return result;
     }
     removeHtmlEntities(input) {
-        let result = input;
-        let previousResult = '';
-        while (result !== previousResult) {
-            previousResult = result;
-            result = result.replace(/&[#\w]+;/g, '');
-            result = result.replace(/&#x?[0-9a-f]+;?/gi, '');
-            result = result.replace(/&[#\w]*$/g, '');
-            result = result.replace(/&#x?[0-9a-f]*$/gi, '');
+        const result = [];
+        let i = 0;
+        while (i < input.length) {
+            if (input[i] === '&') {
+                i = this.skipHtmlEntity(input, i);
+                continue;
+            }
+            result.push(input[i]);
+            i++;
         }
-        return result;
+        return result.join('');
+    }
+    isWordBoundary(input, index) {
+        if (index === 0)
+            return true;
+        const prevChar = input[index - 1];
+        return !(/\w/.test(prevChar));
+    }
+    skipEventHandler(input, startIndex) {
+        let i = startIndex;
+        while (i < input.length && /\w/.test(input[i])) {
+            i++;
+        }
+        while (i < input.length && /\s/.test(input[i])) {
+            i++;
+        }
+        if (i < input.length && input[i] === '=') {
+            i++;
+            while (i < input.length && /\s/.test(input[i])) {
+                i++;
+            }
+            if (i < input.length && (input[i] === '"' || input[i] === "'")) {
+                const quote = input[i];
+                i++;
+                while (i < input.length && input[i] !== quote) {
+                    i++;
+                }
+                if (i < input.length)
+                    i++;
+            }
+            else {
+                while (i < input.length && !/\s/.test(input[i]) && input[i] !== '>' && input[i] !== '<') {
+                    i++;
+                }
+            }
+        }
+        return i;
+    }
+    skipStyleAttribute(input, startIndex) {
+        let i = startIndex + 5;
+        while (i < input.length && /\s/.test(input[i])) {
+            i++;
+        }
+        if (i < input.length && input[i] === '=') {
+            i++;
+            while (i < input.length && /\s/.test(input[i])) {
+                i++;
+            }
+            if (i < input.length && (input[i] === '"' || input[i] === "'")) {
+                const quote = input[i];
+                i++;
+                while (i < input.length && input[i] !== quote) {
+                    i++;
+                }
+                if (i < input.length)
+                    i++;
+            }
+            else {
+                while (i < input.length && !/\s/.test(input[i]) && input[i] !== '>' && input[i] !== '<') {
+                    i++;
+                }
+            }
+        }
+        return i;
+    }
+    skipHtmlEntity(input, startIndex) {
+        let i = startIndex + 1;
+        while (i < input.length && input[i] !== ';' && /[#\w]/.test(input[i])) {
+            i++;
+        }
+        if (i < input.length && input[i] === ';') {
+            i++;
+        }
+        return i;
     }
 };
 exports.InputSanitizationService = InputSanitizationService;

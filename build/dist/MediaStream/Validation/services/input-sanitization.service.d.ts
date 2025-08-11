@@ -19,4 +19,8 @@ export declare class InputSanitizationService implements ISanitizer<any> {
     private removeDangerousProtocols;
     private removeDangerousJavaScript;
     private removeHtmlEntities;
+    private isWordBoundary;
+    private skipEventHandler;
+    private skipStyleAttribute;
+    private skipHtmlEntity;
 }
