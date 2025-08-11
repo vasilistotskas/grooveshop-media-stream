@@ -91,14 +91,12 @@ let InputSanitizationService = InputSanitizationService_1 = class InputSanitizat
     }
     performSanitizationPass(input) {
         let result = input;
-        result = result.replace(/<[^>]*>/g, '');
+        result = this.removeHtmlTags(result);
         result = this.removeEventHandlers(result);
         result = this.removeStyleAttributes(result);
-        result = result.replace(/(?:javascript|vbscript|data|file|ftp|about)\s*:\S*/gi, '');
-        result = result.replace(/data\s*:[^,\s]*/gi, '');
-        result = result.replace(/(?:expression|eval)\s*\(/gi, '');
-        result = result.replace(/&[#\w]+;/g, '');
-        result = result.replace(/&#x?[0-9a-f]+;?/gi, '');
+        result = this.removeDangerousProtocols(result);
+        result = this.removeDangerousJavaScript(result);
+        result = this.removeHtmlEntities(result);
         return result;
     }
     async sanitizeObject(obj) {
@@ -166,14 +164,27 @@ let InputSanitizationService = InputSanitizationService_1 = class InputSanitizat
             return false;
         return true;
     }
+    removeHtmlTags(input) {
+        let result = input;
+        let previousResult = '';
+        while (result !== previousResult) {
+            previousResult = result;
+            result = result.replace(/<[^>]*>/g, '');
+            result = result.replace(/<[^<]*$/g, '');
+            result = result.replace(/^[^>]*>/g, '');
+            result = result.replace(/[<>]/g, '');
+        }
+        return result;
+    }
     removeEventHandlers(input) {
         let result = input;
         let previousResult = '';
         while (result !== previousResult) {
             previousResult = result;
             result = result.replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, '');
-            result = result.replace(/\bon\w+\s*=\s*[^"'\s]+/gi, '');
+            result = result.replace(/\bon\w+\s*=\s*[^\s"'<>]+/gi, '');
             result = result.replace(/\bon\w+\s*=/gi, '');
+            result = result.replace(/\bon\w+/gi, '');
         }
         return result;
     }
@@ -183,8 +194,43 @@ let InputSanitizationService = InputSanitizationService_1 = class InputSanitizat
         while (result !== previousResult) {
             previousResult = result;
             result = result.replace(/\bstyle\s*=\s*["'][^"']*["']/gi, '');
-            result = result.replace(/\bstyle\s*=\s*[^"'\s]+/gi, '');
+            result = result.replace(/\bstyle\s*=\s*[^\s"'<>]+/gi, '');
             result = result.replace(/\bstyle\s*=/gi, '');
+            result = result.replace(/\bstyle\b/gi, '');
+        }
+        return result;
+    }
+    removeDangerousProtocols(input) {
+        let result = input;
+        let previousResult = '';
+        while (result !== previousResult) {
+            previousResult = result;
+            result = result.replace(/(?:javascript|vbscript|data|file|ftp|about)\s*:\S*/gi, '');
+            result = result.replace(/(?:javascript|vbscript|data|file|ftp|about)\s*:/gi, '');
+            result = result.replace(/\b(?:javascript|vbscript|data|file|ftp|about)\b/gi, '');
+        }
+        return result;
+    }
+    removeDangerousJavaScript(input) {
+        let result = input;
+        let previousResult = '';
+        while (result !== previousResult) {
+            previousResult = result;
+            result = result.replace(/(?:expression|eval)\s*\([^)]*\)/gi, '');
+            result = result.replace(/(?:expression|eval)\s*\(/gi, '');
+            result = result.replace(/\b(?:expression|eval)\b/gi, '');
+        }
+        return result;
+    }
+    removeHtmlEntities(input) {
+        let result = input;
+        let previousResult = '';
+        while (result !== previousResult) {
+            previousResult = result;
+            result = result.replace(/&[#\w]+;/g, '');
+            result = result.replace(/&#x?[0-9a-f]+;?/gi, '');
+            result = result.replace(/&[#\w]*$/g, '');
+            result = result.replace(/&#x?[0-9a-f]*$/gi, '');
         }
         return result;
     }

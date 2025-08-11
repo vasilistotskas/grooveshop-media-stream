@@ -105,26 +105,21 @@ export class InputSanitizationService implements ISanitizer<any> {
 	private performSanitizationPass(input: string): string {
 		let result = input
 
-		// Use a whitelist approach - remove all HTML tags but preserve text content
-		// This is safer than trying to match complex nested patterns
-		result = result.replace(/<[^>]*>/g, '')
+		// Use comprehensive HTML tag removal that handles incomplete tags
+		result = this.removeHtmlTags(result)
 
-		// Remove dangerous patterns using iterative character-by-character approach
+		// Remove dangerous patterns using robust character-by-character approach
 		result = this.removeEventHandlers(result)
 		result = this.removeStyleAttributes(result)
 
-		// Remove dangerous protocols
-		result = result.replace(/(?:javascript|vbscript|data|file|ftp|about)\s*:\S*/gi, '')
+		// Remove dangerous protocols with comprehensive pattern matching
+		result = this.removeDangerousProtocols(result)
 
-		// Remove data URLs
-		result = result.replace(/data\s*:[^,\s]*/gi, '')
+		// Remove CSS expressions and eval with comprehensive matching
+		result = this.removeDangerousJavaScript(result)
 
-		// Remove CSS expressions and eval
-		result = result.replace(/(?:expression|eval)\s*\(/gi, '')
-
-		// Remove HTML entities
-		result = result.replace(/&[#\w]+;/g, '')
-		result = result.replace(/&#x?[0-9a-f]+;?/gi, '')
+		// Remove HTML entities with comprehensive matching
+		result = this.removeHtmlEntities(result)
 
 		return result
 	}
@@ -219,37 +214,144 @@ export class InputSanitizationService implements ISanitizer<any> {
 		return true
 	}
 
-	private removeEventHandlers(input: string): string {
-		// Use a more robust approach to remove event handlers
-		// This prevents bypasses by removing any sequence that looks like an event handler
+	private removeHtmlTags(input: string): string {
+		// Comprehensive HTML tag removal that handles incomplete and malformed tags
 		let result = input
 		let previousResult = ''
 
 		// Keep removing until no more changes occur
 		while (result !== previousResult) {
 			previousResult = result
-			// Remove event handlers with their values (including quoted content)
+
+			// Remove complete HTML tags
+			result = result.replace(/<[^>]*>/g, '')
+
+			// Remove incomplete opening tags (handles < without closing >)
+			result = result.replace(/<[^<]*$/g, '')
+
+			// Remove incomplete closing tags (handles > without opening <)
+			result = result.replace(/^[^>]*>/g, '')
+
+			// Remove any remaining < or > characters that could be used for injection
+			result = result.replace(/[<>]/g, '')
+		}
+
+		return result
+	}
+
+	private removeEventHandlers(input: string): string {
+		// Comprehensive event handler removal that prevents bypass attempts
+		let result = input
+		let previousResult = ''
+
+		// Keep removing until no more changes occur
+		while (result !== previousResult) {
+			previousResult = result
+
+			// Remove complete event handlers with quoted values
 			result = result.replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, '')
-			result = result.replace(/\bon\w+\s*=\s*[^"'\s]+/gi, '')
+
+			// Remove complete event handlers with unquoted values
+			result = result.replace(/\bon\w+\s*=\s*[^\s"'<>]+/gi, '')
+
+			// Remove incomplete event handlers (just the attribute name)
 			result = result.replace(/\bon\w+\s*=/gi, '')
+
+			// Remove any remaining 'on' followed by word characters (potential incomplete handlers)
+			result = result.replace(/\bon\w+/gi, '')
 		}
 
 		return result
 	}
 
 	private removeStyleAttributes(input: string): string {
-		// Use a more robust approach to remove style attributes
-		// This prevents bypasses by removing any sequence that looks like a style attribute
+		// Comprehensive style attribute removal that prevents bypass attempts
 		let result = input
 		let previousResult = ''
 
 		// Keep removing until no more changes occur
 		while (result !== previousResult) {
 			previousResult = result
-			// Remove style attributes with their values (including quoted content)
+
+			// Remove complete style attributes with quoted values
 			result = result.replace(/\bstyle\s*=\s*["'][^"']*["']/gi, '')
-			result = result.replace(/\bstyle\s*=\s*[^"'\s]+/gi, '')
+
+			// Remove complete style attributes with unquoted values
+			result = result.replace(/\bstyle\s*=\s*[^\s"'<>]+/gi, '')
+
+			// Remove incomplete style attributes (just the attribute name)
 			result = result.replace(/\bstyle\s*=/gi, '')
+
+			// Remove any remaining 'style' that could be part of an incomplete attribute
+			result = result.replace(/\bstyle\b/gi, '')
+		}
+
+		return result
+	}
+
+	private removeDangerousProtocols(input: string): string {
+		// Comprehensive dangerous protocol removal
+		let result = input
+		let previousResult = ''
+
+		// Keep removing until no more changes occur
+		while (result !== previousResult) {
+			previousResult = result
+
+			// Remove complete dangerous protocol URLs
+			result = result.replace(/(?:javascript|vbscript|data|file|ftp|about)\s*:\S*/gi, '')
+
+			// Remove incomplete protocol declarations
+			result = result.replace(/(?:javascript|vbscript|data|file|ftp|about)\s*:/gi, '')
+
+			// Remove protocol names that could be part of incomplete declarations
+			result = result.replace(/\b(?:javascript|vbscript|data|file|ftp|about)\b/gi, '')
+		}
+
+		return result
+	}
+
+	private removeDangerousJavaScript(input: string): string {
+		// Comprehensive JavaScript and expression removal - only target specific dangerous patterns
+		let result = input
+		let previousResult = ''
+
+		// Keep removing until no more changes occur
+		while (result !== previousResult) {
+			previousResult = result
+
+			// Remove CSS expressions and eval calls (these are always dangerous)
+			result = result.replace(/(?:expression|eval)\s*\([^)]*\)/gi, '')
+
+			// Remove incomplete expressions
+			result = result.replace(/(?:expression|eval)\s*\(/gi, '')
+
+			// Remove the keywords themselves only for CSS expressions and eval
+			result = result.replace(/\b(?:expression|eval)\b/gi, '')
+
+			// Don't remove other JavaScript keywords as they might be legitimate text content
+			// Only remove them if they appear in very specific dangerous contexts like URLs
+		}
+
+		return result
+	}
+
+	private removeHtmlEntities(input: string): string {
+		// Comprehensive HTML entity removal
+		let result = input
+		let previousResult = ''
+
+		// Keep removing until no more changes occur
+		while (result !== previousResult) {
+			previousResult = result
+
+			// Remove complete HTML entities
+			result = result.replace(/&[#\w]+;/g, '')
+			result = result.replace(/&#x?[0-9a-f]+;?/gi, '')
+
+			// Remove incomplete HTML entities (& without closing ;)
+			result = result.replace(/&[#\w]*$/g, '')
+			result = result.replace(/&#x?[0-9a-f]*$/gi, '')
 		}
 
 		return result
