@@ -53,16 +53,21 @@ let InputSanitizationService = InputSanitizationService_1 = class InputSanitizat
         return input;
     }
     sanitizeString(str) {
-        if (str.toLowerCase().startsWith('javascript:')) {
-            return '';
+        const lowerStr = str.toLowerCase();
+        const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'ftp:'];
+        for (const protocol of dangerousProtocols) {
+            if (lowerStr.startsWith(protocol)) {
+                return '';
+            }
         }
         let sanitized = str
-            .replace(/<script[^>]*>.*?<\/script>/gi, '')
-            .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
-            .replace(/on\w+\s*=\s*[^"'\s>]+/gi, '')
-            .replace(/data:text\/html[^;]*;/gi, '')
-            .replace(/vbscript\s*:/gi, '')
+            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script\s*>/gi, '')
+            .replace(/\bon\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '')
+            .replace(/\bstyle\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '')
+            .replace(/data:[^;]*;[^,]*,/gi, '')
+            .replace(/(?:javascript|vbscript|data|file|ftp)\s*:/gi, '')
             .replace(/expression\s*\(/gi, '')
+            .replace(/&#x?[0-9a-f]+;?/gi, '')
             .trim();
         const maxLength = 2048;
         if (sanitized.length > maxLength) {
@@ -81,8 +86,21 @@ let InputSanitizationService = InputSanitizationService_1 = class InputSanitizat
     }
     validateUrl(url) {
         try {
+            const lowerUrl = url.toLowerCase().trim();
+            const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'ftp:', 'about:'];
+            for (const protocol of dangerousProtocols) {
+                if (lowerUrl.startsWith(protocol)) {
+                    this._logger.warn(`Dangerous protocol detected: ${protocol}`);
+                    return false;
+                }
+            }
             const urlObj = new URL(url);
             if (!['http:', 'https:'].includes(urlObj.protocol)) {
+                this._logger.warn(`Invalid protocol: ${urlObj.protocol}`);
+                return false;
+            }
+            if (!urlObj.hostname || urlObj.hostname.length === 0) {
+                this._logger.warn('Empty hostname detected');
                 return false;
             }
             const allowedDomains = this.getAllowedDomains();

@@ -50,24 +50,31 @@ export class InputSanitizationService implements ISanitizer<any> {
 	}
 
 	private sanitizeString(str: string): string {
-		// Check for javascript: protocol and return empty string if found
-		if (str.toLowerCase().startsWith('javascript:')) {
-			return ''
+		// Check for dangerous protocols and return empty string if found
+		const lowerStr = str.toLowerCase()
+		const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'ftp:']
+		for (const protocol of dangerousProtocols) {
+			if (lowerStr.startsWith(protocol)) {
+				return ''
+			}
 		}
 
 		// Remove potentially dangerous characters and patterns
 		let sanitized = str
-			// Remove script tags
-			.replace(/<script[^>]*>.*?<\/script>/gi, '')
-			// Remove on* event handlers - more comprehensive
-			.replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
-			.replace(/on\w+\s*=\s*[^"'\s>]+/gi, '')
-			// Remove data URLs with HTML content
-			.replace(/data:text\/html[^;]*;/gi, '')
-			// Remove vbscript
-			.replace(/vbscript\s*:/gi, '')
+			// Remove script tags (handles spaces and attributes properly)
+			.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script\s*>/gi, '')
+			// Remove all event handlers more comprehensively
+			.replace(/\bon\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '')
+			// Remove style attributes that could contain expressions
+			.replace(/\bstyle\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '')
+			// Remove data URLs completely
+			.replace(/data:[^;]*;[^,]*,/gi, '')
+			// Remove any remaining dangerous protocols
+			.replace(/(?:javascript|vbscript|data|file|ftp)\s*:/gi, '')
 			// Remove CSS expressions
 			.replace(/expression\s*\(/gi, '')
+			// Remove HTML entities that could be used for obfuscation
+			.replace(/&#x?[0-9a-f]+;?/gi, '')
 			// Trim whitespace
 			.trim()
 
@@ -97,10 +104,27 @@ export class InputSanitizationService implements ISanitizer<any> {
 
 	validateUrl(url: string): boolean {
 		try {
+			// Pre-validate URL string for dangerous protocols
+			const lowerUrl = url.toLowerCase().trim()
+			const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'ftp:', 'about:']
+			for (const protocol of dangerousProtocols) {
+				if (lowerUrl.startsWith(protocol)) {
+					this._logger.warn(`Dangerous protocol detected: ${protocol}`)
+					return false
+				}
+			}
+
 			const urlObj = new URL(url)
 
-			// Check protocol
+			// Only allow HTTP and HTTPS protocols
 			if (!['http:', 'https:'].includes(urlObj.protocol)) {
+				this._logger.warn(`Invalid protocol: ${urlObj.protocol}`)
+				return false
+			}
+
+			// Validate hostname format
+			if (!urlObj.hostname || urlObj.hostname.length === 0) {
+				this._logger.warn('Empty hostname detected')
 				return false
 			}
 

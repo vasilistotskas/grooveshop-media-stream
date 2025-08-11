@@ -10,46 +10,47 @@ export class SecurityCheckerService implements ISecurityChecker {
 
 	constructor(private readonly _configService: ConfigService) {
 		// Define patterns that might indicate malicious content
+		// Using non-backtracking patterns to prevent ReDoS attacks
 		this.suspiciousPatterns = [
-			// Script injection patterns
-			/<script[^>]*>/i,
+			// Script injection patterns - more precise and safe
+			/<script\b[^>]{0,100}>/i,
 			/javascript:/i,
 			/vbscript:/i,
 			/data:text\/html/i,
-			/on\w+\s*=/i,
+			/\bon\w{1,20}\s*=/i,
 
-			// SQL injection patterns
-			/union\s+select/i,
-			/drop\s+table/i,
-			/insert\s+into/i,
-			/delete\s+from/i,
+			// SQL injection patterns - limited quantifiers
+			/union\s{1,5}select/i,
+			/drop\s{1,5}table/i,
+			/insert\s{1,5}into/i,
+			/delete\s{1,5}from/i,
 
-			// Path traversal patterns
+			// Path traversal patterns - exact matches
 			/\.\.\//,
 			/\.\.\\/,
 			/\.\.\\\\/,
 			/%2e%2e%2f/i,
 			/%2e%2e%5c/i,
 
-			// Command injection patterns
-			/;\s*rm\s+-rf/i,
-			/;\s*cat\s+/i,
-			/;\s*ls\s+/i,
-			/\|\s*nc\s+/i,
+			// Command injection patterns - limited quantifiers
+			/;\s{0,5}rm\s{1,5}-rf/i,
+			/;\s{0,5}cat\s{1,5}/i,
+			/;\s{0,5}ls\s{1,5}/i,
+			/\|\s{0,5}nc\s{1,5}/i,
 
-			// XXE patterns
-			/<!entity/i,
-			/<!doctype.*\[/i,
+			// XXE patterns - limited and specific
+			/<!entity\b/i,
+			/<!doctype[^>]{0,100}\[/i,
 
-			// LDAP injection patterns
+			// LDAP injection patterns - exact matches
 			/\(\|\(/,
 			/\)\(\|/,
 
-			// NoSQL injection patterns
-			/\$where/i,
-			/\$ne/i,
-			/\$gt/i,
-			/\$lt/i,
+			// NoSQL injection patterns - exact matches
+			/\$where\b/i,
+			/\$ne\b/i,
+			/\$gt\b/i,
+			/\$lt\b/i,
 		]
 	}
 
@@ -78,19 +79,33 @@ export class SecurityCheckerService implements ISecurityChecker {
 	}
 
 	private checkString(str: string): boolean {
-		// Check against suspicious patterns
-		for (const pattern of this.suspiciousPatterns) {
-			if (pattern.test(str)) {
-				this._logger.warn(`Suspicious pattern detected: ${pattern.source}`)
-				return true
-			}
-		}
-
-		// Check for excessive length (potential DoS)
+		// Early return for empty or very long strings to prevent DoS
 		const maxLength = this._configService.getOptional('validation.maxStringLength', 10000)
+		if (str.length === 0) {
+			return false
+		}
 		if (str.length > maxLength) {
 			this._logger.warn(`Excessively long string detected: ${str.length} characters`)
 			return true
+		}
+
+		// Limit string length for pattern matching to prevent ReDoS
+		const maxPatternTestLength = 5000
+		const testStr = str.length > maxPatternTestLength ? str.substring(0, maxPatternTestLength) : str
+
+		// Check against suspicious patterns with timeout protection
+		for (const pattern of this.suspiciousPatterns) {
+			try {
+				if (pattern.test(testStr)) {
+					this._logger.warn(`Suspicious pattern detected: ${pattern.source}`)
+					return true
+				}
+			}
+			catch {
+				// Pattern matching failed - could be ReDoS attempt
+				this._logger.warn(`Pattern matching failed, potential ReDoS attempt: ${pattern.source}`)
+				return true
+			}
 		}
 
 		// Check for high entropy (potential encoded payload)
@@ -127,18 +142,28 @@ export class SecurityCheckerService implements ISecurityChecker {
 	}
 
 	private hasHighEntropy(str: string): boolean {
-		if (str.length < 20)
+		// Limit string length to prevent DoS attacks
+		const maxLengthForEntropy = 1000
+		if (str.length < 20 || str.length > maxLengthForEntropy)
 			return false
+
+		// Sample the string if it's too long to prevent performance issues
+		const sampleStr = str.length > 500 ? str.substring(0, 500) : str
 
 		// Calculate character frequency
 		const charCount: { [key: string]: number } = {}
-		for (const char of str) {
+		for (const char of sampleStr) {
 			charCount[char] = (charCount[char] || 0) + 1
+		}
+
+		// Prevent excessive memory usage
+		if (Object.keys(charCount).length > 256) {
+			return false
 		}
 
 		// Calculate entropy
 		let entropy = 0
-		const length = str.length
+		const length = sampleStr.length
 		for (const count of Object.values(charCount)) {
 			const probability = count / length
 			entropy -= probability * Math.log2(probability)

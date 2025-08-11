@@ -19,32 +19,32 @@ let SecurityCheckerService = SecurityCheckerService_1 = class SecurityCheckerSer
         this._logger = new common_1.Logger(SecurityCheckerService_1.name);
         this.securityEvents = [];
         this.suspiciousPatterns = [
-            /<script[^>]*>/i,
+            /<script\b[^>]{0,100}>/i,
             /javascript:/i,
             /vbscript:/i,
             /data:text\/html/i,
-            /on\w+\s*=/i,
-            /union\s+select/i,
-            /drop\s+table/i,
-            /insert\s+into/i,
-            /delete\s+from/i,
+            /\bon\w{1,20}\s*=/i,
+            /union\s{1,5}select/i,
+            /drop\s{1,5}table/i,
+            /insert\s{1,5}into/i,
+            /delete\s{1,5}from/i,
             /\.\.\//,
             /\.\.\\/,
             /\.\.\\\\/,
             /%2e%2e%2f/i,
             /%2e%2e%5c/i,
-            /;\s*rm\s+-rf/i,
-            /;\s*cat\s+/i,
-            /;\s*ls\s+/i,
-            /\|\s*nc\s+/i,
-            /<!entity/i,
-            /<!doctype.*\[/i,
+            /;\s{0,5}rm\s{1,5}-rf/i,
+            /;\s{0,5}cat\s{1,5}/i,
+            /;\s{0,5}ls\s{1,5}/i,
+            /\|\s{0,5}nc\s{1,5}/i,
+            /<!entity\b/i,
+            /<!doctype[^>]{0,100}\[/i,
             /\(\|\(/,
             /\)\(\|/,
-            /\$where/i,
-            /\$ne/i,
-            /\$gt/i,
-            /\$lt/i,
+            /\$where\b/i,
+            /\$ne\b/i,
+            /\$gt\b/i,
+            /\$lt\b/i,
         ];
     }
     async checkForMaliciousContent(input) {
@@ -67,16 +67,27 @@ let SecurityCheckerService = SecurityCheckerService_1 = class SecurityCheckerSer
         return false;
     }
     checkString(str) {
-        for (const pattern of this.suspiciousPatterns) {
-            if (pattern.test(str)) {
-                this._logger.warn(`Suspicious pattern detected: ${pattern.source}`);
-                return true;
-            }
-        }
         const maxLength = this._configService.getOptional('validation.maxStringLength', 10000);
+        if (str.length === 0) {
+            return false;
+        }
         if (str.length > maxLength) {
             this._logger.warn(`Excessively long string detected: ${str.length} characters`);
             return true;
+        }
+        const maxPatternTestLength = 5000;
+        const testStr = str.length > maxPatternTestLength ? str.substring(0, maxPatternTestLength) : str;
+        for (const pattern of this.suspiciousPatterns) {
+            try {
+                if (pattern.test(testStr)) {
+                    this._logger.warn(`Suspicious pattern detected: ${pattern.source}`);
+                    return true;
+                }
+            }
+            catch {
+                this._logger.warn(`Pattern matching failed, potential ReDoS attempt: ${pattern.source}`);
+                return true;
+            }
         }
         if (this.hasHighEntropy(str)) {
             this._logger.warn('High entropy string detected (potential encoded payload)');
@@ -102,14 +113,19 @@ let SecurityCheckerService = SecurityCheckerService_1 = class SecurityCheckerSer
         return false;
     }
     hasHighEntropy(str) {
-        if (str.length < 20)
+        const maxLengthForEntropy = 1000;
+        if (str.length < 20 || str.length > maxLengthForEntropy)
             return false;
+        const sampleStr = str.length > 500 ? str.substring(0, 500) : str;
         const charCount = {};
-        for (const char of str) {
+        for (const char of sampleStr) {
             charCount[char] = (charCount[char] || 0) + 1;
         }
+        if (Object.keys(charCount).length > 256) {
+            return false;
+        }
         let entropy = 0;
-        const length = str.length;
+        const length = sampleStr.length;
         for (const count of Object.values(charCount)) {
             const probability = count / length;
             entropy -= probability * Math.log2(probability);
