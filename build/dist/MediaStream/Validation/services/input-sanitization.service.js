@@ -61,12 +61,15 @@ let InputSanitizationService = InputSanitizationService_1 = class InputSanitizat
             }
         }
         let sanitized = str
-            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script\s*>/gi, '')
-            .replace(/\bon\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '')
-            .replace(/\bstyle\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '')
-            .replace(/data:[^;]*;[^,]*,/gi, '')
-            .replace(/(?:javascript|vbscript|data|file|ftp)\s*:/gi, '')
-            .replace(/expression\s*\(/gi, '')
+            .replace(/<\s*script\b[^>]*>[\s\S]*?<\s*\/\s*script\s*>/gi, '')
+            .replace(/<\s*script\b[^>]*>/gi, '')
+            .replace(/<[^>]*>/g, '')
+            .replace(/\bon\w+\s*=\s*[^>\s]*/gi, '')
+            .replace(/\bstyle\s*=\s*[^>\s]*/gi, '')
+            .replace(/data\s*:[^,\s]*/gi, '')
+            .replace(/(?:javascript|vbscript|data|file|ftp)\s*:\S*/gi, '')
+            .replace(/(?:expression|eval)\s*\(/gi, '')
+            .replace(/&[#\w]+;/g, '')
             .replace(/&#x?[0-9a-f]+;?/gi, '')
             .trim();
         const maxLength = 2048;

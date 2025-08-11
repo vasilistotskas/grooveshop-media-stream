@@ -59,20 +59,25 @@ export class InputSanitizationService implements ISanitizer<any> {
 			}
 		}
 
-		// Remove potentially dangerous characters and patterns
+		// Remove potentially dangerous characters and patterns with comprehensive sanitization
 		let sanitized = str
-			// Remove script tags (handles spaces and attributes properly)
-			.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script\s*>/gi, '')
-			// Remove all event handlers more comprehensively
-			.replace(/\bon\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '')
-			// Remove style attributes that could contain expressions
-			.replace(/\bstyle\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '')
-			// Remove data URLs completely
-			.replace(/data:[^;]*;[^,]*,/gi, '')
-			// Remove any remaining dangerous protocols
-			.replace(/(?:javascript|vbscript|data|file|ftp)\s*:/gi, '')
-			// Remove CSS expressions
-			.replace(/expression\s*\(/gi, '')
+			// Remove all script tags with any whitespace variations
+			.replace(/<\s*script\b[^>]*>[\s\S]*?<\s*\/\s*script\s*>/gi, '')
+			// Remove script tags without closing tags
+			.replace(/<\s*script\b[^>]*>/gi, '')
+			// Remove all HTML tags completely to prevent any injection
+			.replace(/<[^>]*>/g, '')
+			// Remove all event handlers (on* attributes) with any spacing
+			.replace(/\bon\w+\s*=\s*[^>\s]*/gi, '')
+			// Remove style attributes completely
+			.replace(/\bstyle\s*=\s*[^>\s]*/gi, '')
+			// Remove all data URLs and protocols
+			.replace(/data\s*:[^,\s]*/gi, '')
+			.replace(/(?:javascript|vbscript|data|file|ftp)\s*:\S*/gi, '')
+			// Remove CSS expressions and eval
+			.replace(/(?:expression|eval)\s*\(/gi, '')
+			// Remove HTML entities to prevent obfuscation
+			.replace(/&[#\w]+;/g, '')
 			// Remove HTML entities that could be used for obfuscation
 			.replace(/&#x?[0-9a-f]+;?/gi, '')
 			// Trim whitespace
