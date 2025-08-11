@@ -60,6 +60,18 @@ let InputSanitizationService = InputSanitizationService_1 = class InputSanitizat
                 return '';
             }
         }
+        const emptyStringPatterns = [
+            /^\s*on\w+\s*=.*$/i,
+            /^\s*javascript\s*:.*$/i,
+            /^\s*vbscript\s*:.*$/i,
+            /^\s*data\s*:.*$/i,
+        ];
+        for (const pattern of emptyStringPatterns) {
+            if (pattern.test(str)) {
+                this._logger.warn(`Standalone dangerous pattern detected, returning empty string`);
+                return '';
+            }
+        }
         let sanitized = str;
         let previousLength = 0;
         let iterations = 0;
@@ -80,8 +92,8 @@ let InputSanitizationService = InputSanitizationService_1 = class InputSanitizat
     performSanitizationPass(input) {
         let result = input;
         result = result.replace(/<[^>]*>/g, '');
-        result = result.replace(/\bon\w+\s*=\s*[^>\s]*/gi, '');
-        result = result.replace(/\bstyle\s*=\s*[^>\s]*/gi, '');
+        result = this.removeEventHandlers(result);
+        result = this.removeStyleAttributes(result);
         result = result.replace(/(?:javascript|vbscript|data|file|ftp|about)\s*:\S*/gi, '');
         result = result.replace(/data\s*:[^,\s]*/gi, '');
         result = result.replace(/(?:expression|eval)\s*\(/gi, '');
@@ -153,6 +165,28 @@ let InputSanitizationService = InputSanitizationService_1 = class InputSanitizat
         if ((width * height) > maxPixels)
             return false;
         return true;
+    }
+    removeEventHandlers(input) {
+        let result = input;
+        let previousResult = '';
+        while (result !== previousResult) {
+            previousResult = result;
+            result = result.replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, '');
+            result = result.replace(/\bon\w+\s*=\s*[^"'\s]+/gi, '');
+            result = result.replace(/\bon\w+\s*=/gi, '');
+        }
+        return result;
+    }
+    removeStyleAttributes(input) {
+        let result = input;
+        let previousResult = '';
+        while (result !== previousResult) {
+            previousResult = result;
+            result = result.replace(/\bstyle\s*=\s*["'][^"']*["']/gi, '');
+            result = result.replace(/\bstyle\s*=\s*[^"'\s]+/gi, '');
+            result = result.replace(/\bstyle\s*=/gi, '');
+        }
+        return result;
     }
 };
 exports.InputSanitizationService = InputSanitizationService;

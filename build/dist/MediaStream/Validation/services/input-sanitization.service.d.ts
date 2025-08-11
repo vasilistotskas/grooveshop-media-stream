@@ -13,4 +13,6 @@ export declare class InputSanitizationService implements ISanitizer<any> {
     validateUrl(url: string): boolean;
     validateFileSize(sizeBytes: number, format?: string): boolean;
     validateImageDimensions(width: number, height: number): boolean;
+    private removeEventHandlers;
+    private removeStyleAttributes;
 }

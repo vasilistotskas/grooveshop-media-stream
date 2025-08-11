@@ -59,6 +59,21 @@ export class InputSanitizationService implements ISanitizer<any> {
 			}
 		}
 
+		// Check for patterns that should result in empty string (standalone dangerous patterns)
+		const emptyStringPatterns = [
+			/^\s*on\w+\s*=.*$/i, // Standalone event handlers
+			/^\s*javascript\s*:.*$/i, // Standalone JavaScript protocol
+			/^\s*vbscript\s*:.*$/i, // Standalone VBScript protocol
+			/^\s*data\s*:.*$/i, // Standalone Data URLs
+		]
+
+		for (const pattern of emptyStringPatterns) {
+			if (pattern.test(str)) {
+				this._logger.warn(`Standalone dangerous pattern detected, returning empty string`)
+				return ''
+			}
+		}
+
 		// Use iterative sanitization to handle nested patterns and prevent bypasses
 		let sanitized = str
 		let previousLength = 0
@@ -94,11 +109,9 @@ export class InputSanitizationService implements ISanitizer<any> {
 		// This is safer than trying to match complex nested patterns
 		result = result.replace(/<[^>]*>/g, '')
 
-		// Remove event handlers that might be orphaned after tag removal
-		result = result.replace(/\bon\w+\s*=\s*[^>\s]*/gi, '')
-
-		// Remove style attributes
-		result = result.replace(/\bstyle\s*=\s*[^>\s]*/gi, '')
+		// Remove dangerous patterns using iterative character-by-character approach
+		result = this.removeEventHandlers(result)
+		result = this.removeStyleAttributes(result)
 
 		// Remove dangerous protocols
 		result = result.replace(/(?:javascript|vbscript|data|file|ftp|about)\s*:\S*/gi, '')
@@ -204,5 +217,41 @@ export class InputSanitizationService implements ISanitizer<any> {
 			return false
 
 		return true
+	}
+
+	private removeEventHandlers(input: string): string {
+		// Use a more robust approach to remove event handlers
+		// This prevents bypasses by removing any sequence that looks like an event handler
+		let result = input
+		let previousResult = ''
+
+		// Keep removing until no more changes occur
+		while (result !== previousResult) {
+			previousResult = result
+			// Remove event handlers with their values (including quoted content)
+			result = result.replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, '')
+			result = result.replace(/\bon\w+\s*=\s*[^"'\s]+/gi, '')
+			result = result.replace(/\bon\w+\s*=/gi, '')
+		}
+
+		return result
+	}
+
+	private removeStyleAttributes(input: string): string {
+		// Use a more robust approach to remove style attributes
+		// This prevents bypasses by removing any sequence that looks like a style attribute
+		let result = input
+		let previousResult = ''
+
+		// Keep removing until no more changes occur
+		while (result !== previousResult) {
+			previousResult = result
+			// Remove style attributes with their values (including quoted content)
+			result = result.replace(/\bstyle\s*=\s*["'][^"']*["']/gi, '')
+			result = result.replace(/\bstyle\s*=\s*[^"'\s]+/gi, '')
+			result = result.replace(/\bstyle\s*=/gi, '')
+		}
+
+		return result
 	}
 }
