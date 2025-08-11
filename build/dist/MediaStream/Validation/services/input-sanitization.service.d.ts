@@ -8,6 +8,7 @@ export declare class InputSanitizationService implements ISanitizer<any> {
     private getAllowedDomains;
     sanitize(input: any): Promise<any>;
     private sanitizeString;
+    private performSanitizationPass;
     private sanitizeObject;
     validateUrl(url: string): boolean;
     validateFileSize(sizeBytes: number, format?: string): boolean;

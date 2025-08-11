@@ -52,36 +52,30 @@ export class InputSanitizationService implements ISanitizer<any> {
 	private sanitizeString(str: string): string {
 		// Check for dangerous protocols and return empty string if found
 		const lowerStr = str.toLowerCase()
-		const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'ftp:']
+		const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'ftp:', 'about:']
 		for (const protocol of dangerousProtocols) {
 			if (lowerStr.startsWith(protocol)) {
 				return ''
 			}
 		}
 
-		// Remove potentially dangerous characters and patterns with comprehensive sanitization
+		// Use iterative sanitization to handle nested patterns and prevent bypasses
 		let sanitized = str
-			// Remove all script tags with any whitespace variations
-			.replace(/<\s*script\b[^>]*>[\s\S]*?<\s*\/\s*script\s*>/gi, '')
-			// Remove script tags without closing tags
-			.replace(/<\s*script\b[^>]*>/gi, '')
-			// Remove all HTML tags completely to prevent any injection
-			.replace(/<[^>]*>/g, '')
-			// Remove all event handlers (on* attributes) with any spacing
-			.replace(/\bon\w+\s*=\s*[^>\s]*/gi, '')
-			// Remove style attributes completely
-			.replace(/\bstyle\s*=\s*[^>\s]*/gi, '')
-			// Remove all data URLs and protocols
-			.replace(/data\s*:[^,\s]*/gi, '')
-			.replace(/(?:javascript|vbscript|data|file|ftp)\s*:\S*/gi, '')
-			// Remove CSS expressions and eval
-			.replace(/(?:expression|eval)\s*\(/gi, '')
-			// Remove HTML entities to prevent obfuscation
-			.replace(/&[#\w]+;/g, '')
-			// Remove HTML entities that could be used for obfuscation
-			.replace(/&#x?[0-9a-f]+;?/gi, '')
-			// Trim whitespace
-			.trim()
+		let previousLength = 0
+		let iterations = 0
+		const maxIterations = 10 // Prevent infinite loops
+
+		// Keep sanitizing until no more changes occur or max iterations reached
+		while (sanitized.length !== previousLength && iterations < maxIterations) {
+			previousLength = sanitized.length
+			iterations++
+
+			// Remove dangerous patterns iteratively
+			sanitized = this.performSanitizationPass(sanitized)
+		}
+
+		// Final cleanup
+		sanitized = sanitized.trim()
 
 		// Limit string length to prevent DoS
 		const maxLength = 2048
@@ -91,6 +85,35 @@ export class InputSanitizationService implements ISanitizer<any> {
 		}
 
 		return sanitized
+	}
+
+	private performSanitizationPass(input: string): string {
+		let result = input
+
+		// Use a whitelist approach - remove all HTML tags but preserve text content
+		// This is safer than trying to match complex nested patterns
+		result = result.replace(/<[^>]*>/g, '')
+
+		// Remove event handlers that might be orphaned after tag removal
+		result = result.replace(/\bon\w+\s*=\s*[^>\s]*/gi, '')
+
+		// Remove style attributes
+		result = result.replace(/\bstyle\s*=\s*[^>\s]*/gi, '')
+
+		// Remove dangerous protocols
+		result = result.replace(/(?:javascript|vbscript|data|file|ftp|about)\s*:\S*/gi, '')
+
+		// Remove data URLs
+		result = result.replace(/data\s*:[^,\s]*/gi, '')
+
+		// Remove CSS expressions and eval
+		result = result.replace(/(?:expression|eval)\s*\(/gi, '')
+
+		// Remove HTML entities
+		result = result.replace(/&[#\w]+;/g, '')
+		result = result.replace(/&#x?[0-9a-f]+;?/gi, '')
+
+		return result
 	}
 
 	private async sanitizeObject(obj: any): Promise<any> {

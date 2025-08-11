@@ -54,30 +54,40 @@ let InputSanitizationService = InputSanitizationService_1 = class InputSanitizat
     }
     sanitizeString(str) {
         const lowerStr = str.toLowerCase();
-        const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'ftp:'];
+        const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'ftp:', 'about:'];
         for (const protocol of dangerousProtocols) {
             if (lowerStr.startsWith(protocol)) {
                 return '';
             }
         }
-        let sanitized = str
-            .replace(/<\s*script\b[^>]*>[\s\S]*?<\s*\/\s*script\s*>/gi, '')
-            .replace(/<\s*script\b[^>]*>/gi, '')
-            .replace(/<[^>]*>/g, '')
-            .replace(/\bon\w+\s*=\s*[^>\s]*/gi, '')
-            .replace(/\bstyle\s*=\s*[^>\s]*/gi, '')
-            .replace(/data\s*:[^,\s]*/gi, '')
-            .replace(/(?:javascript|vbscript|data|file|ftp)\s*:\S*/gi, '')
-            .replace(/(?:expression|eval)\s*\(/gi, '')
-            .replace(/&[#\w]+;/g, '')
-            .replace(/&#x?[0-9a-f]+;?/gi, '')
-            .trim();
+        let sanitized = str;
+        let previousLength = 0;
+        let iterations = 0;
+        const maxIterations = 10;
+        while (sanitized.length !== previousLength && iterations < maxIterations) {
+            previousLength = sanitized.length;
+            iterations++;
+            sanitized = this.performSanitizationPass(sanitized);
+        }
+        sanitized = sanitized.trim();
         const maxLength = 2048;
         if (sanitized.length > maxLength) {
             sanitized = sanitized.substring(0, maxLength);
             this._logger.warn(`String truncated to ${maxLength} characters for security`);
         }
         return sanitized;
+    }
+    performSanitizationPass(input) {
+        let result = input;
+        result = result.replace(/<[^>]*>/g, '');
+        result = result.replace(/\bon\w+\s*=\s*[^>\s]*/gi, '');
+        result = result.replace(/\bstyle\s*=\s*[^>\s]*/gi, '');
+        result = result.replace(/(?:javascript|vbscript|data|file|ftp|about)\s*:\S*/gi, '');
+        result = result.replace(/data\s*:[^,\s]*/gi, '');
+        result = result.replace(/(?:expression|eval)\s*\(/gi, '');
+        result = result.replace(/&[#\w]+;/g, '');
+        result = result.replace(/&#x?[0-9a-f]+;?/gi, '');
+        return result;
     }
     async sanitizeObject(obj) {
         const sanitized = {};
