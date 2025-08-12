@@ -223,26 +223,26 @@ export class InputSanitizationService implements ISanitizer<any> {
 
 		while (i < input.length) {
 			const char = input[i]
-			
+
 			if (char === '<') {
 				// Start of potential HTML tag - skip everything until >
 				insideTag = true
 				i++
 				continue
 			}
-			
+
 			if (char === '>') {
 				// End of potential HTML tag
 				insideTag = false
 				i++
 				continue
 			}
-			
+
 			if (!insideTag) {
 				// Only include characters that are outside of HTML tags
 				result.push(char)
 			}
-			
+
 			i++
 		}
 
@@ -256,15 +256,14 @@ export class InputSanitizationService implements ISanitizer<any> {
 
 		while (i < input.length) {
 			// Look for 'on' followed by word characters and '='
-			if (i <= input.length - 2 && 
-				input.substring(i, i + 2).toLowerCase() === 'on' &&
-				this.isWordBoundary(input, i)) {
-				
+			if (i <= input.length - 2
+				&& input.substring(i, i + 2).toLowerCase() === 'on'
+				&& this.isWordBoundary(input, i)) {
 				// Found potential event handler, skip it entirely
 				i = this.skipEventHandler(input, i)
 				continue
 			}
-			
+
 			result.push(input[i])
 			i++
 		}
@@ -279,15 +278,14 @@ export class InputSanitizationService implements ISanitizer<any> {
 
 		while (i < input.length) {
 			// Look for 'style' followed by optional whitespace and '='
-			if (i <= input.length - 5 && 
-				input.substring(i, i + 5).toLowerCase() === 'style' &&
-				this.isWordBoundary(input, i)) {
-				
+			if (i <= input.length - 5
+				&& input.substring(i, i + 5).toLowerCase() === 'style'
+				&& this.isWordBoundary(input, i)) {
 				// Found potential style attribute, skip it entirely
 				i = this.skipStyleAttribute(input, i)
 				continue
 			}
-			
+
 			result.push(input[i])
 			i++
 		}
@@ -353,7 +351,7 @@ export class InputSanitizationService implements ISanitizer<any> {
 				i = this.skipHtmlEntity(input, i)
 				continue
 			}
-			
+
 			result.push(input[i])
 			i++
 		}
@@ -363,101 +361,106 @@ export class InputSanitizationService implements ISanitizer<any> {
 
 	private isWordBoundary(input: string, index: number): boolean {
 		// Check if the position is at a word boundary (start of word)
-		if (index === 0) return true
+		if (index === 0)
+			return true
 		const prevChar = input[index - 1]
 		return !(/\w/.test(prevChar))
 	}
 
 	private skipEventHandler(input: string, startIndex: number): number {
 		let i = startIndex
-		
+
 		// Skip 'on' and any following word characters
 		while (i < input.length && /\w/.test(input[i])) {
 			i++
 		}
-		
+
 		// Skip whitespace
 		while (i < input.length && /\s/.test(input[i])) {
 			i++
 		}
-		
+
 		// If we find '=', skip the entire value
 		if (i < input.length && input[i] === '=') {
 			i++ // skip '='
-			
+
 			// Skip whitespace after '='
 			while (i < input.length && /\s/.test(input[i])) {
 				i++
 			}
-			
+
 			// Skip the value (quoted or unquoted)
-			if (i < input.length && (input[i] === '"' || input[i] === "'")) {
+			if (i < input.length && (input[i] === '"' || input[i] === '\'')) {
 				const quote = input[i]
 				i++ // skip opening quote
 				while (i < input.length && input[i] !== quote) {
 					i++
 				}
-				if (i < input.length) i++ // skip closing quote
-			} else {
+				if (i < input.length)
+					i++ // skip closing quote
+			}
+			else {
 				// Skip unquoted value
 				while (i < input.length && !/\s/.test(input[i]) && input[i] !== '>' && input[i] !== '<') {
 					i++
 				}
 			}
 		}
-		
+
 		return i
 	}
 
 	private skipStyleAttribute(input: string, startIndex: number): number {
 		let i = startIndex + 5 // skip 'style'
-		
+
 		// Skip whitespace
 		while (i < input.length && /\s/.test(input[i])) {
 			i++
 		}
-		
+
 		// If we find '=', skip the entire value
 		if (i < input.length && input[i] === '=') {
 			i++ // skip '='
-			
+
 			// Skip whitespace after '='
 			while (i < input.length && /\s/.test(input[i])) {
 				i++
 			}
-			
+
 			// Skip the value (quoted or unquoted)
-			if (i < input.length && (input[i] === '"' || input[i] === "'")) {
+			if (i < input.length && (input[i] === '"' || input[i] === '\'')) {
 				const quote = input[i]
 				i++ // skip opening quote
 				while (i < input.length && input[i] !== quote) {
 					i++
 				}
-				if (i < input.length) i++ // skip closing quote
-			} else {
+				if (i < input.length)
+					i++ // skip closing quote
+			}
+			else {
 				// Skip unquoted value
 				while (i < input.length && !/\s/.test(input[i]) && input[i] !== '>' && input[i] !== '<') {
 					i++
 				}
 			}
 		}
-		
+
 		return i
 	}
 
 	private skipHtmlEntity(input: string, startIndex: number): number {
 		let i = startIndex + 1 // skip '&'
-		
+
 		// Skip until we find ';' or reach end of potential entity
 		while (i < input.length && input[i] !== ';' && /[#\w]/.test(input[i])) {
 			i++
 		}
-		
+
 		// If we found ';', skip it too
 		if (i < input.length && input[i] === ';') {
 			i++
 		}
-		
+
 		return i
 	}
 }
