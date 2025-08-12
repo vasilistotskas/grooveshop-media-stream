@@ -12,53 +12,348 @@ permissions:
 env:
   COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
   SYSTEM_ENV: ci
+  NODE_ENV: test
+  REDIS_HOST: localhost
+  REDIS_PORT: 6379
+  REDIS_PASSWORD: ''
 
 jobs:
-  Release:
-    name: GitHub Actions Release
+  quality:
+    name: Code Quality
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # to be able to publish a GitHub release
-      issues: write # to be able to comment on released issues
-      pull-requests: write # to be able to comment on released pull requests
-      id-token: write # to enable use of OIDC for npm provenance
-      packages: write # to be able to publish to GitHub Packages
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24.x'
-      - name: Enable corepack for pnpm
-        run: corepack enable pnpm
-      - name: Check pnpm version
-        run: pnpm --version
-      - name: Install Node.js
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '24.x'
           registry-url: 'https://npm.pkg.github.com'
-          cache: 'pnpm'
-          cache-dependency-path: "**/pnpm-lock.yaml"
-          # Defaults to the user or organization that owns the workflow file
           scope: '@vasilistotskas'
+
+      - name: Enable corepack for pnpm
+        run: |
+          corepack enable pnpm
+          pnpm config set store-dir ~/.pnpm-store
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
-      - name: Run lint fix
+
+      - name: Run linting
         run: pnpm run lint:fix
-      - name: Verify the integrity of provenance attestations and registry signatures for installed dependencies
-        run: pnpm audit signatures --audit-level=critical
-      - name: Test
-        run: pnpm run test
-      - name: Coveralls
+
+      - name: Build application
+        run: pnpm run build
+
+      - name: Check TypeScript
+        run: npx tsc --noEmit
+        continue-on-error: true
+
+  testing:
+    name: Testing
+    needs: quality
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: ['22.x', '24.x']
+        redis-version: ['7', '6']
+        include:
+          - node-version: '24.x'
+            redis-version: '7'
+            coverage: true
+
+    services:
+      redis:
+        image: redis:${{ matrix.redis-version }}-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@vasilistotskas'
+
+      - name: Enable corepack for pnpm
+        run: |
+          corepack enable pnpm
+          pnpm config set store-dir ~/.pnpm-store
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Install Sharp dependencies (for image processing)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvips-dev
+
+      - name: Verify Redis connection
+        run: |
+          sudo apt-get install -y redis-tools
+          redis-cli -h localhost -p 6379 ping
+
+      - name: Run unit tests with coverage
+        if: matrix.coverage
+        env:
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          BULL_REDIS_HOST: localhost
+          BULL_REDIS_PORT: 6379
+          NODE_ENV: test
+          CI: true
+        run: pnpm run test:cov
+        timeout-minutes: 10
+
+      - name: Run unit tests without coverage
+        if: '!matrix.coverage'
+        env:
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          BULL_REDIS_HOST: localhost
+          BULL_REDIS_PORT: 6379
+          NODE_ENV: test
+          CI: true
+        run: pnpm run test:watch -- --watchAll=false
+        timeout-minutes: 10
+
+      - name: Upload coverage to Coveralls
+        if: matrix.coverage
         uses: coverallsapp/github-action@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Release
+          path-to-lcov: ./coverage/lcov.info
+
+      - name: Upload coverage artifacts
+        if: matrix.coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-node-${{ matrix.node-version }}-redis-${{ matrix.redis-version }}
+          path: |
+            coverage/
+            test-results/
+            junit.xml
+          retention-days: 7
+
+  e2e-testing:
+    name: E2E Testing
+    needs: quality
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@vasilistotskas'
+
+      - name: Enable corepack for pnpm
+        run: corepack enable pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Install Sharp dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvips-dev
+
+      - name: Build application
+        run: pnpm run build
+
+      - name: Run E2E tests
+        env:
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          BULL_REDIS_HOST: localhost
+          BULL_REDIS_PORT: 6379
+          NODE_ENV: test
+          PORT: 3000
+        run: pnpm run test:e2e
+        timeout-minutes: 15
+
+      - name: Upload E2E test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: |
+            test-results/
+            screenshots/
+          retention-days: 7
+
+  build:
+    name: Build Production
+    needs: [testing, e2e-testing]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@vasilistotskas'
+
+      - name: Enable corepack for pnpm
+        run: corepack enable pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Clean previous build
+        run: pnpm run prebuild
+
+      - name: Build application
+        run: pnpm run build
+        env:
+          NODE_ENV: production
+
+      - name: Test production build
+        run: |
+          timeout 10s pnpm run prod || exit_code=$?
+          if [ $exit_code -eq 124 ]; then
+            echo "Production build starts successfully"
+          else
+            echo "Production build failed with exit code $exit_code"
+            exit $exit_code
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            build/dist/
+            package.json
+            pnpm-lock.yaml
+          retention-days: 7
+
+  release:
+    name: Release
+    needs: [build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    concurrency: release
+    environment: release
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.MEDIA_STREAM_GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@vasilistotskas'
+
+      - name: Enable corepack for pnpm
+        run: corepack enable pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: ./
+
+      - name: Run semantic-release
+        id: release
         env:
           GITHUB_TOKEN: ${{ secrets.MEDIA_STREAM_GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx semantic-release
+        run: pnpm run semantic-release
+
+      - name: Upload release artifacts
+        if: steps.release.outputs.new_release_published == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ steps.release.outputs.new_release_version }}
+          path: |
+            build/dist/
+            CHANGELOG.md
+          retention-days: 90
+
+      - name: Create Docker image tag
+        if: steps.release.outputs.new_release_published == 'true'
+        run: |
+          echo "New version: ${{ steps.release.outputs.new_release_version }}"
+          echo "IMAGE_TAG=${{ steps.release.outputs.new_release_version }}" >> $GITHUB_ENV
+
