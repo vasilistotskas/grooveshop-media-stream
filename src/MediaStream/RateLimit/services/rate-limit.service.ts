@@ -151,6 +151,11 @@ export class RateLimitService {
 	 * Calculate adaptive rate limit based on system load
 	 */
 	async calculateAdaptiveLimit(baseLimit: number): Promise<number> {
+		// Disable adaptive rate limiting in test environment for predictable behavior
+		if (process.env.NODE_ENV === 'test') {
+			return baseLimit
+		}
+
 		const systemLoad = await this.getSystemLoad()
 
 		let adaptiveLimit = baseLimit

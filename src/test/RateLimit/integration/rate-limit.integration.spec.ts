@@ -497,29 +497,49 @@ describe('rate Limiting Integration', () => {
 
 	describe('adaptive Rate Limiting', () => {
 		it('should reduce limits under high system load', async () => {
-			// Mock high system load
-			jest.spyOn(rateLimitService, 'getSystemLoad').mockResolvedValue({
-				cpuUsage: 90, // High CPU
-				memoryUsage: 90, // High memory
-				activeConnections: 2000, // High connections
-			})
+			// Temporarily override NODE_ENV to test adaptive behavior
+			const originalEnv = process.env.NODE_ENV
+			process.env.NODE_ENV = 'production'
 
-			// The adaptive limit should be lower than the configured limit
-			const adaptiveLimit = await rateLimitService.calculateAdaptiveLimit(5)
-			expect(adaptiveLimit).toBeLessThan(5)
-			expect(adaptiveLimit).toBeGreaterThanOrEqual(1)
+			try {
+				// Mock high system load
+				jest.spyOn(rateLimitService, 'getSystemLoad').mockResolvedValue({
+					cpuUsage: 90, // High CPU
+					memoryUsage: 90, // High memory
+					activeConnections: 2000, // High connections
+				})
+
+				// The adaptive limit should be lower than the configured limit
+				const adaptiveLimit = await rateLimitService.calculateAdaptiveLimit(5)
+				expect(adaptiveLimit).toBeLessThan(5)
+				expect(adaptiveLimit).toBeGreaterThanOrEqual(1)
+			}
+			finally {
+				// Restore original environment
+				process.env.NODE_ENV = originalEnv
+			}
 		})
 
 		it('should maintain limits under normal system load', async () => {
-			// Mock normal system load
-			jest.spyOn(rateLimitService, 'getSystemLoad').mockResolvedValue({
-				cpuUsage: 50, // Normal CPU
-				memoryUsage: 60, // Normal memory
-				activeConnections: 100, // Normal connections
-			})
+			// Temporarily override NODE_ENV to test adaptive behavior
+			const originalEnv = process.env.NODE_ENV
+			process.env.NODE_ENV = 'production'
 
-			const adaptiveLimit = await rateLimitService.calculateAdaptiveLimit(5)
-			expect(adaptiveLimit).toBe(5)
+			try {
+				// Mock normal system load
+				jest.spyOn(rateLimitService, 'getSystemLoad').mockResolvedValue({
+					cpuUsage: 50, // Normal CPU
+					memoryUsage: 60, // Normal memory
+					activeConnections: 100, // Normal connections
+				})
+
+				const adaptiveLimit = await rateLimitService.calculateAdaptiveLimit(5)
+				expect(adaptiveLimit).toBe(5)
+			}
+			finally {
+				// Restore original environment
+				process.env.NODE_ENV = originalEnv
+			}
 		})
 	})
 

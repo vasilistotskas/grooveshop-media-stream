@@ -134,6 +134,9 @@ let RateLimitService = RateLimitService_1 = class RateLimitService {
         };
     }
     async calculateAdaptiveLimit(baseLimit) {
+        if (process.env.NODE_ENV === 'test') {
+            return baseLimit;
+        }
         const systemLoad = await this.getSystemLoad();
         let adaptiveLimit = baseLimit;
         if (systemLoad.memoryUsage > this.systemLoadThresholds.memory) {

@@ -182,40 +182,70 @@ describe('rateLimitService', () => {
 
 	describe('calculateAdaptiveLimit', () => {
 		it('should return base limit when system load is low', async () => {
-			// Mock low system load
-			jest.spyOn(service, 'getSystemLoad').mockResolvedValue({
-				cpuUsage: 50,
-				memoryUsage: 60,
-				activeConnections: 100,
-			})
+			// Temporarily override NODE_ENV to test adaptive behavior
+			const originalEnv = process.env.NODE_ENV
+			process.env.NODE_ENV = 'production'
 
-			const adaptiveLimit = await service.calculateAdaptiveLimit(100)
-			expect(adaptiveLimit).toBe(100)
+			try {
+				// Mock low system load
+				jest.spyOn(service, 'getSystemLoad').mockResolvedValue({
+					cpuUsage: 50,
+					memoryUsage: 60,
+					activeConnections: 100,
+				})
+
+				const adaptiveLimit = await service.calculateAdaptiveLimit(100)
+				expect(adaptiveLimit).toBe(100)
+			}
+			finally {
+				// Restore original environment
+				process.env.NODE_ENV = originalEnv
+			}
 		})
 
 		it('should reduce limit when memory usage is high', async () => {
-			// Mock high memory usage
-			jest.spyOn(service, 'getSystemLoad').mockResolvedValue({
-				cpuUsage: 50,
-				memoryUsage: 90, // Above 85% threshold
-				activeConnections: 100,
-			})
+			// Temporarily override NODE_ENV to test adaptive behavior
+			const originalEnv = process.env.NODE_ENV
+			process.env.NODE_ENV = 'production'
 
-			const adaptiveLimit = await service.calculateAdaptiveLimit(100)
-			expect(adaptiveLimit).toBeLessThan(100)
-			expect(adaptiveLimit).toBeGreaterThan(0)
+			try {
+				// Mock high memory usage
+				jest.spyOn(service, 'getSystemLoad').mockResolvedValue({
+					cpuUsage: 50,
+					memoryUsage: 90, // Above 85% threshold
+					activeConnections: 100,
+				})
+
+				const adaptiveLimit = await service.calculateAdaptiveLimit(100)
+				expect(adaptiveLimit).toBeLessThan(100)
+				expect(adaptiveLimit).toBeGreaterThan(0)
+			}
+			finally {
+				// Restore original environment
+				process.env.NODE_ENV = originalEnv
+			}
 		})
 
 		it('should ensure minimum limit of 1', async () => {
-			// Mock extremely high system load
-			jest.spyOn(service, 'getSystemLoad').mockResolvedValue({
-				cpuUsage: 95,
-				memoryUsage: 95,
-				activeConnections: 2000,
-			})
+			// Temporarily override NODE_ENV to test adaptive behavior
+			const originalEnv = process.env.NODE_ENV
+			process.env.NODE_ENV = 'production'
 
-			const adaptiveLimit = await service.calculateAdaptiveLimit(10)
-			expect(adaptiveLimit).toBeGreaterThanOrEqual(1)
+			try {
+				// Mock extremely high system load
+				jest.spyOn(service, 'getSystemLoad').mockResolvedValue({
+					cpuUsage: 95,
+					memoryUsage: 95,
+					activeConnections: 2000,
+				})
+
+				const adaptiveLimit = await service.calculateAdaptiveLimit(10)
+				expect(adaptiveLimit).toBeGreaterThanOrEqual(1)
+			}
+			finally {
+				// Restore original environment
+				process.env.NODE_ENV = originalEnv
+			}
 		})
 	})
 
