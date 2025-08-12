@@ -13,9 +13,12 @@ export default async (): Promise<Config> => {
 		collectCoverageFrom: ['**/*.(t|j)s', '!**/*.d.ts', '!**/node_modules/**'],
 		coverageDirectory: '../coverage',
 		testEnvironment: 'node',
+		testTimeout: 30000, // 30 seconds for integration tests
 		moduleNameMapper: {
 			'^@/(.*)$': '<rootDir>/$1',
 			'^@microservice/(.*)$': '<rootDir>/MediaStream/$1'
-		}
+		},
+		// Reduce concurrency in CI
+		maxWorkers: process.env.CI ? 2 : '50%'
 	}
 }
