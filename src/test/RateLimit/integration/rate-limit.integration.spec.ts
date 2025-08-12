@@ -8,7 +8,6 @@ import { RateLimitService } from '@microservice/RateLimit/services/rate-limit.se
 import { Controller, Get, INestApplication, UseGuards } from '@nestjs/common'
 
 import { Test, TestingModule } from '@nestjs/testing'
-import { ThrottlerModule } from '@nestjs/throttler'
 import request from 'supertest'
 
 // Test controller for integration testing
@@ -43,13 +42,7 @@ describe('rate Limiting Integration', () => {
 			imports: [
 				ConfigModule,
 				MetricsModule,
-				ThrottlerModule.forRoot([
-					{
-						name: 'default',
-						ttl: 60000,
-						limit: 5, // Low limit for testing
-					},
-				]),
+				// Remove ThrottlerModule to avoid conflicts with our custom rate limiting
 				RateLimitModule,
 			],
 			controllers: [TestController],
@@ -68,25 +61,30 @@ describe('rate Limiting Integration', () => {
 			rateLimitService.clearAllRateLimits()
 		}
 
-		// Mock configuration for testing
+		// Mock configuration for testing with higher limits for CI stability
 		jest.spyOn(configService, 'getOptional').mockImplementation((key: string, defaultValue?: any) => {
 			const configs = {
 				'rateLimit.default.windowMs': 60000,
-				'rateLimit.default.max': 10, // Increased for more reliable testing
+				'rateLimit.default.max': process.env.CI ? 15 : 10, // Higher limit in CI
 				'rateLimit.imageProcessing.windowMs': 60000,
-				'rateLimit.imageProcessing.max': 5, // Increased for more reliable testing
+				'rateLimit.imageProcessing.max': process.env.CI ? 8 : 5, // Higher limit in CI
 				'rateLimit.healthCheck.windowMs': 10000,
 				'rateLimit.healthCheck.max': 100,
-				'monitoring.enabled': true,
+				'monitoring.enabled': false, // Disable monitoring in tests
 			}
 			return configs[key] || defaultValue
 		})
 
 		await app.init()
 
-		// Clear rate limit data again after initialization
+		// Clear rate limit data again after initialization and add delay for CI
 		if (rateLimitService && typeof rateLimitService.clearAllRateLimits === 'function') {
 			rateLimitService.clearAllRateLimits()
+		}
+
+		// Add small delay in CI to ensure clean state
+		if (process.env.CI) {
+			await new Promise(resolve => setTimeout(resolve, 100))
 		}
 	})
 	afterEach(async () => {
@@ -149,13 +147,18 @@ describe('rate Limiting Integration', () => {
 
 		it('should block requests when rate limit is exceeded', async () => {
 			const uniqueIP = '192.168.100.2'
+			const limit = process.env.CI ? 15 : 10 // Use higher limit in CI
 
-			// Make requests up to the limit (10 based on our config)
-			for (let i = 0; i < 10; i++) {
-				await request(app.getHttpServer())
+			// Make requests up to the limit
+			for (let i = 0; i < limit; i++) {
+				const response = await request(app.getHttpServer())
 					.get('/test/default')
 					.set('X-Forwarded-For', uniqueIP)
-					.expect(200)
+
+				if (response.status !== 200) {
+					console.log(`Request ${i + 1}/${limit} failed with status ${response.status}`)
+				}
+				expect(response.status).toBe(200)
 			}
 
 			// Next request should be blocked
@@ -226,25 +229,26 @@ describe('rate Limiting Integration', () => {
 	describe('request Type Specific Limits', () => {
 		it('should apply different limits for image processing requests', async () => {
 			const uniqueIP = '192.168.100.4'
+			const limit = process.env.CI ? 8 : 5 // Use higher limit in CI
 
 			// Clear any existing rate limits first
 			if (rateLimitService && typeof rateLimitService.clearAllRateLimits === 'function') {
 				rateLimitService.clearAllRateLimits()
 			}
 
-			// Image processing has limit of 5
-			for (let i = 0; i < 5; i++) {
+			// Image processing has limit of 5 (or 8 in CI)
+			for (let i = 0; i < limit; i++) {
 				const response = await request(app.getHttpServer())
 					.get('/test/image-processing')
 					.set('X-Forwarded-For', uniqueIP)
 
 				if (response.status !== 200) {
-					console.log(`Request ${i + 1} failed with status ${response.status}`)
+					console.log(`Request ${i + 1}/${limit} failed with status ${response.status}`)
 				}
 				expect(response.status).toBe(200)
 			}
 
-			// 6th request should be blocked
+			// Next request should be blocked
 			const response = await request(app.getHttpServer())
 				.get('/test/image-processing')
 				.set('X-Forwarded-For', uniqueIP)
@@ -254,6 +258,7 @@ describe('rate Limiting Integration', () => {
 
 		it('should track different request types independently', async () => {
 			const uniqueIP = '192.168.100.5'
+			const imageLimit = process.env.CI ? 8 : 5 // Use higher limit in CI
 
 			// Clear any existing rate limits first
 			if (rateLimitService && typeof rateLimitService.clearAllRateLimits === 'function') {
@@ -261,7 +266,7 @@ describe('rate Limiting Integration', () => {
 			}
 
 			// Use up image processing limit
-			for (let i = 0; i < 5; i++) {
+			for (let i = 0; i < imageLimit; i++) {
 				await request(app.getHttpServer())
 					.get('/test/image-processing')
 					.set('X-Forwarded-For', uniqueIP)
@@ -279,9 +284,10 @@ describe('rate Limiting Integration', () => {
 	describe('health Check Bypass', () => {
 		it('should bypass rate limiting for health checks', async () => {
 			const uniqueIP = '192.168.100.6'
+			const limit = process.env.CI ? 15 : 10 // Use higher limit in CI
 
 			// First, exhaust the regular rate limit
-			for (let i = 0; i < 10; i++) {
+			for (let i = 0; i < limit; i++) {
 				await request(app.getHttpServer())
 					.get('/test/default')
 					.set('X-Forwarded-For', uniqueIP)
@@ -306,9 +312,10 @@ describe('rate Limiting Integration', () => {
 		it('should track different IPs independently', async () => {
 			const firstIP = '192.168.100.7'
 			const secondIP = '192.168.100.8'
+			const limit = process.env.CI ? 15 : 10 // Use higher limit in CI
 
 			// Make requests from first IP
-			for (let i = 0; i < 10; i++) {
+			for (let i = 0; i < limit; i++) {
 				await request(app.getHttpServer())
 					.get('/test/default')
 					.set('X-Forwarded-For', firstIP)

@@ -223,7 +223,7 @@ let MetricsService = MetricsService_1 = class MetricsService {
             this.startPeriodicMetricsCollection();
         }
         else {
-            this._logger.log('Metrics collection disabled' + (isTestEnv ? ' (test environment)' : ''));
+            this._logger.log(`Metrics collection disabled${isTestEnv ? ' (test environment)' : ''}`);
         }
     }
     async getMetrics() {
