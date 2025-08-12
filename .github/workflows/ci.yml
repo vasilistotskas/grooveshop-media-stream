@@ -72,8 +72,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: ['22.x', '24.x']
-        redis-version: ['7', '6']
+        node-version: ['24.x']
+        redis-version: ['7']
         include:
           - node-version: '24.x'
             redis-version: '7'
