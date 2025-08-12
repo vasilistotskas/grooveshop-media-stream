@@ -261,6 +261,18 @@ jobs:
     name: Build Production
     needs: [testing, e2e-testing]
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          --sysctl net.core.somaxconn=1024
+        ports:
+          - 6379:6379
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -278,6 +290,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
 
+      - name: Configure system for Redis
+        run: |
+          # Enable memory overcommit for Redis
+          sudo sysctl -w vm.overcommit_memory=1
+          # Install Redis tools
+          sudo apt-get update
+          sudo apt-get install -y redis-tools
+
+      - name: Verify Redis connection
+        run: |
+          redis-cli -h localhost -p 6379 ping
+
       - name: Clean previous build
         run: pnpm run prebuild
 
@@ -287,6 +311,12 @@ jobs:
           NODE_ENV: production
 
       - name: Test production build
+        env:
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          BULL_REDIS_HOST: localhost
+          BULL_REDIS_PORT: 6379
+          NODE_ENV: production
         run: |
           timeout 10s pnpm run prod || exit_code=$?
           if [ $exit_code -eq 124 ]; then
