@@ -72,6 +72,11 @@ describe('middleware Configuration', () => {
 	})
 
 	afterAll(async () => {
+		// Stop metrics collection to prevent open handles
+		if (metricsService && typeof metricsService.stopMetricsCollection === 'function') {
+			metricsService.stopMetricsCollection()
+		}
+
 		// Add delay to allow pending requests to complete
 		await new Promise(resolve => setTimeout(resolve, 200))
 

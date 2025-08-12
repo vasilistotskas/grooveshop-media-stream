@@ -248,12 +248,16 @@ export class MetricsService implements OnModuleInit {
 	}
 
 	async onModuleInit(): Promise<void> {
-		if (this._configService.get('monitoring.enabled')) {
+		// Don't start metrics collection in test environment unless explicitly enabled
+		const isTestEnv = process.env.NODE_ENV === 'test'
+		const monitoringEnabled = this._configService.get('monitoring.enabled')
+
+		if (monitoringEnabled && !isTestEnv) {
 			this._logger.log('Metrics collection initialized')
 			this.startPeriodicMetricsCollection()
 		}
 		else {
-			this._logger.log('Metrics collection disabled')
+			this._logger.log(`Metrics collection disabled${isTestEnv ? ' (test environment)' : ''}`)
 		}
 	}
 

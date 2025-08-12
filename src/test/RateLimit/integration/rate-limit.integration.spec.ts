@@ -136,8 +136,10 @@ describe('rate Limiting Integration', () => {
 
 	describe('basic Rate Limiting', () => {
 		it('should allow requests within rate limit', async () => {
+			const uniqueIP = '192.168.100.1'
 			const response = await request(app.getHttpServer())
 				.get('/test/default')
+				.set('X-Forwarded-For', uniqueIP)
 				.expect(200)
 
 			expect(response.headers['x-ratelimit-limit']).toBeDefined()
@@ -146,62 +148,95 @@ describe('rate Limiting Integration', () => {
 		})
 
 		it('should block requests when rate limit is exceeded', async () => {
-			// Make requests up to the limit
+			const uniqueIP = '192.168.100.2'
+
+			// Make requests up to the limit (10 based on our config)
 			for (let i = 0; i < 10; i++) {
 				await request(app.getHttpServer())
 					.get('/test/default')
+					.set('X-Forwarded-For', uniqueIP)
 					.expect(200)
 			}
 
 			// Next request should be blocked
 			await request(app.getHttpServer())
 				.get('/test/default')
+				.set('X-Forwarded-For', uniqueIP)
 				.expect(429) // Too Many Requests
 		})
 
 		it('should reset rate limit after window expires', async () => {
+			const uniqueIP = '192.168.100.3'
+
 			// Clear any existing rate limits first
-			const rateLimitServicePrivate = rateLimitService as any
-			if (rateLimitServicePrivate.requestCounts) {
-				rateLimitServicePrivate.requestCounts.clear()
+			if (rateLimitService && typeof rateLimitService.clearAllRateLimits === 'function') {
+				rateLimitService.clearAllRateLimits()
 			}
 
 			// Mock short window for testing
-			jest.spyOn(configService, 'getOptional').mockImplementation((key: string, defaultValue?: any) => {
+			const originalMock = jest.spyOn(configService, 'getOptional')
+			originalMock.mockImplementation((key: string, defaultValue?: any) => {
 				if (key === 'rateLimit.default.windowMs')
 					return 100 // 100ms window
 				if (key === 'rateLimit.default.max')
 					return 2
-				return defaultValue
+				const configs = {
+					'rateLimit.imageProcessing.windowMs': 60000,
+					'rateLimit.imageProcessing.max': 5,
+					'rateLimit.healthCheck.windowMs': 10000,
+					'rateLimit.healthCheck.max': 100,
+					'monitoring.enabled': true,
+				}
+				return configs[key] || defaultValue
 			})
 
-			// Make requests up to limit
-			await request(app.getHttpServer()).get('/test/default').expect(200)
-			await request(app.getHttpServer()).get('/test/default').expect(200)
+			try {
+				// Make requests up to limit
+				await request(app.getHttpServer())
+					.get('/test/default')
+					.set('X-Forwarded-For', uniqueIP)
+					.expect(200)
+				await request(app.getHttpServer())
+					.get('/test/default')
+					.set('X-Forwarded-For', uniqueIP)
+					.expect(200)
 
-			// Next request should be blocked
-			await request(app.getHttpServer()).get('/test/default').expect(429)
+				// Next request should be blocked
+				await request(app.getHttpServer())
+					.get('/test/default')
+					.set('X-Forwarded-For', uniqueIP)
+					.expect(429)
 
-			// Wait for window to reset
-			await new Promise(resolve => setTimeout(resolve, 150))
+				// Wait for window to reset
+				await new Promise(resolve => setTimeout(resolve, 150))
 
-			// Should be allowed again
-			await request(app.getHttpServer()).get('/test/default').expect(200)
+				// Should be allowed again
+				await request(app.getHttpServer())
+					.get('/test/default')
+					.set('X-Forwarded-For', uniqueIP)
+					.expect(200)
+			}
+			finally {
+				// Restore the original mock
+				originalMock.mockRestore()
+			}
 		}, 10000)
 	})
 
 	describe('request Type Specific Limits', () => {
 		it('should apply different limits for image processing requests', async () => {
+			const uniqueIP = '192.168.100.4'
+
 			// Clear any existing rate limits first
-			const rateLimitServicePrivate = rateLimitService as any
-			if (rateLimitServicePrivate.requestCounts) {
-				rateLimitServicePrivate.requestCounts.clear()
+			if (rateLimitService && typeof rateLimitService.clearAllRateLimits === 'function') {
+				rateLimitService.clearAllRateLimits()
 			}
 
 			// Image processing has limit of 5
 			for (let i = 0; i < 5; i++) {
 				const response = await request(app.getHttpServer())
 					.get('/test/image-processing')
+					.set('X-Forwarded-For', uniqueIP)
 
 				if (response.status !== 200) {
 					console.log(`Request ${i + 1} failed with status ${response.status}`)
@@ -212,79 +247,91 @@ describe('rate Limiting Integration', () => {
 			// 6th request should be blocked
 			const response = await request(app.getHttpServer())
 				.get('/test/image-processing')
+				.set('X-Forwarded-For', uniqueIP)
 
 			expect(response.status).toBe(429)
 		})
 
 		it('should track different request types independently', async () => {
+			const uniqueIP = '192.168.100.5'
+
 			// Clear any existing rate limits first
-			const rateLimitServicePrivate = rateLimitService as any
-			if (rateLimitServicePrivate.requestCounts) {
-				rateLimitServicePrivate.requestCounts.clear()
+			if (rateLimitService && typeof rateLimitService.clearAllRateLimits === 'function') {
+				rateLimitService.clearAllRateLimits()
 			}
 
 			// Use up image processing limit
 			for (let i = 0; i < 5; i++) {
 				await request(app.getHttpServer())
 					.get('/test/image-processing')
+					.set('X-Forwarded-For', uniqueIP)
 					.expect(200)
 			}
 
-			// Default endpoint should still work (different limit)
+			// Default endpoint should still work (different limit and different request type)
 			await request(app.getHttpServer())
 				.get('/test/default')
+				.set('X-Forwarded-For', uniqueIP)
 				.expect(200)
 		})
 	})
 
 	describe('health Check Bypass', () => {
 		it('should bypass rate limiting for health checks', async () => {
+			const uniqueIP = '192.168.100.6'
+
 			// First, exhaust the regular rate limit
 			for (let i = 0; i < 10; i++) {
 				await request(app.getHttpServer())
 					.get('/test/default')
+					.set('X-Forwarded-For', uniqueIP)
 					.expect(200)
 			}
 
 			// Regular requests should be blocked
 			await request(app.getHttpServer())
 				.get('/test/default')
+				.set('X-Forwarded-For', uniqueIP)
 				.expect(429)
 
-			// But health checks should still work
+			// But health checks should still work (they bypass rate limiting)
 			await request(app.getHttpServer())
 				.get('/test/health')
+				.set('X-Forwarded-For', uniqueIP)
 				.expect(200)
 		})
 	})
 
 	describe('iP-based Rate Limiting', () => {
 		it('should track different IPs independently', async () => {
+			const firstIP = '192.168.100.7'
+			const secondIP = '192.168.100.8'
+
 			// Make requests from first IP
 			for (let i = 0; i < 10; i++) {
 				await request(app.getHttpServer())
 					.get('/test/default')
-					.set('X-Forwarded-For', '192.168.1.1')
+					.set('X-Forwarded-For', firstIP)
 					.expect(200)
 			}
 
 			// First IP should be blocked
 			await request(app.getHttpServer())
 				.get('/test/default')
-				.set('X-Forwarded-For', '192.168.1.1')
+				.set('X-Forwarded-For', firstIP)
 				.expect(429)
 
 			// Second IP should still work
 			await request(app.getHttpServer())
 				.get('/test/default')
-				.set('X-Forwarded-For', '192.168.1.2')
+				.set('X-Forwarded-For', secondIP)
 				.expect(200)
 		})
 
 		it('should extract IP from various headers', async () => {
 			const ipHeaders = [
-				{ 'X-Forwarded-For': '192.168.1.1,192.168.1.2' },
-				{ 'X-Real-IP': '192.168.1.3' },
+				{ 'X-Forwarded-For': '192.168.100.9,192.168.100.10' },
+				{ 'X-Real-IP': '192.168.100.11' },
 			]
 
 			for (const headers of ipHeaders) {

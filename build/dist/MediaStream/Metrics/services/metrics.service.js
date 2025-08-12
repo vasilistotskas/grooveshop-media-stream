@@ -216,12 +216,14 @@ let MetricsService = MetricsService_1 = class MetricsService {
         });
     }
     async onModuleInit() {
-        if (this._configService.get('monitoring.enabled')) {
+        const isTestEnv = process.env.NODE_ENV === 'test';
+        const monitoringEnabled = this._configService.get('monitoring.enabled');
+        if (monitoringEnabled && !isTestEnv) {
             this._logger.log('Metrics collection initialized');
             this.startPeriodicMetricsCollection();
         }
         else {
-            this._logger.log('Metrics collection disabled');
+            this._logger.log('Metrics collection disabled' + (isTestEnv ? ' (test environment)' : ''));
         }
     }
     async getMetrics() {

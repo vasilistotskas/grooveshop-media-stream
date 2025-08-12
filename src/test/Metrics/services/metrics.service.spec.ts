@@ -31,6 +31,10 @@ describe('metricsService', () => {
 	})
 
 	afterEach(() => {
+		// Stop metrics collection to prevent open handles
+		if (service && typeof service.stopMetricsCollection === 'function') {
+			service.stopMetricsCollection()
+		}
 		// Reset metrics after each test
 		service.reset()
 	})
@@ -43,6 +47,10 @@ describe('metricsService', () => {
 		it('should initialize with monitoring enabled', async () => {
 			await service.onModuleInit()
 			expect(configService.get).toHaveBeenCalledWith('monitoring.enabled')
+			// Clean up intervals immediately after test
+			if (service && typeof service.stopMetricsCollection === 'function') {
+				service.stopMetricsCollection()
+			}
 		})
 
 		it('should provide metrics registry', () => {
@@ -366,6 +374,10 @@ describe('metricsService', () => {
 		it('should respect monitoring enabled configuration', async () => {
 			await service.onModuleInit()
 			expect(configService.get).toHaveBeenCalledWith('monitoring.enabled')
+			// Clean up intervals immediately after test
+			if (service && typeof service.stopMetricsCollection === 'function') {
+				service.stopMetricsCollection()
+			}
 		})
 
 		it('should handle disabled monitoring', async () => {
