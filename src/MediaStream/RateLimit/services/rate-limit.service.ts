@@ -94,12 +94,13 @@ export class RateLimitService {
 		// Clean up old entries
 		this.cleanupOldEntries(windowStart)
 
-		const entry = this.requestCounts.get(key)
+		let entry = this.requestCounts.get(key)
 		const resetTime = new Date(now + config.windowMs)
 
 		if (!entry || entry.resetTime <= now) {
-			// First request in window or window expired
-			this.requestCounts.set(key, { count: 1, resetTime: now + config.windowMs })
+			// First request in window or window expired - create new entry
+			entry = { count: 1, resetTime: now + config.windowMs }
+			this.requestCounts.set(key, entry)
 
 			return {
 				allowed: true,
@@ -112,10 +113,9 @@ export class RateLimitService {
 			}
 		}
 
-		// Atomic increment to handle concurrent requests better
-		const currentCount = entry.count + 1
-		entry.count = currentCount
-
+		// Atomic increment - increment first, then check
+		entry.count += 1
+		const currentCount = entry.count
 		const allowed = currentCount <= config.max
 
 		return {
@@ -233,7 +233,11 @@ export class RateLimitService {
 	 * Clear all rate limits (useful for testing)
 	 */
 	clearAllRateLimits(): void {
+		const entriesCount = this.requestCounts.size
 		this.requestCounts.clear()
+		if (process.env.NODE_ENV === 'test' && entriesCount > 0) {
+			this._logger.debug(`Cleared ${entriesCount} rate limit entries`)
+		}
 	}
 
 	/**
@@ -250,6 +254,22 @@ export class RateLimitService {
 			current: entry.count,
 			remaining: 0, // Would need to be calculated
 			resetTime: new Date(entry.resetTime),
+		}
+	}
+
+	/**
+	 * Get debug information about current rate limit state (for testing)
+	 */
+	getDebugInfo(): { totalEntries: number, entries: Array<{ key: string, count: number, resetTime: number }> } {
+		const entries = Array.from(this.requestCounts.entries()).map(([key, entry]) => ({
+			key,
+			count: entry.count,
+			resetTime: entry.resetTime,
+		}))
+
+		return {
+			totalEntries: this.requestCounts.size,
+			entries,
 		}
 	}
 }

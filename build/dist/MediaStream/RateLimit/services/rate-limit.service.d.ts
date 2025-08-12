@@ -40,4 +40,12 @@ export declare class RateLimitService {
     resetRateLimit(key: string): void;
     clearAllRateLimits(): void;
     getRateLimitStatus(key: string): RateLimitInfo | null;
+    getDebugInfo(): {
+        totalEntries: number;
+        entries: Array<{
+            key: string;
+            count: number;
+            resetTime: number;
+        }>;
+    };
 }

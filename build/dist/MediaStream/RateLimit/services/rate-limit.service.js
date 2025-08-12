@@ -95,10 +95,11 @@ let RateLimitService = RateLimitService_1 = class RateLimitService {
         const now = Date.now();
         const windowStart = now - config.windowMs;
         this.cleanupOldEntries(windowStart);
-        const entry = this.requestCounts.get(key);
+        let entry = this.requestCounts.get(key);
         const resetTime = new Date(now + config.windowMs);
         if (!entry || entry.resetTime <= now) {
-            this.requestCounts.set(key, { count: 1, resetTime: now + config.windowMs });
+            entry = { count: 1, resetTime: now + config.windowMs };
+            this.requestCounts.set(key, entry);
             return {
                 allowed: true,
                 info: {
@@ -109,8 +110,8 @@ let RateLimitService = RateLimitService_1 = class RateLimitService {
                 },
             };
         }
-        const currentCount = entry.count + 1;
-        entry.count = currentCount;
+        entry.count += 1;
+        const currentCount = entry.count;
         const allowed = currentCount <= config.max;
         return {
             allowed,
@@ -183,7 +184,11 @@ let RateLimitService = RateLimitService_1 = class RateLimitService {
         this.requestCounts.delete(key);
     }
     clearAllRateLimits() {
+        const entriesCount = this.requestCounts.size;
         this.requestCounts.clear();
+        if (process.env.NODE_ENV === 'test' && entriesCount > 0) {
+            this._logger.debug(`Cleared ${entriesCount} rate limit entries`);
+        }
     }
     getRateLimitStatus(key) {
         const entry = this.requestCounts.get(key);
@@ -195,6 +200,17 @@ let RateLimitService = RateLimitService_1 = class RateLimitService {
             current: entry.count,
             remaining: 0,
             resetTime: new Date(entry.resetTime),
+        };
+    }
+    getDebugInfo() {
+        const entries = Array.from(this.requestCounts.entries()).map(([key, entry]) => ({
+            key,
+            count: entry.count,
+            resetTime: entry.resetTime,
+        }));
+        return {
+            totalEntries: this.requestCounts.size,
+            entries,
         };
     }
 };

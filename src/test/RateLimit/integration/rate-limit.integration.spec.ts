@@ -65,9 +65,9 @@ describe('rate Limiting Integration', () => {
 		jest.spyOn(configService, 'getOptional').mockImplementation((key: string, defaultValue?: any) => {
 			const configs = {
 				'rateLimit.default.windowMs': 60000,
-				'rateLimit.default.max': process.env.CI ? 25 : 10, // Much higher limit in CI
+				'rateLimit.default.max': process.env.CI ? 30 : 12, // Increased limits for better stability
 				'rateLimit.imageProcessing.windowMs': 60000,
-				'rateLimit.imageProcessing.max': process.env.CI ? 15 : 5, // Much higher limit in CI
+				'rateLimit.imageProcessing.max': process.env.CI ? 20 : 8, // Increased limits for better stability
 				'rateLimit.healthCheck.windowMs': 10000,
 				'rateLimit.healthCheck.max': 100,
 				'monitoring.enabled': false, // Disable monitoring in tests
@@ -77,14 +77,14 @@ describe('rate Limiting Integration', () => {
 
 		await app.init()
 
-		// Clear rate limit data again after initialization and add delay for CI
+		// Clear rate limit data again after initialization
 		if (rateLimitService && typeof rateLimitService.clearAllRateLimits === 'function') {
 			rateLimitService.clearAllRateLimits()
 		}
 
 		// Add small delay in CI to ensure clean state
 		if (process.env.CI) {
-			await new Promise(resolve => setTimeout(resolve, 100))
+			await new Promise(resolve => setTimeout(resolve, 150))
 		}
 	})
 	afterEach(async () => {
@@ -147,7 +147,7 @@ describe('rate Limiting Integration', () => {
 
 		it('should block requests when rate limit is exceeded', async () => {
 			const uniqueIP = '192.168.100.2'
-			const limit = process.env.CI ? 25 : 10 // Use much higher limit in CI
+			const limit = process.env.CI ? 30 : 12 // Use increased limits for better stability
 
 			// Make requests up to the limit
 			for (let i = 0; i < limit; i++) {
@@ -157,6 +157,11 @@ describe('rate Limiting Integration', () => {
 
 				if (response.status !== 200) {
 					console.log(`Request ${i + 1}/${limit} failed with status ${response.status}`)
+					// Add debug info when request fails unexpectedly
+					const debugInfo = (rateLimitService as any).getDebugInfo?.()
+					if (debugInfo) {
+						console.log('Rate limit debug info:', debugInfo)
+					}
 				}
 				expect(response.status).toBe(200)
 			}
@@ -229,7 +234,7 @@ describe('rate Limiting Integration', () => {
 	describe('request Type Specific Limits', () => {
 		it('should apply different limits for image processing requests', async () => {
 			const uniqueIP = '192.168.100.4'
-			const limit = process.env.CI ? 15 : 5 // Use much higher limit in CI
+			const limit = process.env.CI ? 20 : 8 // Use increased limits for better stability
 
 			// Clear any existing rate limits first
 			if (rateLimitService && typeof rateLimitService.clearAllRateLimits === 'function') {
@@ -241,7 +246,7 @@ describe('rate Limiting Integration', () => {
 				await new Promise(resolve => setTimeout(resolve, 200))
 			}
 
-			// Image processing has limit of 5 (or 15 in CI)
+			// Image processing has limit of 8 (or 20 in CI)
 			for (let i = 0; i < limit; i++) {
 				const response = await request(app.getHttpServer())
 					.get('/test/image-processing')
@@ -249,6 +254,11 @@ describe('rate Limiting Integration', () => {
 
 				if (response.status !== 200) {
 					console.log(`Request ${i + 1}/${limit} failed with status ${response.status}`)
+					// Add debug info when request fails unexpectedly
+					const debugInfo = (rateLimitService as any).getDebugInfo?.()
+					if (debugInfo) {
+						console.log('Rate limit debug info:', debugInfo)
+					}
 				}
 				expect(response.status).toBe(200)
 			}
@@ -263,7 +273,7 @@ describe('rate Limiting Integration', () => {
 
 		it('should track different request types independently', async () => {
 			const uniqueIP = '192.168.100.5'
-			const imageLimit = process.env.CI ? 15 : 5 // Use much higher limit in CI
+			const imageLimit = process.env.CI ? 20 : 8 // Use increased limits for better stability
 
 			// Clear any existing rate limits first
 			if (rateLimitService && typeof rateLimitService.clearAllRateLimits === 'function') {
@@ -283,6 +293,11 @@ describe('rate Limiting Integration', () => {
 
 				if (response.status !== 200) {
 					console.log(`Image processing request ${i + 1}/${imageLimit} failed with status ${response.status}`)
+					// Add debug info when request fails unexpectedly
+					const debugInfo = (rateLimitService as any).getDebugInfo?.()
+					if (debugInfo) {
+						console.log('Rate limit debug info:', debugInfo)
+					}
 				}
 				expect(response.status).toBe(200)
 			}
@@ -299,6 +314,11 @@ describe('rate Limiting Integration', () => {
 
 			if (defaultResponse.status !== 200) {
 				console.log(`Default request failed with status ${defaultResponse.status}`)
+				// Add debug info when request fails unexpectedly
+				const debugInfo = (rateLimitService as any).getDebugInfo?.()
+				if (debugInfo) {
+					console.log('Rate limit debug info:', debugInfo)
+				}
 			}
 			expect(defaultResponse.status).toBe(200)
 		})
@@ -307,7 +327,7 @@ describe('rate Limiting Integration', () => {
 	describe('health Check Bypass', () => {
 		it('should bypass rate limiting for health checks', async () => {
 			const uniqueIP = '192.168.100.6'
-			const limit = process.env.CI ? 25 : 10 // Use much higher limit in CI
+			const limit = process.env.CI ? 30 : 12 // Use increased limits for better stability
 
 			// Add delay in CI for better isolation
 			if (process.env.CI) {
@@ -322,6 +342,11 @@ describe('rate Limiting Integration', () => {
 
 				if (response.status !== 200) {
 					console.log(`Default request ${i + 1}/${limit} failed with status ${response.status}`)
+					// Add debug info when request fails unexpectedly
+					const debugInfo = (rateLimitService as any).getDebugInfo?.()
+					if (debugInfo) {
+						console.log('Rate limit debug info:', debugInfo)
+					}
 				}
 				expect(response.status).toBe(200)
 			}
@@ -344,11 +369,24 @@ describe('rate Limiting Integration', () => {
 		it('should track different IPs independently', async () => {
 			const firstIP = '192.168.100.7'
 			const secondIP = '192.168.100.8'
-			const limit = process.env.CI ? 25 : 10 // Use much higher limit in CI
+			const limit = process.env.CI ? 30 : 12 // Use increased limits for better stability
+
+			// Clear rate limits first
+			if (rateLimitService && typeof rateLimitService.clearAllRateLimits === 'function') {
+				rateLimitService.clearAllRateLimits()
+			}
 
 			// Add delay in CI for better isolation
 			if (process.env.CI) {
 				await new Promise(resolve => setTimeout(resolve, 200))
+			}
+
+			// Add debugging
+			if (process.env.NODE_ENV === 'test') {
+				console.log(`Testing IP independence with limit: ${limit}, IPs: ${firstIP}, ${secondIP}`)
+				// Check what the actual configured limit is
+				const config = rateLimitService.getRateLimitConfig('get-default')
+				console.log(`Actual configured limit: ${config.max}`)
 			}
 
 			// Make requests from first IP
@@ -359,6 +397,14 @@ describe('rate Limiting Integration', () => {
 
 				if (response.status !== 200) {
 					console.log(`First IP request ${i + 1}/${limit} failed with status ${response.status}`)
+					// Add debug info when request fails unexpectedly
+					const debugInfo = (rateLimitService as any).getDebugInfo?.()
+					if (debugInfo) {
+						console.log('Rate limit debug info:', debugInfo)
+					}
+					// Also check the configuration
+					const config = rateLimitService.getRateLimitConfig('get-default')
+					console.log(`Rate limit config at failure: max=${config.max}, windowMs=${config.windowMs}`)
 				}
 				expect(response.status).toBe(200)
 			}
