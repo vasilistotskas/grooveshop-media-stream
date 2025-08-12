@@ -50,6 +50,8 @@ export class MetricsService implements OnModuleInit {
 	// Internal tracking
 	private startTime: number = Date.now()
 	private requestsInFlightCount: number = 0
+	private systemMetricsInterval?: NodeJS.Timeout
+	private performanceMetricsInterval?: NodeJS.Timeout
 
 	constructor(private readonly _configService: ConfigService) {
 		this.register = new promClient.Registry()
@@ -449,14 +451,31 @@ export class MetricsService implements OnModuleInit {
 		this.register.resetMetrics()
 	}
 
+	/**
+	 * Stop all metric collection intervals (useful for testing and shutdown)
+	 */
+	stopMetricsCollection(): void {
+		if (this.systemMetricsInterval) {
+			clearInterval(this.systemMetricsInterval)
+			this.systemMetricsInterval = undefined
+		}
+
+		if (this.performanceMetricsInterval) {
+			clearInterval(this.performanceMetricsInterval)
+			this.performanceMetricsInterval = undefined
+		}
+
+		this._logger.log('Stopped periodic metrics collection')
+	}
+
 	private startPeriodicMetricsCollection(): void {
 		// Collect system metrics every 30 seconds
-		setInterval(() => {
+		this.systemMetricsInterval = setInterval(() => {
 			this.collectSystemMetrics()
 		}, 30000)
 
 		// Collect performance metrics every 10 seconds
-		setInterval(() => {
+		this.performanceMetricsInterval = setInterval(() => {
 			this.collectPerformanceMetrics()
 		}, 10000)
 

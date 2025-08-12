@@ -18,7 +18,11 @@ export default async (): Promise<Config> => {
 			'^@/(.*)$': '<rootDir>/$1',
 			'^@microservice/(.*)$': '<rootDir>/MediaStream/$1'
 		},
-		// Reduce concurrency in CI
-		maxWorkers: process.env.CI ? 2 : '50%'
+		// Reduce concurrency in CI for stability
+		maxWorkers: process.env.CI ? 1 : '50%',
+		// Force exit to prevent hanging
+		forceExit: process.env.CI ? true : false,
+		// Detect open handles in CI
+		detectOpenHandles: process.env.CI ? true : false
 	}
 }

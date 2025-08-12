@@ -322,11 +322,22 @@ let MetricsService = MetricsService_1 = class MetricsService {
     reset() {
         this.register.resetMetrics();
     }
+    stopMetricsCollection() {
+        if (this.systemMetricsInterval) {
+            clearInterval(this.systemMetricsInterval);
+            this.systemMetricsInterval = undefined;
+        }
+        if (this.performanceMetricsInterval) {
+            clearInterval(this.performanceMetricsInterval);
+            this.performanceMetricsInterval = undefined;
+        }
+        this._logger.log('Stopped periodic metrics collection');
+    }
     startPeriodicMetricsCollection() {
-        setInterval(() => {
+        this.systemMetricsInterval = setInterval(() => {
             this.collectSystemMetrics();
         }, 30000);
-        setInterval(() => {
+        this.performanceMetricsInterval = setInterval(() => {
             this.collectPerformanceMetrics();
         }, 10000);
         this._logger.log('Started periodic metrics collection');

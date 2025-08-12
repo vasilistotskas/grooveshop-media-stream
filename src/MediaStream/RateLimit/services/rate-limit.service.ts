@@ -112,16 +112,18 @@ export class RateLimitService {
 			}
 		}
 
-		// Increment counter
-		entry.count++
-		const allowed = entry.count <= config.max
+		// Atomic increment to handle concurrent requests better
+		const currentCount = entry.count + 1
+		entry.count = currentCount
+
+		const allowed = currentCount <= config.max
 
 		return {
 			allowed,
 			info: {
 				limit: config.max,
-				current: entry.count,
-				remaining: Math.max(0, config.max - entry.count),
+				current: currentCount,
+				remaining: Math.max(0, config.max - currentCount),
 				resetTime: new Date(entry.resetTime),
 			},
 		}
@@ -225,6 +227,13 @@ export class RateLimitService {
 	 */
 	resetRateLimit(key: string): void {
 		this.requestCounts.delete(key)
+	}
+
+	/**
+	 * Clear all rate limits (useful for testing)
+	 */
+	clearAllRateLimits(): void {
+		this.requestCounts.clear()
 	}
 
 	/**

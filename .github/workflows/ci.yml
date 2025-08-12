@@ -87,6 +87,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+          --sysctl net.core.somaxconn=1024
         ports:
           - 6379:6379
 
@@ -128,9 +129,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libvips-dev
 
+      - name: Configure system for Redis
+        run: |
+          # Enable memory overcommit for Redis
+          sudo sysctl -w vm.overcommit_memory=1
+          # Install Redis tools
+          sudo apt-get install -y redis-tools
+
       - name: Verify Redis connection
         run: |
-          sudo apt-get install -y redis-tools
           redis-cli -h localhost -p 6379 ping
 
       - name: Run unit tests with coverage
@@ -195,6 +202,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+          --sysctl net.core.somaxconn=1024
         ports:
           - 6379:6379
 
@@ -214,6 +222,11 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Configure system for Redis
+        run: |
+          # Enable memory overcommit for Redis
+          sudo sysctl -w vm.overcommit_memory=1
 
       - name: Install Sharp dependencies
         run: |

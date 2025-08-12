@@ -109,14 +109,15 @@ let RateLimitService = RateLimitService_1 = class RateLimitService {
                 },
             };
         }
-        entry.count++;
-        const allowed = entry.count <= config.max;
+        const currentCount = entry.count + 1;
+        entry.count = currentCount;
+        const allowed = currentCount <= config.max;
         return {
             allowed,
             info: {
                 limit: config.max,
-                current: entry.count,
-                remaining: Math.max(0, config.max - entry.count),
+                current: currentCount,
+                remaining: Math.max(0, config.max - currentCount),
                 resetTime: new Date(entry.resetTime),
             },
         };
@@ -180,6 +181,9 @@ let RateLimitService = RateLimitService_1 = class RateLimitService {
     }
     resetRateLimit(key) {
         this.requestCounts.delete(key);
+    }
+    clearAllRateLimits() {
+        this.requestCounts.clear();
     }
     getRateLimitStatus(key) {
         const entry = this.requestCounts.get(key);

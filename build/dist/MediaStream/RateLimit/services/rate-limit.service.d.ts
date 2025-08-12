@@ -38,5 +38,6 @@ export declare class RateLimitService {
     private cleanupOldEntries;
     private simpleHash;
     resetRateLimit(key: string): void;
+    clearAllRateLimits(): void;
     getRateLimitStatus(key: string): RateLimitInfo | null;
 }

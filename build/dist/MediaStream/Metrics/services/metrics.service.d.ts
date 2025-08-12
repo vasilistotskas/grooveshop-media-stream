@@ -32,6 +32,8 @@ export declare class MetricsService implements OnModuleInit {
     private readonly eventLoopLag;
     private startTime;
     private requestsInFlightCount;
+    private systemMetricsInterval?;
+    private performanceMetricsInterval?;
     constructor(_configService: ConfigService);
     onModuleInit(): Promise<void>;
     getMetrics(): Promise<string>;
@@ -62,6 +64,7 @@ export declare class MetricsService implements OnModuleInit {
     recordGarbageCollection(type: string, duration: number): void;
     recordEventLoopLag(lag: number): void;
     reset(): void;
+    stopMetricsCollection(): void;
     private startPeriodicMetricsCollection;
     private collectSystemMetrics;
     private collectPerformanceMetrics;
