@@ -1,13 +1,12 @@
 import { ConfigService } from '@microservice/Config/config.service'
 import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
 import { MetricsService } from '@microservice/Metrics/services/metrics.service'
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import NodeCache from 'node-cache'
 import { CacheStats, ICacheManager } from '../interfaces/cache-manager.interface'
 
 @Injectable()
 export class MemoryCacheService implements ICacheManager {
-	private readonly _logger = new Logger(MemoryCacheService.name)
 	protected readonly cache: NodeCache
 
 	constructor(
@@ -71,7 +70,7 @@ export class MemoryCacheService implements ICacheManager {
 
 	async set<T>(key: string, value: T, ttl?: number): Promise<void> {
 		try {
-			const success = this.cache.set(key, value, ttl)
+			const success = ttl !== undefined ? this.cache.set(key, value, ttl) : this.cache.set(key, value)
 			if (!success) {
 				this.metricsService.recordCacheOperation('set', 'memory', 'error')
 				CorrelatedLogger.warn(`Failed to set memory cache key: ${key}`, MemoryCacheService.name)
@@ -173,7 +172,7 @@ export class MemoryCacheService implements ICacheManager {
 
 	// Additional memory-specific methods
 	getTtl(key: string): number {
-		return this.cache.getTtl(key)
+		return this.cache.getTtl(key) ?? 0
 	}
 
 	setTtl(key: string, ttl: number): boolean {

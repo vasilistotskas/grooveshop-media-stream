@@ -1,9 +1,10 @@
 import { Buffer } from 'node:buffer'
+import { hrtime } from 'node:process'
+import { MultiLayerCacheManager } from '@microservice/Cache/services/multi-layer-cache.manager'
+import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
+import { HttpClientService } from '@microservice/HTTP/services/http-client.service'
 import { Injectable, Logger } from '@nestjs/common'
 import sharp from 'sharp'
-import { MultiLayerCacheManager } from '../../Cache/services/multi-layer-cache.manager'
-import { CorrelationService } from '../../Correlation/services/correlation.service'
-import { HttpClientService } from '../../HTTP/services/http-client.service'
 import { Job } from '../interfaces/job-queue.interface'
 import { ImageProcessingJobData, JobResult } from '../types/job.types'
 
@@ -19,73 +20,82 @@ export class ImageProcessingProcessor {
 
 	async process(job: Job<ImageProcessingJobData>): Promise<JobResult> {
 		const startTime = Date.now()
-		const { imageUrl, width, height, quality, format, cacheKey } = job.data
+		const { imageUrl, width, height, quality, format, cacheKey, correlationId } = job.data
 
-		try {
-			// Note: Correlation ID is already set in the job data
-			// The correlation service doesn't have a setCorrelationId method
+		return this._correlationService.runWithContext(
+			{
+				correlationId,
+				timestamp: Date.now(),
+				clientIp: 'queue-worker',
+				method: 'JOB',
+				url: `/queue/image-processing/${job.id}`,
+				startTime: hrtime.bigint(),
+			},
+			async () => {
+				try {
+					this._logger.debug(`Processing image job ${job.id} for URL: ${imageUrl}`)
 
-			this._logger.debug(`Processing image job ${job.id} for URL: ${imageUrl}`)
+					// Check if already cached
+					const cached = await this.cacheManager.get('images', cacheKey)
+					if (cached) {
+						this._logger.debug(`Image already cached for job ${job.id}`)
+						return {
+							success: true,
+							data: cached,
+							processingTime: Date.now() - startTime,
+							cacheHit: true,
+						}
+					}
 
-			// Check if already cached
-			const cached = await this.cacheManager.get('images', cacheKey)
-			if (cached) {
-				this._logger.debug(`Image already cached for job ${job.id}`)
-				return {
-					success: true,
-					data: cached,
-					processingTime: Date.now() - startTime,
-					cacheHit: true,
+					// Update job progress
+					await this.updateProgress(job, 25, 'Downloading image')
+
+					// Download image
+					const imageBuffer = await this.downloadImage(imageUrl)
+
+					// Update job progress
+					await this.updateProgress(job, 50, 'Processing image')
+
+					// Process image
+					const processedBuffer = await this.processImage(imageBuffer, {
+						width: width ? Number(width) : undefined,
+						height: height ? Number(height) : undefined,
+						quality: quality ? Number(quality) : undefined,
+						format,
+					})
+
+					// Update job progress
+					await this.updateProgress(job, 75, 'Caching result')
+
+					// Cache the result
+					await this.cacheManager.set('images', cacheKey, processedBuffer.toString('base64'), 3600) // 1 hour TTL
+
+					// Update job progress
+					await this.updateProgress(job, 100, 'Completed')
+
+					const processingTime = Date.now() - startTime
+					this._logger.debug(`Image processing completed for job ${job.id} in ${processingTime}ms`)
+
+					return {
+						success: true,
+						data: processedBuffer,
+						processingTime,
+						cacheHit: false,
+					}
 				}
-			}
+				catch (error: unknown) {
+					const processingTime = Date.now() - startTime
+					this._logger.error(`Image processing failed for job ${job.id}:`, error)
 
-			// Update job progress
-			await this.updateProgress(job, 25, 'Downloading image')
-
-			// Download image
-			const imageBuffer = await this.downloadImage(imageUrl)
-
-			// Update job progress
-			await this.updateProgress(job, 50, 'Processing image')
-
-			// Process image
-			const processedBuffer = await this.processImage(imageBuffer, {
-				width: width ? Number(width) : undefined,
-				height: height ? Number(height) : undefined,
-				quality: quality ? Number(quality) : undefined,
-				format,
-			})
-
-			// Update job progress
-			await this.updateProgress(job, 75, 'Caching result')
-
-			// Cache the result
-			await this.cacheManager.set('images', cacheKey, processedBuffer.toString('base64'), 3600) // 1 hour TTL
-
-			// Update job progress
-			await this.updateProgress(job, 100, 'Completed')
-
-			const processingTime = Date.now() - startTime
-			this._logger.debug(`Image processing completed for job ${job.id} in ${processingTime}ms`)
-
-			return {
-				success: true,
-				data: processedBuffer,
-				processingTime,
-				cacheHit: false,
-			}
-		}
-		catch (error: unknown) {
-			const processingTime = Date.now() - startTime
-			this._logger.error(`Image processing failed for job ${job.id}:`, error)
-
-			return {
-				success: false,
-				error: (error as Error).message,
-				processingTime,
-				cacheHit: false,
-			}
-		}
+					return {
+						success: false,
+						error: (error as Error).message,
+						processingTime,
+						cacheHit: false,
+					}
+				}
+			},
+		)
 	}
 
 	private async downloadImage(url: string): Promise<Buffer> {

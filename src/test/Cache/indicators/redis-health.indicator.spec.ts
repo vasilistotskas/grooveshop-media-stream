@@ -6,8 +6,6 @@ import { Test, TestingModule } from '@nestjs/testing'
 describe('redisHealthIndicator', () => {
 	let indicator: RedisHealthIndicator
 	let redisCacheService: jest.Mocked<RedisCacheService>
-	// eslint-disable-next-line unused-imports/no-unused-vars
-	let configService: jest.Mocked<ConfigService>
 
 	const mockConfig = {
 		host: 'localhost',
@@ -56,7 +54,6 @@ describe('redisHealthIndicator', () => {
 
 		indicator = module.get<RedisHealthIndicator>(RedisHealthIndicator)
 		redisCacheService = module.get(RedisCacheService)
-		configService = module.get(ConfigService)
 	})
 
 	afterEach(() => {

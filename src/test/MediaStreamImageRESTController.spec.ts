@@ -11,7 +11,7 @@ import { InputSanitizationService } from '@microservice/Validation/services/inpu
 import { SecurityCheckerService } from '@microservice/Validation/services/security-checker.service'
 import { HttpService } from '@nestjs/axios'
 import { Test, TestingModule } from '@nestjs/testing'
-import { Request, Response } from 'express'
+import { Response } from 'express'
 
 jest.mock('@nestjs/axios')
 jest.mock('@microservice/Job/GenerateResourceIdentityFromRequestJob')
@@ -71,7 +71,6 @@ describe('mediaStreamImageRESTController', () => {
 	let mockCorrelationService: jest.Mocked<CorrelationService>
 	let mockMetricsService: jest.Mocked<MetricsService>
 	let mockResponse: jest.Mocked<Response>
-	let mockRequest: jest.Mocked<Request>
 
 	beforeEach(async () => {
 		mockHttpService = {
@@ -132,11 +131,6 @@ describe('mediaStreamImageRESTController', () => {
 			writable: true,
 			writableEnded: false,
 			writableFinished: false,
-		} as any
-
-		mockRequest = {
-			ip: '127.0.0.1',
-			headers: {},
 		} as any
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -217,7 +211,7 @@ describe('mediaStreamImageRESTController', () => {
 
 		it('should throw error if headers are undefined', () => {
 			expect(() => {
-				controller.testAddHeadersToRequest(mockResponse, undefined)
+				controller.testAddHeadersToRequest(mockResponse, undefined as any)
 			}).toThrow('Headers object is undefined')
 		})
 	})
@@ -261,7 +255,6 @@ describe('mediaStreamImageRESTController', () => {
 				5,
 				SupportedResizeFormats.webp,
 				80,
-				mockRequest,
 				mockResponse,
 			)
 
@@ -300,7 +293,6 @@ describe('mediaStreamImageRESTController', () => {
 				5,
 				SupportedResizeFormats.webp,
 				80,
-				mockRequest,
 				mockResponse,
 			)
 
@@ -322,7 +314,6 @@ describe('mediaStreamImageRESTController', () => {
 				5,
 				SupportedResizeFormats.webp,
 				80,
-				mockRequest,
 				mockResponse,
 			)).rejects.toThrow('Invalid width parameter')
 
@@ -368,7 +359,6 @@ describe('mediaStreamImageRESTController', () => {
 				5,
 				SupportedResizeFormats.webp,
 				80,
-				mockRequest,
 				mockResponse,
 			)
 
@@ -395,7 +385,6 @@ describe('mediaStreamImageRESTController', () => {
 				5,
 				SupportedResizeFormats.webp,
 				150, // Invalid quality
-				mockRequest,
 				mockResponse,
 			)).rejects.toThrow('Invalid quality parameter')
 

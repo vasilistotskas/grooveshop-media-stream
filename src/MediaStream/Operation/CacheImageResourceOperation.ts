@@ -26,17 +26,14 @@ import { JobQueueManager } from '@microservice/Queue/services/job-queue.manager'
 import { JobPriority } from '@microservice/Queue/types/job.types'
 import ValidateCacheImageRequestRule from '@microservice/Rule/ValidateCacheImageRequestRule'
 import { InputSanitizationService } from '@microservice/Validation/services/input-sanitization.service'
-import { HttpService } from '@nestjs/axios'
-import { Injectable, InternalServerErrorException, Logger, Scope } from '@nestjs/common'
+import { Injectable, InternalServerErrorException, Scope } from '@nestjs/common'
 import UnableToFetchResourceException from '../API/Exception/UnableToFetchResourceException'
 
 @Injectable({ scope: Scope.REQUEST })
 export default class CacheImageResourceOperation {
-	private readonly _logger = new Logger(CacheImageResourceOperation.name)
 	private readonly basePath = cwd()
 
 	constructor(
-		private readonly _httpService: HttpService,
 		private readonly validateCacheImageRequest: ValidateCacheImageRequestRule,
 		private readonly fetchResourceResponseJob: FetchResourceResponseJob,
 		private readonly webpImageManipulationJob: WebpImageManipulationJob,
@@ -157,12 +154,12 @@ export default class CacheImageResourceOperation {
 					}
 					else {
 						CorrelatedLogger.warn('Metadata file does not exist.', CacheImageResourceOperation.name)
-						return null
+						return new ResourceMetaData()
 					}
 				}
 				catch (error: unknown) {
 					CorrelatedLogger.error(`Failed to read or parse resource metadata: ${error}`, '', CacheImageResourceOperation.name)
-					return null
+					return new ResourceMetaData()
 				}
 			}
 			return this.metaData
@@ -259,7 +256,7 @@ export default class CacheImageResourceOperation {
 		const totalPixels = width * height
 
 		// Queue if dimensions are large (> 2MP) or if quality is high
-		return totalPixels > 2000000 || (resizeOptions.quality && resizeOptions.quality > 90)
+		return totalPixels > 2000000 || (resizeOptions.quality !== undefined && resizeOptions.quality > 90)
 	}
 
 	private async queueImageProcessing(): Promise<void> {
@@ -269,8 +266,8 @@ export default class CacheImageResourceOperation {
 
 		await this.jobQueueManager.addImageProcessingJob({
 			imageUrl: this.request.resourceTarget,
-			width: this.request.resizeOptions?.width,
-			height: this.request.resizeOptions?.height,
+			width: this.request.resizeOptions?.width ?? undefined,
+			height: this.request.resizeOptions?.height ?? undefined,
 			quality: this.request.resizeOptions?.quality,
 			format: this.request.resizeOptions?.format as 'webp' | 'jpeg' | 'png',
 			cacheKey: this.id,

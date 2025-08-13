@@ -1,5 +1,5 @@
 import type ResourceMetaData from '@microservice/DTO/ResourceMetaData'
-import type { Request, Response } from 'express'
+import type { Response } from 'express'
 import { Buffer } from 'node:buffer'
 import { open } from 'node:fs/promises'
 import * as process from 'node:process'
@@ -18,14 +18,12 @@ import {
 	InvalidRequestError,
 	ResourceStreamingError,
 } from '@microservice/Error/MediaStreamErrors'
-import GenerateResourceIdentityFromRequestJob from '@microservice/Job/GenerateResourceIdentityFromRequestJob'
 import { MetricsService } from '@microservice/Metrics/services/metrics.service'
 import CacheImageResourceOperation from '@microservice/Operation/CacheImageResourceOperation'
 import { AdaptiveRateLimitGuard } from '@microservice/RateLimit/guards/adaptive-rate-limit.guard'
 import { InputSanitizationService } from '@microservice/Validation/services/input-sanitization.service'
 import { SecurityCheckerService } from '@microservice/Validation/services/security-checker.service'
-import { HttpService } from '@nestjs/axios'
-import { Controller, Get, Logger, Param, Req, Res, Scope, UseGuards } from '@nestjs/common'
+import { Controller, Get, Logger, Param, Res, Scope, UseGuards } from '@nestjs/common'
 
 @Controller({
 	path: IMAGE,
@@ -37,8 +35,6 @@ export default class MediaStreamImageRESTController {
 	private readonly _logger = new Logger(MediaStreamImageRESTController.name)
 
 	constructor(
-		private readonly _httpService: HttpService,
-		private readonly generateResourceIdentityFromRequestJob: GenerateResourceIdentityFromRequestJob,
 		private readonly cacheImageResourceOperation: CacheImageResourceOperation,
 		private readonly inputSanitizationService: InputSanitizationService,
 		private readonly securityCheckerService: SecurityCheckerService,
@@ -140,7 +136,7 @@ export default class MediaStreamImageRESTController {
 			.header('Content-Length', size)
 			.header('Cache-Control', `max-age=${publicTTL / 1000}, public`)
 			.header('Expires', new Date(expiresAt).toUTCString())
-			.header('X-Correlation-ID', correlationId)
+			.header('X-Correlation-ID', correlationId || 'unknown')
 
 		if (format === 'svg') {
 			res.header('Content-Type', 'image/svg+xml')
@@ -190,7 +186,8 @@ export default class MediaStreamImageRESTController {
 				error,
 				context,
 			)
-			this.metricsService.recordError('image_request', error.constructor.name)
+			const errorName = error instanceof Error ? error.constructor.name : 'UnknownError'
+			this.metricsService.recordError('image_request', errorName)
 			await this.defaultImageFallback(request, res)
 		}
 		finally {
@@ -407,17 +404,18 @@ export default class MediaStreamImageRESTController {
 			)
 
 			// Add correlation ID to response headers
-			res.header('X-Correlation-ID', correlationId)
+			res.header('X-Correlation-ID', correlationId || 'unknown')
 			res.sendFile(optimizedDefaultImagePath)
 		}
-		catch (defaultImageError) {
+		catch (defaultImageError: unknown) {
+			const errorMessage = defaultImageError instanceof Error ? defaultImageError.message : String(defaultImageError)
 			const context = {
 				request,
 				resizeOptions: request.resizeOptions,
-				error: defaultImageError.message || defaultImageError,
+				error: errorMessage,
 				correlationId,
 			}
-			this._logger.error(`Failed to serve default image: ${defaultImageError.message || defaultImageError}`, defaultImageError, context)
+			this._logger.error(`Failed to serve default image: ${errorMessage}`, defaultImageError, context)
 			this.metricsService.recordError('default_image_fallback', 'fallback_error')
 			throw new DefaultImageFallbackError('Failed to process the image request', context)
 		}
@@ -433,15 +431,15 @@ export default class MediaStreamImageRESTController {
 	public async uploadedImage(
     @Param('imageType') imageType: string,
     @Param('image') image: string,
-    @Param('width') width: number = null,
-    @Param('height') height: number = null,
+    @Param('width') width: number | null = null,
+    @Param('height') height: number | null = null,
     @Param('fit') fit: FitOptions = FitOptions.contain,
     @Param('position') position = PositionOptions.entropy,
     @Param('background') background = BackgroundOptions.transparent,
     @Param('trimThreshold') trimThreshold = 5,
     @Param('format') format: SupportedResizeFormats = SupportedResizeFormats.webp,
     @Param('quality') quality = 100,
-    @Req() req: Request,
+
     @Res() res: Response,
 	): Promise<void> {
 		const correlationId = this._correlationService.getCorrelationId()
@@ -512,7 +510,8 @@ export default class MediaStreamImageRESTController {
 				error: (error as Error).message || error,
 			}
 			this._logger.error(`Error in uploadedImage: ${(error as Error).message || error}`, error, context)
-			this.metricsService.recordError('uploaded_image_request', error.constructor.name)
+			const errorName = error instanceof Error ? error.constructor.name : 'UnknownError'
+			this.metricsService.recordError('uploaded_image_request', errorName)
 			throw error
 		}
 		finally {
@@ -523,15 +522,15 @@ export default class MediaStreamImageRESTController {
 	@Get('static/images/:image/:width/:height/:fit/:position/:background/:trimThreshold/:format/:quality')
 	public async staticImage(
 		@Param('image') image: string,
-		@Param('width') width: number = null,
-		@Param('height') height: number = null,
+		@Param('width') width: number | null = null,
+		@Param('height') height: number | null = null,
 		@Param('fit') fit: FitOptions = FitOptions.contain,
 		@Param('position') position = PositionOptions.entropy,
 		@Param('background') background = BackgroundOptions.transparent,
 		@Param('trimThreshold') trimThreshold = 5,
 		@Param('format') format: SupportedResizeFormats = SupportedResizeFormats.webp,
 		@Param('quality') quality = 100,
-		@Req() req: Request,
+
 		@Res() res: Response,
 	): Promise<void> {
 		const correlationId = this._correlationService.getCorrelationId()
@@ -597,7 +596,8 @@ export default class MediaStreamImageRESTController {
 				error: (error as Error).message || error,
 			}
 			this._logger.error(`Error in staticImage: ${(error as Error).message || error}`, error, context)
-			this.metricsService.recordError('static_image_request', error.constructor.name)
+			const errorName = error instanceof Error ? error.constructor.name : 'UnknownError'
+			this.metricsService.recordError('static_image_request', errorName)
 			throw error
 		}
 		finally {

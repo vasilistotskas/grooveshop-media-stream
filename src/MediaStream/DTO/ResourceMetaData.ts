@@ -4,9 +4,9 @@ export const resourceMetaVersion = 1
 
 export default class ResourceMetaData {
 	version: number
-	size: string
-	format: string
-	dateCreated: number
+	size: string = ''
+	format: string = ''
+	dateCreated: number = Date.now()
 	privateTTL: number
 	publicTTL: number
 

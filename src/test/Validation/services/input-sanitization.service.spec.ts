@@ -1,6 +1,6 @@
+import { ConfigService } from '@microservice/Config/config.service'
+import { InputSanitizationService } from '@microservice/Validation/services/input-sanitization.service'
 import { Test, TestingModule } from '@nestjs/testing'
-import { ConfigService } from '../../../MediaStream/Config/config.service'
-import { InputSanitizationService } from '../../../MediaStream/Validation/services/input-sanitization.service'
 
 describe('inputSanitizationService', () => {
 	let service: InputSanitizationService

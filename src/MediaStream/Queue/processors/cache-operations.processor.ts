@@ -2,10 +2,10 @@ import { Buffer } from 'node:buffer'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import * as process from 'node:process'
+import { MultiLayerCacheManager } from '@microservice/Cache/services/multi-layer-cache.manager'
+import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
+import { HttpClientService } from '@microservice/HTTP/services/http-client.service'
 import { Injectable, Logger } from '@nestjs/common'
-import { MultiLayerCacheManager } from '../../Cache/services/multi-layer-cache.manager'
-import { CorrelationService } from '../../Correlation/services/correlation.service'
-import { HttpClientService } from '../../HTTP/services/http-client.service'
 import { Job } from '../interfaces/job-queue.interface'
 import { CacheCleanupJobData, CacheWarmingJobData, JobResult } from '../types/job.types'
 
@@ -21,115 +21,135 @@ export class CacheOperationsProcessor {
 
 	async processCacheWarming(job: Job<CacheWarmingJobData>): Promise<JobResult> {
 		const startTime = Date.now()
-		const { imageUrls, batchSize = 5 } = job.data
+		const { imageUrls, batchSize = 5, correlationId } = job.data
 
-		try {
-			// Note: Correlation ID is already set in the job data
+		return this._correlationService.runWithContext(
+			{
+				correlationId,
+				timestamp: Date.now(),
+				clientIp: 'queue-worker',
+				method: 'JOB',
+				url: `/queue/cache-warming/${job.id}`,
+				startTime: process.hrtime.bigint(),
+			},
+			async () => {
+				try {
+					this._logger.debug(`Starting cache warming job ${job.id} for ${imageUrls.length} images`)
 
-			this._logger.debug(`Starting cache warming job ${job.id} for ${imageUrls.length} images`)
+					let processed = 0
+					let successful = 0
+					let failed = 0
 
-			let processed = 0
-			let successful = 0
-			let failed = 0
+					// Process images in batches
+					for (let i = 0; i < imageUrls.length; i += batchSize) {
+						const batch = imageUrls.slice(i, i + batchSize)
 
-			// Process images in batches
-			for (let i = 0; i < imageUrls.length; i += batchSize) {
-				const batch = imageUrls.slice(i, i + batchSize)
+						const batchPromises = batch.map(async (url) => {
+							try {
+								await this.warmCacheForImage(url)
+								successful++
+								return true
+							}
+							catch (error: unknown) {
+								this._logger.warn(`Failed to warm cache for ${url}:`, error)
+								failed++
+								return false
+							}
+						})
 
-				const batchPromises = batch.map(async (url) => {
-					try {
-						await this.warmCacheForImage(url)
-						successful++
-						return true
+						await Promise.allSettled(batchPromises)
+						processed += batch.length
+
+						// Update progress
+						const progress = Math.round((processed / imageUrls.length) * 100)
+						this._logger.debug(`Cache warming progress: ${progress}% (${processed}/${imageUrls.length})`)
 					}
-					catch (error: unknown) {
-						this._logger.warn(`Failed to warm cache for ${url}:`, error)
-						failed++
-						return false
+
+					const processingTime = Date.now() - startTime
+					this._logger.log(`Cache warming completed: ${successful} successful, ${failed} failed in ${processingTime}ms`)
+
+					return {
+						success: true,
+						data: { successful, failed, total: imageUrls.length },
+						processingTime,
 					}
-				})
+				}
+				catch (error: unknown) {
+					const processingTime = Date.now() - startTime
+					this._logger.error(`Cache warming job ${job.id} failed:`, error)
 
-				await Promise.allSettled(batchPromises)
-				processed += batch.length
-
-				// Update progress
-				const progress = Math.round((processed / imageUrls.length) * 100)
-				this._logger.debug(`Cache warming progress: ${progress}% (${processed}/${imageUrls.length})`)
-			}
-
-			const processingTime = Date.now() - startTime
-			this._logger.log(`Cache warming completed: ${successful} successful, ${failed} failed in ${processingTime}ms`)
-
-			return {
-				success: true,
-				data: { successful, failed, total: imageUrls.length },
-				processingTime,
-			}
-		}
-		catch (error: unknown) {
-			const processingTime = Date.now() - startTime
-			this._logger.error(`Cache warming job ${job.id} failed:`, error)
-
-			return {
-				success: false,
-				error: (error as Error).message,
-				processingTime,
-			}
-		}
+					return {
+						success: false,
+						error: (error as Error).message,
+						processingTime,
+					}
+				}
+			},
+		)
 	}
 
 	async processCacheCleanup(job: Job<CacheCleanupJobData>): Promise<JobResult> {
 		const startTime = Date.now()
-		const { maxAge, maxSize } = job.data
+		const { maxAge, maxSize, correlationId } = job.data
 
-		try {
-			// Note: Correlation ID is already set in the job data
+		return this._correlationService.runWithContext(
+			{
+				correlationId,
+				timestamp: Date.now(),
+				clientIp: 'queue-worker',
+				method: 'JOB',
+				url: `/queue/cache-cleanup/${job.id}`,
+				startTime: process.hrtime.bigint(),
+			},
+			async () => {
+				try {
+					this._logger.debug(`Starting cache cleanup job ${job.id}`)
 
-			this._logger.debug(`Starting cache cleanup job ${job.id}`)
+					const cleanupResults = await Promise.allSettled([
+						this.cleanupMemoryCache(),
+						this.cleanupFileCache(maxAge, maxSize),
+					])
 
-			const cleanupResults = await Promise.allSettled([
-				this.cleanupMemoryCache(),
-				this.cleanupFileCache(maxAge, maxSize),
-			])
+					let totalCleaned = 0
+					const errors: string[] = []
 
-			let totalCleaned = 0
-			const errors: string[] = []
+					cleanupResults.forEach((result, index) => {
+						if (result.status === 'fulfilled') {
+							totalCleaned += result.value.cleaned
+						}
+						else {
+							const operation = index === 0 ? 'memory cache' : 'file cache'
+							errors.push(`${operation}: ${result.reason.message}`)
+						}
+					})
 
-			cleanupResults.forEach((result, index) => {
-				if (result.status === 'fulfilled') {
-					totalCleaned += result.value.cleaned
+					const processingTime = Date.now() - startTime
+
+					if (errors.length > 0) {
+						this._logger.warn(`Cache cleanup completed with errors: ${errors.join(', ')}`)
+					}
+					else {
+						this._logger.log(`Cache cleanup completed: ${totalCleaned} items cleaned in ${processingTime}ms`)
+					}
+
+					return {
+						success: errors.length === 0,
+						data: { cleaned: totalCleaned, errors },
+						processingTime,
+					}
 				}
-				else {
-					const operation = index === 0 ? 'memory cache' : 'file cache'
-					errors.push(`${operation}: ${result.reason.message}`)
+				catch (error: unknown) {
+					const processingTime = Date.now() - startTime
+					this._logger.error(`Cache cleanup job ${job.id} failed:`, error)
+
+					return {
+						success: false,
+						error: (error as Error).message,
+						processingTime,
+					}
 				}
-			})
-
-			const processingTime = Date.now() - startTime
-
-			if (errors.length > 0) {
-				this._logger.warn(`Cache cleanup completed with errors: ${errors.join(', ')}`)
-			}
-			else {
-				this._logger.log(`Cache cleanup completed: ${totalCleaned} items cleaned in ${processingTime}ms`)
-			}
-
-			return {
-				success: errors.length === 0,
-				data: { cleaned: totalCleaned, errors },
-				processingTime,
-			}
-		}
-		catch (error: unknown) {
-			const processingTime = Date.now() - startTime
-			this._logger.error(`Cache cleanup job ${job.id} failed:`, error)
-
-			return {
-				success: false,
-				error: (error as Error).message,
-				processingTime,
-			}
-		}
+			},
+		)
 	}
 
 	private async warmCacheForImage(imageUrl: string): Promise<void> {

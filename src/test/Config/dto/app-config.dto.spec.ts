@@ -121,8 +121,8 @@ describe('appConfigDto', () => {
 
 			const externalServicesError = errors.find(error => error.property === 'externalServices')
 			expect(externalServicesError).toBeDefined()
-			expect(externalServicesError.children).toBeDefined()
-			expect(externalServicesError.children.length).toBeGreaterThan(0)
+			expect(externalServicesError?.children).toBeDefined()
+			expect(externalServicesError?.children?.length).toBeGreaterThan(0)
 		})
 	})
 

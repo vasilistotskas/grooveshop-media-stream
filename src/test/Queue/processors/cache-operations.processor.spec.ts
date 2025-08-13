@@ -1,14 +1,14 @@
 import { Buffer } from 'node:buffer'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
+import { MultiLayerCacheManager } from '@microservice/Cache/services/multi-layer-cache.manager'
+import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
+import { HttpClientService } from '@microservice/HTTP/services/http-client.service'
+import { Job } from '@microservice/Queue/interfaces/job-queue.interface'
+import { CacheOperationsProcessor } from '@microservice/Queue/processors/cache-operations.processor'
+import { CacheCleanupJobData, CacheWarmingJobData, JobPriority } from '@microservice/Queue/types/job.types'
 import { Logger } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
-import { MultiLayerCacheManager } from '../../../MediaStream/Cache/services/multi-layer-cache.manager'
-import { CorrelationService } from '../../../MediaStream/Correlation/services/correlation.service'
-import { HttpClientService } from '../../../MediaStream/HTTP/services/http-client.service'
-import { Job } from '../../../MediaStream/Queue/interfaces/job-queue.interface'
-import { CacheOperationsProcessor } from '../../../MediaStream/Queue/processors/cache-operations.processor'
-import { CacheCleanupJobData, CacheWarmingJobData, JobPriority } from '../../../MediaStream/Queue/types/job.types'
 
 // Mock fs module
 jest.mock('node:fs/promises')
@@ -64,6 +64,7 @@ describe('cacheOperationsProcessor', () => {
 		const mockCorrelationServiceFactory = {
 			getCorrelationId: jest.fn(),
 			setCorrelationId: jest.fn(),
+			runWithContext: jest.fn((context, fn) => fn()),
 		}
 
 		const mockHttpClientFactory = {

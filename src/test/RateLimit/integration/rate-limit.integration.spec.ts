@@ -72,7 +72,7 @@ describe('rate Limiting Integration', () => {
 				'rateLimit.healthCheck.max': 100,
 				'monitoring.enabled': false, // Disable monitoring in tests
 			}
-			return configs[key] || defaultValue
+			return (configs as any)[key] || defaultValue
 		})
 
 		await app.init()

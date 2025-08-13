@@ -1,5 +1,5 @@
+import { ConfigService } from '@microservice/Config/config.service'
 import { Injectable, Logger } from '@nestjs/common'
-import { ConfigService } from '../../../MediaStream/Config/config.service'
 import { ISecurityChecker, SecurityEvent } from '../interfaces/validator.interface'
 
 @Injectable()
@@ -241,7 +241,7 @@ export class SecurityCheckerService implements ISecurityChecker {
 
 		for (const event of this.securityEvents) {
 			eventsByType[event.type] = (eventsByType[event.type] || 0) + 1
-			if (event.timestamp > oneHourAgo) {
+			if (event.timestamp && event.timestamp > oneHourAgo) {
 				recentEvents++
 			}
 		}

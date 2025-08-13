@@ -8,8 +8,6 @@ import { Observable, of, throwError } from 'rxjs'
 describe('httpClientService', () => {
 	let service: HttpClientService
 	let httpService: HttpService
-	// eslint-disable-next-line unused-imports/no-unused-vars
-	let configService: ConfigService
 
 	const mockConfigService = {
 		getOptional: jest.fn(),
@@ -19,7 +17,7 @@ describe('httpClientService', () => {
 		jest.clearAllMocks()
 
 		// Setup default config values
-		mockConfigService.getOptional.mockImplementation((key: string, defaultValue: any) => {
+		mockConfigService.getOptional.mockImplementation((_key: string, defaultValue: any) => {
 			return defaultValue
 		})
 
@@ -36,7 +34,6 @@ describe('httpClientService', () => {
 
 		service = module.get<HttpClientService>(HttpClientService)
 		httpService = module.get<HttpService>(HttpService)
-		configService = module.get<ConfigService>(ConfigService)
 	})
 
 	describe('initialization', () => {

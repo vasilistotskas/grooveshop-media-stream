@@ -1,6 +1,6 @@
+import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { CorrelationService } from '../../Correlation/services/correlation.service'
 import { MonitoringConfig, PerformanceMetrics } from '../interfaces/monitoring.interface'
 import { MonitoringService } from './monitoring.service'
 
@@ -115,7 +115,8 @@ export class PerformanceMonitoringService {
 			return result
 		}
 		catch (error: unknown) {
-			this.endOperation(operationId, false, (error as Error).message || error.toString())
+			const errorMessage = error instanceof Error ? error.message : String(error)
+			this.endOperation(operationId, false, errorMessage)
 			throw error
 		}
 	}
@@ -135,7 +136,8 @@ export class PerformanceMonitoringService {
 			return result
 		}
 		catch (error: unknown) {
-			this.endOperation(operationId, false, (error as Error).message || error.toString())
+			const errorMessage = error instanceof Error ? error.message : String(error)
+			this.endOperation(operationId, false, errorMessage)
 			throw error
 		}
 	}

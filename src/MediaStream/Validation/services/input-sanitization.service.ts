@@ -1,5 +1,5 @@
+import { ConfigService } from '@microservice/Config/config.service'
 import { Injectable, Logger } from '@nestjs/common'
-import { ConfigService } from '../../../MediaStream/Config/config.service'
 import { ISanitizer } from '../interfaces/validator.interface'
 
 @Injectable()
@@ -194,7 +194,7 @@ export class InputSanitizationService implements ISanitizer<any> {
 			svg: 1024 * 1024, // 1MB
 		})
 
-		const maxSize = format ? maxSizes[format.toLowerCase()] || maxSizes.default : maxSizes.default
+		const maxSize = format ? (maxSizes as any)[format.toLowerCase()] || maxSizes.default : maxSizes.default
 		return sizeBytes > 0 && sizeBytes <= maxSize
 	}
 

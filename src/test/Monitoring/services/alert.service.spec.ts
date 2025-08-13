@@ -1,19 +1,17 @@
-import { ConfigService } from '@nestjs/config'
-import { Test, TestingModule } from '@nestjs/testing'
-import { CorrelationService } from '../../../MediaStream/Correlation/services/correlation.service'
+import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
 import {
 	AlertCondition,
 	AlertRule,
 	AlertSeverity,
-} from '../../../MediaStream/Monitoring/interfaces/monitoring.interface'
-import { AlertService } from '../../../MediaStream/Monitoring/services/alert.service'
-import { MonitoringService } from '../../../MediaStream/Monitoring/services/monitoring.service'
+} from '@microservice/Monitoring/interfaces/monitoring.interface'
+import { AlertService } from '@microservice/Monitoring/services/alert.service'
+import { MonitoringService } from '@microservice/Monitoring/services/monitoring.service'
+import { ConfigService } from '@nestjs/config'
+import { Test, TestingModule } from '@nestjs/testing'
 
 describe('alertService', () => {
 	let service: AlertService
 	let monitoringService: jest.Mocked<MonitoringService>
-	let _configService: jest.Mocked<ConfigService>
-	let _correlationService: jest.Mocked<CorrelationService>
 
 	const mockAlertRule: AlertRule = {
 		id: 'test-rule',
@@ -68,8 +66,6 @@ describe('alertService', () => {
 		}).compile()
 
 		service = module.get<AlertService>(AlertService)
-		_configService = module.get(ConfigService)
-		_correlationService = module.get(CorrelationService)
 		monitoringService = module.get(MonitoringService)
 
 		// Clear any default rules for clean testing

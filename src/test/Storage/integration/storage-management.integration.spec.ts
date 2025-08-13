@@ -34,7 +34,6 @@ describe('storage Management Integration', () => {
 	let storageCleanup: StorageCleanupService
 	let storageOptimization: StorageOptimizationService
 	let storageHealth: StorageHealthIndicator
-	let _configService: ConfigService
 
 	const testStorageDir = '/test/storage'
 	const mockFiles = [
@@ -81,7 +80,7 @@ describe('storage Management Integration', () => {
 					'storage.optimization.compressionRatio': 0.7,
 					'storage.optimization.createBackups': true,
 				}
-				return defaults[key] || defaultValue
+				return (defaults as any)[key] || defaultValue
 			}),
 		}
 
@@ -97,7 +96,6 @@ describe('storage Management Integration', () => {
 		storageCleanup = module.get<StorageCleanupService>(StorageCleanupService)
 		storageOptimization = module.get<StorageOptimizationService>(StorageOptimizationService)
 		storageHealth = module.get<StorageHealthIndicator>(StorageHealthIndicator)
-		_configService = module.get<ConfigService>(ConfigService)
 
 		// Setup fs mocks
 		mockFs.mkdir.mockResolvedValue(undefined)

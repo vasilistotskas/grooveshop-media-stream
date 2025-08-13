@@ -102,18 +102,18 @@ export class ResizeOptions {
 
 		Object.assign(this, rest);
 
-		['width', 'height'].forEach((sizeOption: string) => {
+		(['width', 'height'] as const).forEach((sizeOption) => {
 			if (data && data[sizeOption] === null) {
-				delete this[sizeOption]
+				delete (this as any)[sizeOption]
 			}
 		})
 	}
 }
 
 export default class CacheImageRequest {
-	resourceTarget: string
+	resourceTarget: string = ''
 	ttl?: number
-	resizeOptions: ResizeOptions
+	resizeOptions: ResizeOptions = new ResizeOptions()
 
 	constructor(data?: Partial<CacheImageRequest>) {
 		Object.assign(this, data)

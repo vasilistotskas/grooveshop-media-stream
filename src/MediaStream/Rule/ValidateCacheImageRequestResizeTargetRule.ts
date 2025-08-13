@@ -16,6 +16,12 @@ export default class ValidateCacheImageRequestResizeTargetRule {
 	public async apply(): Promise<void> {
 		const { width, height } = this.request.resizeOptions
 
+		// Handle null width/height values
+		if (width === null || height === null) {
+			// If either dimension is null, no resize is requested, so no validation needed
+			return
+		}
+
 		const pixelCount = width * height
 
 		if (pixelCount > this.allowedPixelCount) {

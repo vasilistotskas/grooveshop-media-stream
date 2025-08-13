@@ -1,5 +1,5 @@
+import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
-import { CorrelationService } from '../../Correlation/services/correlation.service'
 import { Job, JobOptions } from '../interfaces/job-queue.interface'
 import { CacheOperationsProcessor } from '../processors/cache-operations.processor'
 import { ImageProcessingProcessor } from '../processors/image-processing.processor'
@@ -39,7 +39,7 @@ export class JobQueueManager implements OnModuleInit {
 		data: Omit<ImageProcessingJobData, 'correlationId'>,
 		options: Partial<JobOptions> = {},
 	): Promise<Job<ImageProcessingJobData>> {
-		const correlationId = this._correlationService.getCorrelationId()
+		const correlationId = this._correlationService.getCorrelationId() || this._correlationService.generateCorrelationId()
 
 		const jobData: ImageProcessingJobData = {
 			...data,
@@ -66,7 +66,7 @@ export class JobQueueManager implements OnModuleInit {
 		data: Omit<CacheWarmingJobData, 'correlationId'>,
 		options: Partial<JobOptions> = {},
 	): Promise<Job<CacheWarmingJobData>> {
-		const correlationId = this._correlationService.getCorrelationId()
+		const correlationId = this._correlationService.getCorrelationId() || this._correlationService.generateCorrelationId()
 
 		const jobData: CacheWarmingJobData = {
 			...data,
@@ -93,7 +93,7 @@ export class JobQueueManager implements OnModuleInit {
 		data: Omit<CacheCleanupJobData, 'correlationId'>,
 		options: Partial<JobOptions> = {},
 	): Promise<Job<CacheCleanupJobData>> {
-		const correlationId = this._correlationService.getCorrelationId()
+		const correlationId = this._correlationService.getCorrelationId() || this._correlationService.generateCorrelationId()
 
 		const jobData: CacheCleanupJobData = {
 			...data,

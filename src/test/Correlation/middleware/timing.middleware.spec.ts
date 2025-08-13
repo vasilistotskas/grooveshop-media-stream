@@ -27,7 +27,7 @@ describe('timingMiddleware', () => {
 			setHeader: jest.fn(),
 			statusCode: 200,
 			headersSent: false,
-			end: jest.fn().mockImplementation(function (chunk?: any, encoding?: any, cb?: any) {
+			end: jest.fn().mockImplementation(function (this: any, chunk?: any, encoding?: any, cb?: any) {
 				if (typeof chunk === 'function')
 					cb = chunk
 				if (typeof encoding === 'function')

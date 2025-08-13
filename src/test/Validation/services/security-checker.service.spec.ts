@@ -1,6 +1,6 @@
+import { ConfigService } from '@microservice/Config/config.service'
+import { SecurityCheckerService } from '@microservice/Validation/services/security-checker.service'
 import { Test, TestingModule } from '@nestjs/testing'
-import { ConfigService } from '../../../MediaStream/Config/config.service'
-import { SecurityCheckerService } from '../../../MediaStream/Validation/services/security-checker.service'
 
 describe('securityCheckerService', () => {
 	let service: SecurityCheckerService

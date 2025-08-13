@@ -1,8 +1,8 @@
+import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
+import { MetricType } from '@microservice/Monitoring/interfaces/monitoring.interface'
+import { MonitoringService } from '@microservice/Monitoring/services/monitoring.service'
 import { ConfigService } from '@nestjs/config'
 import { Test, TestingModule } from '@nestjs/testing'
-import { CorrelationService } from '../../../MediaStream/Correlation/services/correlation.service'
-import { MetricType } from '../../../MediaStream/Monitoring/interfaces/monitoring.interface'
-import { MonitoringService } from '../../../MediaStream/Monitoring/services/monitoring.service'
 
 describe('monitoringService', () => {
 	let service: MonitoringService

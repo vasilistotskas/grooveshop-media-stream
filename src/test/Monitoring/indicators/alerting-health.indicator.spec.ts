@@ -1,8 +1,8 @@
+import { AlertingHealthIndicator } from '@microservice/Monitoring/indicators/alerting-health.indicator'
+import { Alert, AlertSeverity } from '@microservice/Monitoring/interfaces/monitoring.interface'
+import { AlertService } from '@microservice/Monitoring/services/alert.service'
 import { HealthIndicatorService } from '@nestjs/terminus'
 import { Test, TestingModule } from '@nestjs/testing'
-import { AlertingHealthIndicator } from '../../../MediaStream/Monitoring/indicators/alerting-health.indicator'
-import { Alert, AlertSeverity } from '../../../MediaStream/Monitoring/interfaces/monitoring.interface'
-import { AlertService } from '../../../MediaStream/Monitoring/services/alert.service'
 
 describe('alertingHealthIndicator', () => {
 	let indicator: AlertingHealthIndicator

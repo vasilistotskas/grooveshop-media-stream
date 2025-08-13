@@ -1,8 +1,8 @@
+import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
+import { MonitoringService } from '@microservice/Monitoring/services/monitoring.service'
+import { PerformanceMonitoringService } from '@microservice/Monitoring/services/performance-monitoring.service'
 import { ConfigService } from '@nestjs/config'
 import { Test, TestingModule } from '@nestjs/testing'
-import { CorrelationService } from '../../../MediaStream/Correlation/services/correlation.service'
-import { MonitoringService } from '../../../MediaStream/Monitoring/services/monitoring.service'
-import { PerformanceMonitoringService } from '../../../MediaStream/Monitoring/services/performance-monitoring.service'
 
 describe('performanceMonitoringService', () => {
 	let service: PerformanceMonitoringService
@@ -257,8 +257,9 @@ describe('performanceMonitoringService', () => {
 					throw new Error('Test error')
 				})
 			}
-			catch (e) {
-				console.error(`Error tracking operation: ${e.message}, ${e}`)
+			catch (e: unknown) {
+				const error = e as Error
+				console.error(`Error tracking operation: ${error.message}, ${error}`)
 			}
 		})
 

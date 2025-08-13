@@ -1,16 +1,16 @@
-import { ConfigModule } from '@nestjs/config'
-import { Test, TestingModule } from '@nestjs/testing'
-import { CorrelationModule } from '../../../MediaStream/Correlation/correlation.module'
-import { MetricsModule } from '../../../MediaStream/Metrics/metrics.module'
-import { MonitoringController } from '../../../MediaStream/Monitoring/controllers/monitoring.controller'
+import { CorrelationModule } from '@microservice/Correlation/correlation.module'
+import { MetricsModule } from '@microservice/Metrics/metrics.module'
+import { MonitoringController } from '@microservice/Monitoring/controllers/monitoring.controller'
 import {
 	AlertCondition,
 	AlertSeverity,
-} from '../../../MediaStream/Monitoring/interfaces/monitoring.interface'
-import { MonitoringModule } from '../../../MediaStream/Monitoring/monitoring.module'
-import { AlertService } from '../../../MediaStream/Monitoring/services/alert.service'
-import { MonitoringService } from '../../../MediaStream/Monitoring/services/monitoring.service'
-import { PerformanceMonitoringService } from '../../../MediaStream/Monitoring/services/performance-monitoring.service'
+} from '@microservice/Monitoring/interfaces/monitoring.interface'
+import { MonitoringModule } from '@microservice/Monitoring/monitoring.module'
+import { AlertService } from '@microservice/Monitoring/services/alert.service'
+import { MonitoringService } from '@microservice/Monitoring/services/monitoring.service'
+import { PerformanceMonitoringService } from '@microservice/Monitoring/services/performance-monitoring.service'
+import { ConfigModule } from '@nestjs/config'
+import { Test, TestingModule } from '@nestjs/testing'
 
 describe('monitoring Integration', () => {
 	let app: TestingModule
@@ -113,8 +113,8 @@ describe('monitoring Integration', () => {
 					throw new Error('Processing failed')
 				})
 			}
-			catch (error) {
-				expect(error.message).toBe('Processing failed')
+			catch (error: unknown) {
+				expect((error as Error).message).toBe('Processing failed')
 			}
 
 			// 3. Get performance statistics

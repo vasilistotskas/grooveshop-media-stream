@@ -22,7 +22,7 @@ describe('Bootstrap', () => {
 			enableCors: jest.fn().mockReturnThis(),
 			listen: jest.fn().mockImplementation(() => Promise.resolve()),
 			get: jest.fn().mockReturnValue({
-				get: jest.fn().mockImplementation((key: string) => {
+				get: jest.fn().mockImplementation((key: any) => {
 					if (key === 'server') {
 						return {
 							port: Number.parseInt(process.env.PORT || '3003'),

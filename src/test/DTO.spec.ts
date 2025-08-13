@@ -69,9 +69,9 @@ describe('cacheImageRequest', () => {
 	it('should set default values for CacheImageRequest', () => {
 		const cacheImageRequest = new CacheImageRequest()
 
-		expect(cacheImageRequest.resourceTarget).toBeUndefined()
+		expect(cacheImageRequest.resourceTarget).toBe('')
 		expect(cacheImageRequest.ttl).toBeUndefined()
-		expect(cacheImageRequest.resizeOptions).toBeUndefined()
+		expect(cacheImageRequest.resizeOptions).toBeDefined()
 	})
 
 	it('should accept custom values', () => {
@@ -98,15 +98,15 @@ describe('cacheImageRequest', () => {
 
 		expect(cacheImageRequest.resourceTarget).toBe('http://example.com/image.jpg')
 		expect(cacheImageRequest.ttl).toBeUndefined()
-		expect(cacheImageRequest.resizeOptions).toBeUndefined()
+		expect(cacheImageRequest.resizeOptions).toBeDefined()
 	})
 })
 
 describe('manipulationJobResult', () => {
 	it('should create an instance with default values', () => {
 		const result = new ManipulationJobResult()
-		expect(result.size).toBeUndefined()
-		expect(result.format).toBeUndefined()
+		expect(result.size).toBe('')
+		expect(result.format).toBe('')
 	})
 
 	it('should create an instance with provided data', () => {
@@ -120,7 +120,7 @@ describe('manipulationJobResult', () => {
 		const data = { size: '2048' }
 		const result = new ManipulationJobResult(data)
 		expect(result.size).toBe('2048')
-		expect(result.format).toBeUndefined()
+		expect(result.format).toBe('')
 	})
 })
 
@@ -131,9 +131,9 @@ describe('resourceMetaData', () => {
 		expect(metaData.version).toBe(resourceMetaVersion)
 		expect(metaData.publicTTL).toBe(defaultPublicTTL)
 		expect(metaData.privateTTL).toBe(defaultPrivateTTL)
-		expect(metaData.size).toBeUndefined()
-		expect(metaData.format).toBeUndefined()
-		expect(metaData.dateCreated).toBeUndefined()
+		expect(metaData.size).toBe('')
+		expect(metaData.format).toBe('')
+		expect(metaData.dateCreated).toBeDefined()
 	})
 
 	it('should create an instance with provided data', () => {
@@ -165,6 +165,6 @@ describe('resourceMetaData', () => {
 		expect(metaData.version).toBe(resourceMetaVersion)
 		expect(metaData.publicTTL).toBe(defaultPublicTTL)
 		expect(metaData.privateTTL).toBe(defaultPrivateTTL)
-		expect(metaData.dateCreated).toBeUndefined()
+		expect(metaData.dateCreated).toBeDefined()
 	})
 })

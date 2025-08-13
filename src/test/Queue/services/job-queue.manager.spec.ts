@@ -1,12 +1,12 @@
+import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
+import { JobOptions } from '@microservice/Queue/interfaces/job-queue.interface'
+import { CacheOperationsProcessor } from '@microservice/Queue/processors/cache-operations.processor'
+import { ImageProcessingProcessor } from '@microservice/Queue/processors/image-processing.processor'
+import { BullQueueService } from '@microservice/Queue/services/bull-queue.service'
+import { JobQueueManager } from '@microservice/Queue/services/job-queue.manager'
+import { JobPriority, JobType } from '@microservice/Queue/types/job.types'
 import { Logger } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
-import { CorrelationService } from '../../../MediaStream/Correlation/services/correlation.service'
-import { JobOptions } from '../../../MediaStream/Queue/interfaces/job-queue.interface'
-import { CacheOperationsProcessor } from '../../../MediaStream/Queue/processors/cache-operations.processor'
-import { ImageProcessingProcessor } from '../../../MediaStream/Queue/processors/image-processing.processor'
-import { BullQueueService } from '../../../MediaStream/Queue/services/bull-queue.service'
-import { JobQueueManager } from '../../../MediaStream/Queue/services/job-queue.manager'
-import { JobPriority, JobType } from '../../../MediaStream/Queue/types/job.types'
 
 describe('jobQueueManager', () => {
 	let manager: JobQueueManager

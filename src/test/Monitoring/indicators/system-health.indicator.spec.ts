@@ -1,7 +1,7 @@
+import { SystemHealthIndicator } from '@microservice/Monitoring/indicators/system-health.indicator'
+import { SystemHealth } from '@microservice/Monitoring/interfaces/monitoring.interface'
+import { MonitoringService } from '@microservice/Monitoring/services/monitoring.service'
 import { Test, TestingModule } from '@nestjs/testing'
-import { SystemHealthIndicator } from '../../../MediaStream/Monitoring/indicators/system-health.indicator'
-import { SystemHealth } from '../../../MediaStream/Monitoring/interfaces/monitoring.interface'
-import { MonitoringService } from '../../../MediaStream/Monitoring/services/monitoring.service'
 
 describe('systemHealthIndicator', () => {
 	let indicator: SystemHealthIndicator

@@ -6,7 +6,7 @@ import { MemoryCacheService } from '@microservice/Cache/services/memory-cache.se
 import { ConfigService } from '@microservice/Config/config.service'
 import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
 import { MetricsService } from '@microservice/Metrics/services/metrics.service'
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
+import { Injectable, OnModuleInit } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 
 interface CacheWarmingConfig {
@@ -26,7 +26,6 @@ interface FileAccessInfo {
 
 @Injectable()
 export class CacheWarmingService implements OnModuleInit {
-	private readonly _logger = new Logger(CacheWarmingService.name)
 	private readonly config: CacheWarmingConfig
 	private readonly storagePath: string
 

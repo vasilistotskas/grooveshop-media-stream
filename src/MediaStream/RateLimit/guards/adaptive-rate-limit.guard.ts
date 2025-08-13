@@ -1,3 +1,4 @@
+import * as process from 'node:process'
 import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common'
 import { ThrottlerException } from '@nestjs/throttler'
 import { RateLimitMetricsService } from '../services/rate-limit-metrics.service'
@@ -13,6 +14,11 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 	) {}
 
 	async canActivate(context: ExecutionContext): Promise<boolean> {
+		if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'dev') {
+			this._logger.debug('Skipping rate limiting in development mode')
+			return true
+		}
+
 		const request = context.switchToHttp().getRequest()
 		const response = context.switchToHttp().getResponse()
 

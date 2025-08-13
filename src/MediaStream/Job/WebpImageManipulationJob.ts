@@ -34,9 +34,10 @@ export default class WebpImageManipulationJob {
 
 		const resizeScales: Record<string, number> = {};
 
-		['width', 'height'].forEach((scale: string) => {
-			if (options[scale] !== null && !Number.isNaN(options[scale])) {
-				resizeScales[scale] = Number(options[scale])
+		(['width', 'height'] as const).forEach((scale) => {
+			const value = options[scale]
+			if (value !== null && !Number.isNaN(value)) {
+				resizeScales[scale] = Number(value)
 			}
 		})
 

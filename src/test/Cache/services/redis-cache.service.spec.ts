@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { RedisCacheService } from '@microservice/Cache/services/redis-cache.service'
 import { ConfigService } from '@microservice/Config/config.service'
 import { MetricsService } from '@microservice/Metrics/services/metrics.service'
@@ -9,8 +10,6 @@ jest.mock('ioredis')
 
 describe('redisCacheService', () => {
 	let service: RedisCacheService
-	// eslint-disable-next-line unused-imports/no-unused-vars
-	let configService: jest.Mocked<ConfigService>
 	let metricsService: jest.Mocked<MetricsService>
 	let mockRedis: jest.Mocked<Redis>
 
@@ -72,7 +71,6 @@ describe('redisCacheService', () => {
 		}).compile()
 
 		service = module.get<RedisCacheService>(RedisCacheService)
-		configService = module.get(ConfigService)
 		metricsService = module.get(MetricsService)
 	})
 
@@ -332,7 +330,8 @@ describe('redisCacheService', () => {
 
 		describe('getStats', () => {
 			it('should return cache statistics', async () => {
-				mockRedis.info.mockImplementation((section: string) => {
+				mockRedis.info.mockImplementation((...args: (string | Buffer)[]) => {
+					const section = args[0] as string
 					if (section === 'keyspace')
 						return Promise.resolve('db0:keys=100,expires=50')
 					if (section === 'memory')

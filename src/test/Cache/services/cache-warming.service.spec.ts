@@ -71,7 +71,7 @@ describe('cacheWarmingService', () => {
 					popularImageThreshold: 5,
 				},
 			}
-			return config[key]
+			return (config as any)[key]
 		})
 
 		// Setup default mocks

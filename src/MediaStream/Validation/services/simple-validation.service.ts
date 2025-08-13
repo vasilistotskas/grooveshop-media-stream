@@ -1,7 +1,6 @@
+import CacheImageRequest from '@microservice/API/DTO/CacheImageRequest'
+
 import { Injectable, Logger } from '@nestjs/common'
-import CacheImageRequest from '../../API/DTO/CacheImageRequest'
-import { ConfigService } from '../../Config/config.service'
-import { CorrelationService } from '../../Correlation/services/correlation.service'
 import { InputSanitizationService } from './input-sanitization.service'
 import { SecurityCheckerService } from './security-checker.service'
 
@@ -16,8 +15,6 @@ export class SimpleValidationService {
 	private readonly _logger = new Logger(SimpleValidationService.name)
 
 	constructor(
-		private readonly _configService: ConfigService,
-		private readonly _correlationService: CorrelationService,
 		private readonly sanitizationService: InputSanitizationService,
 		private readonly securityChecker: SecurityCheckerService,
 	) {}

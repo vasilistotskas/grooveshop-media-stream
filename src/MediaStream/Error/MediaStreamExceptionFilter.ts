@@ -1,7 +1,7 @@
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
 import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
 import { MediaStreamError } from '@microservice/Error/MediaStreamErrors'
-import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common'
+import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
 import { Request, Response } from 'express'
 
@@ -11,8 +11,6 @@ import { Request, Response } from 'express'
  */
 @Catch()
 export class MediaStreamExceptionFilter implements ExceptionFilter {
-	private readonly _logger = new Logger(MediaStreamExceptionFilter.name)
-
 	constructor(
 		private readonly httpAdapterHost: HttpAdapterHost,
 		private readonly _correlationService: CorrelationService,

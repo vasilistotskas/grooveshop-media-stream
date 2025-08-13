@@ -1,11 +1,11 @@
+import CacheImageRequest, { ResizeOptions, SupportedResizeFormats } from '@microservice/API/DTO/CacheImageRequest'
+import { ConfigModule } from '@microservice/Config/config.module'
+import { CorrelationModule } from '@microservice/Correlation/correlation.module'
+import { InputSanitizationService } from '@microservice/Validation/services/input-sanitization.service'
+import { SecurityCheckerService } from '@microservice/Validation/services/security-checker.service'
+import { SimpleValidationService } from '@microservice/Validation/services/simple-validation.service'
+import { ValidationModule } from '@microservice/Validation/validation.module'
 import { Test, TestingModule } from '@nestjs/testing'
-import CacheImageRequest, { ResizeOptions, SupportedResizeFormats } from '../../../MediaStream/API/DTO/CacheImageRequest'
-import { ConfigModule } from '../../../MediaStream/Config/config.module'
-import { CorrelationModule } from '../../../MediaStream/Correlation/correlation.module'
-import { InputSanitizationService } from '../../../MediaStream/Validation/services/input-sanitization.service'
-import { SecurityCheckerService } from '../../../MediaStream/Validation/services/security-checker.service'
-import { SimpleValidationService } from '../../../MediaStream/Validation/services/simple-validation.service'
-import { ValidationModule } from '../../../MediaStream/Validation/validation.module'
 
 describe('validation Integration', () => {
 	let module: TestingModule

@@ -6,10 +6,6 @@ import { AxiosResponse } from 'axios'
 
 describe('httpHealthIndicator', () => {
 	let indicator: HttpHealthIndicator
-	// eslint-disable-next-line unused-imports/no-unused-vars
-	let httpClientService: HttpClientService
-	// eslint-disable-next-line unused-imports/no-unused-vars
-	let configService: ConfigService
 
 	const mockHttpClientService = {
 		getStats: jest.fn(),
@@ -48,8 +44,6 @@ describe('httpHealthIndicator', () => {
 		}).compile()
 
 		indicator = module.get<HttpHealthIndicator>(HttpHealthIndicator)
-		httpClientService = module.get<HttpClientService>(HttpClientService)
-		configService = module.get<ConfigService>(ConfigService)
 	})
 
 	describe('initialization', () => {

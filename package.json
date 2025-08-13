@@ -30,9 +30,6 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "test:rate-limit": "node scripts/test-rate-limit.js",
-    "test:rate-limit:ci": "node scripts/test-rate-limit-ci.js",
-    "check:deprecations": "node scripts/check-deprecations.js",
     "semantic-release": "semantic-release"
   },
   "dependencies": {

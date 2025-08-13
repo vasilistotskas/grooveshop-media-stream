@@ -25,7 +25,7 @@ export default class FetchResourceResponseJob {
 					status: error.response?.status ?? 404,
 					statusText: error.response?.statusText ?? 'Bad Request',
 					headers: {},
-					config: error.config,
+					config: error.config || {} as any,
 					data: null,
 				}
 			}

@@ -1,13 +1,13 @@
 import { Buffer } from 'node:buffer'
+import { MultiLayerCacheManager } from '@microservice/Cache/services/multi-layer-cache.manager'
+import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
+import { HttpClientService } from '@microservice/HTTP/services/http-client.service'
+import { Job } from '@microservice/Queue/interfaces/job-queue.interface'
+import { ImageProcessingProcessor } from '@microservice/Queue/processors/image-processing.processor'
+import { ImageProcessingJobData, JobPriority } from '@microservice/Queue/types/job.types'
 import { Logger } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import sharp from 'sharp'
-import { MultiLayerCacheManager } from '../../../MediaStream/Cache/services/multi-layer-cache.manager'
-import { CorrelationService } from '../../../MediaStream/Correlation/services/correlation.service'
-import { HttpClientService } from '../../../MediaStream/HTTP/services/http-client.service'
-import { Job } from '../../../MediaStream/Queue/interfaces/job-queue.interface'
-import { ImageProcessingProcessor } from '../../../MediaStream/Queue/processors/image-processing.processor'
-import { ImageProcessingJobData, JobPriority } from '../../../MediaStream/Queue/types/job.types'
 
 // Mock sharp
 jest.mock('sharp')
@@ -16,7 +16,6 @@ const mockSharp = sharp as jest.MockedFunction<typeof sharp>
 describe('imageProcessingProcessor', () => {
 	let processor: ImageProcessingProcessor
 	let mockCacheManager: jest.Mocked<MultiLayerCacheManager>
-	let _mockCorrelationService: jest.Mocked<CorrelationService>
 	let mockHttpClient: jest.Mocked<HttpClientService>
 
 	const createMockJob = (data: Partial<ImageProcessingJobData>): Job<ImageProcessingJobData> => ({
@@ -45,6 +44,7 @@ describe('imageProcessingProcessor', () => {
 		const mockCorrelationServiceFactory = {
 			getCorrelationId: jest.fn(),
 			setCorrelationId: jest.fn(),
+			runWithContext: jest.fn((context, fn) => fn()),
 		}
 
 		const mockHttpClientFactory = {
@@ -71,7 +71,6 @@ describe('imageProcessingProcessor', () => {
 
 		processor = module.get<ImageProcessingProcessor>(ImageProcessingProcessor)
 		mockCacheManager = module.get(MultiLayerCacheManager)
-		_mockCorrelationService = module.get(CorrelationService)
 		mockHttpClient = module.get(HttpClientService)
 
 		// Mock logger to avoid console output during tests

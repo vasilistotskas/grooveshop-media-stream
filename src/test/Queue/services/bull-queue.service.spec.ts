@@ -1,10 +1,10 @@
+import { JobOptions, JobProcessor } from '@microservice/Queue/interfaces/job-queue.interface'
+import { BullQueueService } from '@microservice/Queue/services/bull-queue.service'
+import { JobType } from '@microservice/Queue/types/job.types'
 import { getQueueToken } from '@nestjs/bull'
 import { Logger } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { Job as BullJob, Queue } from 'bull'
-import { JobOptions, JobProcessor } from '../../../MediaStream/Queue/interfaces/job-queue.interface'
-import { BullQueueService } from '../../../MediaStream/Queue/services/bull-queue.service'
-import { JobType } from '../../../MediaStream/Queue/types/job.types'
 
 describe('bullQueueService', () => {
 	let service: BullQueueService

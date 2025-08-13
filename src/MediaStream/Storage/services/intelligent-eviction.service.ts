@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { ConfigService } from '@microservice/Config/config.service'
 import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { AccessPattern, StorageMonitoringService } from './storage-monitoring.service'
 
 export interface EvictionStrategy {
@@ -29,7 +29,6 @@ export interface EvictionConfig {
 
 @Injectable()
 export class IntelligentEvictionService {
-	private readonly _logger = new Logger(IntelligentEvictionService.name)
 	private readonly storageDirectory: string
 	private readonly config: EvictionConfig
 	private readonly strategies = new Map<string, EvictionStrategy>()

@@ -1,14 +1,13 @@
 import { ConfigService } from '@microservice/Config/config.service'
 import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
 import { MetricsService } from '@microservice/Metrics/services/metrics.service'
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import Redis from 'ioredis'
 import { CacheStats, ICacheManager } from '../interfaces/cache-manager.interface'
 
 @Injectable()
 export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleDestroy {
-	private readonly _logger = new Logger(RedisCacheService.name)
-	private redis: Redis
+	private redis!: Redis
 	private isConnected = false
 	private stats = {
 		hits: 0,
