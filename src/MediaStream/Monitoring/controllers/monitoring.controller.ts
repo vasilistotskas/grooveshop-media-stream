@@ -25,7 +25,7 @@ export class MonitoringController {
 	 */
 	@Get('dashboard')
 	async getDashboard(@Query('since') since?: string): Promise<any> {
-		const sinceTimestamp = since ? Number.parseInt(since) : Date.now() - 24 * 60 * 60 * 1000 // Last 24 hours
+		const sinceTimestamp = since ? Number.parseInt(since) : Date.now() - 24 * 60 * 60 * 1000
 
 		const [systemHealth, alertStats, performanceOverview, monitoringStats] = await Promise.all([
 			this.monitoringService.getSystemHealth(),

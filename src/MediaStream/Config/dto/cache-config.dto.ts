@@ -4,17 +4,17 @@ import { IsBoolean, IsNumber, IsOptional, IsString, Max, Min, ValidateNested } f
 export class MemoryCacheConfigDto {
 	@IsNumber()
 	@Min(1)
-	@Transform(({ value }) => Number.parseInt(value) || 104857600) // 100MB
+	@Transform(({ value }) => Number.parseInt(value) || 104857600)
 	maxSize: number = 104857600
 
 	@IsNumber()
 	@Min(1)
-	@Transform(({ value }) => Number.parseInt(value) || 3600) // 1 hour
+	@Transform(({ value }) => Number.parseInt(value) || 3600)
 	ttl: number = 3600
 
 	@IsNumber()
 	@Min(1)
-	@Transform(({ value }) => Number.parseInt(value) || 600) // 10 minutes
+	@Transform(({ value }) => Number.parseInt(value) || 600)
 	checkPeriod: number = 600
 
 	@IsBoolean()
@@ -49,7 +49,7 @@ export class RedisConfigDto {
 
 	@IsNumber()
 	@Min(1)
-	@Transform(({ value }) => Number.parseInt(value) || 7200) // 2 hours
+	@Transform(({ value }) => Number.parseInt(value) || 7200)
 	ttl: number = 7200
 
 	@IsNumber()
@@ -70,12 +70,12 @@ export class FileCacheConfigDto {
 
 	@IsNumber()
 	@Min(1)
-	@Transform(({ value }) => Number.parseInt(value) || 1073741824) // 1GB
+	@Transform(({ value }) => Number.parseInt(value) || 1073741824)
 	maxSize: number = 1073741824
 
 	@IsNumber()
 	@Min(1)
-	@Transform(({ value }) => Number.parseInt(value) || 3600) // 1 hour
+	@Transform(({ value }) => Number.parseInt(value) || 3600)
 	cleanupInterval: number = 3600
 }
 

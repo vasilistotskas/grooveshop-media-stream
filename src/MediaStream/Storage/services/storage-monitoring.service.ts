@@ -28,7 +28,7 @@ export interface StorageThresholds {
 	criticalSize: number
 	warningFileCount: number
 	criticalFileCount: number
-	maxFileAge: number // in days
+	maxFileAge: number
 }
 
 @Injectable()
@@ -42,11 +42,11 @@ export class StorageMonitoringService implements OnModuleInit {
 	constructor(private readonly _configService: ConfigService) {
 		this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage')
 		this.thresholds = {
-			warningSize: this._configService.getOptional('storage.warningSize', 800 * 1024 * 1024), // 800MB
-			criticalSize: this._configService.getOptional('storage.criticalSize', 1024 * 1024 * 1024), // 1GB
+			warningSize: this._configService.getOptional('storage.warningSize', 800 * 1024 * 1024),
+			criticalSize: this._configService.getOptional('storage.criticalSize', 1024 * 1024 * 1024),
 			warningFileCount: this._configService.getOptional('storage.warningFileCount', 5000),
 			criticalFileCount: this._configService.getOptional('storage.criticalFileCount', 10000),
-			maxFileAge: this._configService.getOptional('storage.maxFileAge', 30), // 30 days
+			maxFileAge: this._configService.getOptional('storage.maxFileAge', 30),
 		}
 	}
 
@@ -78,7 +78,6 @@ export class StorageMonitoringService implements OnModuleInit {
 				totalSize += stats.size
 				processedFileCount++
 
-				// Track oldest and newest files
 				if (!oldestFile || stats.mtime < oldestFile) {
 					oldestFile = stats.mtime
 				}
@@ -86,11 +85,9 @@ export class StorageMonitoringService implements OnModuleInit {
 					newestFile = stats.mtime
 				}
 
-				// Track file types
 				const ext = extname(file).toLowerCase()
 				fileTypes[ext] = (fileTypes[ext] || 0) + 1
 
-				// Update access patterns
 				this.updateAccessPattern(file, stats)
 			}
 
@@ -105,7 +102,7 @@ export class StorageMonitoringService implements OnModuleInit {
 				fileTypes,
 				accessPatterns: Array.from(this.accessPatterns.values())
 					.sort((a: any, b: any) => b.accessCount - a.accessCount)
-					.slice(0, 100), // Top 100 most accessed files
+					.slice(0, 100),
 			}
 		}
 		catch (error: unknown) {
@@ -130,7 +127,6 @@ export class StorageMonitoringService implements OnModuleInit {
 		const issues: string[] = []
 		let status: 'healthy' | 'warning' | 'critical' = 'healthy'
 
-		// Check size thresholds
 		if (stats.totalSize >= this.thresholds.criticalSize) {
 			status = 'critical'
 			issues.push(`Storage size critical: ${this.formatBytes(stats.totalSize)} / ${this.formatBytes(this.thresholds.criticalSize)}`)
@@ -140,7 +136,6 @@ export class StorageMonitoringService implements OnModuleInit {
 			issues.push(`Storage size warning: ${this.formatBytes(stats.totalSize)} / ${this.formatBytes(this.thresholds.warningSize)}`)
 		}
 
-		// Check file count thresholds
 		if (stats.totalFiles >= this.thresholds.criticalFileCount) {
 			status = 'critical'
 			issues.push(`File count critical: ${stats.totalFiles} / ${this.thresholds.criticalFileCount}`)
@@ -151,8 +146,7 @@ export class StorageMonitoringService implements OnModuleInit {
 			issues.push(`File count warning: ${stats.totalFiles} / ${this.thresholds.warningFileCount}`)
 		}
 
-		// Check for old files
-		const maxAge = this.thresholds.maxFileAge * 24 * 60 * 60 * 1000 // Convert days to milliseconds
+		const maxAge = this.thresholds.maxFileAge * 24 * 60 * 60 * 1000
 		const cutoffDate = new Date(Date.now() - maxAge)
 		const oldFiles = stats.accessPatterns.filter(pattern => pattern.lastAccessed < cutoffDate)
 
@@ -171,19 +165,16 @@ export class StorageMonitoringService implements OnModuleInit {
 	async getEvictionCandidates(targetSize?: number): Promise<AccessPattern[]> {
 		const stats = await this.getStorageStats()
 
-		// If no target size specified, aim to free 20% of current storage
 		const defaultTarget = Math.floor(stats.totalSize * 0.2)
 		const target = targetSize || defaultTarget
 
-		// Sort by access score (combination of access count and recency)
 		const candidates = stats.accessPatterns
 			.map(pattern => ({
 				...pattern,
 				score: this.calculateEvictionScore(pattern),
 			}))
-			.sort((a: any, b: any) => a.score - b.score) // Lower score = better candidate for eviction
+			.sort((a: any, b: any) => a.score - b.score)
 
-		// Select candidates until we reach target size
 		const selected: AccessPattern[] = []
 		let freedSize = 0
 
@@ -208,7 +199,6 @@ export class StorageMonitoringService implements OnModuleInit {
 			pattern.accessCount++
 			pattern.lastAccessed = new Date()
 		}
-		// If file not in patterns, it will be added during next scan
 	}
 
 	/**
@@ -233,7 +223,6 @@ export class StorageMonitoringService implements OnModuleInit {
 				this.updateAccessPattern(file, stats)
 			}
 
-			// Remove patterns for files that no longer exist
 			for (const [filename] of this.accessPatterns) {
 				if (!currentFiles.has(filename)) {
 					this.accessPatterns.delete(filename)
@@ -266,16 +255,13 @@ export class StorageMonitoringService implements OnModuleInit {
 		const existing = this.accessPatterns.get(filename)
 
 		if (existing) {
-			// Update existing pattern
 			existing.size = stats.size
-			// Don't update lastAccessed from file stats as it's less accurate than our tracking
 		}
 		else {
-			// Create new pattern
 			this.accessPatterns.set(filename, {
 				file: filename,
 				lastAccessed: stats.atime,
-				accessCount: 1, // Default to 1 for new files
+				accessCount: 1,
 				size: stats.size,
 				extension: extname(filename).toLowerCase(),
 			})
@@ -285,13 +271,11 @@ export class StorageMonitoringService implements OnModuleInit {
 	private calculateEvictionScore(pattern: AccessPattern): number {
 		const now = Date.now()
 		const ageInDays = (now - pattern.lastAccessed.getTime()) / (1000 * 60 * 60 * 24)
-		const sizeWeight = pattern.size / (1024 * 1024) // Size in MB
+		const sizeWeight = pattern.size / (1024 * 1024)
 
-		// Lower score = better candidate for eviction
-		// Factors: age (higher is worse), access count (lower is worse), size (larger files get slight penalty)
-		const ageScore = Math.min(ageInDays * 10, 1000) // Cap age score at 1000
-		const accessScore = Math.max(1000 - (pattern.accessCount * 10), 0) // More accesses = lower score
-		const sizeScore = Math.min(sizeWeight, 100) // Cap size penalty at 100
+		const ageScore = Math.min(ageInDays * 10, 1000)
+		const accessScore = Math.max(1000 - (pattern.accessCount * 10), 0)
+		const sizeScore = Math.min(sizeWeight, 100)
 
 		return ageScore + accessScore + sizeScore
 	}

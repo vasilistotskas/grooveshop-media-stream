@@ -11,11 +11,9 @@ export class CorrelationMiddleware implements NestMiddleware {
 	constructor(private readonly _correlationService: CorrelationService) {}
 
 	use(req: Request, res: Response, next: NextFunction): void {
-		// Get correlation ID from header or generate new one
 		const correlationId
       = (req.headers[CORRELATION_ID_HEADER] as string) || this._correlationService.generateCorrelationId()
 
-		// Create request context
 		const context: RequestContext = {
 			correlationId,
 			timestamp: Date.now(),
@@ -26,10 +24,8 @@ export class CorrelationMiddleware implements NestMiddleware {
 			startTime: process.hrtime.bigint(),
 		}
 
-		// Set correlation ID in response header
 		res.setHeader(CORRELATION_ID_HEADER, correlationId)
 
-		// Run the request within the correlation context
 		this._correlationService.runWithContext(context, () => {
 			next()
 		})

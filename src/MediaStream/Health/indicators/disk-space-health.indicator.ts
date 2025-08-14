@@ -22,14 +22,14 @@ export class DiskSpaceHealthIndicator extends BaseHealthIndicator {
 	constructor(private readonly _configService: ConfigService) {
 		const options: HealthCheckOptions = {
 			timeout: 3000,
-			threshold: 0.9, // 90% disk usage threshold
+			threshold: 0.9,
 		}
 
 		super('disk_space', options)
 
 		this.storagePath = this._configService.get('cache.file.directory')
-		this._warningThreshold = 0.8 // 80% warning threshold
-		this._criticalThreshold = 0.9 // 90% critical threshold
+		this._warningThreshold = 0.8
+		this._criticalThreshold = 0.9
 	}
 
 	protected async performHealthCheck(): Promise<HealthIndicatorResult> {
@@ -60,7 +60,6 @@ export class DiskSpaceHealthIndicator extends BaseHealthIndicator {
 
 	private async getDiskSpaceInfo(): Promise<DiskSpaceInfo> {
 		try {
-			// Ensure the directory exists
 			await fs.mkdir(this.storagePath, { recursive: true })
 
 			const stats = await fs.statfs(this.storagePath)
@@ -87,7 +86,6 @@ export class DiskSpaceHealthIndicator extends BaseHealthIndicator {
 
 	private async getFallbackDiskInfo(): Promise<DiskSpaceInfo> {
 		try {
-			// For fallback, we'll estimate based on available system info
 			// This is a simplified approach when statvfs is not available
 			return {
 				total: 0,
@@ -104,7 +102,7 @@ export class DiskSpaceHealthIndicator extends BaseHealthIndicator {
 	}
 
 	private formatBytes(bytes: number): number {
-		return Math.round(bytes / (1024 * 1024)) // Convert to MB
+		return Math.round(bytes / (1024 * 1024))
 	}
 
 	/**

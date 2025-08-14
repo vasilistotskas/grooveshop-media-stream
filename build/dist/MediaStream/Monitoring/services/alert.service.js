@@ -45,9 +45,9 @@ var AlertService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AlertService = void 0;
 const process = __importStar(require("node:process"));
+const correlation_service_1 = require("../../Correlation/services/correlation.service");
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
-const correlation_service_1 = require("../../Correlation/services/correlation.service");
 const monitoring_interface_1 = require("../interfaces/monitoring.interface");
 const monitoring_service_1 = require("./monitoring.service");
 let AlertService = AlertService_1 = class AlertService {

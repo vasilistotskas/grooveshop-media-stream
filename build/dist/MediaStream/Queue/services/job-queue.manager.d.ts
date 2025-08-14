@@ -1,5 +1,5 @@
+import { CorrelationService } from '@microservice/Correlation/services/correlation.service';
 import { OnModuleInit } from '@nestjs/common';
-import { CorrelationService } from '../../Correlation/services/correlation.service';
 import { Job, JobOptions } from '../interfaces/job-queue.interface';
 import { CacheOperationsProcessor } from '../processors/cache-operations.processor';
 import { ImageProcessingProcessor } from '../processors/image-processing.processor';

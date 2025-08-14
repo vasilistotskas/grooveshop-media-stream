@@ -99,8 +99,8 @@ let HealthController = class HealthController {
         const memoryInfo = this.memoryIndicator.getCurrentMemoryInfo();
         return {
             status: healthResults.status,
-            info: healthResults.info,
-            error: healthResults.error,
+            info: healthResults.info || {},
+            error: healthResults.error || {},
             details: healthResults.details,
             timestamp: new Date().toISOString(),
             uptime: process.uptime(),

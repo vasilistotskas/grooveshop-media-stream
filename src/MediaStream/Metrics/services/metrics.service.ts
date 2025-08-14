@@ -10,13 +10,11 @@ export class MetricsService implements OnModuleInit {
 	private readonly _logger = new Logger(MetricsService.name)
 	private readonly register: promClient.Registry
 
-	// HTTP metrics
 	private readonly httpRequestsTotal: promClient.Counter
 	private readonly httpRequestDuration: promClient.Histogram
 	private readonly httpRequestSize: promClient.Histogram
 	private readonly httpResponseSize: promClient.Histogram
 
-	// System resource metrics
 	private readonly memoryUsage: promClient.Gauge
 	private readonly diskSpaceUsage: promClient.Gauge
 	private readonly cpuUsage: promClient.Gauge
@@ -24,30 +22,25 @@ export class MetricsService implements OnModuleInit {
 	private readonly fileDescriptors: promClient.Gauge
 	private readonly networkConnections: promClient.Gauge
 
-	// Cache metrics
 	private readonly cacheHitRatio: promClient.Gauge
 	private readonly cacheSize: promClient.Gauge
 	private readonly cacheEvictions: promClient.Counter
 	private readonly cacheOperationsTotal: promClient.Counter
 	private readonly cacheOperationDuration: promClient.Histogram
 
-	// Image processing metrics
 	private readonly imageProcessingDuration: promClient.Histogram
 	private readonly imageProcessingTotal: promClient.Counter
 	private readonly imageProcessingQueueSize: promClient.Gauge
 	private readonly imageProcessingErrors: promClient.Counter
 
-	// Application metrics
 	private readonly activeConnections: promClient.Gauge
 	private readonly errorTotal: promClient.Counter
 	private readonly requestsInFlight: promClient.Gauge
 	private readonly uptime: promClient.Gauge
 
-	// Performance metrics
 	private readonly gcDuration: promClient.Histogram
 	private readonly eventLoopLag: promClient.Histogram
 
-	// Internal tracking
 	private startTime: number = Date.now()
 	private requestsInFlightCount: number = 0
 	private systemMetricsInterval?: NodeJS.Timeout
@@ -56,13 +49,11 @@ export class MetricsService implements OnModuleInit {
 	constructor(private readonly _configService: ConfigService) {
 		this.register = new promClient.Registry()
 
-		// Add default metrics (CPU, memory, etc.)
 		promClient.collectDefaultMetrics({
 			register: this.register,
 			prefix: 'mediastream_',
 		})
 
-		// HTTP metrics
 		this.httpRequestsTotal = new promClient.Counter({
 			name: 'mediastream_http_requests_total',
 			help: 'Total number of HTTP requests',
@@ -94,7 +85,6 @@ export class MetricsService implements OnModuleInit {
 			registers: [this.register],
 		})
 
-		// System resource metrics
 		this.memoryUsage = new promClient.Gauge({
 			name: 'mediastream_memory_usage_bytes',
 			help: 'Memory usage in bytes',
@@ -137,7 +127,6 @@ export class MetricsService implements OnModuleInit {
 			registers: [this.register],
 		})
 
-		// Application metrics
 		this.activeConnections = new promClient.Gauge({
 			name: 'mediastream_active_connections',
 			help: 'Number of active connections',
@@ -170,7 +159,6 @@ export class MetricsService implements OnModuleInit {
 			registers: [this.register],
 		})
 
-		// Performance metrics
 		this.gcDuration = new promClient.Histogram({
 			name: 'mediastream_gc_duration_seconds',
 			help: 'Garbage collection duration in seconds',
@@ -186,7 +174,6 @@ export class MetricsService implements OnModuleInit {
 			registers: [this.register],
 		})
 
-		// Cache metrics
 		this.cacheHitRatio = new promClient.Gauge({
 			name: 'mediastream_cache_hit_ratio',
 			help: 'Cache hit ratio (0-1)',
@@ -216,7 +203,6 @@ export class MetricsService implements OnModuleInit {
 			registers: [this.register],
 		})
 
-		// Application metrics
 		this.imageProcessingDuration = new promClient.Histogram({
 			name: 'mediastream_image_processing_duration_seconds',
 			help: 'Duration of image processing operations in seconds',
@@ -248,7 +234,6 @@ export class MetricsService implements OnModuleInit {
 	}
 
 	async onModuleInit(): Promise<void> {
-		// Don't start metrics collection in test environment unless explicitly enabled
 		const isTestEnv = process.env.NODE_ENV === 'test'
 		const monitoringEnabled = this._configService.get('monitoring.enabled')
 
@@ -473,12 +458,10 @@ export class MetricsService implements OnModuleInit {
 	}
 
 	private startPeriodicMetricsCollection(): void {
-		// Collect system metrics every 30 seconds
 		this.systemMetricsInterval = setInterval(() => {
 			this.collectSystemMetrics()
 		}, 30000)
 
-		// Collect performance metrics every 10 seconds
 		this.performanceMetricsInterval = setInterval(() => {
 			this.collectPerformanceMetrics()
 		}, 10000)
@@ -488,7 +471,6 @@ export class MetricsService implements OnModuleInit {
 
 	private collectSystemMetrics(): void {
 		try {
-			// Collect memory metrics
 			const memoryUsage = process.memoryUsage()
 			this.updateMemoryMetrics({
 				rss: memoryUsage.rss,
@@ -497,22 +479,18 @@ export class MetricsService implements OnModuleInit {
 				external: memoryUsage.external,
 			})
 
-			// Collect CPU metrics
 			const cpuUsage = process.cpuUsage()
 			const totalCpuTime = cpuUsage.user + cpuUsage.system
 			const userPercent = totalCpuTime > 0 ? (cpuUsage.user / totalCpuTime) * 100 : 0
 			const systemPercent = totalCpuTime > 0 ? (cpuUsage.system / totalCpuTime) * 100 : 0
 			this.updateCpuUsage(userPercent, systemPercent)
 
-			// Collect load average
 			const loadAvg = os.loadavg()
 			this.updateLoadAverage(loadAvg[0], loadAvg[1], loadAvg[2])
 
-			// Update uptime
 			const uptimeSeconds = (Date.now() - this.startTime) / 1000
 			this.uptime.set(uptimeSeconds)
 
-			// Collect disk space for storage directory
 			this.collectDiskSpaceMetrics()
 
 			this._logger.debug('System metrics collected')
@@ -525,7 +503,6 @@ export class MetricsService implements OnModuleInit {
 
 	private collectPerformanceMetrics(): void {
 		try {
-			// Measure event loop lag
 			const start = process.hrtime.bigint()
 			setImmediate(() => {
 				const lag = Number(process.hrtime.bigint() - start) / 1e9
@@ -546,7 +523,6 @@ export class MetricsService implements OnModuleInit {
 				if (fs.existsSync(path)) {
 					const stats = fs.statSync(path)
 					if (stats.isDirectory()) {
-						// Get disk space info (simplified - in production you'd use a proper disk space library)
 						const diskUsage = this.getDiskUsage(path)
 						if (diskUsage) {
 							this.updateDiskSpaceMetrics(path, diskUsage.total, diskUsage.used, diskUsage.free)
@@ -563,12 +539,11 @@ export class MetricsService implements OnModuleInit {
 
 	private getDiskUsage(path: string): { total: number, used: number, free: number } | null {
 		try {
-			// This is a simplified implementation
 			// In production, you'd use a library like 'node-disk-info' or 'statvfs'
 			const size = this.getDirectorySize(path)
 
 			return {
-				total: size * 2, // Simplified estimation
+				total: size * 2,
 				used: size,
 				free: size,
 			}

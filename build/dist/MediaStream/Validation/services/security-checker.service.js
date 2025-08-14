@@ -11,8 +11,8 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var SecurityCheckerService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SecurityCheckerService = void 0;
+const config_service_1 = require("../../Config/config.service");
 const common_1 = require("@nestjs/common");
-const config_service_1 = require("../../../MediaStream/Config/config.service");
 let SecurityCheckerService = SecurityCheckerService_1 = class SecurityCheckerService {
     constructor(_configService) {
         this._configService = _configService;
@@ -175,7 +175,7 @@ let SecurityCheckerService = SecurityCheckerService_1 = class SecurityCheckerSer
         let recentEvents = 0;
         for (const event of this.securityEvents) {
             eventsByType[event.type] = (eventsByType[event.type] || 0) + 1;
-            if (event.timestamp > oneHourAgo) {
+            if (event.timestamp && event.timestamp > oneHourAgo) {
                 recentEvents++;
             }
         }

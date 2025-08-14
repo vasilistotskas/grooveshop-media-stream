@@ -23,7 +23,6 @@ export class SimpleValidationService {
 		const errors: string[] = []
 
 		try {
-			// 1. Check for malicious content
 			const isMalicious = await this.securityChecker.checkForMaliciousContent(request)
 			if (isMalicious) {
 				errors.push('Request contains potentially malicious content')
@@ -35,12 +34,10 @@ export class SimpleValidationService {
 				})
 			}
 
-			// 2. Validate URL
 			if (!this.sanitizationService.validateUrl(request.resourceTarget)) {
 				errors.push('Invalid or disallowed URL')
 			}
 
-			// 3. Validate image dimensions
 			const { width, height } = request.resizeOptions
 			if (width && height) {
 				if (!this.sanitizationService.validateImageDimensions(width, height)) {
@@ -48,7 +45,6 @@ export class SimpleValidationService {
 				}
 			}
 
-			// 4. Sanitize the request
 			const sanitizedInput = await this.sanitizationService.sanitize(request)
 
 			return {
@@ -70,13 +66,11 @@ export class SimpleValidationService {
 		const errors: string[] = []
 
 		try {
-			// Check for malicious content
 			const isMalicious = await this.securityChecker.checkForMaliciousContent(input)
 			if (isMalicious) {
 				errors.push('Input contains potentially malicious content')
 			}
 
-			// Sanitize input
 			const sanitizedInput = await this.sanitizationService.sanitize(input)
 
 			return {

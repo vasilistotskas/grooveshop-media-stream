@@ -65,12 +65,10 @@ const job_queue_manager_1 = require("../Queue/services/job-queue.manager");
 const job_types_1 = require("../Queue/types/job.types");
 const ValidateCacheImageRequestRule_1 = __importDefault(require("../Rule/ValidateCacheImageRequestRule"));
 const input_sanitization_service_1 = require("../Validation/services/input-sanitization.service");
-const axios_1 = require("@nestjs/axios");
 const common_1 = require("@nestjs/common");
 const UnableToFetchResourceException_1 = __importDefault(require("../API/Exception/UnableToFetchResourceException"));
 let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheImageResourceOperation {
-    constructor(_httpService, validateCacheImageRequest, fetchResourceResponseJob, webpImageManipulationJob, storeResourceResponseToFileJob, generateResourceIdentityFromRequestJob, cacheManager, inputSanitizationService, jobQueueManager, metricsService) {
-        this._httpService = _httpService;
+    constructor(validateCacheImageRequest, fetchResourceResponseJob, webpImageManipulationJob, storeResourceResponseToFileJob, generateResourceIdentityFromRequestJob, cacheManager, inputSanitizationService, jobQueueManager, metricsService) {
         this.validateCacheImageRequest = validateCacheImageRequest;
         this.fetchResourceResponseJob = fetchResourceResponseJob;
         this.webpImageManipulationJob = webpImageManipulationJob;
@@ -80,7 +78,6 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
         this.inputSanitizationService = inputSanitizationService;
         this.jobQueueManager = jobQueueManager;
         this.metricsService = metricsService;
-        this._logger = new common_1.Logger(CacheImageResourceOperation_1.name);
         this.basePath = (0, node_process_1.cwd)();
     }
     get getResourcePath() {
@@ -168,12 +165,12 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
                     }
                     else {
                         logger_util_1.CorrelatedLogger.warn('Metadata file does not exist.', CacheImageResourceOperation_1.name);
-                        return null;
+                        return new ResourceMetaData_1.default();
                     }
                 }
                 catch (error) {
                     logger_util_1.CorrelatedLogger.error(`Failed to read or parse resource metadata: ${error}`, '', CacheImageResourceOperation_1.name);
-                    return null;
+                    return new ResourceMetaData_1.default();
                 }
             }
             return this.metaData;
@@ -243,7 +240,7 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
         const width = resizeOptions.width || 0;
         const height = resizeOptions.height || 0;
         const totalPixels = width * height;
-        return totalPixels > 2000000 || (resizeOptions.quality && resizeOptions.quality > 90);
+        return totalPixels > 2000000 || (resizeOptions.quality !== undefined && resizeOptions.quality > 90);
     }
     async queueImageProcessing() {
         const priority = this.request.resizeOptions?.width && this.request.resizeOptions.width > 1920
@@ -251,8 +248,8 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
             : job_types_1.JobPriority.NORMAL;
         await this.jobQueueManager.addImageProcessingJob({
             imageUrl: this.request.resourceTarget,
-            width: this.request.resizeOptions?.width,
-            height: this.request.resizeOptions?.height,
+            width: this.request.resizeOptions?.width ?? undefined,
+            height: this.request.resizeOptions?.height ?? undefined,
             quality: this.request.resizeOptions?.quality,
             format: this.request.resizeOptions?.format,
             cacheKey: this.id,
@@ -447,8 +444,7 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
 };
 CacheImageResourceOperation = CacheImageResourceOperation_1 = __decorate([
     (0, common_1.Injectable)({ scope: common_1.Scope.REQUEST }),
-    __metadata("design:paramtypes", [axios_1.HttpService,
-        ValidateCacheImageRequestRule_1.default,
+    __metadata("design:paramtypes", [ValidateCacheImageRequestRule_1.default,
         FetchResourceResponseJob_1.default,
         WebpImageManipulationJob_1.default,
         StoreResourceResponseToFileJob_1.default,

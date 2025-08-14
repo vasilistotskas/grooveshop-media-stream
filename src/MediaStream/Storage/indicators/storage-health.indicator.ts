@@ -37,7 +37,7 @@ export class StorageHealthIndicator extends BaseHealthIndicator {
 	) {
 		const options: HealthCheckOptions = {
 			timeout: 5000,
-			threshold: 0.9, // 90% storage usage threshold
+			threshold: 0.9,
 		}
 
 		super('storage', options)
@@ -49,14 +49,11 @@ export class StorageHealthIndicator extends BaseHealthIndicator {
 			const stats = thresholdCheck.stats
 			const cleanupStatus = this.storageCleanup.getCleanupStatus()
 
-			// Calculate usage percentage (approximation based on file count and size)
-			const maxSize = this._configService.getOptional('storage.maxSize', 1024 * 1024 * 1024) // 1GB default
+			const maxSize = this._configService.getOptional('storage.maxSize', 1024 * 1024 * 1024)
 			const usagePercentage = stats.totalSize / maxSize
 
-			// Generate recommendations
 			const recommendations = this.generateRecommendations(thresholdCheck, cleanupStatus)
 
-			// Prepare health details
 			const details: StorageHealthDetails = {
 				totalFiles: stats.totalFiles,
 				totalSize: this.formatBytes(stats.totalSize),
@@ -81,7 +78,6 @@ export class StorageHealthIndicator extends BaseHealthIndicator {
 				recommendations,
 			}
 
-			// Determine health status
 			if (thresholdCheck.status === 'critical') {
 				return this.createUnhealthyResult(
 					`Storage in critical state: ${thresholdCheck.issues.join(', ')}`,
@@ -121,7 +117,7 @@ export class StorageHealthIndicator extends BaseHealthIndicator {
 		return {
 			stats,
 			thresholds: thresholdCheck,
-			evictionCandidates: evictionRecommendations.slice(0, 10), // Top 10 candidates
+			evictionCandidates: evictionRecommendations.slice(0, 10),
 			cleanupRecommendations: this.generateCleanupRecommendations(stats, thresholdCheck),
 		}
 	}
@@ -132,7 +128,6 @@ export class StorageHealthIndicator extends BaseHealthIndicator {
 	): string[] {
 		const recommendations: string[] = []
 
-		// Storage size recommendations
 		if (thresholdCheck.status === 'critical') {
 			recommendations.push('URGENT: Run immediate cleanup to free storage space')
 			recommendations.push('Consider increasing storage capacity or reducing retention periods')
@@ -142,7 +137,6 @@ export class StorageHealthIndicator extends BaseHealthIndicator {
 			recommendations.push('Review retention policies for optimization')
 		}
 
-		// Cleanup recommendations
 		if (!cleanupStatus.enabled) {
 			recommendations.push('Enable automatic cleanup to maintain storage health')
 		}
@@ -155,7 +149,6 @@ export class StorageHealthIndicator extends BaseHealthIndicator {
 			}
 		}
 
-		// File pattern recommendations
 		if (thresholdCheck.stats.fileTypes['.json'] > 1000) {
 			recommendations.push('High number of JSON cache files - consider shorter TTL for cache entries')
 		}
@@ -164,7 +157,6 @@ export class StorageHealthIndicator extends BaseHealthIndicator {
 			recommendations.push('Many WebP files stored - ensure image optimization is working correctly')
 		}
 
-		// Access pattern recommendations
 		const lowAccessFiles = thresholdCheck.stats.accessPatterns.filter((p: AccessPattern) => p.accessCount < 2).length
 		if (lowAccessFiles > thresholdCheck.stats.totalFiles * 0.5) {
 			recommendations.push('Over 50% of files have low access counts - consider more aggressive eviction')
@@ -176,7 +168,6 @@ export class StorageHealthIndicator extends BaseHealthIndicator {
 	private generateCleanupRecommendations(stats: StorageStats, _thresholdCheck: any): string[] {
 		const recommendations: string[] = []
 
-		// Age-based recommendations
 		const oldFiles = stats.accessPatterns.filter((p: AccessPattern) => {
 			const ageInDays = (Date.now() - p.lastAccessed.getTime()) / (1000 * 60 * 60 * 24)
 			return ageInDays > 30
@@ -187,9 +178,8 @@ export class StorageHealthIndicator extends BaseHealthIndicator {
 			recommendations.push(`${oldFiles.length} files older than 30 days (${this.formatBytes(totalOldSize)})`)
 		}
 
-		// Size-based recommendations
 		const largeFiles = stats.accessPatterns
-			.filter((p: AccessPattern) => p.size > 1024 * 1024) // Files larger than 1MB
+			.filter((p: AccessPattern) => p.size > 1024 * 1024)
 			.sort((a: AccessPattern, b: AccessPattern) => b.size - a.size)
 			.slice(0, 10)
 
@@ -197,7 +187,6 @@ export class StorageHealthIndicator extends BaseHealthIndicator {
 			recommendations.push(`Top large files: ${largeFiles.map((f: AccessPattern) => `${f.file} (${this.formatBytes(f.size)})`).join(', ')}`)
 		}
 
-		// Access pattern recommendations
 		const neverAccessedFiles = stats.accessPatterns.filter((p: AccessPattern) => p.accessCount === 1)
 		if (neverAccessedFiles.length > 0) {
 			const totalNeverAccessedSize = neverAccessedFiles.reduce((sum: number, f: AccessPattern) => sum + f.size, 0)

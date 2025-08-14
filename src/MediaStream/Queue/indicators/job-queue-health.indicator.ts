@@ -13,9 +13,8 @@ export class JobQueueHealthIndicator extends BaseHealthIndicator {
 		try {
 			const stats = await this.jobQueueManager.getQueueStats()
 
-			// Define health thresholds
 			const maxQueueLength = 1000
-			const maxFailureRate = 0.1 // 10%
+			const maxFailureRate = 0.1
 
 			const failureRate = stats.totalJobs > 0
 				? stats.failedJobs / stats.totalJobs

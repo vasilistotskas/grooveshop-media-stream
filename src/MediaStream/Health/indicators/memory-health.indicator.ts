@@ -24,22 +24,21 @@ export class MemoryHealthIndicator extends BaseHealthIndicator {
 	constructor() {
 		const options: HealthCheckOptions = {
 			timeout: 1000,
-			threshold: 0.95, // 95% memory usage threshold
+			threshold: 0.95,
 		}
 
 		super('memory', options)
 
-		this._warningThreshold = 0.85 // 85% system memory warning
-		this._criticalThreshold = 0.95 // 95% system memory critical
-		this.heapWarningThreshold = 0.90 // 90% heap warning (more lenient for Node.js)
-		this.heapCriticalThreshold = 0.98 // 98% heap critical (very high threshold)
+		this._warningThreshold = 0.85
+		this._criticalThreshold = 0.95
+		this.heapWarningThreshold = 0.90
+		this.heapCriticalThreshold = 0.98
 	}
 
 	protected async performHealthCheck(): Promise<HealthIndicatorResult> {
 		return this.executeWithTimeout(async () => {
 			const memoryInfo = this.getMemoryInfo()
 
-			// Check system memory
 			if (memoryInfo.memoryUsagePercentage >= this._criticalThreshold) {
 				return this.createUnhealthyResult(
 					`System memory critically high: ${(memoryInfo.memoryUsagePercentage * 100).toFixed(1)}% used`,
@@ -47,7 +46,6 @@ export class MemoryHealthIndicator extends BaseHealthIndicator {
 				)
 			}
 
-			// Check heap memory
 			if (memoryInfo.heapUsagePercentage >= this.heapCriticalThreshold) {
 				return this.createUnhealthyResult(
 					`Heap memory critically high: ${(memoryInfo.heapUsagePercentage * 100).toFixed(1)}% used`,
@@ -55,7 +53,6 @@ export class MemoryHealthIndicator extends BaseHealthIndicator {
 				)
 			}
 
-			// Determine warning status for details
 			let detailStatus = 'healthy'
 			if (memoryInfo.memoryUsagePercentage >= this._warningThreshold
 				|| memoryInfo.heapUsagePercentage >= this.heapWarningThreshold) {
@@ -105,7 +102,7 @@ export class MemoryHealthIndicator extends BaseHealthIndicator {
 	}
 
 	private formatBytes(bytes: number): number {
-		return Math.round(bytes / (1024 * 1024)) // Convert to MB
+		return Math.round(bytes / (1024 * 1024))
 	}
 
 	/**

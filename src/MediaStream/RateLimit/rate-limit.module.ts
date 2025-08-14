@@ -18,8 +18,8 @@ import { RateLimitService } from './services/rate-limit.service'
 				throttlers: [
 					{
 						name: 'default',
-						ttl: _configService.getOptional('rateLimit.default.windowMs', 60000), // 1 minute default
-						limit: _configService.getOptional('rateLimit.default.max', 100), // 100 requests per minute default
+						ttl: _configService.getOptional('rateLimit.default.windowMs', 60000),
+						limit: _configService.getOptional('rateLimit.default.max', 100),
 					},
 					{
 						name: 'image-processing',
@@ -29,7 +29,6 @@ import { RateLimitService } from './services/rate-limit.service'
 				],
 				skipIf: (context) => {
 					const request = context.switchToHttp().getRequest()
-					// Skip rate limiting for health checks
 					return request.url?.startsWith('/health')
 				},
 			}),

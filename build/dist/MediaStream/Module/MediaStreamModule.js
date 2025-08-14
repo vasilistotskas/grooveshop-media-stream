@@ -35,7 +35,6 @@ const ValidateCacheImageRequestRule_1 = __importDefault(require("../Rule/Validat
 const storage_module_1 = require("../Storage/storage.module");
 const tasks_module_1 = require("../Tasks/tasks.module");
 const validation_module_1 = require("../Validation/validation.module");
-const axios_1 = require("@nestjs/axios");
 const common_1 = require("@nestjs/common");
 const core_1 = require("@nestjs/core");
 const schedule_1 = require("@nestjs/schedule");
@@ -63,7 +62,6 @@ MediaStreamModule = __decorate([
             correlation_module_1.CorrelationModule,
             health_module_1.HealthModule,
             http_module_1.HttpModule,
-            axios_1.HttpModule.register({}),
             metrics_module_1.MetricsModule,
             monitoring_module_1.MonitoringModule,
             queue_module_1.QueueModule,

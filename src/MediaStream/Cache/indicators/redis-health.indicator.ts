@@ -18,41 +18,33 @@ export class RedisHealthIndicator extends BaseHealthIndicator {
 		const startTime = Date.now()
 
 		try {
-			// Test Redis connection with ping
 			const pingResult = await this.redisCacheService.ping()
 			if (pingResult !== 'PONG') {
 				throw new Error(`Redis ping failed: ${pingResult}`)
 			}
 
-			// Test basic Redis operations
 			const testKey = 'health-check-redis-test'
 			const testValue = { timestamp: Date.now(), test: true }
 
-			// Test SET operation
 			await this.redisCacheService.set(testKey, testValue, 60)
 
-			// Test GET operation
 			const retrievedValue = await this.redisCacheService.get<{ timestamp: number, test: boolean }>(testKey)
 			if (!retrievedValue || retrievedValue.timestamp !== testValue.timestamp) {
 				throw new Error('Redis GET operation failed')
 			}
 
-			// Test TTL operation
 			const ttl = await this.redisCacheService.getTtl(testKey)
 			if (ttl <= 0 || ttl > 60) {
 				throw new Error(`Redis TTL operation failed: ${ttl}`)
 			}
 
-			// Test DELETE operation
 			await this.redisCacheService.delete(testKey)
 
-			// Test that key was deleted
 			const deletedValue = await this.redisCacheService.get(testKey)
 			if (deletedValue !== null) {
 				throw new Error('Redis DELETE operation failed')
 			}
 
-			// Get Redis statistics and memory usage
 			const stats = await this.redisCacheService.getStats()
 			const memoryUsage = await this.redisCacheService.getMemoryUsage()
 			const connectionStatus = this.redisCacheService.getConnectionStatus()
@@ -73,7 +65,7 @@ export class RedisHealthIndicator extends BaseHealthIndicator {
 					statistics: {
 						hits: stats.hits,
 						misses: stats.misses,
-						hitRate: Math.round(stats.hitRate * 10000) / 100, // Percentage with 2 decimals
+						hitRate: Math.round(stats.hitRate * 10000) / 100,
 						keys: stats.keys,
 						operations: connectionStatus.stats.operations,
 						errors: connectionStatus.stats.errors,
@@ -183,7 +175,7 @@ export class RedisHealthIndicator extends BaseHealthIndicator {
 					ttl: this._configService.get('cache.redis.ttl'),
 					maxRetries: this._configService.get('cache.redis.maxRetries'),
 				},
-				recentKeys: keys.slice(0, 10), // Show first 10 keys for debugging
+				recentKeys: keys.slice(0, 10),
 				lastUpdated: new Date().toISOString(),
 			}
 		}

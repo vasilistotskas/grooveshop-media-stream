@@ -5,7 +5,6 @@ import { CacheStats, ICacheManager } from '../interfaces/cache-manager.interface
 export declare class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleDestroy {
     private readonly _configService;
     private readonly metricsService;
-    private readonly _logger;
     private redis;
     private isConnected;
     private stats;

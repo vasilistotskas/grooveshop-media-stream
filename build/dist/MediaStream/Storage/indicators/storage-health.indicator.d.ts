@@ -30,8 +30,6 @@ export declare class StorageHealthIndicator extends BaseHealthIndicator {
     private readonly _configService;
     private readonly storageMonitoring;
     private readonly storageCleanup;
-    private readonly _warningThreshold;
-    private readonly _criticalThreshold;
     constructor(_configService: ConfigService, storageMonitoring: StorageMonitoringService, storageCleanup: StorageCleanupService);
     protected performHealthCheck(): Promise<HealthIndicatorResult>;
     protected getDescription(): string;

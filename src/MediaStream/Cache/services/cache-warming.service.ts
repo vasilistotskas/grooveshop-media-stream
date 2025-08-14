@@ -38,7 +38,7 @@ export class CacheWarmingService implements OnModuleInit {
 			enabled: true,
 			warmupOnStart: true,
 			maxFilesToWarm: 50,
-			warmupCron: '0 */6 * * *', // Every 6 hours
+			warmupCron: '0 */6 * * *',
 			popularImageThreshold: 5,
 		}
 
@@ -48,7 +48,6 @@ export class CacheWarmingService implements OnModuleInit {
 	async onModuleInit(): Promise<void> {
 		if (this.config.enabled && this.config.warmupOnStart) {
 			CorrelatedLogger.log('Starting cache warming on module initialization', CacheWarmingService.name)
-			// Run warmup in background to not block startup
 			setImmediate(() => this.warmupCache())
 		}
 	}
@@ -73,7 +72,6 @@ export class CacheWarmingService implements OnModuleInit {
 		try {
 			CorrelatedLogger.log('Starting cache warmup process', CacheWarmingService.name)
 
-			// Get popular files based on access patterns
 			const popularFiles = await this.getPopularFiles()
 
 			for (const fileInfo of popularFiles.slice(0, this.config.maxFilesToWarm)) {
@@ -89,7 +87,6 @@ export class CacheWarmingService implements OnModuleInit {
 			const duration = Date.now() - startTime
 			CorrelatedLogger.log(`Cache warmup completed: ${warmedCount} files warmed in ${duration}ms`, CacheWarmingService.name)
 
-			// Record metrics
 			this.metricsService.recordCacheOperation('warmup', 'memory', 'success')
 		}
 		catch (error: unknown) {
@@ -105,7 +102,7 @@ export class CacheWarmingService implements OnModuleInit {
 			const entries = await readdir(this.storagePath)
 
 			for (const entry of entries) {
-				if (entry.endsWith('.rsc')) { // Resource files
+				if (entry.endsWith('.rsc')) {
 					const filePath = join(this.storagePath, entry)
 					const metaPath = filePath.replace('.rsc', '.rsm')
 
@@ -139,7 +136,6 @@ export class CacheWarmingService implements OnModuleInit {
 				}
 			}
 
-			// Sort by access count (descending) and last accessed (recent first)
 			return files
 				.filter(f => f.accessCount >= this.config.popularImageThreshold)
 				.sort((a: any, b: any) => {
@@ -158,22 +154,18 @@ export class CacheWarmingService implements OnModuleInit {
 	private async warmupFile(fileInfo: FileAccessInfo): Promise<void> {
 		const cacheKey = this.generateCacheKey(fileInfo.path)
 
-		// Check if already in cache
 		if (await this.memoryCacheService.has(cacheKey)) {
 			CorrelatedLogger.debug(`File already in cache: ${fileInfo.path}`, CacheWarmingService.name)
 			return
 		}
 
 		try {
-			// Read file content
 			const content = await readFile(fileInfo.path)
 
-			// Calculate TTL based on access patterns (more popular = longer TTL)
-			const baseTtl = 3600 // 1 hour
-			const accessMultiplier = Math.min(fileInfo.accessCount / 10, 5) // Max 5x multiplier
+			const baseTtl = 3600
+			const accessMultiplier = Math.min(fileInfo.accessCount / 10, 5)
 			const ttl = Math.floor(baseTtl * (1 + accessMultiplier))
 
-			// Store in memory cache
 			await this.memoryCacheService.set(cacheKey, content, ttl)
 
 			CorrelatedLogger.debug(`Warmed up file: ${fileInfo.path} (TTL: ${ttl}s)`, CacheWarmingService.name)
@@ -185,7 +177,6 @@ export class CacheWarmingService implements OnModuleInit {
 	}
 
 	private generateCacheKey(filePath: string): string {
-		// Extract filename without extension and use as cache key
 		const filename = filePath.split('/').pop() || filePath.split('\\').pop()
 		return `file:${filename?.replace(/\.[^/.]+$/, '')}`
 	}

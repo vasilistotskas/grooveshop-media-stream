@@ -5,12 +5,12 @@ export class RateLimitThrottlerConfigDto {
 	@IsNumber()
 	@Min(1000)
 	@Transform(({ value }) => Number.parseInt(value, 10))
-	windowMs: number = 60000 // 1 minute
+	windowMs: number = 60000
 
 	@IsNumber()
 	@Min(1)
 	@Transform(({ value }) => Number.parseInt(value, 10))
-	max: number = 100 // 100 requests per minute
+	max: number = 100
 
 	@IsBoolean()
 	@IsOptional()
@@ -33,17 +33,17 @@ export class SystemLoadThresholdsDto {
 	@IsNumber()
 	@Min(0)
 	@Transform(({ value }) => Number.parseFloat(value))
-	cpu: number = 80 // 80% CPU usage
+	cpu: number = 80
 
 	@IsNumber()
 	@Min(0)
 	@Transform(({ value }) => Number.parseFloat(value))
-	memory: number = 85 // 85% memory usage
+	memory: number = 85
 
 	@IsNumber()
 	@Min(0)
 	@Transform(({ value }) => Number.parseInt(value, 10))
-	connections: number = 1000 // 1000 active connections
+	connections: number = 1000
 }
 
 export class AdaptiveConfigDto {
@@ -58,12 +58,12 @@ export class AdaptiveConfigDto {
 	@IsNumber()
 	@Min(0)
 	@Transform(({ value }) => Number.parseFloat(value))
-	maxReduction: number = 0.5 // Maximum 50% reduction
+	maxReduction: number = 0.5
 
 	@IsNumber()
 	@Min(1)
 	@Transform(({ value }) => Number.parseInt(value, 10))
-	minLimit: number = 1 // Minimum 1 request allowed
+	minLimit: number = 1
 }
 
 export class BypassConfigDto {

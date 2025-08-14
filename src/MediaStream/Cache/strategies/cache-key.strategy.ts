@@ -11,7 +11,6 @@ export class DefaultCacheKeyStrategy implements CacheKeyStrategy {
 		const parts = [namespace, identifier]
 
 		if (params && Object.keys(params).length > 0) {
-			// Sort params for consistent key generation
 			const sortedParams = Object.keys(params)
 				.sort()
 				.map(key => `${key}=${params[key]}`)
@@ -40,6 +39,6 @@ export class DefaultCacheKeyStrategy implements CacheKeyStrategy {
 		return createHash(this.hashAlgorithm)
 			.update(input)
 			.digest('hex')
-			.substring(0, 16) // Use first 16 characters for shorter keys
+			.substring(0, 16)
 	}
 }

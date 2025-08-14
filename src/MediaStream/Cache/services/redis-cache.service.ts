@@ -49,7 +49,6 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 				commandTimeout: 5000,
 			})
 
-			// Set up event listeners
 			this.redis.on('connect', () => {
 				CorrelatedLogger.log('Redis connecting...', RedisCacheService.name)
 			})
@@ -77,7 +76,6 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 				CorrelatedLogger.log('Redis reconnecting...', RedisCacheService.name)
 			})
 
-			// Connect to Redis
 			await this.redis.connect()
 		}
 		catch (error: unknown) {
@@ -147,7 +145,6 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			this.stats.errors++
 			this.metricsService.recordCacheOperation('set', 'redis', 'error')
 			CorrelatedLogger.error(`Redis cache SET error for key ${key}: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
-			// Don't throw error, handle gracefully
 		}
 	}
 
@@ -255,7 +252,6 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 				? this.stats.hits / (this.stats.hits + this.stats.misses)
 				: 0
 
-			// Update metrics
 			this.metricsService.updateCacheHitRatio('redis', hitRate)
 
 			let keys = 0
@@ -280,7 +276,7 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 				hits: this.stats.hits,
 				misses: this.stats.misses,
 				keys,
-				ksize: 0, // Redis doesn't provide separate key size
+				ksize: 0,
 				vsize: memoryUsage,
 				hitRate,
 			}
@@ -298,7 +294,6 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 		}
 	}
 
-	// Redis-specific methods
 	async ping(): Promise<string> {
 		if (!this.isConnected) {
 			throw new Error('Redis not connected')

@@ -76,7 +76,6 @@ export class BullQueueService implements IJobQueue, OnModuleDestroy {
 
 	async getJob(jobId: string): Promise<Job | null> {
 		try {
-			// Try to find job in both queues
 			const [imageJob, cacheJob] = await Promise.all([
 				this.imageQueue.getJob(jobId),
 				this.cacheQueue.getJob(jobId),
@@ -142,8 +141,7 @@ export class BullQueueService implements IJobQueue, OnModuleDestroy {
 
 	async clean(grace: number, status: JobStatus): Promise<void> {
 		try {
-			// Map our JobStatus to Bull's JobStatusClean
-			const bullStatus = status as any // Bull has different status types
+			const bullStatus = status as any
 			await Promise.all([
 				this.imageQueue.clean(grace, bullStatus),
 				this.cacheQueue.clean(grace, bullStatus),
@@ -201,7 +199,7 @@ export class BullQueueService implements IJobQueue, OnModuleDestroy {
 			priority: options.priority,
 			delay: options.delay,
 			attempts: options.attempts || 3,
-			repeat: options.repeat as any, // Bull has specific repeat types
+			repeat: options.repeat as any,
 			backoff: options.backoff || { type: 'exponential', delay: 2000 },
 			lifo: options.lifo,
 			timeout: options.timeout || 30000,
@@ -218,7 +216,7 @@ export class BullQueueService implements IJobQueue, OnModuleDestroy {
 			data: bullJob.data,
 			opts: bullJob.opts as JobOptions,
 			progress: bullJob.progress(),
-			delay: (bullJob as any).delay || 0, // Bull job may not have delay property
+			delay: (bullJob as any).delay || 0,
 			timestamp: bullJob.timestamp,
 			attemptsMade: bullJob.attemptsMade,
 			failedReason: bullJob.failedReason,

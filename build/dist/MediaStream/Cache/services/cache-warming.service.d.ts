@@ -7,7 +7,6 @@ export declare class CacheWarmingService implements OnModuleInit {
     private readonly memoryCacheService;
     private readonly _configService;
     private readonly metricsService;
-    private readonly _logger;
     private readonly config;
     private readonly storagePath;
     constructor(memoryCacheService: MemoryCacheService, _configService: ConfigService, metricsService: MetricsService);

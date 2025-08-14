@@ -23,7 +23,6 @@ let MemoryCacheService = MemoryCacheService_1 = class MemoryCacheService {
     constructor(_configService, metricsService) {
         this._configService = _configService;
         this.metricsService = metricsService;
-        this._logger = new common_1.Logger(MemoryCacheService_1.name);
         const config = this._configService.get('cache.memory') || {};
         this.cache = new node_cache_1.default({
             stdTTL: config.defaultTtl || 3600,
@@ -72,7 +71,7 @@ let MemoryCacheService = MemoryCacheService_1 = class MemoryCacheService {
     }
     async set(key, value, ttl) {
         try {
-            const success = this.cache.set(key, value, ttl);
+            const success = ttl !== undefined ? this.cache.set(key, value, ttl) : this.cache.set(key, value);
             if (!success) {
                 this.metricsService.recordCacheOperation('set', 'memory', 'error');
                 logger_util_1.CorrelatedLogger.warn(`Failed to set memory cache key: ${key}`, MemoryCacheService_1.name);
@@ -162,7 +161,7 @@ let MemoryCacheService = MemoryCacheService_1 = class MemoryCacheService {
         }
     }
     getTtl(key) {
-        return this.cache.getTtl(key);
+        return this.cache.getTtl(key) ?? 0;
     }
     setTtl(key, ttl) {
         return this.cache.ttl(key, ttl);

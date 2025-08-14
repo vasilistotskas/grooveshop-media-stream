@@ -16,7 +16,7 @@ import { Module } from '@nestjs/common'
 	exports: [
 		HttpClientService,
 		HttpHealthIndicator,
-		NestHttpModule, // Re-export the NestHttpModule so other modules can access HttpService
+		NestHttpModule,
 	],
 })
 export class HttpModule {}

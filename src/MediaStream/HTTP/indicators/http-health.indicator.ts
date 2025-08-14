@@ -23,7 +23,6 @@ export class HttpHealthIndicator extends BaseHealthIndicator {
 		const stats = this.httpClient.getStats()
 		const circuitBreakerOpen = this.httpClient.isCircuitOpen()
 
-		// If no health check URLs are configured, just check the circuit breaker
 		if (!this.healthCheckUrls || this.healthCheckUrls.length === 0) {
 			if (circuitBreakerOpen) {
 				return this.createUnhealthyResult('Circuit breaker is open', {
@@ -40,7 +39,6 @@ export class HttpHealthIndicator extends BaseHealthIndicator {
 		}
 
 		try {
-			// Check all configured health check URLs
 			const results = await Promise.allSettled(
 				this.healthCheckUrls.map(async (url) => {
 					try {
@@ -65,7 +63,6 @@ export class HttpHealthIndicator extends BaseHealthIndicator {
 				}),
 			)
 
-			// Process results
 			const checks = results.map((result) => {
 				if (result.status === 'fulfilled') {
 					return result.value

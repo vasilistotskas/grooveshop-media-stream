@@ -34,7 +34,7 @@ let FetchResourceResponseJob = FetchResourceResponseJob_1 = class FetchResourceR
                     status: error.response?.status ?? 404,
                     statusText: error.response?.statusText ?? 'Bad Request',
                     headers: {},
-                    config: error.config,
+                    config: error.config || {},
                     data: null,
                 };
             }

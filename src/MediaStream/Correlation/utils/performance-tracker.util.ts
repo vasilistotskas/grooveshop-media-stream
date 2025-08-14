@@ -14,7 +14,6 @@ export class PerformanceTracker {
 	private static phases = new Map<string, PerformancePhase[]>()
 
 	private static getCorrelationService(): CorrelationService {
-		// Create a new instance each time to avoid static context issues
 		return new CorrelationService()
 	}
 
@@ -56,7 +55,6 @@ export class PerformanceTracker {
 		if (!phases)
 			return null
 
-		// Find the most recent phase with this name that hasn't ended
 		const phase = phases
 			.slice()
 			.reverse()
@@ -71,7 +69,7 @@ export class PerformanceTracker {
 		}
 
 		phase.endTime = process.hrtime.bigint()
-		phase.duration = Number(phase.endTime - phase.startTime) / 1_000_000 // Convert to milliseconds
+		phase.duration = Number(phase.endTime - phase.startTime) / 1_000_000
 
 		if (metadata) {
 			phase.metadata = { ...phase.metadata, ...metadata }
@@ -196,7 +194,6 @@ export class PerformanceTracker {
 			'PerformanceTracker',
 		)
 
-		// Clear phases after logging
 		this.clearPhases()
 	}
 }

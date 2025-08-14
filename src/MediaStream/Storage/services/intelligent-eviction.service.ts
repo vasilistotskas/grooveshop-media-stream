@@ -24,7 +24,7 @@ export interface EvictionConfig {
 	aggressiveness: 'conservative' | 'moderate' | 'aggressive'
 	preservePopular: boolean
 	minAccessCount: number
-	maxFileAge: number // in days
+	maxFileAge: number
 }
 
 @Injectable()
@@ -61,7 +61,6 @@ export class IntelligentEvictionService {
 				IntelligentEvictionService.name,
 			)
 
-			// Get current storage stats and eviction candidates
 			await this.storageMonitoring.getStorageStats()
 			const candidates = await this.storageMonitoring.getEvictionCandidates(targetSize)
 
@@ -75,7 +74,6 @@ export class IntelligentEvictionService {
 				}
 			}
 
-			// Apply selected strategy
 			const strategy = this.strategies.get(this.config.strategy)
 			if (!strategy) {
 				throw new Error(`Unknown eviction strategy: ${this.config.strategy}`)
@@ -83,7 +81,6 @@ export class IntelligentEvictionService {
 
 			const finalCandidates = await strategy.execute(candidates, targetSize || 0)
 
-			// Execute eviction
 			const result = await this.evictFiles(finalCandidates)
 			result.strategy = this.config.strategy
 			result.duration = Date.now() - startTime
@@ -128,15 +125,12 @@ export class IntelligentEvictionService {
 			}
 		}
 
-		// Calculate target size based on threshold status
 		let targetReduction: number
 
 		if (thresholdCheck.status === 'critical') {
-			// Aggressive cleanup - free 40% of current storage
 			targetReduction = Math.floor(thresholdCheck.stats.totalSize * 0.4)
 		}
 		else {
-			// Moderate cleanup - free 20% of current storage
 			targetReduction = Math.floor(thresholdCheck.stats.totalSize * 0.2)
 		}
 
@@ -173,7 +167,6 @@ export class IntelligentEvictionService {
 	}
 
 	private initializeStrategies(): void {
-		// LRU Strategy - Least Recently Used
 		this.strategies.set('lru', {
 			name: 'LRU',
 			description: 'Evict least recently used files',
@@ -184,7 +177,6 @@ export class IntelligentEvictionService {
 			},
 		})
 
-		// LFU Strategy - Least Frequently Used
 		this.strategies.set('lfu', {
 			name: 'LFU',
 			description: 'Evict least frequently used files',
@@ -195,7 +187,6 @@ export class IntelligentEvictionService {
 			},
 		})
 
-		// Size-based Strategy - Largest files first
 		this.strategies.set('size-based', {
 			name: 'Size-based',
 			description: 'Evict largest files first',
@@ -206,7 +197,6 @@ export class IntelligentEvictionService {
 			},
 		})
 
-		// Age-based Strategy - Oldest files first
 		this.strategies.set('age-based', {
 			name: 'Age-based',
 			description: 'Evict oldest files first',
@@ -221,12 +211,10 @@ export class IntelligentEvictionService {
 			},
 		})
 
-		// Intelligent Strategy - Combines multiple factors
 		this.strategies.set('intelligent', {
 			name: 'Intelligent',
 			description: 'Combines access patterns, size, and age for optimal eviction',
 			execute: async (candidates: AccessPattern[], targetSize: number) => {
-				// Filter out popular files if configured
 				let filtered = candidates
 				if (this.config.preservePopular) {
 					filtered = candidates.filter(candidate =>
@@ -234,11 +222,9 @@ export class IntelligentEvictionService {
 					)
 				}
 
-				// Apply aggressiveness factor
 				const aggressivenessMultiplier = this.getAggressivenessMultiplier()
 				const adjustedTargetSize = targetSize * aggressivenessMultiplier
 
-				// Score-based selection (already sorted by eviction score)
 				return filtered.slice(0, this.calculateFileCount(filtered, adjustedTargetSize))
 			},
 		})

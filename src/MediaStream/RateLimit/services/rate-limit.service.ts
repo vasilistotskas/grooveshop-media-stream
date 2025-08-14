@@ -29,9 +29,9 @@ export class RateLimitService {
 	private readonly _logger = new Logger(RateLimitService.name)
 	private readonly requestCounts = new Map<string, { count: number, resetTime: number }>()
 	private readonly systemLoadThresholds = {
-		cpu: 80, // 80% CPU usage
-		memory: 85, // 85% memory usage
-		connections: 1000, // 1000 active connections
+		cpu: 80,
+		memory: 85,
+		connections: 1000,
 	}
 
 	constructor(
@@ -50,7 +50,6 @@ export class RateLimitService {
 	 * Generate key based on IP and user agent for more granular control
 	 */
 	generateAdvancedKey(ip: string, userAgent: string, requestType: string): string {
-		// Create a simple hash of user agent to avoid storing full strings
 		const userAgentHash = this.simpleHash(userAgent || 'unknown')
 		return `${ip}:${userAgentHash}:${requestType}`
 	}
@@ -91,14 +90,12 @@ export class RateLimitService {
 		const now = Date.now()
 		const windowStart = now - config.windowMs
 
-		// Clean up old entries
 		this.cleanupOldEntries(windowStart)
 
 		let entry = this.requestCounts.get(key)
 		const resetTime = new Date(now + config.windowMs)
 
 		if (!entry || entry.resetTime <= now) {
-			// First request in window or window expired - create new entry
 			entry = { count: 1, resetTime: now + config.windowMs }
 			this.requestCounts.set(key, entry)
 
@@ -113,7 +110,6 @@ export class RateLimitService {
 			}
 		}
 
-		// Atomic increment - increment first, then check
 		entry.count += 1
 		const currentCount = entry.count
 		const allowed = currentCount <= config.max
@@ -151,7 +147,6 @@ export class RateLimitService {
 	 * Calculate adaptive rate limit based on system load
 	 */
 	async calculateAdaptiveLimit(baseLimit: number): Promise<number> {
-		// Disable adaptive rate limiting in test environment for predictable behavior
 		if (process.env.NODE_ENV === 'test') {
 			return baseLimit
 		}
@@ -160,19 +155,16 @@ export class RateLimitService {
 
 		let adaptiveLimit = baseLimit
 
-		// Reduce limit based on memory usage
 		if (systemLoad.memoryUsage > this.systemLoadThresholds.memory) {
 			const reductionFactor = Math.min(0.5, (systemLoad.memoryUsage - this.systemLoadThresholds.memory) / 20)
 			adaptiveLimit = Math.floor(adaptiveLimit * (1 - reductionFactor))
 		}
 
-		// Reduce limit based on CPU usage
 		if (systemLoad.cpuUsage > this.systemLoadThresholds.cpu) {
 			const reductionFactor = Math.min(0.5, (systemLoad.cpuUsage - this.systemLoadThresholds.cpu) / 20)
 			adaptiveLimit = Math.floor(adaptiveLimit * (1 - reductionFactor))
 		}
 
-		// Ensure minimum limit
 		return Math.max(1, adaptiveLimit)
 	}
 
@@ -180,12 +172,10 @@ export class RateLimitService {
 	 * Record rate limit metrics
 	 */
 	recordRateLimitMetrics(requestType: string, allowed: boolean, info: RateLimitInfo): void {
-		// Record rate limit metrics using error tracking
 		if (!allowed) {
 			this.metricsService.recordError('rate_limit_exceeded', requestType)
 		}
 
-		// Record custom rate limit metrics if available
 		try {
 			this.metricsService.getRegistry()
 
@@ -222,7 +212,7 @@ export class RateLimitService {
 		for (let i = 0; i < str.length; i++) {
 			const char = str.charCodeAt(i)
 			hash = ((hash << 5) - hash) + char
-			hash = hash & hash // Convert to 32-bit integer
+			hash = hash & hash
 		}
 		return Math.abs(hash).toString(36)
 	}

@@ -39,13 +39,11 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 		private readonly _httpService: HttpService,
 		private readonly _configService: ConfigService,
 	) {
-		// Load configuration with fallbacks
 		this.maxRetries = this._configService.getOptional('http.retry.retries', 3)
 		this.retryDelay = this._configService.getOptional('http.retry.retryDelay', 1000)
 		this.maxRetryDelay = this._configService.getOptional('http.retry.maxRetryDelay', 10000)
 		this.timeout = this._configService.getOptional('http.connectionPool.timeout', 30000)
 
-		// Create circuit breaker
 		this.circuitBreaker = new CircuitBreaker({
 			failureThreshold: this._configService.getOptional('http.circuitBreaker.failureThreshold', 5),
 			resetTimeout: this._configService.getOptional('http.circuitBreaker.resetTimeout', 60000),
@@ -53,7 +51,6 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 			minimumRequests: 5,
 		})
 
-		// Create HTTP agents with keep-alive
 		const maxSockets = this._configService.getOptional('http.connectionPool.maxSockets', 50)
 		const keepAliveMsecs = this._configService.getOptional('http.connectionPool.keepAliveMsecs', 1000)
 
@@ -69,7 +66,6 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 			maxSockets,
 		})
 
-		// Configure axios
 		this.configureAxios()
 	}
 
@@ -78,7 +74,6 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	}
 
 	async onModuleDestroy(): Promise<void> {
-		// Close agents
 		this.httpAgent.destroy()
 		this.httpsAgent.destroy()
 		CorrelatedLogger.log('HTTP client service destroyed', HttpClientService.name)
@@ -174,7 +169,6 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	 * Execute a request with circuit breaker and retry logic
 	 */
 	private async executeRequest<T>(requestFn: () => any): Promise<AxiosResponse<T>> {
-		// Check if circuit breaker is open
 		if (this.circuitBreaker.isOpen()) {
 			throw new Error('Circuit breaker is open')
 		}
@@ -184,21 +178,17 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 		this.stats.totalRequests++
 
 		try {
-			// Execute request with retry logic
 			const response: AxiosResponse<T> = await lastValueFrom(
 				requestFn().pipe(
 					retry({
 						count: this.maxRetries,
 						delay: (error, retryCount) => {
-							// Don't retry if not a retryable error
 							if (!this.isRetryableError(error)) {
 								return throwError(() => error)
 							}
 
-							// Increment retry counter
 							this.stats.retriedRequests++
 
-							// Calculate exponential backoff delay
 							const delayMs = Math.min(
 								this.retryDelay * 2 ** (retryCount - 1),
 								this.maxRetryDelay,
@@ -209,7 +199,6 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 								HttpClientService.name,
 							)
 
-							// Return a timer observable for the delay
 							return timer(delayMs)
 						},
 					}),
@@ -235,7 +224,6 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 				),
 			)
 
-			// Update response time statistics
 			const responseTime = performance.now() - startTime
 			this.totalResponseTime += responseTime
 			this.stats.averageResponseTime = this.totalResponseTime / this.stats.successfulRequests
@@ -243,7 +231,6 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 			return response
 		}
 		catch (error: unknown) {
-			// Update response time for failed requests too
 			const responseTime = performance.now() - startTime
 			this.totalResponseTime += responseTime
 
@@ -258,12 +245,10 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	 * Check if an error is retryable
 	 */
 	private isRetryableError(error: any): boolean {
-		// Network errors are always retryable
 		if ((error as any).code && ['ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'ENOTFOUND'].includes((error as any).code)) {
 			return true
 		}
 
-		// Check if status code is in the retry list
 		if (error.response && [408, 429, 500, 502, 503, 504].includes(error.response.status)) {
 			return true
 		}
@@ -287,7 +272,6 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	 * Configure axios defaults
 	 */
 	private configureAxios(): void {
-		// Set default timeout
 		this._httpService.axiosRef.defaults.timeout = this.timeout
 	}
 }

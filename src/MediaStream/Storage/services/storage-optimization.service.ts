@@ -27,7 +27,7 @@ export interface OptimizationConfig {
 	popularFileThreshold: number
 	compressionLevel: number
 	createBackups: boolean
-	maxOptimizationTime: number // in milliseconds
+	maxOptimizationTime: number
 }
 
 export interface FileOptimization {
@@ -59,7 +59,7 @@ export class StorageOptimizationService implements OnModuleInit {
 			popularFileThreshold: this._configService.getOptional('storage.optimization.popularThreshold', 10),
 			compressionLevel: this._configService.getOptional('storage.optimization.compressionLevel', 6),
 			createBackups: this._configService.getOptional('storage.optimization.createBackups', false),
-			maxOptimizationTime: this._configService.getOptional('storage.optimization.maxTime', 600000), // 10 minutes
+			maxOptimizationTime: this._configService.getOptional('storage.optimization.maxTime', 600000),
 		}
 
 		this.initializeStrategies()
@@ -102,7 +102,6 @@ export class StorageOptimizationService implements OnModuleInit {
 				}
 			}
 
-			// Filter for frequently accessed files
 			const popularFiles = stats.accessPatterns.filter(
 				pattern => pattern.accessCount >= this.config.popularFileThreshold,
 			)
@@ -117,7 +116,6 @@ export class StorageOptimizationService implements OnModuleInit {
 				}
 			}
 
-			// Apply optimization strategies
 			let totalFilesOptimized = 0
 			let totalSizeReduced = 0
 			const allErrors: string[] = []
@@ -225,7 +223,6 @@ export class StorageOptimizationService implements OnModuleInit {
 	}
 
 	private initializeStrategies(): void {
-		// Compression Strategy
 		this.strategies.set('compression', {
 			name: 'Compression',
 			description: 'Compress frequently accessed files using gzip',
@@ -258,7 +255,6 @@ export class StorageOptimizationService implements OnModuleInit {
 			},
 		})
 
-		// Deduplication Strategy
 		this.strategies.set('deduplication', {
 			name: 'Deduplication',
 			description: 'Remove duplicate files and create hard links',
@@ -290,7 +286,6 @@ export class StorageOptimizationService implements OnModuleInit {
 			},
 		})
 
-		// Prefetch Strategy
 		this.strategies.set('prefetch', {
 			name: 'Prefetch',
 			description: 'Move frequently accessed files to faster storage tier',
@@ -312,7 +307,6 @@ export class StorageOptimizationService implements OnModuleInit {
 		const filePath = join(this.storageDirectory, file.file)
 		const compressedPath = `${filePath}.gz`
 
-		// Skip if already compressed or if file is too small
 		if (file.extension === '.gz' || file.size < 1024) {
 			return null
 		}
@@ -328,7 +322,6 @@ export class StorageOptimizationService implements OnModuleInit {
 				})
 			})
 
-			// Only keep compressed version if it's significantly smaller
 			const compressionRatio = compressedData.length / originalData.length
 			if (compressionRatio < 0.8) {
 				if (this.config.createBackups) {
@@ -353,7 +346,7 @@ export class StorageOptimizationService implements OnModuleInit {
 				`Failed to compress ${file.file}: ${(error as Error).message}`,
 				StorageOptimizationService.name,
 			)
-			throw error // Rethrow so compression strategy can catch it
+			throw error
 		}
 
 		return null
@@ -382,7 +375,6 @@ export class StorageOptimizationService implements OnModuleInit {
 			}
 		}
 
-		// Return only groups with duplicates
 		return Array.from(hashMap.values()).filter(group => group.length > 1)
 	}
 
@@ -394,7 +386,6 @@ export class StorageOptimizationService implements OnModuleInit {
 			return { filesProcessed: 0, sizeReduced: 0 }
 		}
 
-		// Keep the most frequently accessed file as the original
 		const sortedFiles = duplicateGroup.sort((a: any, b: any) => b.accessCount - a.accessCount)
 		const originalFile = sortedFiles[0]
 		const duplicates = sortedFiles.slice(1)
@@ -407,7 +398,6 @@ export class StorageOptimizationService implements OnModuleInit {
 				const originalPath = join(this.storageDirectory, originalFile.file)
 				const duplicatePath = join(this.storageDirectory, duplicate.file)
 
-				// Create hard link (or copy if hard links not supported)
 				await fs.unlink(duplicatePath)
 				await fs.link(originalPath, duplicatePath)
 

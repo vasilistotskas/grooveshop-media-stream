@@ -20,7 +20,6 @@ let MediaStreamExceptionFilter = MediaStreamExceptionFilter_1 = class MediaStrea
     constructor(httpAdapterHost, _correlationService) {
         this.httpAdapterHost = httpAdapterHost;
         this._correlationService = _correlationService;
-        this._logger = new common_1.Logger(MediaStreamExceptionFilter_1.name);
     }
     catch(exception, host) {
         const { httpAdapter } = this.httpAdapterHost;

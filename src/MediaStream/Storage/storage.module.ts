@@ -3,11 +3,9 @@ import { CorrelationModule } from '@microservice/Correlation/correlation.module'
 import { Module } from '@nestjs/common'
 import { ScheduleModule } from '@nestjs/schedule'
 
-// Health Indicators
 import { StorageHealthIndicator } from './indicators/storage-health.indicator'
 import { IntelligentEvictionService } from './services/intelligent-eviction.service'
 import { StorageCleanupService } from './services/storage-cleanup.service'
-// Services
 import { StorageMonitoringService } from './services/storage-monitoring.service'
 
 import { StorageOptimizationService } from './services/storage-optimization.service'
@@ -19,13 +17,10 @@ import { StorageOptimizationService } from './services/storage-optimization.serv
 		ScheduleModule.forRoot(),
 	],
 	providers: [
-		// Services
 		StorageMonitoringService,
 		IntelligentEvictionService,
 		StorageCleanupService,
 		StorageOptimizationService,
-
-		// Health Indicators
 		StorageHealthIndicator,
 	],
 	exports: [

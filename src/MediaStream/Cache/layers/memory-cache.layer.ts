@@ -5,7 +5,7 @@ import { MemoryCacheService } from '../services/memory-cache.service'
 @Injectable()
 export class MemoryCacheLayer implements CacheLayer {
 	private readonly layerName = 'memory'
-	private readonly priority = 1 // Highest priority
+	private readonly priority = 1
 
 	constructor(private readonly memoryCacheService: MemoryCacheService) {}
 
@@ -37,7 +37,7 @@ export class MemoryCacheLayer implements CacheLayer {
 			keys: stats.keys,
 			hitRate: stats.hitRate,
 			memoryUsage: stats.memoryUsage || (stats.vsize + stats.ksize),
-			errors: 0, // Memory cache doesn't track errors separately
+			errors: 0,
 		}
 	}
 

@@ -1,4 +1,4 @@
-import { ConfigService } from '../../../MediaStream/Config/config.service';
+import { ConfigService } from '@microservice/Config/config.service';
 import { ISanitizer } from '../interfaces/validator.interface';
 export declare class InputSanitizationService implements ISanitizer<any> {
     private readonly _configService;

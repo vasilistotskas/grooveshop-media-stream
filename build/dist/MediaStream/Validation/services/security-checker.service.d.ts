@@ -1,4 +1,4 @@
-import { ConfigService } from '../../../MediaStream/Config/config.service';
+import { ConfigService } from '@microservice/Config/config.service';
 import { ISecurityChecker, SecurityEvent } from '../interfaces/validator.interface';
 export declare class SecurityCheckerService implements ISecurityChecker {
     private readonly _configService;

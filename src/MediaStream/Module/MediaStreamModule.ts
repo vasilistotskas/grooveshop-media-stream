@@ -24,7 +24,6 @@ import ValidateCacheImageRequestRule from '@microservice/Rule/ValidateCacheImage
 import { StorageModule } from '@microservice/Storage/storage.module'
 import { TasksModule } from '@microservice/Tasks/tasks.module'
 import { ValidationModule } from '@microservice/Validation/validation.module'
-import { HttpModule as NestHttpModule } from '@nestjs/axios'
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common'
 import { APP_FILTER, APP_GUARD, HttpAdapterHost } from '@nestjs/core'
 import { ScheduleModule } from '@nestjs/schedule'
@@ -53,7 +52,6 @@ const rules = [ValidateCacheImageRequestRule, ValidateCacheImageRequestResizeTar
 		CorrelationModule,
 		HealthModule,
 		HttpModule,
-		NestHttpModule.register({}), // Add the original HttpModule for backward compatibility
 		MetricsModule,
 		MonitoringModule,
 		QueueModule,

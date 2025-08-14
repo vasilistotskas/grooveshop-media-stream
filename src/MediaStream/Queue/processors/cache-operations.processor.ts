@@ -40,7 +40,6 @@ export class CacheOperationsProcessor {
 					let successful = 0
 					let failed = 0
 
-					// Process images in batches
 					for (let i = 0; i < imageUrls.length; i += batchSize) {
 						const batch = imageUrls.slice(i, i + batchSize)
 
@@ -60,7 +59,6 @@ export class CacheOperationsProcessor {
 						await Promise.allSettled(batchPromises)
 						processed += batch.length
 
-						// Update progress
 						const progress = Math.round((processed / imageUrls.length) * 100)
 						this._logger.debug(`Cache warming progress: ${progress}% (${processed}/${imageUrls.length})`)
 					}
@@ -154,24 +152,21 @@ export class CacheOperationsProcessor {
 
 	private async warmCacheForImage(imageUrl: string): Promise<void> {
 		try {
-			// Generate cache key
 			const cacheKey = this.generateCacheKey(imageUrl)
 
-			// Check if already cached
 			const cached = await this.cacheManager.get('images', cacheKey)
 			if (cached) {
 				this._logger.debug(`Image already cached: ${imageUrl}`)
 				return
 			}
 
-			// Download and cache image
 			const response = await this.httpClient.get(imageUrl, {
 				responseType: 'arraybuffer',
 				timeout: 30000,
 			})
 
 			const buffer = Buffer.from(response.data)
-			await this.cacheManager.set('images', cacheKey, buffer.toString('base64'), 3600) // 1 hour TTL
+			await this.cacheManager.set('images', cacheKey, buffer.toString('base64'), 3600)
 
 			this._logger.debug(`Cached image: ${imageUrl}`)
 		}
@@ -182,10 +177,8 @@ export class CacheOperationsProcessor {
 
 	private async cleanupMemoryCache(): Promise<{ cleaned: number }> {
 		try {
-			// Get cache stats to determine cleanup strategy
 			await this.cacheManager.getStats()
 
-			// For now, we'll just clear expired items
 			// In a real implementation, this would be more sophisticated
 			const cleaned = 0
 
@@ -212,7 +205,6 @@ export class CacheOperationsProcessor {
 					try {
 						const stats = await fs.stat(filePath)
 
-						// Check age
 						const age = now - stats.mtime.getTime()
 						if (age > maxAge) {
 							await fs.unlink(filePath)
@@ -220,7 +212,6 @@ export class CacheOperationsProcessor {
 							continue
 						}
 
-						// Check size
 						if (stats.size > maxSize) {
 							await fs.unlink(filePath)
 							cleaned++

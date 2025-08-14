@@ -1,5 +1,5 @@
+import { CorrelationService } from '@microservice/Correlation/services/correlation.service';
 import { ConfigService } from '@nestjs/config';
-import { CorrelationService } from '../../Correlation/services/correlation.service';
 import { CustomMetric, MetricType, SystemHealth } from '../interfaces/monitoring.interface';
 export declare class MonitoringService {
     private readonly _configService;

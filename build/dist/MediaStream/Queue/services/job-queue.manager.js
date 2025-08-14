@@ -11,8 +11,8 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var JobQueueManager_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.JobQueueManager = void 0;
-const common_1 = require("@nestjs/common");
 const correlation_service_1 = require("../../Correlation/services/correlation.service");
+const common_1 = require("@nestjs/common");
 const cache_operations_processor_1 = require("../processors/cache-operations.processor");
 const image_processing_processor_1 = require("../processors/image-processing.processor");
 const job_types_1 = require("../types/job.types");
@@ -36,7 +36,7 @@ let JobQueueManager = JobQueueManager_1 = class JobQueueManager {
         this._logger.log('Job queue manager initialized');
     }
     async addImageProcessingJob(data, options = {}) {
-        const correlationId = this._correlationService.getCorrelationId();
+        const correlationId = this._correlationService.getCorrelationId() || this._correlationService.generateCorrelationId();
         const jobData = {
             ...data,
             correlationId,
@@ -54,7 +54,7 @@ let JobQueueManager = JobQueueManager_1 = class JobQueueManager {
         return await this.queueService.add(job_types_1.JobType.IMAGE_PROCESSING, jobData, jobOptions);
     }
     async addCacheWarmingJob(data, options = {}) {
-        const correlationId = this._correlationService.getCorrelationId();
+        const correlationId = this._correlationService.getCorrelationId() || this._correlationService.generateCorrelationId();
         const jobData = {
             ...data,
             correlationId,
@@ -72,7 +72,7 @@ let JobQueueManager = JobQueueManager_1 = class JobQueueManager {
         return await this.queueService.add(job_types_1.JobType.CACHE_WARMING, jobData, jobOptions);
     }
     async addCacheCleanupJob(data, options = {}) {
-        const correlationId = this._correlationService.getCorrelationId();
+        const correlationId = this._correlationService.getCorrelationId() || this._correlationService.generateCorrelationId();
         const jobData = {
             ...data,
             correlationId,

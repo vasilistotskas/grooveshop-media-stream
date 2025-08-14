@@ -25,7 +25,6 @@ let CacheWarmingService = CacheWarmingService_1 = class CacheWarmingService {
         this.memoryCacheService = memoryCacheService;
         this._configService = _configService;
         this.metricsService = metricsService;
-        this._logger = new common_1.Logger(CacheWarmingService_1.name);
         this.config = this._configService.get('cache.warming') || {
             enabled: true,
             warmupOnStart: true,

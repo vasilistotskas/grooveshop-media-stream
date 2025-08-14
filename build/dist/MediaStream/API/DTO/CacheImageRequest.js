@@ -102,6 +102,8 @@ class ResizeOptions {
 exports.ResizeOptions = ResizeOptions;
 class CacheImageRequest {
     constructor(data) {
+        this.resourceTarget = '';
+        this.resizeOptions = new ResizeOptions();
         Object.assign(this, data);
     }
 }

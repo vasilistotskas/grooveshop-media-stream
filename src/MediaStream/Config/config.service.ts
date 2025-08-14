@@ -62,15 +62,12 @@ export class ConfigService implements OnModuleInit {
 	 * Validate the current configuration
 	 */
 	async validate(): Promise<void> {
-		// Import validation dependencies
 		const { plainToClass } = await import('class-transformer')
 		const { validate } = await import('class-validator')
 		const { AppConfigDto } = await import('@microservice/Config/dto/app-config.dto')
 
-		// Create raw config object from environment variables for validation
 		const rawConfig = this.createRawConfigForValidation()
 
-		// Convert config to DTO and validate
 		const dto = plainToClass(AppConfigDto, rawConfig, {
 			enableImplicitConversion: true,
 			excludeExtraneousValues: false,
@@ -179,7 +176,6 @@ export class ConfigService implements OnModuleInit {
 
 		const newConfig = this.loadConfig()
 
-		// Only update hot-reloadable settings
 		this.updateHotReloadableSettings(newConfig)
 
 		this._logger.log('Hot-reloadable configuration updated successfully')
@@ -197,14 +193,12 @@ export class ConfigService implements OnModuleInit {
 	}
 
 	private loadConfig(): AppConfig {
-		// Server configuration
 		const serverPort = Number.parseInt(this.nestConfigService.get('PORT') || '3003')
 		const serverHost = this.nestConfigService.get('HOST') || '0.0.0.0'
 		const corsOrigin = this.nestConfigService.get('CORS_ORIGIN') || '*'
 		const corsMethods = this.nestConfigService.get('CORS_METHODS') || 'GET'
 		const corsMaxAge = Number.parseInt(this.nestConfigService.get('CORS_MAX_AGE') || '86400')
 
-		// Cache configuration
 		const memoryMaxSize = Number.parseInt(this.nestConfigService.get('CACHE_MEMORY_MAX_SIZE') || '104857600')
 		const memoryDefaultTtl = Number.parseInt(this.nestConfigService.get('CACHE_MEMORY_DEFAULT_TTL') || '3600')
 		const memoryCheckPeriod = Number.parseInt(this.nestConfigService.get('CACHE_MEMORY_CHECK_PERIOD') || '600')
@@ -223,7 +217,6 @@ export class ConfigService implements OnModuleInit {
 		const fileMaxSize = Number.parseInt(this.nestConfigService.get('CACHE_FILE_MAX_SIZE') || '1073741824')
 		const fileCleanupInterval = Number.parseInt(this.nestConfigService.get('CACHE_FILE_CLEANUP_INTERVAL') || '3600')
 
-		// Cache warming configuration
 		const warmingEnabledStr = this.nestConfigService.get('CACHE_WARMING_ENABLED') || 'true'
 		const warmingEnabled = typeof warmingEnabledStr === 'string'
 			? warmingEnabledStr.toLowerCase() === 'true'
@@ -236,7 +229,6 @@ export class ConfigService implements OnModuleInit {
 		const warmingCron = this.nestConfigService.get('CACHE_WARMING_CRON') || '0 */6 * * *'
 		const warmingThreshold = Number.parseInt(this.nestConfigService.get('CACHE_WARMING_THRESHOLD') || '5')
 
-		// Processing configuration
 		const processingMaxConcurrent = Number.parseInt(this.nestConfigService.get('PROCESSING_MAX_CONCURRENT') || '10')
 		const processingTimeout = Number.parseInt(this.nestConfigService.get('PROCESSING_TIMEOUT') || '30000')
 		const processingRetries = Number.parseInt(this.nestConfigService.get('PROCESSING_RETRIES') || '3')
@@ -247,7 +239,6 @@ export class ConfigService implements OnModuleInit {
 			? allowedFormatsStr.split(',').map(format => format.trim().toLowerCase())
 			: allowedFormatsStr
 
-		// Monitoring configuration
 		const monitoringEnabledStr = this.nestConfigService.get('MONITORING_ENABLED') || 'true'
 		const monitoringEnabled = typeof monitoringEnabledStr === 'string'
 			? monitoringEnabledStr.toLowerCase() === 'true'
@@ -256,7 +247,6 @@ export class ConfigService implements OnModuleInit {
 		const monitoringHealthPath = this.nestConfigService.get('MONITORING_HEALTH_PATH') || '/health'
 		const monitoringMetricsPath = this.nestConfigService.get('MONITORING_METRICS_PATH') || '/metrics'
 
-		// External services configuration
 		const djangoUrl = this.nestConfigService.get('NEST_PUBLIC_DJANGO_URL') || 'http://localhost:8000'
 		const nuxtUrl = this.nestConfigService.get('NEST_PUBLIC_NUXT_URL') || 'http://localhost:3000'
 		const externalRequestTimeout = Number.parseInt(this.nestConfigService.get('EXTERNAL_REQUEST_TIMEOUT') || '30000')
@@ -325,17 +315,14 @@ export class ConfigService implements OnModuleInit {
 	}
 
 	private updateHotReloadableSettings(newConfig: AppConfig): void {
-		// Update monitoring settings
 		if (this.isHotReloadable('MONITORING_ENABLED')) {
 			this.config.monitoring.enabled = newConfig.monitoring.enabled
 		}
 
-		// Update processing settings
 		if (this.isHotReloadable('PROCESSING_MAX_CONCURRENT')) {
 			this.config.processing.maxConcurrent = newConfig.processing.maxConcurrent
 		}
 
-		// Update cache settings
 		if (this.isHotReloadable('CACHE_MEMORY_TTL')) {
 			this.config.cache.memory.defaultTtl = newConfig.cache.memory.defaultTtl
 		}

@@ -50,7 +50,6 @@ export class InputSanitizationService implements ISanitizer<any> {
 	}
 
 	private sanitizeString(str: string): string {
-		// Check for dangerous protocols and return empty string if found
 		const lowerStr = str.toLowerCase()
 		const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'ftp:', 'about:']
 		for (const protocol of dangerousProtocols) {
@@ -59,12 +58,11 @@ export class InputSanitizationService implements ISanitizer<any> {
 			}
 		}
 
-		// Check for patterns that should result in empty string (standalone dangerous patterns)
 		const emptyStringPatterns = [
-			/^\s*on\w+\s*=.*$/i, // Standalone event handlers
-			/^\s*javascript\s*:.*$/i, // Standalone JavaScript protocol
-			/^\s*vbscript\s*:.*$/i, // Standalone VBScript protocol
-			/^\s*data\s*:.*$/i, // Standalone Data URLs
+			/^\s*on\w+\s*=.*$/i,
+			/^\s*javascript\s*:.*$/i,
+			/^\s*vbscript\s*:.*$/i,
+			/^\s*data\s*:.*$/i,
 		]
 
 		for (const pattern of emptyStringPatterns) {
@@ -74,25 +72,20 @@ export class InputSanitizationService implements ISanitizer<any> {
 			}
 		}
 
-		// Use iterative sanitization to handle nested patterns and prevent bypasses
 		let sanitized = str
 		let previousLength = 0
 		let iterations = 0
-		const maxIterations = 10 // Prevent infinite loops
+		const maxIterations = 10
 
-		// Keep sanitizing until no more changes occur or max iterations reached
 		while (sanitized.length !== previousLength && iterations < maxIterations) {
 			previousLength = sanitized.length
 			iterations++
 
-			// Remove dangerous patterns iteratively
 			sanitized = this.performSanitizationPass(sanitized)
 		}
 
-		// Final cleanup
 		sanitized = sanitized.trim()
 
-		// Limit string length to prevent DoS
 		const maxLength = 2048
 		if (sanitized.length > maxLength) {
 			sanitized = sanitized.substring(0, maxLength)
@@ -104,23 +97,12 @@ export class InputSanitizationService implements ISanitizer<any> {
 
 	private performSanitizationPass(input: string): string {
 		let result = input
-
-		// Use comprehensive HTML tag removal that handles incomplete tags
 		result = this.removeHtmlTags(result)
-
-		// Remove dangerous patterns using robust character-by-character approach
 		result = this.removeEventHandlers(result)
 		result = this.removeStyleAttributes(result)
-
-		// Remove dangerous protocols with comprehensive pattern matching
 		result = this.removeDangerousProtocols(result)
-
-		// Remove CSS expressions and eval with comprehensive matching
 		result = this.removeDangerousJavaScript(result)
-
-		// Remove HTML entities with comprehensive matching
 		result = this.removeHtmlEntities(result)
-
 		return result
 	}
 
@@ -128,10 +110,8 @@ export class InputSanitizationService implements ISanitizer<any> {
 		const sanitized: any = {}
 
 		for (const [key, value] of Object.entries(obj)) {
-			// Sanitize the key itself
 			const sanitizedKey = this.sanitizeString(String(key))
 
-			// Recursively sanitize the value
 			sanitized[sanitizedKey] = await this.sanitize(value)
 		}
 
@@ -140,7 +120,6 @@ export class InputSanitizationService implements ISanitizer<any> {
 
 	validateUrl(url: string): boolean {
 		try {
-			// Pre-validate URL string for dangerous protocols
 			const lowerUrl = url.toLowerCase().trim()
 			const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'ftp:', 'about:']
 			for (const protocol of dangerousProtocols) {
@@ -152,19 +131,16 @@ export class InputSanitizationService implements ISanitizer<any> {
 
 			const urlObj = new URL(url)
 
-			// Only allow HTTP and HTTPS protocols
 			if (!['http:', 'https:'].includes(urlObj.protocol)) {
 				this._logger.warn(`Invalid protocol: ${urlObj.protocol}`)
 				return false
 			}
 
-			// Validate hostname format
 			if (!urlObj.hostname || urlObj.hostname.length === 0) {
 				this._logger.warn('Empty hostname detected')
 				return false
 			}
 
-			// Check against whitelist
 			const allowedDomains = this.getAllowedDomains()
 			const isAllowed = allowedDomains.some(domain =>
 				urlObj.hostname === domain || urlObj.hostname.endsWith(`.${domain}`),
@@ -185,13 +161,13 @@ export class InputSanitizationService implements ISanitizer<any> {
 
 	validateFileSize(sizeBytes: number, format?: string): boolean {
 		const maxSizes = this._configService.getOptional('validation.maxFileSizes', {
-			default: 10 * 1024 * 1024, // 10MB
-			jpeg: 5 * 1024 * 1024, // 5MB
-			jpg: 5 * 1024 * 1024, // 5MB
-			png: 8 * 1024 * 1024, // 8MB
-			webp: 3 * 1024 * 1024, // 3MB
-			gif: 2 * 1024 * 1024, // 2MB
-			svg: 1024 * 1024, // 1MB
+			default: 10 * 1024 * 1024,
+			jpeg: 5 * 1024 * 1024,
+			jpg: 5 * 1024 * 1024,
+			png: 8 * 1024 * 1024,
+			webp: 3 * 1024 * 1024,
+			gif: 2 * 1024 * 1024,
+			svg: 1024 * 1024,
 		})
 
 		const maxSize = format ? (maxSizes as any)[format.toLowerCase()] || maxSizes.default : maxSizes.default
@@ -199,10 +175,9 @@ export class InputSanitizationService implements ISanitizer<any> {
 	}
 
 	validateImageDimensions(width: number, height: number): boolean {
-		// Maximum dimensions
-		const maxWidth = 8192 // 8K width
-		const maxHeight = 8192 // 8K height
-		const maxPixels = 7680 * 4320 // 8K total pixels
+		const maxWidth = 8192
+		const maxHeight = 8192
+		const maxPixels = 7680 * 4320
 
 		if (width <= 0 || height <= 0)
 			return false
@@ -215,8 +190,6 @@ export class InputSanitizationService implements ISanitizer<any> {
 	}
 
 	private removeHtmlTags(input: string): string {
-		// Use character-by-character filtering to completely eliminate HTML injection risks
-		// This approach is more secure than regex-based sanitization
 		const result: string[] = []
 		let insideTag = false
 		let i = 0
@@ -225,21 +198,18 @@ export class InputSanitizationService implements ISanitizer<any> {
 			const char = input[i]
 
 			if (char === '<') {
-				// Start of potential HTML tag - skip everything until >
 				insideTag = true
 				i++
 				continue
 			}
 
 			if (char === '>') {
-				// End of potential HTML tag
 				insideTag = false
 				i++
 				continue
 			}
 
 			if (!insideTag) {
-				// Only include characters that are outside of HTML tags
 				result.push(char)
 			}
 
@@ -250,16 +220,13 @@ export class InputSanitizationService implements ISanitizer<any> {
 	}
 
 	private removeEventHandlers(input: string): string {
-		// Use character-by-character analysis to remove event handlers completely
 		const result: string[] = []
 		let i = 0
 
 		while (i < input.length) {
-			// Look for 'on' followed by word characters and '='
 			if (i <= input.length - 2
 				&& input.substring(i, i + 2).toLowerCase() === 'on'
 				&& this.isWordBoundary(input, i)) {
-				// Found potential event handler, skip it entirely
 				i = this.skipEventHandler(input, i)
 				continue
 			}
@@ -272,16 +239,13 @@ export class InputSanitizationService implements ISanitizer<any> {
 	}
 
 	private removeStyleAttributes(input: string): string {
-		// Use character-by-character analysis to remove style attributes completely
 		const result: string[] = []
 		let i = 0
 
 		while (i < input.length) {
-			// Look for 'style' followed by optional whitespace and '='
 			if (i <= input.length - 5
 				&& input.substring(i, i + 5).toLowerCase() === 'style'
 				&& this.isWordBoundary(input, i)) {
-				// Found potential style attribute, skip it entirely
 				i = this.skipStyleAttribute(input, i)
 				continue
 			}
@@ -294,21 +258,16 @@ export class InputSanitizationService implements ISanitizer<any> {
 	}
 
 	private removeDangerousProtocols(input: string): string {
-		// Comprehensive dangerous protocol removal
 		let result = input
 		let previousResult = ''
 
-		// Keep removing until no more changes occur
 		while (result !== previousResult) {
 			previousResult = result
 
-			// Remove complete dangerous protocol URLs
 			result = result.replace(/(?:javascript|vbscript|data|file|ftp|about)\s*:\S*/gi, '')
 
-			// Remove incomplete protocol declarations
 			result = result.replace(/(?:javascript|vbscript|data|file|ftp|about)\s*:/gi, '')
 
-			// Remove protocol names that could be part of incomplete declarations
 			result = result.replace(/\b(?:javascript|vbscript|data|file|ftp|about)\b/gi, '')
 		}
 
@@ -316,38 +275,25 @@ export class InputSanitizationService implements ISanitizer<any> {
 	}
 
 	private removeDangerousJavaScript(input: string): string {
-		// Comprehensive JavaScript and expression removal - only target specific dangerous patterns
 		let result = input
 		let previousResult = ''
 
-		// Keep removing until no more changes occur
 		while (result !== previousResult) {
 			previousResult = result
-
-			// Remove CSS expressions and eval calls (these are always dangerous)
 			result = result.replace(/(?:expression|eval)\s*\([^)]*\)/gi, '')
-
-			// Remove incomplete expressions
 			result = result.replace(/(?:expression|eval)\s*\(/gi, '')
-
-			// Remove the keywords themselves only for CSS expressions and eval
 			result = result.replace(/\b(?:expression|eval)\b/gi, '')
-
-			// Don't remove other JavaScript keywords as they might be legitimate text content
-			// Only remove them if they appear in very specific dangerous contexts like URLs
 		}
 
 		return result
 	}
 
 	private removeHtmlEntities(input: string): string {
-		// Use character-by-character analysis to remove HTML entities completely
 		const result: string[] = []
 		let i = 0
 
 		while (i < input.length) {
 			if (input[i] === '&') {
-				// Found potential HTML entity, skip it entirely
 				i = this.skipHtmlEntity(input, i)
 				continue
 			}
@@ -360,7 +306,6 @@ export class InputSanitizationService implements ISanitizer<any> {
 	}
 
 	private isWordBoundary(input: string, index: number): boolean {
-		// Check if the position is at a word boundary (start of word)
 		if (index === 0)
 			return true
 		const prevChar = input[index - 1]
@@ -370,37 +315,31 @@ export class InputSanitizationService implements ISanitizer<any> {
 	private skipEventHandler(input: string, startIndex: number): number {
 		let i = startIndex
 
-		// Skip 'on' and any following word characters
 		while (i < input.length && /\w/.test(input[i])) {
 			i++
 		}
 
-		// Skip whitespace
 		while (i < input.length && /\s/.test(input[i])) {
 			i++
 		}
 
-		// If we find '=', skip the entire value
 		if (i < input.length && input[i] === '=') {
-			i++ // skip '='
+			i++
 
-			// Skip whitespace after '='
 			while (i < input.length && /\s/.test(input[i])) {
 				i++
 			}
 
-			// Skip the value (quoted or unquoted)
 			if (i < input.length && (input[i] === '"' || input[i] === '\'')) {
 				const quote = input[i]
-				i++ // skip opening quote
+				i++
 				while (i < input.length && input[i] !== quote) {
 					i++
 				}
 				if (i < input.length)
-					i++ // skip closing quote
+					i++
 			}
 			else {
-				// Skip unquoted value
 				while (i < input.length && !/\s/.test(input[i]) && input[i] !== '>' && input[i] !== '<') {
 					i++
 				}
@@ -411,34 +350,29 @@ export class InputSanitizationService implements ISanitizer<any> {
 	}
 
 	private skipStyleAttribute(input: string, startIndex: number): number {
-		let i = startIndex + 5 // skip 'style'
+		let i = startIndex + 5
 
-		// Skip whitespace
 		while (i < input.length && /\s/.test(input[i])) {
 			i++
 		}
 
-		// If we find '=', skip the entire value
 		if (i < input.length && input[i] === '=') {
-			i++ // skip '='
+			i++
 
-			// Skip whitespace after '='
 			while (i < input.length && /\s/.test(input[i])) {
 				i++
 			}
 
-			// Skip the value (quoted or unquoted)
 			if (i < input.length && (input[i] === '"' || input[i] === '\'')) {
 				const quote = input[i]
-				i++ // skip opening quote
+				i++
 				while (i < input.length && input[i] !== quote) {
 					i++
 				}
 				if (i < input.length)
-					i++ // skip closing quote
+					i++
 			}
 			else {
-				// Skip unquoted value
 				while (i < input.length && !/\s/.test(input[i]) && input[i] !== '>' && input[i] !== '<') {
 					i++
 				}
@@ -449,14 +383,12 @@ export class InputSanitizationService implements ISanitizer<any> {
 	}
 
 	private skipHtmlEntity(input: string, startIndex: number): number {
-		let i = startIndex + 1 // skip '&'
+		let i = startIndex + 1
 
-		// Skip until we find ';' or reach end of potential entity
 		while (i < input.length && input[i] !== ';' && /[#\w]/.test(input[i])) {
 			i++
 		}
 
-		// If we found ';', skip it too
 		if (i < input.length && input[i] === ';') {
 			i++
 		}

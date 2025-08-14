@@ -19,7 +19,6 @@ export class AlertingHealthIndicator {
 			const alertStats = this.alertService.getAlertStats()
 			const activeAlerts = this.alertService.getActiveAlerts()
 
-			// Consider system unhealthy if there are critical alerts
 			const criticalAlerts = activeAlerts.filter(alert => alert.severity === AlertSeverity.CRITICAL)
 			const highAlerts = activeAlerts.filter(alert => alert.severity === AlertSeverity.HIGH)
 
@@ -71,7 +70,7 @@ export class AlertingHealthIndicator {
 		try {
 			const alertStats = this.alertService.getAlertStats()
 			const activeAlerts = this.alertService.getActiveAlerts()
-			const recentAlerts = this.alertService.getAlertHistory(Date.now() - 24 * 60 * 60 * 1000) // Last 24 hours
+			const recentAlerts = this.alertService.getAlertHistory(Date.now() - 24 * 60 * 60 * 1000)
 
 			const criticalAlerts = activeAlerts.filter(alert => alert.severity === AlertSeverity.CRITICAL)
 			const healthy = criticalAlerts.length === 0
@@ -80,7 +79,7 @@ export class AlertingHealthIndicator {
 				healthy,
 				alertStats,
 				activeAlerts,
-				recentAlerts: recentAlerts.slice(0, 10), // Last 10 alerts
+				recentAlerts: recentAlerts.slice(0, 10),
 			}
 		}
 		catch (error: unknown) {
@@ -111,7 +110,7 @@ export class AlertingHealthIndicator {
 		recentActivity: boolean
 	}> {
 		const alertStats = this.alertService.getAlertStats()
-		const recentAlerts = this.alertService.getAlertHistory(Date.now() - 60 * 60 * 1000) // Last hour
+		const recentAlerts = this.alertService.getAlertHistory(Date.now() - 60 * 60 * 1000)
 
 		return {
 			rulesConfigured: alertStats.totalRules > 0,

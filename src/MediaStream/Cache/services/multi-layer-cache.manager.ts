@@ -35,7 +35,6 @@ export class MultiLayerCacheManager implements OnModuleInit {
 	}
 
 	async onModuleInit(): Promise<void> {
-		// Initialize layers in priority order
 		this.layers = [
 			this.memoryCacheLayer,
 			this.redisCacheLayer,
@@ -47,7 +46,6 @@ export class MultiLayerCacheManager implements OnModuleInit {
 			MultiLayerCacheManager.name,
 		)
 
-		// Start preloading if enabled
 		if (this.preloadingEnabled) {
 			this.startPreloading()
 		}
@@ -60,7 +58,6 @@ export class MultiLayerCacheManager implements OnModuleInit {
 		const key = this.keyStrategy.generateKey(namespace, identifier, params)
 		this.trackKeyAccess(key)
 
-		// Try each layer in priority order
 		for (const layer of this.layers) {
 			try {
 				const value = await layer.get<T>(key)
@@ -70,10 +67,8 @@ export class MultiLayerCacheManager implements OnModuleInit {
 						MultiLayerCacheManager.name,
 					)
 
-					// Update metrics
 					this.metricsService.recordCacheOperation('get', layer.getLayerName(), 'hit')
 
-					// Backfill higher priority layers
 					await this.backfillLayers(key, value, layer)
 
 					return value
@@ -87,7 +82,6 @@ export class MultiLayerCacheManager implements OnModuleInit {
 			}
 		}
 
-		// Cache miss across all layers
 		CorrelatedLogger.debug(`Cache MISS for key: ${key}`, MultiLayerCacheManager.name)
 		this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss')
 
@@ -106,7 +100,6 @@ export class MultiLayerCacheManager implements OnModuleInit {
 	): Promise<void> {
 		const key = this.keyStrategy.generateKey(namespace, identifier, params)
 
-		// Set in all layers concurrently
 		const setPromises = this.layers.map(async (layer) => {
 			try {
 				await layer.set(key, value, ttl)
@@ -133,7 +126,6 @@ export class MultiLayerCacheManager implements OnModuleInit {
 	async delete(namespace: string, identifier: string, params?: Record<string, any>): Promise<void> {
 		const key = this.keyStrategy.generateKey(namespace, identifier, params)
 
-		// Delete from all layers concurrently
 		const deletePromises = this.layers.map(async (layer) => {
 			try {
 				await layer.delete(key)
@@ -161,7 +153,6 @@ export class MultiLayerCacheManager implements OnModuleInit {
 	async exists(namespace: string, identifier: string, params?: Record<string, any>): Promise<boolean> {
 		const key = this.keyStrategy.generateKey(namespace, identifier, params)
 
-		// Check layers in priority order
 		for (const layer of this.layers) {
 			try {
 				if (await layer.exists(key)) {
@@ -208,14 +199,11 @@ export class MultiLayerCacheManager implements OnModuleInit {
 	 * Invalidate keys by namespace
 	 */
 	async invalidateNamespace(namespace: string): Promise<void> {
-		// This is a simplified implementation
-		// In a production system, you'd want more sophisticated pattern matching
 		CorrelatedLogger.debug(
 			`Invalidating cache namespace: ${namespace}`,
 			MultiLayerCacheManager.name,
 		)
 
-		// For now, we'll clear all layers as we don't have pattern matching implemented
 		await this.clear()
 		this.metricsService.recordCacheOperation('flush', 'multi-layer', 'success')
 	}
@@ -229,7 +217,6 @@ export class MultiLayerCacheManager implements OnModuleInit {
 		let totalMisses = 0
 		const layerHitDistribution: Record<string, number> = {}
 
-		// Collect stats from all layers
 		for (const layer of this.layers) {
 			try {
 				const stats = await layer.getStats()
@@ -275,7 +262,7 @@ export class MultiLayerCacheManager implements OnModuleInit {
 
 		const popularKeys = Array.from(this.popularKeys.entries())
 			.sort(([, a], [, b]) => b - a)
-			.slice(0, 100) // Top 100 popular keys
+			.slice(0, 100)
 			.map(([key]) => key)
 
 		CorrelatedLogger.debug(
@@ -285,11 +272,9 @@ export class MultiLayerCacheManager implements OnModuleInit {
 
 		for (const key of popularKeys) {
 			try {
-				// Try to get from lower priority layers and set in higher priority ones
 				for (let i = this.layers.length - 1; i >= 0; i--) {
 					const value = await this.layers[i].get(key)
 					if (value !== null) {
-						// Backfill higher priority layers
 						for (let j = 0; j < i; j++) {
 							await this.layers[j].set(key, value)
 						}
@@ -312,10 +297,9 @@ export class MultiLayerCacheManager implements OnModuleInit {
 	private async backfillLayers<T>(key: string, value: T, sourceLayer: CacheLayer): Promise<void> {
 		const sourceIndex = this.layers.findIndex(layer => layer === sourceLayer)
 		if (sourceIndex <= 0) {
-			return // Already in highest priority layer or not found
+			return
 		}
 
-		// Backfill all higher priority layers
 		const backfillPromises = this.layers.slice(0, sourceIndex).map(async (layer) => {
 			try {
 				await layer.set(key, value, undefined)
@@ -346,9 +330,7 @@ export class MultiLayerCacheManager implements OnModuleInit {
 		const currentCount = this.popularKeys.get(key) || 0
 		this.popularKeys.set(key, currentCount + 1)
 
-		// Limit the size of the popular keys map
 		if (this.popularKeys.size > 10000) {
-			// Remove least popular keys
 			const entries = Array.from(this.popularKeys.entries())
 				.sort(([, a], [, b]) => b - a)
 				.slice(0, 5000)
@@ -362,7 +344,7 @@ export class MultiLayerCacheManager implements OnModuleInit {
 	 * Start periodic preloading
 	 */
 	private startPreloading(): void {
-		const interval = this._configService.getOptional('cache.preloading.interval', 300000) // 5 minutes
+		const interval = this._configService.getOptional('cache.preloading.interval', 300000)
 
 		setInterval(async () => {
 			try {

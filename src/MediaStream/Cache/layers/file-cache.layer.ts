@@ -14,7 +14,7 @@ interface FileCacheEntry<T> {
 @Injectable()
 export class FileCacheLayer implements CacheLayer {
 	private readonly layerName = 'file'
-	private readonly priority = 3 // Lowest priority
+	private readonly priority = 3
 	private readonly cacheDirectory: string
 	private stats = {
 		hits: 0,
@@ -33,7 +33,6 @@ export class FileCacheLayer implements CacheLayer {
 			const data = await fs.readFile(filePath, 'utf8')
 			const entry: FileCacheEntry<T> = JSON.parse(data)
 
-			// Check TTL
 			if (entry.ttl && Date.now() - entry.timestamp > entry.ttl * 1000) {
 				await this.delete(key)
 				this.stats.misses++
@@ -150,7 +149,6 @@ export class FileCacheLayer implements CacheLayer {
 	}
 
 	private getFilePath(key: string): string {
-		// Sanitize key for filesystem
 		const sanitizedKey = key.replace(/[^\w\-.:]/g, '_')
 		return join(this.cacheDirectory, `${sanitizedKey}.json`)
 	}

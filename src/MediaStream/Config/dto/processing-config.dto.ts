@@ -13,8 +13,8 @@ export class ProcessingConfigDto {
 
 	@IsNumber()
 	@Min(1000)
-	@Max(300000) // 5 minutes max
-	@Transform(({ value }) => Number.parseInt(value) || 30000) // 30 seconds
+	@Max(300000)
+	@Transform(({ value }) => Number.parseInt(value) || 30000)
 	timeout: number = 30000
 
 	@IsNumber()
@@ -24,9 +24,9 @@ export class ProcessingConfigDto {
 	retries: number = 3
 
 	@IsNumber()
-	@Min(1024) // 1KB minimum
-	@Max(52428800) // 50MB maximum
-	@Transform(({ value }) => Number.parseInt(value) || 10485760) // 10MB default
+	@Min(1024)
+	@Max(52428800)
+	@Transform(({ value }) => Number.parseInt(value) || 10485760)
 	maxFileSize: number = 10485760
 
 	@IsArray()

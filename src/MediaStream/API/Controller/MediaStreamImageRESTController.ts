@@ -48,7 +48,6 @@ export default class MediaStreamImageRESTController {
 	private async validateRequestParameters(params: any): Promise<void> {
 		const correlationId = this._correlationService.getCorrelationId()
 
-		// Security validation
 		if (params.imageType) {
 			const isMalicious = await this.securityCheckerService.checkForMaliciousContent(params.imageType)
 			if (isMalicious) {
@@ -68,7 +67,6 @@ export default class MediaStreamImageRESTController {
 			}
 		}
 
-		// Validate numeric parameters
 		if (params.width !== null && params.width !== undefined) {
 			const width = Number(params.width)
 			if (Number.isNaN(width) || width < 1 || width > 5000) {
@@ -293,10 +291,8 @@ export default class MediaStreamImageRESTController {
 		}
 
 		try {
-			// Check if we have cached resource data
 			const cachedResource = await this.cacheImageResourceOperation.getCachedResource()
 			if (cachedResource && cachedResource.data) {
-				// Stream from cached data (convert from base64 if needed)
 				res = this.addHeadersToRequest(res, headers)
 				const imageData = typeof cachedResource.data === 'string'
 					? Buffer.from(cachedResource.data, 'base64')
@@ -305,7 +301,6 @@ export default class MediaStreamImageRESTController {
 				return
 			}
 
-			// Fallback to filesystem streaming
 			await this.streamFileToResponse(
 				this.cacheImageResourceOperation.getResourcePath,
 				headers,
@@ -340,9 +335,7 @@ export default class MediaStreamImageRESTController {
 		try {
 			await this.cacheImageResourceOperation.execute()
 
-			// For background processing, we need to wait a bit and check cache
 			if (this.cacheImageResourceOperation.shouldUseBackgroundProcessing && this.cacheImageResourceOperation.shouldUseBackgroundProcessing()) {
-				// Wait a short time for background processing to complete
 				await new Promise(resolve => setTimeout(resolve, 100))
 			}
 
@@ -357,10 +350,8 @@ export default class MediaStreamImageRESTController {
 				return
 			}
 
-			// Check if we have cached resource data
 			const cachedResource = await this.cacheImageResourceOperation.getCachedResource()
 			if (cachedResource && cachedResource.data) {
-				// Stream from cached data (convert from base64 if needed)
 				res = this.addHeadersToRequest(res, headers)
 				const imageData = typeof cachedResource.data === 'string'
 					? Buffer.from(cachedResource.data, 'base64')
@@ -369,7 +360,6 @@ export default class MediaStreamImageRESTController {
 				return
 			}
 
-			// Fallback to filesystem streaming
 			await this.streamFileToResponse(
 				this.cacheImageResourceOperation.getResourcePath,
 				headers,
@@ -403,7 +393,6 @@ export default class MediaStreamImageRESTController {
 				request.resizeOptions,
 			)
 
-			// Add correlation ID to response headers
 			res.header('X-Correlation-ID', correlationId || 'unknown')
 			res.sendFile(optimizedDefaultImagePath)
 		}
@@ -446,7 +435,6 @@ export default class MediaStreamImageRESTController {
 		PerformanceTracker.startPhase('uploaded_image_request')
 
 		try {
-			// Validate request parameters
 			await this.validateRequestParameters({
 				imageType,
 				image,
@@ -470,7 +458,6 @@ export default class MediaStreamImageRESTController {
 			const djangoApiUrl = process.env.NEST_PUBLIC_DJANGO_URL || 'http://localhost:8000'
 			const resourceUrl = `${djangoApiUrl}/media/uploads/${imageType}/${image}`
 
-			// Security check for the resource URL
 			const isValidUrl = this.inputSanitizationService.validateUrl(resourceUrl)
 			if (!isValidUrl) {
 				throw new InvalidRequestError('Invalid resource URL', {
@@ -537,7 +524,6 @@ export default class MediaStreamImageRESTController {
 		PerformanceTracker.startPhase('static_image_request')
 
 		try {
-			// Validate request parameters
 			await this.validateRequestParameters({
 				image,
 				width,
@@ -549,7 +535,6 @@ export default class MediaStreamImageRESTController {
 			const djangoApiUrl = process.env.NEST_PUBLIC_DJANGO_URL || 'http://localhost:8000'
 			const resourceUrl = `${djangoApiUrl}/static/images/${image}`
 
-			// Security check for the resource URL
 			const isValidUrl = this.inputSanitizationService.validateUrl(resourceUrl)
 			if (!isValidUrl) {
 				throw new InvalidRequestError('Invalid resource URL', {

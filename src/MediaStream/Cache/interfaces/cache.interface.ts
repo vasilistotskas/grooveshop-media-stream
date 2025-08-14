@@ -31,11 +31,11 @@ export interface CacheEntry<T = any> {
 }
 
 export interface CacheConfig {
-	maxSize: number // Maximum memory size in bytes
-	ttl: number // Default TTL in seconds
-	checkPeriod: number // Check period for expired keys in seconds
-	useClones: boolean // Whether to clone objects
-	deleteOnExpire: boolean // Whether to delete expired keys automatically
+	maxSize: number
+	ttl: number
+	checkPeriod: number
+	useClones: boolean
+	deleteOnExpire: boolean
 }
 
 export interface CacheMetrics {

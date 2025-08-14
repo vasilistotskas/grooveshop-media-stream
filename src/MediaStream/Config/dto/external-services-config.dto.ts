@@ -14,8 +14,8 @@ export class ExternalServicesConfigDto {
 
 	@IsNumber()
 	@Min(1000)
-	@Max(300000) // 5 minutes max
-	@Transform(({ value }) => Number.parseInt(value) || 30000) // 30 seconds
+	@Max(300000)
+	@Transform(({ value }) => Number.parseInt(value) || 30000)
 	requestTimeout: number = 30000
 
 	@IsNumber()

@@ -4,7 +4,6 @@ import { HttpAdapterHost } from '@nestjs/core';
 export declare class MediaStreamExceptionFilter implements ExceptionFilter {
     private readonly httpAdapterHost;
     private readonly _correlationService;
-    private readonly _logger;
     constructor(httpAdapterHost: HttpAdapterHost, _correlationService: CorrelationService);
     catch(exception: Error, host: ArgumentsHost): void;
     private formatErrorResponse;

@@ -10,10 +10,10 @@ import { StorageMonitoringService } from './storage-monitoring.service'
 export interface RetentionPolicy {
 	name: string
 	description: string
-	maxAge: number // in days
-	maxSize: number // in bytes
+	maxAge: number
+	maxSize: number
 	filePattern?: RegExp
-	preserveCount?: number // minimum files to keep
+	preserveCount?: number
 	enabled: boolean
 }
 
@@ -31,7 +31,7 @@ export interface CleanupConfig {
 	cronSchedule: string
 	policies: RetentionPolicy[]
 	dryRun: boolean
-	maxCleanupDuration: number // in milliseconds
+	maxCleanupDuration: number
 }
 
 @Injectable()
@@ -85,7 +85,6 @@ export class StorageCleanupService implements OnModuleInit {
 			const allErrors: string[] = []
 			const appliedPolicies: string[] = []
 
-			// Apply each retention policy
 			for (const policy of policiesToApply) {
 				try {
 					const result = await this.applyRetentionPolicy(policy, isDryRun)
@@ -106,7 +105,6 @@ export class StorageCleanupService implements OnModuleInit {
 				}
 			}
 
-			// Check if we need intelligent eviction after policy cleanup
 			const thresholdCheck = await this.storageMonitoring.checkThresholds()
 			if (thresholdCheck.status !== 'healthy' && !isDryRun) {
 				try {
@@ -148,9 +146,8 @@ export class StorageCleanupService implements OnModuleInit {
 	/**
 	 * Scheduled cleanup based on cron configuration
 	 */
-	@Cron('0 2 * * *') // Default: 2 AM daily
+	@Cron('0 2 * * *')
 	async scheduledCleanup(): Promise<void> {
-		// Check current enabled status (not cached config)
 		const currentlyEnabled = this._configService.getOptional('storage.cleanup.enabled', true)
 		if (!currentlyEnabled || this.isCleanupRunning) {
 			return
@@ -226,7 +223,6 @@ export class StorageCleanupService implements OnModuleInit {
 		const files = await fs.readdir(this.storageDirectory)
 		const candidates: Array<{ file: string, stats: Stats }> = []
 
-		// Collect candidate files
 		for (const file of files) {
 			if (file === '.gitkeep')
 				continue
@@ -234,12 +230,10 @@ export class StorageCleanupService implements OnModuleInit {
 			const filePath = join(this.storageDirectory, file)
 			const stats = await fs.stat(filePath)
 
-			// Apply file pattern filter if specified
 			if (policy.filePattern && !policy.filePattern.test(file)) {
 				continue
 			}
 
-			// Check age criteria
 			const ageInDays = (Date.now() - stats.mtime.getTime()) / (1000 * 60 * 60 * 24)
 			if (ageInDays < policy.maxAge) {
 				continue
@@ -248,10 +242,8 @@ export class StorageCleanupService implements OnModuleInit {
 			candidates.push({ file, stats })
 		}
 
-		// Sort by modification time (oldest first)
 		candidates.sort((a: any, b: any) => a.stats.mtime.getTime() - b.stats.mtime.getTime())
 
-		// Apply preserve count if specified
 		if (policy.preserveCount && candidates.length <= policy.preserveCount) {
 			return { filesRemoved: 0, sizeFreed: 0, errors: [] }
 		}
@@ -260,7 +252,6 @@ export class StorageCleanupService implements OnModuleInit {
 			? candidates.slice(0, candidates.length - policy.preserveCount)
 			: candidates
 
-		// Apply size limit
 		let totalSize = 0
 		const finalCandidates: Array<{ file: string, stats: Stats }> = []
 
@@ -272,7 +263,6 @@ export class StorageCleanupService implements OnModuleInit {
 			totalSize += candidate.stats.size
 		}
 
-		// Remove files
 		let filesRemoved = 0
 		let sizeFreed = 0
 		const errors: string[] = []
@@ -306,15 +296,14 @@ export class StorageCleanupService implements OnModuleInit {
 		const enabled = this._configService.getOptional('storage.cleanup.enabled', true)
 		const cronSchedule = this._configService.getOptional('storage.cleanup.cronSchedule', '0 2 * * *')
 		const dryRun = this._configService.getOptional('storage.cleanup.dryRun', false)
-		const maxCleanupDuration = this._configService.getOptional('storage.cleanup.maxDuration', 300000) // 5 minutes
+		const maxCleanupDuration = this._configService.getOptional('storage.cleanup.maxDuration', 300000)
 
-		// Default retention policies
 		const defaultPolicies: RetentionPolicy[] = [
 			{
 				name: 'old-cache-files',
 				description: 'Remove cache files older than 30 days',
 				maxAge: 30,
-				maxSize: 0, // No size limit
+				maxSize: 0,
 				filePattern: /\.(json|cache)$/,
 				enabled: true,
 			},
@@ -322,7 +311,7 @@ export class StorageCleanupService implements OnModuleInit {
 				name: 'large-images',
 				description: 'Remove large image files older than 7 days',
 				maxAge: 7,
-				maxSize: 100 * 1024 * 1024, // 100MB total
+				maxSize: 100 * 1024 * 1024,
 				filePattern: /\.(jpg|jpeg|png|webp|gif)$/,
 				enabled: true,
 			},
@@ -337,7 +326,7 @@ export class StorageCleanupService implements OnModuleInit {
 			{
 				name: 'preserve-recent',
 				description: 'Keep at least 100 most recent files',
-				maxAge: 0, // No age limit
+				maxAge: 0,
 				maxSize: 0,
 				preserveCount: 100,
 				enabled: true,
@@ -354,10 +343,9 @@ export class StorageCleanupService implements OnModuleInit {
 	}
 
 	private getNextCleanupTime(): Date {
-		// Simple calculation - in a real implementation, you'd parse the cron schedule
 		const nextCleanup = new Date(this.lastCleanup)
-		nextCleanup.setDate(nextCleanup.getDate() + 1) // Daily cleanup
-		nextCleanup.setHours(2, 0, 0, 0) // 2 AM
+		nextCleanup.setDate(nextCleanup.getDate() + 1)
+		nextCleanup.setHours(2, 0, 0, 0)
 
 		return nextCleanup
 	}

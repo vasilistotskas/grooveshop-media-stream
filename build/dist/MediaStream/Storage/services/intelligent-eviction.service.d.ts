@@ -22,7 +22,6 @@ export interface EvictionConfig {
 export declare class IntelligentEvictionService {
     private readonly _configService;
     private readonly storageMonitoring;
-    private readonly _logger;
     private readonly storageDirectory;
     private readonly config;
     private readonly strategies;

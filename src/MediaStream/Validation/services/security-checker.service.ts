@@ -9,44 +9,35 @@ export class SecurityCheckerService implements ISecurityChecker {
 	private readonly securityEvents: SecurityEvent[] = []
 
 	constructor(private readonly _configService: ConfigService) {
-		// Define patterns that might indicate malicious content
-		// Using non-backtracking patterns to prevent ReDoS attacks
 		this.suspiciousPatterns = [
-			// Script injection patterns - more precise and safe
 			/<script\b[^>]{0,100}>/i,
 			/javascript:/i,
 			/vbscript:/i,
 			/data:text\/html/i,
 			/\bon\w{1,20}\s*=/i,
 
-			// SQL injection patterns - limited quantifiers
 			/union\s{1,5}select/i,
 			/drop\s{1,5}table/i,
 			/insert\s{1,5}into/i,
 			/delete\s{1,5}from/i,
 
-			// Path traversal patterns - exact matches
 			/\.\.\//,
 			/\.\.\\/,
 			/\.\.\\\\/,
 			/%2e%2e%2f/i,
 			/%2e%2e%5c/i,
 
-			// Command injection patterns - limited quantifiers
 			/;\s{0,5}rm\s{1,5}-rf/i,
 			/;\s{0,5}cat\s{1,5}/i,
 			/;\s{0,5}ls\s{1,5}/i,
 			/\|\s{0,5}nc\s{1,5}/i,
 
-			// XXE patterns - limited and specific
 			/<!entity\b/i,
 			/<!doctype[^>]{0,100}\[/i,
 
-			// LDAP injection patterns - exact matches
 			/\(\|\(/,
 			/\)\(\|/,
 
-			// NoSQL injection patterns - exact matches
 			/\$where\b/i,
 			/\$ne\b/i,
 			/\$gt\b/i,
@@ -79,7 +70,6 @@ export class SecurityCheckerService implements ISecurityChecker {
 	}
 
 	private checkString(str: string): boolean {
-		// Early return for empty or very long strings to prevent DoS
 		const maxLength = this._configService.getOptional('validation.maxStringLength', 10000)
 		if (str.length === 0) {
 			return false
@@ -89,11 +79,9 @@ export class SecurityCheckerService implements ISecurityChecker {
 			return true
 		}
 
-		// Limit string length for pattern matching to prevent ReDoS
 		const maxPatternTestLength = 5000
 		const testStr = str.length > maxPatternTestLength ? str.substring(0, maxPatternTestLength) : str
 
-		// Check against suspicious patterns with timeout protection
 		for (const pattern of this.suspiciousPatterns) {
 			try {
 				if (pattern.test(testStr)) {
@@ -102,13 +90,11 @@ export class SecurityCheckerService implements ISecurityChecker {
 				}
 			}
 			catch {
-				// Pattern matching failed - could be ReDoS attempt
 				this._logger.warn(`Pattern matching failed, potential ReDoS attempt: ${pattern.source}`)
 				return true
 			}
 		}
 
-		// Check for high entropy (potential encoded payload)
 		if (this.hasHighEntropy(str)) {
 			this._logger.warn('High entropy string detected (potential encoded payload)')
 			return true
@@ -118,7 +104,6 @@ export class SecurityCheckerService implements ISecurityChecker {
 	}
 
 	private async checkObject(obj: any): Promise<boolean> {
-		// Check for prototype pollution attempts
 		const dangerousKeys = ['__proto__', 'constructor', 'prototype']
 		for (const key of Object.keys(obj)) {
 			if (dangerousKeys.includes(key)) {
@@ -126,13 +111,11 @@ export class SecurityCheckerService implements ISecurityChecker {
 				return true
 			}
 
-			// Recursively check values
 			if (await this.checkForMaliciousContent(obj[key])) {
 				return true
 			}
 		}
 
-		// Check for excessive object depth
 		if (this.getObjectDepth(obj) > 10) {
 			this._logger.warn('Excessively deep object detected (potential DoS)')
 			return true
@@ -142,26 +125,21 @@ export class SecurityCheckerService implements ISecurityChecker {
 	}
 
 	private hasHighEntropy(str: string): boolean {
-		// Limit string length to prevent DoS attacks
 		const maxLengthForEntropy = 1000
 		if (str.length < 20 || str.length > maxLengthForEntropy)
 			return false
 
-		// Sample the string if it's too long to prevent performance issues
 		const sampleStr = str.length > 500 ? str.substring(0, 500) : str
 
-		// Calculate character frequency
 		const charCount: { [key: string]: number } = {}
 		for (const char of sampleStr) {
 			charCount[char] = (charCount[char] || 0) + 1
 		}
 
-		// Prevent excessive memory usage
 		if (Object.keys(charCount).length > 256) {
 			return false
 		}
 
-		// Calculate entropy
 		let entropy = 0
 		const length = sampleStr.length
 		for (const count of Object.values(charCount)) {
@@ -169,13 +147,12 @@ export class SecurityCheckerService implements ISecurityChecker {
 			entropy -= probability * Math.log2(probability)
 		}
 
-		// High entropy threshold (base64 encoded data typically has entropy > 4.5)
 		return entropy > 4.5
 	}
 
 	private getObjectDepth(obj: any, depth = 0): number {
 		if (depth > 20)
-			return depth // Prevent stack overflow
+			return depth
 
 		if (obj === null || typeof obj !== 'object') {
 			return depth
@@ -193,15 +170,12 @@ export class SecurityCheckerService implements ISecurityChecker {
 	}
 
 	async logSecurityEvent(event: SecurityEvent): Promise<void> {
-		// Add timestamp if not provided
 		if (!event.timestamp) {
 			event.timestamp = new Date()
 		}
 
-		// Store event (in production, this would go to a security monitoring system)
 		this.securityEvents.push(event)
 
-		// Log the event
 		this._logger.warn(`Security event: ${event.type}`, {
 			source: event.source,
 			details: event.details,
@@ -216,7 +190,6 @@ export class SecurityCheckerService implements ISecurityChecker {
 		// - Update threat intelligence feeds
 		// - Block suspicious IPs temporarily
 
-		// For now, just keep the last 1000 events in memory
 		if (this.securityEvents.length > 1000) {
 			this.securityEvents.shift()
 		}

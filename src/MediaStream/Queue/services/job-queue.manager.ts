@@ -161,7 +161,6 @@ export class JobQueueManager implements OnModuleInit {
 	}
 
 	private setupJobProcessors(): void {
-		// Setup image processing job processor
 		this.queueService.process(JobType.IMAGE_PROCESSING, async (job) => {
 			const startTime = Date.now()
 
@@ -181,7 +180,6 @@ export class JobQueueManager implements OnModuleInit {
 			}
 		})
 
-		// Setup cache warming job processor
 		this.queueService.process(JobType.CACHE_WARMING, async (job) => {
 			const startTime = Date.now()
 
@@ -201,7 +199,6 @@ export class JobQueueManager implements OnModuleInit {
 			}
 		})
 
-		// Setup cache cleanup job processor
 		this.queueService.process(JobType.CACHE_CLEANUP, async (job) => {
 			const startTime = Date.now()
 
@@ -234,7 +231,6 @@ export class JobQueueManager implements OnModuleInit {
 
 		this.metrics.processingTimes.push(processingTime)
 
-		// Keep only last 1000 processing times for average calculation
 		if (this.metrics.processingTimes.length > 1000) {
 			this.metrics.processingTimes = this.metrics.processingTimes.slice(-1000)
 		}

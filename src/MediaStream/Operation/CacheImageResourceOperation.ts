@@ -70,7 +70,6 @@ export default class CacheImageResourceOperation {
 			try {
 				CorrelatedLogger.debug(`Checking if resource exists in cache: ${this.id}`, CacheImageResourceOperation.name)
 
-				// First check multi-layer cache
 				const cachedResource = await this.cacheManager.get<{ data: Buffer, metadata: ResourceMetaData }>('image', this.id)
 				if (cachedResource) {
 					const isValid = cachedResource.metadata.dateCreated + cachedResource.metadata.privateTTL > Date.now()
@@ -82,12 +81,10 @@ export default class CacheImageResourceOperation {
 					}
 					else {
 						CorrelatedLogger.debug(`Resource found in cache but expired: ${this.id}`, CacheImageResourceOperation.name)
-						// Remove expired resource from cache
 						await this.cacheManager.delete('image', this.id)
 					}
 				}
 
-				// Fallback to file system check for backward compatibility
 				const resourcePathExists = await access(this.getResourcePath).then(() => true).catch(() => false)
 				if (!resourcePathExists) {
 					CorrelatedLogger.debug(`Resource not found in filesystem: ${this.getResourcePath}`, CacheImageResourceOperation.name)
@@ -139,14 +136,12 @@ export default class CacheImageResourceOperation {
 		return (async (): Promise<ResourceMetaData> => {
 			if (!this.metaData) {
 				try {
-					// First check if we have cached resource data
 					const cachedResource = await this.getCachedResource()
 					if (cachedResource && cachedResource.metadata) {
 						this.metaData = cachedResource.metadata
 						return this.metaData
 					}
 
-					// Fallback to filesystem metadata
 					const exists = await access(this.getResourceMetaPath).then(() => true).catch(() => false)
 					if (exists) {
 						const content = await readFile(this.getResourceMetaPath, 'utf8')
@@ -172,26 +167,21 @@ export default class CacheImageResourceOperation {
 		try {
 			CorrelatedLogger.debug('Setting up cache image resource operation', CacheImageResourceOperation.name)
 
-			// Sanitize input request
 			this.request = await this.inputSanitizationService.sanitize(cacheImageRequest) as CacheImageRequest
 
-			// Validate URL if present
 			if (this.request.resourceTarget && !this.inputSanitizationService.validateUrl(this.request.resourceTarget)) {
 				throw new Error(`Invalid or disallowed URL: ${this.request.resourceTarget}`)
 			}
 
-			// Validate image dimensions if present
 			if (this.request.resizeOptions?.width && this.request.resizeOptions?.height) {
 				if (!this.inputSanitizationService.validateImageDimensions(this.request.resizeOptions.width, this.request.resizeOptions.height)) {
 					throw new Error(`Invalid image dimensions: ${this.request.resizeOptions.width}x${this.request.resizeOptions.height}`)
 				}
 			}
 
-			// Apply existing validation rules
 			await this.validateCacheImageRequest.setup(this.request)
 			await this.validateCacheImageRequest.apply()
 
-			// Generate resource identity
 			this.id = await this.generateResourceIdentityFromRequestJob.handle(this.request)
 			this.metaData = null as any
 
@@ -213,7 +203,6 @@ export default class CacheImageResourceOperation {
 		try {
 			CorrelatedLogger.debug('Executing cache image resource operation', CacheImageResourceOperation.name)
 
-			// Check if resource already exists in cache
 			if (await this.resourceExists) {
 				CorrelatedLogger.log('Resource already exists in cache', CacheImageResourceOperation.name)
 				const duration = PerformanceTracker.endPhase('execute')
@@ -221,7 +210,6 @@ export default class CacheImageResourceOperation {
 				return
 			}
 
-			// Check if we should process this in background queue for large images
 			const shouldUseQueue = this.shouldUseBackgroundProcessing()
 
 			if (shouldUseQueue) {
@@ -230,7 +218,6 @@ export default class CacheImageResourceOperation {
 				return
 			}
 
-			// Process synchronously for smaller images
 			await this.processImageSynchronously()
 		}
 		catch (error: unknown) {
@@ -246,7 +233,6 @@ export default class CacheImageResourceOperation {
 	}
 
 	public shouldUseBackgroundProcessing(): boolean {
-		// Use background processing for large dimensions or complex operations
 		const resizeOptions = this.request.resizeOptions
 		if (!resizeOptions)
 			return false
@@ -255,7 +241,6 @@ export default class CacheImageResourceOperation {
 		const height = resizeOptions.height || 0
 		const totalPixels = width * height
 
-		// Queue if dimensions are large (> 2MP) or if quality is high
 		return totalPixels > 2000000 || (resizeOptions.quality !== undefined && resizeOptions.quality > 90)
 	}
 
@@ -281,13 +266,11 @@ export default class CacheImageResourceOperation {
 		PerformanceTracker.startPhase('sync_processing')
 
 		try {
-			// Fetch the resource
 			const response = await this.fetchResourceResponseJob.handle(this.request)
 			if (!response || response.status === 404) {
 				throw new UnableToFetchResourceException(this.request.resourceTarget)
 			}
 
-			// Validate file size if available
 			const contentLength = response.headers['content-length']
 			if (contentLength) {
 				const sizeBytes = Number.parseInt(contentLength, 10)
@@ -297,7 +280,6 @@ export default class CacheImageResourceOperation {
 				}
 			}
 
-			// Store response to temporary file
 			await this.storeResourceResponseToFileJob.handle(this.request.resourceTarget, this.getResourceTempPath, response)
 
 			let processedData: Buffer
@@ -314,17 +296,14 @@ export default class CacheImageResourceOperation {
 				metadata = result.metadata
 			}
 
-			// Store in multi-layer cache
 			await this.cacheManager.set('image', this.id, {
 				data: processedData,
 				metadata,
 			}, metadata.privateTTL)
 
-			// Also store to filesystem for backward compatibility
 			await writeFile(this.getResourcePath, processedData)
 			await writeFile(this.getResourceMetaPath, JSON.stringify(metadata), 'utf8')
 
-			// Clean up temporary file
 			try {
 				await unlink(this.getResourceTempPath)
 			}
@@ -456,14 +435,11 @@ export default class CacheImageResourceOperation {
 		PerformanceTracker.startPhase('get_cached_resource')
 
 		try {
-			// Try to get from multi-layer cache first (check both 'image' and 'images' keys)
 			let cachedResource = await this.cacheManager.get<{ data: Buffer, metadata: ResourceMetaData }>('image', this.id)
 
-			// If not found, check the 'images' key used by background processing
 			if (!cachedResource) {
 				const cachedData = await this.cacheManager.get<string>('images', this.id)
 				if (cachedData) {
-					// Create metadata for cached image data
 					const metadata = new ResourceMetaData({
 						version: 1,
 						size: Buffer.from(cachedData, 'base64').length.toString(),
@@ -487,7 +463,6 @@ export default class CacheImageResourceOperation {
 				return cachedResource
 			}
 
-			// Fallback to filesystem
 			const resourceExists = await access(this.getResourcePath).then(() => true).catch(() => false)
 			const metadataExists = await access(this.getResourceMetaPath).then(() => true).catch(() => false)
 
@@ -496,7 +471,6 @@ export default class CacheImageResourceOperation {
 				const metadataContent = await readFile(this.getResourceMetaPath, 'utf8')
 				const metadata = new ResourceMetaData(JSON.parse(metadataContent))
 
-				// Store in cache for future requests
 				await this.cacheManager.set('image', this.id, { data, metadata }, metadata.privateTTL)
 
 				CorrelatedLogger.debug(`Resource retrieved from filesystem and cached: ${this.id}`, CacheImageResourceOperation.name)

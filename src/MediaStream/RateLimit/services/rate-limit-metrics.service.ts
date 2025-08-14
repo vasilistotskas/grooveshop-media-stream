@@ -7,7 +7,6 @@ export class RateLimitMetricsService implements OnModuleInit {
 	private readonly _logger = new Logger(RateLimitMetricsService.name)
 	private readonly register: promClient.Registry
 
-	// Rate limiting metrics
 	private readonly rateLimitAttemptsTotal: promClient.Counter
 	private readonly rateLimitBlockedTotal: promClient.Counter
 	private readonly rateLimitCurrentRequests: promClient.Gauge
@@ -17,10 +16,8 @@ export class RateLimitMetricsService implements OnModuleInit {
 	constructor(
 		private readonly _configService: ConfigService,
 	) {
-		// Create a separate registry for rate limit metrics to avoid conflicts
 		this.register = new promClient.Registry()
 
-		// Rate limit attempts counter
 		this.rateLimitAttemptsTotal = new promClient.Counter({
 			name: 'mediastream_rate_limit_attempts_total',
 			help: 'Total number of rate limit attempts',
@@ -28,7 +25,6 @@ export class RateLimitMetricsService implements OnModuleInit {
 			registers: [this.register],
 		})
 
-		// Rate limit blocked requests counter
 		this.rateLimitBlockedTotal = new promClient.Counter({
 			name: 'mediastream_rate_limit_blocked_total',
 			help: 'Total number of blocked requests due to rate limiting',
@@ -36,7 +32,6 @@ export class RateLimitMetricsService implements OnModuleInit {
 			registers: [this.register],
 		})
 
-		// Current requests gauge
 		this.rateLimitCurrentRequests = new promClient.Gauge({
 			name: 'mediastream_rate_limit_current_requests',
 			help: 'Current number of requests in rate limit window',
@@ -44,7 +39,6 @@ export class RateLimitMetricsService implements OnModuleInit {
 			registers: [this.register],
 		})
 
-		// Adaptive adjustments counter
 		this.rateLimitAdaptiveAdjustments = new promClient.Counter({
 			name: 'mediastream_rate_limit_adaptive_adjustments_total',
 			help: 'Total number of adaptive rate limit adjustments',
@@ -52,7 +46,6 @@ export class RateLimitMetricsService implements OnModuleInit {
 			registers: [this.register],
 		})
 
-		// System load gauge for rate limiting decisions
 		this.rateLimitSystemLoad = new promClient.Gauge({
 			name: 'mediastream_rate_limit_system_load',
 			help: 'System load metrics used for adaptive rate limiting',
@@ -165,12 +158,11 @@ export class RateLimitMetricsService implements OnModuleInit {
 	 * Hash IP address for privacy in metrics
 	 */
 	private hashIp(ip: string): string {
-		// Simple hash to protect IP privacy in metrics
 		let hash = 0
 		for (let i = 0; i < ip.length; i++) {
 			const char = ip.charCodeAt(i)
 			hash = ((hash << 5) - hash) + char
-			hash = hash & hash // Convert to 32-bit integer
+			hash = hash & hash
 		}
 		return `ip_${Math.abs(hash).toString(36)}`
 	}

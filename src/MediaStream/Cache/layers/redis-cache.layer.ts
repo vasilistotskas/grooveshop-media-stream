@@ -5,7 +5,7 @@ import { RedisCacheService } from '../services/redis-cache.service'
 @Injectable()
 export class RedisCacheLayer implements CacheLayer {
 	private readonly layerName = 'redis'
-	private readonly priority = 2 // Medium priority
+	private readonly priority = 2
 
 	constructor(private readonly redisCacheService: RedisCacheService) {}
 

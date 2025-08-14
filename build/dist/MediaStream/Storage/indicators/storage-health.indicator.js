@@ -25,8 +25,6 @@ let StorageHealthIndicator = class StorageHealthIndicator extends base_health_in
         this._configService = _configService;
         this.storageMonitoring = storageMonitoring;
         this.storageCleanup = storageCleanup;
-        this._warningThreshold = this._configService.getOptional('storage.health.warningThreshold', 0.8);
-        this._criticalThreshold = this._configService.getOptional('storage.health.criticalThreshold', 0.9);
     }
     async performHealthCheck() {
         return this.executeWithTimeout(async () => {
@@ -112,7 +110,7 @@ let StorageHealthIndicator = class StorageHealthIndicator extends base_health_in
         if (thresholdCheck.stats.fileTypes['.webp'] > 500) {
             recommendations.push('Many WebP files stored - ensure image optimization is working correctly');
         }
-        const lowAccessFiles = thresholdCheck.stats.accessPatterns.filter(p => p.accessCount < 2).length;
+        const lowAccessFiles = thresholdCheck.stats.accessPatterns.filter((p) => p.accessCount < 2).length;
         if (lowAccessFiles > thresholdCheck.stats.totalFiles * 0.5) {
             recommendations.push('Over 50% of files have low access counts - consider more aggressive eviction');
         }
@@ -129,13 +127,13 @@ let StorageHealthIndicator = class StorageHealthIndicator extends base_health_in
             recommendations.push(`${oldFiles.length} files older than 30 days (${this.formatBytes(totalOldSize)})`);
         }
         const largeFiles = stats.accessPatterns
-            .filter(p => p.size > 1024 * 1024)
+            .filter((p) => p.size > 1024 * 1024)
             .sort((a, b) => b.size - a.size)
             .slice(0, 10);
         if (largeFiles.length > 0) {
-            recommendations.push(`Top large files: ${largeFiles.map(f => `${f.file} (${this.formatBytes(f.size)})`).join(', ')}`);
+            recommendations.push(`Top large files: ${largeFiles.map((f) => `${f.file} (${this.formatBytes(f.size)})`).join(', ')}`);
         }
-        const neverAccessedFiles = stats.accessPatterns.filter(p => p.accessCount === 1);
+        const neverAccessedFiles = stats.accessPatterns.filter((p) => p.accessCount === 1);
         if (neverAccessedFiles.length > 0) {
             const totalNeverAccessedSize = neverAccessedFiles.reduce((sum, f) => sum + f.size, 0);
             recommendations.push(`${neverAccessedFiles.length} files accessed only once (${this.formatBytes(totalNeverAccessedSize)})`);

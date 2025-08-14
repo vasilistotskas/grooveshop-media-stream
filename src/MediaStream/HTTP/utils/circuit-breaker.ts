@@ -195,7 +195,6 @@ export class CircuitBreaker {
 		const now = Date.now()
 		const cutoff = now - this.options.rollingWindow
 
-		// Remove entries older than the rolling window
 		let i = 0
 		while (i < this.requestWindow.length && this.requestWindow[i].timestamp < cutoff) {
 			i++

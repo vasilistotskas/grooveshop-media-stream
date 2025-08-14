@@ -11,8 +11,8 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var InputSanitizationService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.InputSanitizationService = void 0;
+const config_service_1 = require("../../Config/config.service");
 const common_1 = require("@nestjs/common");
-const config_service_1 = require("../../../MediaStream/Config/config.service");
 let InputSanitizationService = InputSanitizationService_1 = class InputSanitizationService {
     constructor(_configService) {
         this._configService = _configService;

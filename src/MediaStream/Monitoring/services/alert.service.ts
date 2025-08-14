@@ -40,7 +40,6 @@ export class AlertService {
 
 		if (this.config.enabled) {
 			this.initializeDefaultRules()
-			// Only start automatic evaluation in production
 			if (process.env.NODE_ENV !== 'test') {
 				this.startAlertEvaluation()
 			}
@@ -128,7 +127,6 @@ export class AlertService {
 			alert.resolvedAt = Date.now()
 			this.activeAlerts.delete(alertId)
 
-			// Update the alert in history with resolution information
 			const historyAlert = this.alertHistory.find(a => a.id === alertId)
 			if (historyAlert) {
 				historyAlert.resolved = true
@@ -177,7 +175,6 @@ export class AlertService {
 			alertsBySeverity[alert.severity]++
 		})
 
-		// Calculate average resolution time for resolved alerts
 		const resolvedAlerts = this.alertHistory.filter(a => a.resolved && a.resolvedAt)
 		const totalResolutionTime = resolvedAlerts.reduce((sum: any, alert: any) => {
 			return sum + (alert.resolvedAt! - alert.timestamp)
@@ -231,7 +228,7 @@ export class AlertService {
 	 * Start periodic alert evaluation
 	 */
 	private startAlertEvaluation(): void {
-		const evaluationInterval = 30 * 1000 // 30 seconds
+		const evaluationInterval = 30 * 1000
 		setInterval(() => {
 			this.evaluateAlerts()
 		}, evaluationInterval)
@@ -242,13 +239,12 @@ export class AlertService {
 	 */
 	private evaluateAlerts(): void {
 		const now = Date.now()
-		const evaluationWindow = 5 * 60 * 1000 // 5 minutes
+		const evaluationWindow = 5 * 60 * 1000
 
 		for (const rule of this.alertRules.values()) {
 			if (!rule.enabled)
 				continue
 
-			// Check cooldown
 			const lastAlert = this.alertCooldowns.get(rule.id)
 			if (lastAlert && (now - lastAlert) < rule.cooldownMs) {
 				continue
@@ -275,10 +271,9 @@ export class AlertService {
 		const aggregatedMetrics = this.monitoringService.getAggregatedMetrics(rule.metric, since)
 
 		if (aggregatedMetrics.count === 0) {
-			return false // No data to evaluate
+			return false
 		}
 
-		// Use the latest value for evaluation
 		const value = aggregatedMetrics.latest
 
 		switch (rule.condition) {
@@ -339,7 +334,7 @@ export class AlertService {
 	 * Start alert cleanup process
 	 */
 	private startAlertCleanup(): void {
-		const cleanupInterval = 60 * 60 * 1000 // 1 hour
+		const cleanupInterval = 60 * 60 * 1000
 		setInterval(() => {
 			this.cleanupOldAlerts()
 		}, cleanupInterval)
@@ -352,7 +347,6 @@ export class AlertService {
 		const cutoffTime = Date.now() - this.config.alertsRetentionMs
 		const originalLength = this.alertHistory.length
 
-		// Remove old alerts from history
 		const filteredHistory = this.alertHistory.filter(alert => alert.timestamp >= cutoffTime)
 		this.alertHistory.splice(0, this.alertHistory.length, ...filteredHistory)
 

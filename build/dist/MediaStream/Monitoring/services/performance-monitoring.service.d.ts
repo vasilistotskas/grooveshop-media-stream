@@ -1,5 +1,5 @@
+import { CorrelationService } from '@microservice/Correlation/services/correlation.service';
 import { ConfigService } from '@nestjs/config';
-import { CorrelationService } from '../../Correlation/services/correlation.service';
 import { PerformanceMetrics } from '../interfaces/monitoring.interface';
 import { MonitoringService } from './monitoring.service';
 export declare class PerformanceMonitoringService {

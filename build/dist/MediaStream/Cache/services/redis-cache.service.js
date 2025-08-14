@@ -23,7 +23,6 @@ let RedisCacheService = RedisCacheService_1 = class RedisCacheService {
     constructor(_configService, metricsService) {
         this._configService = _configService;
         this.metricsService = metricsService;
-        this._logger = new common_1.Logger(RedisCacheService_1.name);
         this.isConnected = false;
         this.stats = {
             hits: 0,

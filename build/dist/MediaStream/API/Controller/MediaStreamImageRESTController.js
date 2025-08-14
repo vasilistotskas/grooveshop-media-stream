@@ -57,18 +57,14 @@ const RoutePrefixes_1 = require("../../Constant/RoutePrefixes");
 const correlation_service_1 = require("../../Correlation/services/correlation.service");
 const performance_tracker_util_1 = require("../../Correlation/utils/performance-tracker.util");
 const MediaStreamErrors_1 = require("../../Error/MediaStreamErrors");
-const GenerateResourceIdentityFromRequestJob_1 = __importDefault(require("../../Job/GenerateResourceIdentityFromRequestJob"));
 const metrics_service_1 = require("../../Metrics/services/metrics.service");
 const CacheImageResourceOperation_1 = __importDefault(require("../../Operation/CacheImageResourceOperation"));
 const adaptive_rate_limit_guard_1 = require("../../RateLimit/guards/adaptive-rate-limit.guard");
 const input_sanitization_service_1 = require("../../Validation/services/input-sanitization.service");
 const security_checker_service_1 = require("../../Validation/services/security-checker.service");
-const axios_1 = require("@nestjs/axios");
 const common_1 = require("@nestjs/common");
 let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class MediaStreamImageRESTController {
-    constructor(_httpService, generateResourceIdentityFromRequestJob, cacheImageResourceOperation, inputSanitizationService, securityCheckerService, _correlationService, metricsService) {
-        this._httpService = _httpService;
-        this.generateResourceIdentityFromRequestJob = generateResourceIdentityFromRequestJob;
+    constructor(cacheImageResourceOperation, inputSanitizationService, securityCheckerService, _correlationService, metricsService) {
         this.cacheImageResourceOperation = cacheImageResourceOperation;
         this.inputSanitizationService = inputSanitizationService;
         this.securityCheckerService = securityCheckerService;
@@ -150,7 +146,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
             .header('Content-Length', size)
             .header('Cache-Control', `max-age=${publicTTL / 1000}, public`)
             .header('Expires', new Date(expiresAt).toUTCString())
-            .header('X-Correlation-ID', correlationId);
+            .header('X-Correlation-ID', correlationId || 'unknown');
         if (format === 'svg') {
             res.header('Content-Type', 'image/svg+xml');
         }
@@ -183,7 +179,8 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
         catch (error) {
             const context = { request, error, correlationId };
             this._logger.error(`Error while processing the image request: ${error.message || error}`, error, context);
-            this.metricsService.recordError('image_request', error.constructor.name);
+            const errorName = error instanceof Error ? error.constructor.name : 'UnknownError';
+            this.metricsService.recordError('image_request', errorName);
             await this.defaultImageFallback(request, res);
         }
         finally {
@@ -330,17 +327,18 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
         const correlationId = this._correlationService.getCorrelationId();
         try {
             const optimizedDefaultImagePath = await this.cacheImageResourceOperation.optimizeAndServeDefaultImage(request.resizeOptions);
-            res.header('X-Correlation-ID', correlationId);
+            res.header('X-Correlation-ID', correlationId || 'unknown');
             res.sendFile(optimizedDefaultImagePath);
         }
         catch (defaultImageError) {
+            const errorMessage = defaultImageError instanceof Error ? defaultImageError.message : String(defaultImageError);
             const context = {
                 request,
                 resizeOptions: request.resizeOptions,
-                error: defaultImageError.message || defaultImageError,
+                error: errorMessage,
                 correlationId,
             };
-            this._logger.error(`Failed to serve default image: ${defaultImageError.message || defaultImageError}`, defaultImageError, context);
+            this._logger.error(`Failed to serve default image: ${errorMessage}`, defaultImageError, context);
             this.metricsService.recordError('default_image_fallback', 'fallback_error');
             throw new MediaStreamErrors_1.DefaultImageFallbackError('Failed to process the image request', context);
         }
@@ -348,7 +346,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
     static resourceTargetPrepare(resourceTarget) {
         return resourceTarget;
     }
-    async uploadedImage(imageType, image, width = null, height = null, fit = CacheImageRequest_1.FitOptions.contain, position = CacheImageRequest_1.PositionOptions.entropy, background = CacheImageRequest_1.BackgroundOptions.transparent, trimThreshold = 5, format = CacheImageRequest_1.SupportedResizeFormats.webp, quality = 100, req, res) {
+    async uploadedImage(imageType, image, width = null, height = null, fit = CacheImageRequest_1.FitOptions.contain, position = CacheImageRequest_1.PositionOptions.entropy, background = CacheImageRequest_1.BackgroundOptions.transparent, trimThreshold = 5, format = CacheImageRequest_1.SupportedResizeFormats.webp, quality = 100, res) {
         const correlationId = this._correlationService.getCorrelationId();
         performance_tracker_util_1.PerformanceTracker.startPhase('uploaded_image_request');
         try {
@@ -408,14 +406,15 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                 error: error.message || error,
             };
             this._logger.error(`Error in uploadedImage: ${error.message || error}`, error, context);
-            this.metricsService.recordError('uploaded_image_request', error.constructor.name);
+            const errorName = error instanceof Error ? error.constructor.name : 'UnknownError';
+            this.metricsService.recordError('uploaded_image_request', errorName);
             throw error;
         }
         finally {
             performance_tracker_util_1.PerformanceTracker.endPhase('uploaded_image_request');
         }
     }
-    async staticImage(image, width = null, height = null, fit = CacheImageRequest_1.FitOptions.contain, position = CacheImageRequest_1.PositionOptions.entropy, background = CacheImageRequest_1.BackgroundOptions.transparent, trimThreshold = 5, format = CacheImageRequest_1.SupportedResizeFormats.webp, quality = 100, req, res) {
+    async staticImage(image, width = null, height = null, fit = CacheImageRequest_1.FitOptions.contain, position = CacheImageRequest_1.PositionOptions.entropy, background = CacheImageRequest_1.BackgroundOptions.transparent, trimThreshold = 5, format = CacheImageRequest_1.SupportedResizeFormats.webp, quality = 100, res) {
         const correlationId = this._correlationService.getCorrelationId();
         performance_tracker_util_1.PerformanceTracker.startPhase('static_image_request');
         try {
@@ -471,7 +470,8 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                 error: error.message || error,
             };
             this._logger.error(`Error in staticImage: ${error.message || error}`, error, context);
-            this.metricsService.recordError('static_image_request', error.constructor.name);
+            const errorName = error instanceof Error ? error.constructor.name : 'UnknownError';
+            this.metricsService.recordError('static_image_request', errorName);
             throw error;
         }
         finally {
@@ -491,10 +491,9 @@ __decorate([
     __param(7, (0, common_1.Param)('trimThreshold')),
     __param(8, (0, common_1.Param)('format')),
     __param(9, (0, common_1.Param)('quality')),
-    __param(10, (0, common_1.Req)()),
-    __param(11, (0, common_1.Res)()),
+    __param(10, (0, common_1.Res)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, Number, Number, String, Object, Object, Object, String, Object, Object, Object]),
+    __metadata("design:paramtypes", [String, String, Number, Number, String, Object, Object, Object, String, Object, Object]),
     __metadata("design:returntype", Promise)
 ], MediaStreamImageRESTController.prototype, "uploadedImage", null);
 __decorate([
@@ -508,10 +507,9 @@ __decorate([
     __param(6, (0, common_1.Param)('trimThreshold')),
     __param(7, (0, common_1.Param)('format')),
     __param(8, (0, common_1.Param)('quality')),
-    __param(9, (0, common_1.Req)()),
-    __param(10, (0, common_1.Res)()),
+    __param(9, (0, common_1.Res)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Number, Number, String, Object, Object, Object, String, Object, Object, Object]),
+    __metadata("design:paramtypes", [String, Number, Number, String, Object, Object, Object, String, Object, Object]),
     __metadata("design:returntype", Promise)
 ], MediaStreamImageRESTController.prototype, "staticImage", null);
 MediaStreamImageRESTController = MediaStreamImageRESTController_1 = __decorate([
@@ -521,9 +519,7 @@ MediaStreamImageRESTController = MediaStreamImageRESTController_1 = __decorate([
         scope: common_1.Scope.REQUEST,
     }),
     (0, common_1.UseGuards)(adaptive_rate_limit_guard_1.AdaptiveRateLimitGuard),
-    __metadata("design:paramtypes", [axios_1.HttpService,
-        GenerateResourceIdentityFromRequestJob_1.default,
-        CacheImageResourceOperation_1.default,
+    __metadata("design:paramtypes", [CacheImageResourceOperation_1.default,
         input_sanitization_service_1.InputSanitizationService,
         security_checker_service_1.SecurityCheckerService,
         correlation_service_1.CorrelationService,

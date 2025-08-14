@@ -23,11 +23,11 @@ export class MonitoringService {
 	) {
 		this.config = this._configService.get<MonitoringConfig>('monitoring', {
 			enabled: true,
-			metricsRetentionMs: 24 * 60 * 60 * 1000, // 24 hours
-			alertsRetentionMs: 7 * 24 * 60 * 60 * 1000, // 7 days
-			performanceRetentionMs: 24 * 60 * 60 * 1000, // 24 hours
-			healthCheckIntervalMs: 30 * 1000, // 30 seconds
-			alertCooldownMs: 5 * 60 * 1000, // 5 minutes
+			metricsRetentionMs: 24 * 60 * 60 * 1000,
+			alertsRetentionMs: 7 * 24 * 60 * 60 * 1000,
+			performanceRetentionMs: 24 * 60 * 60 * 1000,
+			healthCheckIntervalMs: 30 * 1000,
+			alertCooldownMs: 5 * 60 * 1000,
 			externalIntegrations: {
 				enabled: false,
 				endpoints: [],
@@ -62,7 +62,6 @@ export class MonitoringService {
 		const metricsList = this.metrics.get(name)!
 		metricsList.push(metric)
 
-		// Keep only the most recent metrics to prevent memory issues
 		if (metricsList.length > this.maxMetricsPerType) {
 			metricsList.splice(0, metricsList.length - this.maxMetricsPerType)
 		}
@@ -162,7 +161,6 @@ export class MonitoringService {
 		const components: ComponentHealth[] = []
 		let totalScore = 0
 
-		// Check various system components
 		const memoryHealth = await this.checkMemoryHealth()
 		const diskHealth = await this.checkDiskHealth()
 		const networkHealth = await this.checkNetworkHealth()
@@ -170,10 +168,8 @@ export class MonitoringService {
 
 		components.push(memoryHealth, diskHealth, networkHealth, cacheHealth)
 
-		// Calculate overall score
 		totalScore = components.reduce((sum: any, comp: any) => sum + comp.score, 0) / components.length
 
-		// More lenient overall health scoring
 		let status: 'healthy' | 'degraded' | 'unhealthy'
 		if (totalScore >= 70) {
 			status = 'healthy'
@@ -217,8 +213,7 @@ export class MonitoringService {
 			}
 		}
 
-		// Estimate memory usage (rough calculation)
-		const avgMetricSize = 200 // bytes per metric (rough estimate)
+		const avgMetricSize = 200
 		const memoryUsage = totalMetrics * avgMetricSize
 
 		return {
@@ -234,7 +229,7 @@ export class MonitoringService {
 	 * Clear old metrics based on retention policy
 	 */
 	private startMetricsCleanup(): void {
-		const cleanupInterval = Math.min(this.config.metricsRetentionMs / 10, 60 * 60 * 1000) // Max 1 hour
+		const cleanupInterval = Math.min(this.config.metricsRetentionMs / 10, 60 * 60 * 1000)
 		setInterval(() => {
 			this.cleanupOldMetrics()
 		}, cleanupInterval)
@@ -264,7 +259,6 @@ export class MonitoringService {
 		const usedMB = memUsage.heapUsed / 1024 / 1024
 		const usagePercent = (usedMB / totalMB) * 100
 
-		// More lenient scoring for Node.js applications
 		let score = 100
 		if (usagePercent > 98)
 			score = 20
@@ -289,7 +283,6 @@ export class MonitoringService {
 	}
 
 	private async checkDiskHealth(): Promise<ComponentHealth> {
-		// Simplified disk health check
 		// In a real implementation, you'd check actual disk usage
 		return {
 			name: 'disk',
@@ -304,7 +297,6 @@ export class MonitoringService {
 	}
 
 	private async checkNetworkHealth(): Promise<ComponentHealth> {
-		// Simplified network health check
 		// In a real implementation, you'd check network connectivity
 		return {
 			name: 'network',
@@ -319,13 +311,11 @@ export class MonitoringService {
 	}
 
 	private async checkCacheHealth(): Promise<ComponentHealth> {
-		// Check cache performance metrics
-		const cacheHits = this.getAggregatedMetrics('cache.hits', Date.now() - 60000) // Last minute
+		const cacheHits = this.getAggregatedMetrics('cache.hits', Date.now() - 60000)
 		const cacheMisses = this.getAggregatedMetrics('cache.misses', Date.now() - 60000)
 		const totalRequests = cacheHits.sum + cacheMisses.sum
-		const hitRate = totalRequests > 0 ? (cacheHits.sum / totalRequests) * 100 : 85 // Default to good score if no data
+		const hitRate = totalRequests > 0 ? (cacheHits.sum / totalRequests) * 100 : 85
 
-		// More lenient cache scoring - low hit rates are normal for new applications
 		let score = 100
 		if (hitRate < 20)
 			score = 60

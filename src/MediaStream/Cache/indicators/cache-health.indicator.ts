@@ -20,34 +20,27 @@ export class CacheHealthIndicator extends BaseHealthIndicator {
 		const startTime = Date.now()
 
 		try {
-			// Test memory cache operations
 			const testKey = 'health-check-test'
 			const testValue = { timestamp: Date.now(), test: true }
 
-			// Test SET operation
 			await this.memoryCacheService.set(testKey, testValue, 60)
 
-			// Test GET operation
 			const retrievedValue = await this.memoryCacheService.get<{ timestamp: number, test: boolean }>(testKey)
 			if (!retrievedValue || retrievedValue.timestamp !== testValue.timestamp) {
 				throw new Error('Cache GET operation failed')
 			}
 
-			// Test DELETE operation
 			await this.memoryCacheService.delete(testKey)
 
-			// Test that key was deleted
 			const deletedValue = await this.memoryCacheService.get(testKey)
 			if (deletedValue !== null) {
 				throw new Error('Cache DELETE operation failed')
 			}
 
-			// Get cache statistics
 			const stats = await this.memoryCacheService.getStats()
 			const memoryUsage = this.memoryCacheService.getMemoryUsage()
 			const warmupStats = await this.cacheWarmingService.getWarmupStats()
 
-			// Check memory usage thresholds
 			const memoryUsagePercent = (memoryUsage.used / memoryUsage.total) * 100
 			const memoryThreshold = this._configService.get('cache.memory.warningThreshold') || 80
 
@@ -67,7 +60,7 @@ export class CacheHealthIndicator extends BaseHealthIndicator {
 					statistics: {
 						hits: stats.hits,
 						misses: stats.misses,
-						hitRate: Math.round(stats.hitRate * 10000) / 100, // Percentage with 2 decimals
+						hitRate: Math.round(stats.hitRate * 10000) / 100,
 						keys: stats.keys,
 						keySize: stats.ksize,
 						valueSize: stats.vsize,
@@ -121,7 +114,7 @@ export class CacheHealthIndicator extends BaseHealthIndicator {
 			warnings.push(`Cache hit rate (${Math.round(stats.hitRate * 100)}%) is below optimal (70%)`)
 		}
 
-		if (stats.keys > 900) { // Approaching max keys limit
+		if (stats.keys > 900) {
 			warnings.push(`Cache key count (${stats.keys}) is approaching limit`)
 		}
 
@@ -146,7 +139,7 @@ export class CacheHealthIndicator extends BaseHealthIndicator {
 					defaultTtl: this._configService.get('cache.memory.defaultTtl') || 3600,
 					checkPeriod: this._configService.get('cache.memory.checkPeriod') || 600,
 				},
-				recentKeys: keys.slice(0, 10), // Show first 10 keys for debugging
+				recentKeys: keys.slice(0, 10),
 				lastUpdated: new Date().toISOString(),
 			}
 		}

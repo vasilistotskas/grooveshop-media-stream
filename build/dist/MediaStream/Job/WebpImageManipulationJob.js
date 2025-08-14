@@ -36,8 +36,9 @@ let WebpImageManipulationJob = class WebpImageManipulationJob {
         }
         const resizeScales = {};
         ['width', 'height'].forEach((scale) => {
-            if (options[scale] !== null && !Number.isNaN(options[scale])) {
-                resizeScales[scale] = Number(options[scale]);
+            const value = options[scale];
+            if (value !== null && !Number.isNaN(value)) {
+                resizeScales[scale] = Number(value);
             }
         });
         if (Object.keys(resizeScales).length > 0) {

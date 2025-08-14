@@ -11,9 +11,9 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var PerformanceMonitoringService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PerformanceMonitoringService = void 0;
+const correlation_service_1 = require("../../Correlation/services/correlation.service");
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
-const correlation_service_1 = require("../../Correlation/services/correlation.service");
 const monitoring_service_1 = require("./monitoring.service");
 let PerformanceMonitoringService = PerformanceMonitoringService_1 = class PerformanceMonitoringService {
     constructor(_configService, _correlationService, monitoringService) {
@@ -98,7 +98,8 @@ let PerformanceMonitoringService = PerformanceMonitoringService_1 = class Perfor
             return result;
         }
         catch (error) {
-            this.endOperation(operationId, false, error.message || error.toString());
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.endOperation(operationId, false, errorMessage);
             throw error;
         }
     }
@@ -110,7 +111,8 @@ let PerformanceMonitoringService = PerformanceMonitoringService_1 = class Perfor
             return result;
         }
         catch (error) {
-            this.endOperation(operationId, false, error.message || error.toString());
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.endOperation(operationId, false, errorMessage);
             throw error;
         }
     }

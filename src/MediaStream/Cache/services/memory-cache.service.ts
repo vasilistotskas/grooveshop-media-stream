@@ -16,14 +16,13 @@ export class MemoryCacheService implements ICacheManager {
 		const config = this._configService.get('cache.memory') || {}
 
 		this.cache = new NodeCache({
-			stdTTL: config.defaultTtl || 3600, // 1 hour default
-			checkperiod: config.checkPeriod || 600, // 10 minutes
-			useClones: false, // Better performance, but be careful with object mutations
+			stdTTL: config.defaultTtl || 3600,
+			checkperiod: config.checkPeriod || 600,
+			useClones: false,
 			deleteOnExpire: true,
 			maxKeys: config.maxKeys || 1000,
 		})
 
-		// Set up event listeners for metrics
 		this.cache.on('set', (key: string, _value: any) => {
 			this.metricsService.recordCacheOperation('set', 'memory', 'success')
 			CorrelatedLogger.debug(`Memory cache SET: ${key}`, MemoryCacheService.name)
@@ -110,7 +109,6 @@ export class MemoryCacheService implements ICacheManager {
 			const stats = this.cache.getStats()
 			const hitRate = stats.hits + stats.misses > 0 ? stats.hits / (stats.hits + stats.misses) : 0
 
-			// Update metrics
 			this.metricsService.updateCacheHitRatio('memory', hitRate)
 
 			return {
@@ -170,7 +168,6 @@ export class MemoryCacheService implements ICacheManager {
 		}
 	}
 
-	// Additional memory-specific methods
 	getTtl(key: string): number {
 		return this.cache.getTtl(key) ?? 0
 	}
@@ -183,7 +180,7 @@ export class MemoryCacheService implements ICacheManager {
 		const stats = this.cache.getStats()
 		return {
 			used: stats.vsize + stats.ksize,
-			total: this._configService.get('cache.memory.maxSize') || 100 * 1024 * 1024, // 100MB default
+			total: this._configService.get('cache.memory.maxSize') || 100 * 1024 * 1024,
 		}
 	}
 }

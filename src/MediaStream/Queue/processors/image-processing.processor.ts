@@ -35,7 +35,6 @@ export class ImageProcessingProcessor {
 				try {
 					this._logger.debug(`Processing image job ${job.id} for URL: ${imageUrl}`)
 
-					// Check if already cached
 					const cached = await this.cacheManager.get('images', cacheKey)
 					if (cached) {
 						this._logger.debug(`Image already cached for job ${job.id}`)
@@ -47,16 +46,12 @@ export class ImageProcessingProcessor {
 						}
 					}
 
-					// Update job progress
 					await this.updateProgress(job, 25, 'Downloading image')
 
-					// Download image
 					const imageBuffer = await this.downloadImage(imageUrl)
 
-					// Update job progress
 					await this.updateProgress(job, 50, 'Processing image')
 
-					// Process image
 					const processedBuffer = await this.processImage(imageBuffer, {
 						width: width ? Number(width) : undefined,
 						height: height ? Number(height) : undefined,
@@ -64,13 +59,10 @@ export class ImageProcessingProcessor {
 						format,
 					})
 
-					// Update job progress
 					await this.updateProgress(job, 75, 'Caching result')
 
-					// Cache the result
-					await this.cacheManager.set('images', cacheKey, processedBuffer.toString('base64'), 3600) // 1 hour TTL
+					await this.cacheManager.set('images', cacheKey, processedBuffer.toString('base64'), 3600)
 
-					// Update job progress
 					await this.updateProgress(job, 100, 'Completed')
 
 					const processingTime = Date.now() - startTime
@@ -125,7 +117,6 @@ export class ImageProcessingProcessor {
 		try {
 			let pipeline = sharp(buffer)
 
-			// Resize if dimensions specified
 			if (options.width || options.height) {
 				pipeline = pipeline.resize(options.width, options.height, {
 					fit: 'inside',
@@ -133,7 +124,6 @@ export class ImageProcessingProcessor {
 				})
 			}
 
-			// Convert format and set quality
 			switch (options.format) {
 				case 'webp':
 					pipeline = pipeline.webp({ quality: options.quality || 80 })
@@ -145,7 +135,6 @@ export class ImageProcessingProcessor {
 					pipeline = pipeline.png({ quality: options.quality || 80 })
 					break
 				default:
-					// Keep original format
 					break
 			}
 

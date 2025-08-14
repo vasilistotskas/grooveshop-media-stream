@@ -71,7 +71,6 @@ export class PerformanceMonitoringService {
 		}
 
 		const duration = Date.now() - operation.startTime
-		// Extract operation name from operationId (everything before the first timestamp)
 		const operationName = operationId.replace(/-\d+-[a-z0-9]+$/, '')
 
 		const performanceMetric: PerformanceMetrics = {
@@ -86,7 +85,6 @@ export class PerformanceMonitoringService {
 		this.recordPerformanceMetric(performanceMetric)
 		this.activeOperations.delete(operationId)
 
-		// Also record as monitoring metrics
 		this.monitoringService.recordTimer(`performance.${operationName}.duration`, duration)
 		this.monitoringService.incrementCounter(`performance.${operationName}.total`)
 		if (success) {
@@ -280,7 +278,6 @@ export class PerformanceMonitoringService {
 			})
 		}
 
-		// Sort for top lists
 		const slowestOperations = [...operationStats]
 			.sort((a: any, b: any) => b.avgDuration - a.avgDuration)
 			.slice(0, 5)
@@ -318,7 +315,6 @@ export class PerformanceMonitoringService {
 		const metrics = this.performanceData.get(metric.operationName)!
 		metrics.push(metric)
 
-		// Keep only recent metrics to prevent memory issues
 		const maxMetricsPerOperation = 10000
 		if (metrics.length > maxMetricsPerOperation) {
 			metrics.splice(0, metrics.length - maxMetricsPerOperation)
@@ -339,7 +335,7 @@ export class PerformanceMonitoringService {
 	 * Start performance data cleanup
 	 */
 	private startPerformanceCleanup(): void {
-		const cleanupInterval = Math.min(this.config.performanceRetentionMs / 10, 60 * 60 * 1000) // Max 1 hour
+		const cleanupInterval = Math.min(this.config.performanceRetentionMs / 10, 60 * 60 * 1000)
 		setInterval(() => {
 			this.cleanupOldPerformanceData()
 		}, cleanupInterval)

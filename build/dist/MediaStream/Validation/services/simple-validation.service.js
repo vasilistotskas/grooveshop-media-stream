@@ -12,14 +12,10 @@ var SimpleValidationService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SimpleValidationService = void 0;
 const common_1 = require("@nestjs/common");
-const config_service_1 = require("../../Config/config.service");
-const correlation_service_1 = require("../../Correlation/services/correlation.service");
 const input_sanitization_service_1 = require("./input-sanitization.service");
 const security_checker_service_1 = require("./security-checker.service");
 let SimpleValidationService = SimpleValidationService_1 = class SimpleValidationService {
-    constructor(_configService, _correlationService, sanitizationService, securityChecker) {
-        this._configService = _configService;
-        this._correlationService = _correlationService;
+    constructor(sanitizationService, securityChecker) {
         this.sanitizationService = sanitizationService;
         this.securityChecker = securityChecker;
         this._logger = new common_1.Logger(SimpleValidationService_1.name);
@@ -87,9 +83,7 @@ let SimpleValidationService = SimpleValidationService_1 = class SimpleValidation
 exports.SimpleValidationService = SimpleValidationService;
 exports.SimpleValidationService = SimpleValidationService = SimpleValidationService_1 = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [config_service_1.ConfigService,
-        correlation_service_1.CorrelationService,
-        input_sanitization_service_1.InputSanitizationService,
+    __metadata("design:paramtypes", [input_sanitization_service_1.InputSanitizationService,
         security_checker_service_1.SecurityCheckerService])
 ], SimpleValidationService);
 //# sourceMappingURL=simple-validation.service.js.map

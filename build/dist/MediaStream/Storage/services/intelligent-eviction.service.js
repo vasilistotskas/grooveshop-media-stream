@@ -21,7 +21,6 @@ let IntelligentEvictionService = IntelligentEvictionService_1 = class Intelligen
     constructor(_configService, storageMonitoring) {
         this._configService = _configService;
         this.storageMonitoring = storageMonitoring;
-        this._logger = new common_1.Logger(IntelligentEvictionService_1.name);
         this.strategies = new Map();
         this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage');
         this.config = {

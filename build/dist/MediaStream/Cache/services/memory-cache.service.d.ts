@@ -5,7 +5,6 @@ import { CacheStats, ICacheManager } from '../interfaces/cache-manager.interface
 export declare class MemoryCacheService implements ICacheManager {
     private readonly _configService;
     private readonly metricsService;
-    private readonly _logger;
     protected readonly cache: NodeCache;
     constructor(_configService: ConfigService, metricsService: MetricsService);
     get<T>(key: string): Promise<T | null>;
