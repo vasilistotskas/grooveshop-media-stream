@@ -1,4 +1,4 @@
-import CacheImageRequest, { ResizeOptions, SupportedResizeFormats } from '@microservice/API/DTO/CacheImageRequest'
+import CacheImageRequest, { ResizeOptions, SupportedResizeFormats } from '@microservice/API/dto/cache-image-request.dto'
 import { ConfigService } from '@microservice/Config/config.service'
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
 import { InputSanitizationService } from '@microservice/Validation/services/input-sanitization.service'

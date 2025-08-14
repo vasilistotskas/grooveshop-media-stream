@@ -1,4 +1,4 @@
-import CacheImageRequest from '@microservice/API/DTO/CacheImageRequest';
+import CacheImageRequest from '@microservice/API/dto/cache-image-request.dto';
 import { InputSanitizationService } from './input-sanitization.service';
 import { SecurityCheckerService } from './security-checker.service';
 export interface SimpleValidationResult {

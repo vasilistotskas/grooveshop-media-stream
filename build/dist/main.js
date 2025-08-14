@@ -39,11 +39,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.bootstrap = bootstrap;
 const process = __importStar(require("node:process"));
 const config_service_1 = require("./MediaStream/Config/config.service");
-const MediaStreamModule_1 = __importDefault(require("./MediaStream/Module/MediaStreamModule"));
+const media_stream_module_1 = __importDefault(require("./MediaStream/media-stream.module"));
 const core_1 = require("@nestjs/core");
 async function bootstrap(exitProcess = true) {
     try {
-        const app = await core_1.NestFactory.create(MediaStreamModule_1.default);
+        const app = await core_1.NestFactory.create(media_stream_module_1.default);
         const configService = app.get(config_service_1.ConfigService);
         app.useStaticAssets('public');
         const serverConfig = configService.get('server');

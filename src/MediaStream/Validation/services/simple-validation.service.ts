@@ -1,4 +1,4 @@
-import CacheImageRequest from '@microservice/API/DTO/CacheImageRequest'
+import CacheImageRequest from '@microservice/API/dto/cache-image-request.dto'
 
 import { Injectable, Logger } from '@nestjs/common'
 import { InputSanitizationService } from './input-sanitization.service'
