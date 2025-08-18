@@ -131,6 +131,7 @@ describe('mediaStreamImageRESTController', () => {
 			writable: true,
 			writableEnded: false,
 			writableFinished: false,
+			locals: {},
 		} as any
 
 		const module: TestingModule = await Test.createTestingModule({

@@ -1,4 +1,4 @@
-import MediaStreamModule from '@microservice/Module/MediaStreamModule'
+import MediaStreamModule from '@microservice/media-stream.module'
 import { INestApplication } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import request from 'supertest'
