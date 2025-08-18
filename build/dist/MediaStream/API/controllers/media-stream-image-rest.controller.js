@@ -392,6 +392,8 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                 },
                 correlationId,
             });
+            res.locals.requestedFormat = format;
+            res.locals.originalUrl = resourceUrl;
             await this.handleStreamOrFallback(request, res);
         }
         catch (error) {
@@ -457,6 +459,8 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                 },
                 correlationId,
             });
+            res.locals.requestedFormat = format;
+            res.locals.originalUrl = resourceUrl;
             await this.handleStreamOrFallback(request, res);
         }
         catch (error) {

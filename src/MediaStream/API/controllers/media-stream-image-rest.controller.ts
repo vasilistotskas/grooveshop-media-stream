@@ -483,6 +483,9 @@ export default class MediaStreamImageRESTController {
 				correlationId,
 			})
 
+			res.locals.requestedFormat = format
+			res.locals.originalUrl = resourceUrl
+
 			await this.handleStreamOrFallback(request, res)
 		}
 		catch (error: unknown) {
@@ -567,6 +570,9 @@ export default class MediaStreamImageRESTController {
 				},
 				correlationId,
 			})
+
+			res.locals.requestedFormat = format
+			res.locals.originalUrl = resourceUrl
 
 			await this.handleStreamOrFallback(request, res)
 		}

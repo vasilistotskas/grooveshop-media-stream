@@ -241,6 +241,10 @@ export default class CacheImageResourceOperation {
 		const height = resizeOptions.height || 0
 		const totalPixels = width * height
 
+		if (resizeOptions.format === 'svg') {
+			return false
+		}
+
 		return totalPixels > 2000000 || (resizeOptions.quality !== undefined && resizeOptions.quality > 90)
 	}
 
@@ -285,7 +289,18 @@ export default class CacheImageResourceOperation {
 			let processedData: Buffer
 			let metadata!: ResourceMetaData
 
-			if (this.request.resourceTarget.toLowerCase().endsWith('.svg')) {
+			let isSourceSvg = false
+			try {
+				const fileContent = await readFile(this.getResourceTempPath, 'utf8')
+				isSourceSvg = fileContent.trim().startsWith('<svg') || fileContent.includes('xmlns="http://www.w3.org/2000/svg"')
+				CorrelatedLogger.debug(`Source file SVG detection: ${isSourceSvg}`, CacheImageResourceOperation.name)
+			}
+			catch {
+				isSourceSvg = false
+				CorrelatedLogger.debug('Could not read file as text, assuming not SVG', CacheImageResourceOperation.name)
+			}
+
+			if (isSourceSvg) {
 				const result = await this.processSvgImage()
 				processedData = result.data
 				metadata = result.metadata
@@ -332,17 +347,42 @@ export default class CacheImageResourceOperation {
 			return await this.processDefaultImage()
 		}
 
-		const data = Buffer.from(svgContent, 'utf8')
-		const metadata = new ResourceMetaData({
-			version: 1,
-			size: data.length.toString(),
-			format: 'svg',
-			dateCreated: Date.now(),
-			publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
-			privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
-		})
+		const needsResizing = (this.request.resizeOptions?.width !== null && !Number.isNaN(this.request.resizeOptions?.width))
+			|| (this.request.resizeOptions?.height !== null && !Number.isNaN(this.request.resizeOptions?.height))
 
-		return { data, metadata }
+		if (!needsResizing) {
+			const data = Buffer.from(svgContent, 'utf8')
+			const metadata = new ResourceMetaData({
+				version: 1,
+				size: data.length.toString(),
+				format: 'svg',
+				dateCreated: Date.now(),
+				publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
+				privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
+			})
+
+			return { data, metadata }
+		}
+		else {
+			CorrelatedLogger.debug('SVG needs resizing, converting to PNG for better quality', CacheImageResourceOperation.name)
+			const result = await this.webpImageManipulationJob.handle(
+				this.getResourceTempPath,
+				this.getResourcePath,
+				this.request.resizeOptions,
+			)
+
+			const data = await readFile(this.getResourcePath)
+			const metadata = new ResourceMetaData({
+				version: 1,
+				size: result.size,
+				format: result.format,
+				dateCreated: Date.now(),
+				publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
+				privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
+			})
+
+			return { data, metadata }
+		}
 	}
 
 	private async processRasterImage(): Promise<{ data: Buffer, metadata: ResourceMetaData }> {
@@ -352,15 +392,27 @@ export default class CacheImageResourceOperation {
 			this.request.resizeOptions,
 		)
 
+		CorrelatedLogger.debug(`processRasterImage received result: ${JSON.stringify(result)}`, 'CacheImageResourceOperation')
+
 		const data = await readFile(this.getResourcePath)
+
+		const actualFormat = result.format
+		const requestedFormat = this.request.resizeOptions?.format
+
+		if (requestedFormat === 'svg' && result.format !== 'svg') {
+			CorrelatedLogger.debug(`SVG format requested but actual format is ${result.format}. Using actual format for content-type.`, 'CacheImageResourceOperation')
+		}
+
 		const metadata = new ResourceMetaData({
 			version: 1,
 			size: result.size,
-			format: result.format,
+			format: actualFormat,
 			dateCreated: Date.now(),
 			publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
 			privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
 		})
+
+		CorrelatedLogger.debug(`processRasterImage created metadata: ${JSON.stringify(metadata)}`, 'CacheImageResourceOperation')
 
 		return { data, metadata }
 	}

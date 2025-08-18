@@ -240,6 +240,9 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
         const width = resizeOptions.width || 0;
         const height = resizeOptions.height || 0;
         const totalPixels = width * height;
+        if (resizeOptions.format === 'svg') {
+            return false;
+        }
         return totalPixels > 2000000 || (resizeOptions.quality !== undefined && resizeOptions.quality > 90);
     }
     async queueImageProcessing() {
@@ -275,7 +278,17 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
             await this.storeResourceResponseToFileJob.handle(this.request.resourceTarget, this.getResourceTempPath, response);
             let processedData;
             let metadata;
-            if (this.request.resourceTarget.toLowerCase().endsWith('.svg')) {
+            let isSourceSvg = false;
+            try {
+                const fileContent = await (0, promises_1.readFile)(this.getResourceTempPath, 'utf8');
+                isSourceSvg = fileContent.trim().startsWith('<svg') || fileContent.includes('xmlns="http://www.w3.org/2000/svg"');
+                logger_util_1.CorrelatedLogger.debug(`Source file SVG detection: ${isSourceSvg}`, CacheImageResourceOperation_1.name);
+            }
+            catch {
+                isSourceSvg = false;
+                logger_util_1.CorrelatedLogger.debug('Could not read file as text, assuming not SVG', CacheImageResourceOperation_1.name);
+            }
+            if (isSourceSvg) {
                 const result = await this.processSvgImage();
                 processedData = result.data;
                 metadata = result.metadata;
@@ -315,28 +328,53 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
             logger_util_1.CorrelatedLogger.warn('The file is not a valid SVG. Serving default WebP image.', CacheImageResourceOperation_1.name);
             return await this.processDefaultImage();
         }
-        const data = node_buffer_1.Buffer.from(svgContent, 'utf8');
-        const metadata = new resource_meta_data_dto_1.default({
-            version: 1,
-            size: data.length.toString(),
-            format: 'svg',
-            dateCreated: Date.now(),
-            publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
-            privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
-        });
-        return { data, metadata };
+        const needsResizing = (this.request.resizeOptions?.width !== null && !Number.isNaN(this.request.resizeOptions?.width))
+            || (this.request.resizeOptions?.height !== null && !Number.isNaN(this.request.resizeOptions?.height));
+        if (!needsResizing) {
+            const data = node_buffer_1.Buffer.from(svgContent, 'utf8');
+            const metadata = new resource_meta_data_dto_1.default({
+                version: 1,
+                size: data.length.toString(),
+                format: 'svg',
+                dateCreated: Date.now(),
+                publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
+                privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
+            });
+            return { data, metadata };
+        }
+        else {
+            logger_util_1.CorrelatedLogger.debug('SVG needs resizing, converting to PNG for better quality', CacheImageResourceOperation_1.name);
+            const result = await this.webpImageManipulationJob.handle(this.getResourceTempPath, this.getResourcePath, this.request.resizeOptions);
+            const data = await (0, promises_1.readFile)(this.getResourcePath);
+            const metadata = new resource_meta_data_dto_1.default({
+                version: 1,
+                size: result.size,
+                format: result.format,
+                dateCreated: Date.now(),
+                publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
+                privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
+            });
+            return { data, metadata };
+        }
     }
     async processRasterImage() {
         const result = await this.webpImageManipulationJob.handle(this.getResourceTempPath, this.getResourcePath, this.request.resizeOptions);
+        logger_util_1.CorrelatedLogger.debug(`processRasterImage received result: ${JSON.stringify(result)}`, 'CacheImageResourceOperation');
         const data = await (0, promises_1.readFile)(this.getResourcePath);
+        const actualFormat = result.format;
+        const requestedFormat = this.request.resizeOptions?.format;
+        if (requestedFormat === 'svg' && result.format !== 'svg') {
+            logger_util_1.CorrelatedLogger.debug(`SVG format requested but actual format is ${result.format}. Using actual format for content-type.`, 'CacheImageResourceOperation');
+        }
         const metadata = new resource_meta_data_dto_1.default({
             version: 1,
             size: result.size,
-            format: result.format,
+            format: actualFormat,
             dateCreated: Date.now(),
             publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
             privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
         });
+        logger_util_1.CorrelatedLogger.debug(`processRasterImage created metadata: ${JSON.stringify(metadata)}`, 'CacheImageResourceOperation');
         return { data, metadata };
     }
     async processDefaultImage() {

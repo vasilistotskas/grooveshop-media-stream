@@ -1,15 +1,130 @@
 import type { ResizeOptions } from '@microservice/API/dto/cache-image-request.dto'
+import { copyFile, readFile } from 'node:fs/promises'
+import { extname } from 'node:path'
 import ManipulationJobResult from '@microservice/Queue/dto/manipulation-job-result.dto'
-import { Injectable, Scope } from '@nestjs/common'
+import { Injectable, Logger, Scope } from '@nestjs/common'
 import sharp from 'sharp'
 
 @Injectable({ scope: Scope.REQUEST })
 export default class WebpImageManipulationJob {
+	private readonly logger = new Logger(WebpImageManipulationJob.name)
 	async handle(
 		filePathFrom: string,
 		filePathTo: string,
 		options: ResizeOptions,
 	): Promise<ManipulationJobResult> {
+		this.logger.debug(`WebpImageManipulationJob.handle called with format: ${options.format}`, {
+			filePathFrom,
+			filePathTo,
+			format: options.format,
+			width: options.width,
+			height: options.height,
+		})
+
+		if (options.format === 'svg') {
+			this.logger.debug(`SVG format requested. Source file: ${filePathFrom}`)
+			const sourceExtension = extname(filePathFrom).toLowerCase()
+			let isSourceSvg = sourceExtension === '.svg'
+
+			this.logger.debug(`Source extension: ${sourceExtension}, isSourceSvg: ${isSourceSvg}`)
+
+			if (!isSourceSvg) {
+				try {
+					const fileContent = await readFile(filePathFrom, 'utf8')
+					isSourceSvg = fileContent.trim().startsWith('<svg') || fileContent.includes('xmlns="http://www.w3.org/2000/svg"')
+					this.logger.debug(`Content-based SVG detection: ${isSourceSvg}`)
+				}
+				catch {
+					isSourceSvg = false
+					this.logger.debug('Could not read file as text, assuming not SVG')
+				}
+			}
+
+			if (isSourceSvg) {
+				const needsResizing = (options.width !== null && !Number.isNaN(options.width))
+					|| (options.height !== null && !Number.isNaN(options.height))
+
+				if (!needsResizing) {
+					this.logger.debug(`SVG file needs no resizing, copying original`)
+					await copyFile(filePathFrom, filePathTo)
+					const stats = await readFile(filePathFrom)
+					const result = new ManipulationJobResult({
+						size: String(stats.length),
+						format: 'svg',
+					})
+					this.logger.debug(`SVG copy result: ${JSON.stringify(result)}`)
+					return result
+				}
+				else {
+					const manipulation = sharp(filePathFrom)
+					manipulation.png({ quality: options.quality })
+
+					const resizeScales: Record<string, number> = {}
+					if (options.width !== null && !Number.isNaN(options.width)) {
+						resizeScales.width = Number(options.width)
+					}
+					if (options.height !== null && !Number.isNaN(options.height)) {
+						resizeScales.height = Number(options.height)
+					}
+
+					manipulation.resize({
+						...resizeScales,
+						fit: options.fit,
+						position: options.position,
+						background: options.background,
+					})
+
+					const manipulatedFile = await manipulation.toFile(filePathTo)
+					const result = new ManipulationJobResult({
+						size: String(manipulatedFile.size),
+						format: 'png',
+					})
+					this.logger.debug(`SVG resized to PNG. Result: ${JSON.stringify(result)}`)
+					return result
+				}
+			}
+			else {
+				this.logger.debug('Non-SVG source with SVG output requested, converting to PNG')
+
+				const manipulation = sharp(filePathFrom)
+				manipulation.png({ quality: options.quality })
+
+				const resizeScales: Record<string, number> = {}
+				if (options.width !== null && !Number.isNaN(options.width)) {
+					resizeScales.width = Number(options.width)
+				}
+				if (options.height !== null && !Number.isNaN(options.height)) {
+					resizeScales.height = Number(options.height)
+				}
+
+				this.logger.debug(`Resize scales: ${JSON.stringify(resizeScales)}`)
+
+				if (Object.keys(resizeScales).length > 0) {
+					if (options.trimThreshold !== null && !Number.isNaN(options.trimThreshold)) {
+						manipulation.trim({
+							background: options.background,
+							threshold: Number(options.trimThreshold),
+						})
+					}
+
+					manipulation.resize({
+						...resizeScales,
+						fit: options.fit,
+						position: options.position,
+						background: options.background,
+					})
+				}
+
+				const manipulatedFile = await manipulation.toFile(filePathTo)
+				this.logger.debug(`Manipulation complete. Result format: png, size: ${manipulatedFile.size}`)
+
+				return new ManipulationJobResult({
+					size: String(manipulatedFile.size),
+					format: 'png',
+				})
+			}
+		}
+
 		const manipulation = sharp(filePathFrom)
 
 		switch (options.format) {
