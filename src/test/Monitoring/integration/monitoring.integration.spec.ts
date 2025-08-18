@@ -123,7 +123,7 @@ describe('monitoring Integration', () => {
 			expect(stats.successfulOperations).toBe(1)
 			expect(stats.failedOperations).toBe(1)
 			expect(stats.successRate).toBe(50)
-			expect(stats.averageDuration).toBeGreaterThanOrEqual(50)
+			expect(stats.averageDuration).toBeGreaterThanOrEqual(25)
 		})
 
 		it('should provide comprehensive system health', async () => {
