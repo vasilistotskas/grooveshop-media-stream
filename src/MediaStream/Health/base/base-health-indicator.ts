@@ -10,7 +10,7 @@ export abstract class BaseHealthIndicator implements IHealthIndicator {
 
 	constructor(
 		public readonly key: string,
-    options: HealthCheckOptions = {},
+		options: HealthCheckOptions = {},
 	) {
 		this.logger = new Logger(`${this.constructor.name}`)
 		this.options = {
@@ -118,7 +118,7 @@ export abstract class BaseHealthIndicator implements IHealthIndicator {
 	 */
 	protected async executeWithTimeout<T>(
 		operation: () => Promise<T>,
-    timeoutMs: number = this.options.timeout || 5000,
+		timeoutMs: number = this.options.timeout || 5000,
 	): Promise<T> {
 		return new Promise((resolve, reject) => {
 			const timer = setTimeout(() => {

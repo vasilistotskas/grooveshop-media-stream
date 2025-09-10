@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { ConfigService } from '@microservice/Config/config.service'
 import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
 import { MetricsService } from '@microservice/Metrics/services/metrics.service'
@@ -108,7 +109,7 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			this.metricsService.recordCacheOperation('get', 'redis', 'hit')
 			CorrelatedLogger.debug(`Redis cache HIT: ${key}`, RedisCacheService.name)
 
-			return JSON.parse(value) as T
+			return this.deserializeValue(value) as T
 		}
 		catch (error: unknown) {
 			this.stats.errors++
@@ -127,7 +128,7 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 
 		try {
 			this.stats.operations++
-			const serializedValue = JSON.stringify(value)
+			const serializedValue = this.serializeValue(value)
 			const defaultTtl = this._configService.get('cache.redis.ttl')
 			const effectiveTtl = ttl !== undefined ? ttl : defaultTtl
 
@@ -359,5 +360,32 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 	private extractMemoryValue(info: string, key: string): number {
 		const match = info.match(new RegExp(`${key}:(\\d+(?:\\.\\d+)?)`))
 		return match ? Number.parseFloat(match[1]) : 0
+	}
+
+	/**
+	 * Serialize value for Redis storage, handling Buffers properly
+	 */
+	private serializeValue<T>(value: T): string {
+		return JSON.stringify(value, (key, val) => {
+			if (Buffer.isBuffer(val)) {
+				return {
+					type: 'Buffer',
+					data: val.toString('base64'),
+				}
+			}
+			return val
+		})
+	}
+
+	/**
+	 * Deserialize value from Redis storage, reconstructing Buffers properly
+	 */
+	private deserializeValue<T>(value: string): T {
+		return JSON.parse(value, (key, val) => {
+			if (val && typeof val === 'object' && val.type === 'Buffer' && typeof val.data === 'string') {
+				return Buffer.from(val.data, 'base64')
+			}
+			return val
+		})
 	}
 }

@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "Redis MCP Server": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-redis"
+      ],
+      "env": {
+        "REDIS_HOST": "localhost",
+        "REDIS_PORT": "6379",
+        "REDIS_DB": "0",
+        "REDIS_PASSWORD": ""
+      },
+      "disabled": false,
+      "autoApprove": [
+        "list_keys",
+        "get_value",
+        "set_value",
+        "delete_key"
+      ]
+    }
+  }
+}

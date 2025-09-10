@@ -57,7 +57,7 @@ jobs:
         run: pnpm install --frozen-lockfile --prefer-offline
 
       - name: Run linting
-        run: pnpm run lint:fix
+        run: pnpm run lint
 
       - name: Build application
         run: pnpm run build

@@ -263,9 +263,24 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
             const cachedResource = await this.cacheImageResourceOperation.getCachedResource();
             if (cachedResource && cachedResource.data) {
                 res = this.addHeadersToRequest(res, headers);
-                const imageData = typeof cachedResource.data === 'string'
-                    ? node_buffer_1.Buffer.from(cachedResource.data, 'base64')
-                    : cachedResource.data;
+                let imageData;
+                if (typeof cachedResource.data === 'string') {
+                    imageData = node_buffer_1.Buffer.from(cachedResource.data, 'base64');
+                }
+                else if (node_buffer_1.Buffer.isBuffer(cachedResource.data)) {
+                    imageData = cachedResource.data;
+                }
+                else if (cachedResource.data && typeof cachedResource.data === 'object' && 'data' in cachedResource.data) {
+                    imageData = node_buffer_1.Buffer.from(cachedResource.data.data);
+                }
+                else {
+                    this._logger.warn('Unexpected data type in cached resource, falling back to file streaming', {
+                        dataType: typeof cachedResource.data,
+                        correlationId: this._correlationService.getCorrelationId(),
+                    });
+                    await this.streamFileToResponse(this.cacheImageResourceOperation.getResourcePath, headers, res);
+                    return;
+                }
                 res.end(imageData);
                 return;
             }

@@ -86,7 +86,6 @@ export class DiskSpaceHealthIndicator extends BaseHealthIndicator {
 
 	private async getFallbackDiskInfo(): Promise<DiskSpaceInfo> {
 		try {
-			// This is a simplified approach when statvfs is not available
 			return {
 				total: 0,
 				free: 0,

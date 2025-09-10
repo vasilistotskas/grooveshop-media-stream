@@ -14,6 +14,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 var RedisCacheService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RedisCacheService = void 0;
+const node_buffer_1 = require("node:buffer");
 const config_service_1 = require("../../Config/config.service");
 const logger_util_1 = require("../../Correlation/utils/logger.util");
 const metrics_service_1 = require("../../Metrics/services/metrics.service");
@@ -104,7 +105,7 @@ let RedisCacheService = RedisCacheService_1 = class RedisCacheService {
             this.stats.hits++;
             this.metricsService.recordCacheOperation('get', 'redis', 'hit');
             logger_util_1.CorrelatedLogger.debug(`Redis cache HIT: ${key}`, RedisCacheService_1.name);
-            return JSON.parse(value);
+            return this.deserializeValue(value);
         }
         catch (error) {
             this.stats.errors++;
@@ -121,7 +122,7 @@ let RedisCacheService = RedisCacheService_1 = class RedisCacheService {
         }
         try {
             this.stats.operations++;
-            const serializedValue = JSON.stringify(value);
+            const serializedValue = this.serializeValue(value);
             const defaultTtl = this._configService.get('cache.redis.ttl');
             const effectiveTtl = ttl !== undefined ? ttl : defaultTtl;
             if (effectiveTtl > 0) {
@@ -324,6 +325,25 @@ let RedisCacheService = RedisCacheService_1 = class RedisCacheService {
     extractMemoryValue(info, key) {
         const match = info.match(new RegExp(`${key}:(\\d+(?:\\.\\d+)?)`));
         return match ? Number.parseFloat(match[1]) : 0;
+    }
+    serializeValue(value) {
+        return JSON.stringify(value, (key, val) => {
+            if (node_buffer_1.Buffer.isBuffer(val)) {
+                return {
+                    type: 'Buffer',
+                    data: val.toString('base64'),
+                };
+            }
+            return val;
+        });
+    }
+    deserializeValue(value) {
+        return JSON.parse(value, (key, val) => {
+            if (val && typeof val === 'object' && val.type === 'Buffer' && typeof val.data === 'string') {
+                return node_buffer_1.Buffer.from(val.data, 'base64');
+            }
+            return val;
+        });
     }
 };
 exports.RedisCacheService = RedisCacheService;

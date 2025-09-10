@@ -34,4 +34,6 @@ export declare class RedisCacheService implements ICacheManager, OnModuleInit, O
         fragmentation: number;
     }>;
     private extractMemoryValue;
+    private serializeValue;
+    private deserializeValue;
 }

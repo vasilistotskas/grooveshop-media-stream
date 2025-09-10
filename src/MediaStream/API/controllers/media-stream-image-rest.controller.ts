@@ -294,9 +294,30 @@ export default class MediaStreamImageRESTController {
 			const cachedResource = await this.cacheImageResourceOperation.getCachedResource()
 			if (cachedResource && cachedResource.data) {
 				res = this.addHeadersToRequest(res, headers)
-				const imageData = typeof cachedResource.data === 'string'
-					? Buffer.from(cachedResource.data, 'base64')
-					: cachedResource.data
+
+				let imageData: Buffer
+				if (typeof cachedResource.data === 'string') {
+					imageData = Buffer.from(cachedResource.data, 'base64')
+				}
+				else if (Buffer.isBuffer(cachedResource.data)) {
+					imageData = cachedResource.data
+				}
+				else if (cachedResource.data && typeof cachedResource.data === 'object' && 'data' in cachedResource.data) {
+					imageData = Buffer.from((cachedResource.data as any).data)
+				}
+				else {
+					this._logger.warn('Unexpected data type in cached resource, falling back to file streaming', {
+						dataType: typeof cachedResource.data,
+						correlationId: this._correlationService.getCorrelationId(),
+					})
+					await this.streamFileToResponse(
+						this.cacheImageResourceOperation.getResourcePath,
+						headers,
+						res,
+					)
+					return
+				}
+
 				res.end(imageData)
 				return
 			}
@@ -418,18 +439,18 @@ export default class MediaStreamImageRESTController {
 		'media/uploads/:imageType/:image/:width/:height/:fit/:position/:background/:trimThreshold/:format/:quality',
 	)
 	public async uploadedImage(
-    @Param('imageType') imageType: string,
-    @Param('image') image: string,
-    @Param('width') width: number | null = null,
-    @Param('height') height: number | null = null,
-    @Param('fit') fit: FitOptions = FitOptions.contain,
-    @Param('position') position = PositionOptions.entropy,
-    @Param('background') background = BackgroundOptions.transparent,
-    @Param('trimThreshold') trimThreshold = 5,
-    @Param('format') format: SupportedResizeFormats = SupportedResizeFormats.webp,
-    @Param('quality') quality = 100,
+		@Param('imageType') imageType: string,
+		@Param('image') image: string,
+		@Param('width') width: number | null = null,
+		@Param('height') height: number | null = null,
+		@Param('fit') fit: FitOptions = FitOptions.contain,
+		@Param('position') position = PositionOptions.entropy,
+		@Param('background') background = BackgroundOptions.transparent,
+		@Param('trimThreshold') trimThreshold = 5,
+		@Param('format') format: SupportedResizeFormats = SupportedResizeFormats.webp,
+		@Param('quality') quality = 100,
 
-    @Res() res: Response,
+		@Res() res: Response,
 	): Promise<void> {
 		const correlationId = this._correlationService.getCorrelationId()
 		PerformanceTracker.startPhase('uploaded_image_request')

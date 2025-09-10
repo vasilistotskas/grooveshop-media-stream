@@ -67,7 +67,7 @@ pnpm run test:watch
 pnpm run test:e2e
 
 # Lint and fix
-pnpm run lint:fix
+pnpm run lint
 ```
 
 ## Build Configuration
