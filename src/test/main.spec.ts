@@ -1,6 +1,6 @@
 import * as process from 'node:process'
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import MediaStreamModule from '@microservice/Module/MediaStreamModule'
+import MediaStreamModule from '@microservice/media-stream.module'
 import { NestFactory } from '@nestjs/core'
 import { bootstrap } from '../main'
 
@@ -21,6 +21,22 @@ describe('Bootstrap', () => {
 			useStaticAssets: jest.fn().mockReturnThis(),
 			enableCors: jest.fn().mockReturnThis(),
 			listen: jest.fn().mockImplementation(() => Promise.resolve()),
+			get: jest.fn().mockReturnValue({
+				get: jest.fn().mockImplementation((key: any) => {
+					if (key === 'server') {
+						return {
+							port: Number.parseInt(process.env.PORT || '3003'),
+							host: '0.0.0.0',
+							cors: {
+								origin: '*',
+								methods: 'GET',
+								maxAge: 86400,
+							},
+						}
+					}
+					return undefined
+				}),
+			}),
 		}
 
 		jest.mocked(NestFactory.create).mockResolvedValue(mockApp)
@@ -49,7 +65,7 @@ describe('Bootstrap', () => {
 			methods: 'GET',
 			maxAge: 86400,
 		})
-		expect(mockApp.listen).toHaveBeenCalledWith('4000')
+		expect(mockApp.listen).toHaveBeenCalledWith(4000, '0.0.0.0')
 	})
 
 	it('should use default port if PORT environment variable is not set', async () => {
@@ -57,7 +73,7 @@ describe('Bootstrap', () => {
 
 		await bootstrap(false)
 
-		expect(mockApp.listen).toHaveBeenCalledWith(3003)
+		expect(mockApp.listen).toHaveBeenCalledWith(3003, '0.0.0.0')
 	})
 
 	it('should handle errors during bootstrap', async () => {

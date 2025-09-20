@@ -6,8 +6,13 @@
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },
+  "setupFiles": ["<rootDir>/../.jest/setEnvVars.ts"],
+  "setupFilesAfterEnv": ["<rootDir>/setup.ts"],
   "moduleNameMapper": {
     "^@/(.*)$": "<rootDir>/../src/$1",
     "^@microservice/(.*)$": "<rootDir>/../src/MediaStream/$1"
-  }
+  },
+  "testTimeout": 30000,
+  "forceExit": true,
+  "detectOpenHandles": false
 }

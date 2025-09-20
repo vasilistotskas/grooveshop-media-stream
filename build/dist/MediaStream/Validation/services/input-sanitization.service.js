@@ -1,0 +1,334 @@
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var InputSanitizationService_1;
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.InputSanitizationService = void 0;
+const config_service_1 = require("../../Config/config.service");
+const common_1 = require("@nestjs/common");
+let InputSanitizationService = InputSanitizationService_1 = class InputSanitizationService {
+    constructor(_configService) {
+        this._configService = _configService;
+        this._logger = new common_1.Logger(InputSanitizationService_1.name);
+        this.allowedDomains = null;
+    }
+    getAllowedDomains() {
+        if (this.allowedDomains === null) {
+            this.allowedDomains = this._configService.getOptional('validation.allowedDomains', [
+                'localhost',
+                '127.0.0.1',
+                'example.com',
+                'test.com',
+                'grooveshop.com',
+                'cdn.grooveshop.com',
+                'images.grooveshop.com',
+            ]);
+        }
+        return this.allowedDomains;
+    }
+    async sanitize(input) {
+        if (input === null || input === undefined) {
+            return input;
+        }
+        if (typeof input === 'string') {
+            return this.sanitizeString(input);
+        }
+        if (Array.isArray(input)) {
+            const sanitizedArray = [];
+            for (let i = 0; i < input.length; i++) {
+                sanitizedArray[i] = await this.sanitize(input[i]);
+            }
+            return sanitizedArray;
+        }
+        if (typeof input === 'object') {
+            return this.sanitizeObject(input);
+        }
+        return input;
+    }
+    sanitizeString(str) {
+        const lowerStr = str.toLowerCase();
+        const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'ftp:', 'about:'];
+        for (const protocol of dangerousProtocols) {
+            if (lowerStr.startsWith(protocol)) {
+                return '';
+            }
+        }
+        const emptyStringPatterns = [
+            /^\s*on\w+\s*=.*$/i,
+            /^\s*javascript\s*:.*$/i,
+            /^\s*vbscript\s*:.*$/i,
+            /^\s*data\s*:.*$/i,
+        ];
+        for (const pattern of emptyStringPatterns) {
+            if (pattern.test(str)) {
+                this._logger.warn(`Standalone dangerous pattern detected, returning empty string`);
+                return '';
+            }
+        }
+        let sanitized = str;
+        let previousLength = 0;
+        let iterations = 0;
+        const maxIterations = 10;
+        while (sanitized.length !== previousLength && iterations < maxIterations) {
+            previousLength = sanitized.length;
+            iterations++;
+            sanitized = this.performSanitizationPass(sanitized);
+        }
+        sanitized = sanitized.trim();
+        const maxLength = 2048;
+        if (sanitized.length > maxLength) {
+            sanitized = sanitized.substring(0, maxLength);
+            this._logger.warn(`String truncated to ${maxLength} characters for security`);
+        }
+        return sanitized;
+    }
+    performSanitizationPass(input) {
+        let result = input;
+        result = this.removeHtmlTags(result);
+        result = this.removeEventHandlers(result);
+        result = this.removeStyleAttributes(result);
+        result = this.removeDangerousProtocols(result);
+        result = this.removeDangerousJavaScript(result);
+        result = this.removeHtmlEntities(result);
+        return result;
+    }
+    async sanitizeObject(obj) {
+        const sanitized = {};
+        for (const [key, value] of Object.entries(obj)) {
+            const sanitizedKey = this.sanitizeString(String(key));
+            sanitized[sanitizedKey] = await this.sanitize(value);
+        }
+        return sanitized;
+    }
+    validateUrl(url) {
+        try {
+            const lowerUrl = url.toLowerCase().trim();
+            const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'ftp:', 'about:'];
+            for (const protocol of dangerousProtocols) {
+                if (lowerUrl.startsWith(protocol)) {
+                    this._logger.warn(`Dangerous protocol detected: ${protocol}`);
+                    return false;
+                }
+            }
+            const urlObj = new URL(url);
+            if (!['http:', 'https:'].includes(urlObj.protocol)) {
+                this._logger.warn(`Invalid protocol: ${urlObj.protocol}`);
+                return false;
+            }
+            if (!urlObj.hostname || urlObj.hostname.length === 0) {
+                this._logger.warn('Empty hostname detected');
+                return false;
+            }
+            const allowedDomains = this.getAllowedDomains();
+            const isAllowed = allowedDomains.some(domain => urlObj.hostname === domain || urlObj.hostname.endsWith(`.${domain}`));
+            if (!isAllowed) {
+                this._logger.warn(`URL blocked - not in whitelist: ${urlObj.hostname}`);
+                return false;
+            }
+            return true;
+        }
+        catch (error) {
+            this._logger.warn(`Invalid URL format: ${url}, error: ${error}`);
+            return false;
+        }
+    }
+    validateFileSize(sizeBytes, format) {
+        const maxSizes = this._configService.getOptional('validation.maxFileSizes', {
+            default: 10 * 1024 * 1024,
+            jpeg: 5 * 1024 * 1024,
+            jpg: 5 * 1024 * 1024,
+            png: 8 * 1024 * 1024,
+            webp: 3 * 1024 * 1024,
+            gif: 2 * 1024 * 1024,
+            svg: 1024 * 1024,
+        });
+        const maxSize = format ? maxSizes[format.toLowerCase()] || maxSizes.default : maxSizes.default;
+        return sizeBytes > 0 && sizeBytes <= maxSize;
+    }
+    validateImageDimensions(width, height) {
+        const maxWidth = 8192;
+        const maxHeight = 8192;
+        const maxPixels = 7680 * 4320;
+        if (width <= 0 || height <= 0)
+            return false;
+        if (width > maxWidth || height > maxHeight)
+            return false;
+        if ((width * height) > maxPixels)
+            return false;
+        return true;
+    }
+    removeHtmlTags(input) {
+        const result = [];
+        let insideTag = false;
+        let i = 0;
+        while (i < input.length) {
+            const char = input[i];
+            if (char === '<') {
+                insideTag = true;
+                i++;
+                continue;
+            }
+            if (char === '>') {
+                insideTag = false;
+                i++;
+                continue;
+            }
+            if (!insideTag) {
+                result.push(char);
+            }
+            i++;
+        }
+        return result.join('');
+    }
+    removeEventHandlers(input) {
+        const result = [];
+        let i = 0;
+        while (i < input.length) {
+            if (i <= input.length - 2
+                && input.substring(i, i + 2).toLowerCase() === 'on'
+                && this.isWordBoundary(input, i)) {
+                i = this.skipEventHandler(input, i);
+                continue;
+            }
+            result.push(input[i]);
+            i++;
+        }
+        return result.join('');
+    }
+    removeStyleAttributes(input) {
+        const result = [];
+        let i = 0;
+        while (i < input.length) {
+            if (i <= input.length - 5
+                && input.substring(i, i + 5).toLowerCase() === 'style'
+                && this.isWordBoundary(input, i)) {
+                i = this.skipStyleAttribute(input, i);
+                continue;
+            }
+            result.push(input[i]);
+            i++;
+        }
+        return result.join('');
+    }
+    removeDangerousProtocols(input) {
+        let result = input;
+        let previousResult = '';
+        while (result !== previousResult) {
+            previousResult = result;
+            result = result.replace(/(?:javascript|vbscript|data|file|ftp|about)\s*:\S*/gi, '');
+            result = result.replace(/(?:javascript|vbscript|data|file|ftp|about)\s*:/gi, '');
+            result = result.replace(/\b(?:javascript|vbscript|data|file|ftp|about)\b/gi, '');
+        }
+        return result;
+    }
+    removeDangerousJavaScript(input) {
+        let result = input;
+        let previousResult = '';
+        while (result !== previousResult) {
+            previousResult = result;
+            result = result.replace(/(?:expression|eval)\s*\([^)]*\)/gi, '');
+            result = result.replace(/(?:expression|eval)\s*\(/gi, '');
+            result = result.replace(/\b(?:expression|eval)\b/gi, '');
+        }
+        return result;
+    }
+    removeHtmlEntities(input) {
+        const result = [];
+        let i = 0;
+        while (i < input.length) {
+            if (input[i] === '&') {
+                i = this.skipHtmlEntity(input, i);
+                continue;
+            }
+            result.push(input[i]);
+            i++;
+        }
+        return result.join('');
+    }
+    isWordBoundary(input, index) {
+        if (index === 0)
+            return true;
+        const prevChar = input[index - 1];
+        return !(/\w/.test(prevChar));
+    }
+    skipEventHandler(input, startIndex) {
+        let i = startIndex;
+        while (i < input.length && /\w/.test(input[i])) {
+            i++;
+        }
+        while (i < input.length && /\s/.test(input[i])) {
+            i++;
+        }
+        if (i < input.length && input[i] === '=') {
+            i++;
+            while (i < input.length && /\s/.test(input[i])) {
+                i++;
+            }
+            if (i < input.length && (input[i] === '"' || input[i] === '\'')) {
+                const quote = input[i];
+                i++;
+                while (i < input.length && input[i] !== quote) {
+                    i++;
+                }
+                if (i < input.length)
+                    i++;
+            }
+            else {
+                while (i < input.length && !/\s/.test(input[i]) && input[i] !== '>' && input[i] !== '<') {
+                    i++;
+                }
+            }
+        }
+        return i;
+    }
+    skipStyleAttribute(input, startIndex) {
+        let i = startIndex + 5;
+        while (i < input.length && /\s/.test(input[i])) {
+            i++;
+        }
+        if (i < input.length && input[i] === '=') {
+            i++;
+            while (i < input.length && /\s/.test(input[i])) {
+                i++;
+            }
+            if (i < input.length && (input[i] === '"' || input[i] === '\'')) {
+                const quote = input[i];
+                i++;
+                while (i < input.length && input[i] !== quote) {
+                    i++;
+                }
+                if (i < input.length)
+                    i++;
+            }
+            else {
+                while (i < input.length && !/\s/.test(input[i]) && input[i] !== '>' && input[i] !== '<') {
+                    i++;
+                }
+            }
+        }
+        return i;
+    }
+    skipHtmlEntity(input, startIndex) {
+        let i = startIndex + 1;
+        while (i < input.length && input[i] !== ';' && /[#\w]/.test(input[i])) {
+            i++;
+        }
+        if (i < input.length && input[i] === ';') {
+            i++;
+        }
+        return i;
+    }
+};
+exports.InputSanitizationService = InputSanitizationService;
+exports.InputSanitizationService = InputSanitizationService = InputSanitizationService_1 = __decorate([
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [config_service_1.ConfigService])
+], InputSanitizationService);
+//# sourceMappingURL=input-sanitization.service.js.map

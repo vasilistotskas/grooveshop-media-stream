@@ -104,7 +104,7 @@ End-to-end tests should be placed in the `test` directory and follow the naming 
 import { Test, TestingModule } from '@nestjs/testing'
 import { INestApplication } from '@nestjs/common'
 import * as request from 'supertest'
-import MediaStreamModule from '@microservice/Module/MediaStreamModule'
+import MediaStreamModule from '@microservice/media-stream.module'
 
 describe('MediaStreamController (e2e)', () => {
   let app: INestApplication
