@@ -1,3 +1,43 @@
+# [1.135.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.134.0...v1.135.0) (2025-09-20)
+
+
+### Bug Fixes
+
+* Add getDebugInfo to RateLimitService ([ddebfa2](https://github.com/vasilistotskas/grooveshop-media-stream/commit/ddebfa2ac16ee5ff64ca3f79d5999d0d865c1055))
+* Add Redis service to CI production build workflow ([2e4c0d5](https://github.com/vasilistotskas/grooveshop-media-stream/commit/2e4c0d59dedfdb672912955fb8ee007965f53cc6))
+* Disable metrics collection in test environment ([84b11ef](https://github.com/vasilistotskas/grooveshop-media-stream/commit/84b11ef3a34dc324b68bce325bf5237ecccf265b))
+* Enhance input sanitization for event and style attributes ([6b82da5](https://github.com/vasilistotskas/grooveshop-media-stream/commit/6b82da57c6ffa8889eb371dda3ef1263077b2025))
+* Improve input sanitization logic and coverage ([7c7042c](https://github.com/vasilistotskas/grooveshop-media-stream/commit/7c7042c4e139cfa6d018fb82b36f47bd4f39762f))
+* Improve input sanitization logic and regex patterns ([0f9a642](https://github.com/vasilistotskas/grooveshop-media-stream/commit/0f9a642bb93817699afbe19d04623f10d23256d2))
+* Increase rate limit thresholds for CI tests ([5f45e0e](https://github.com/vasilistotskas/grooveshop-media-stream/commit/5f45e0e30b665cf5169cfce6d41d54885b1b91aa))
+* Input sanitization for improved accuracy ([2c05532](https://github.com/vasilistotskas/grooveshop-media-stream/commit/2c055326fb18a9264c2602b4083e8c1d2ab90476))
+* Input sanitization logic for robustness ([e29fe12](https://github.com/vasilistotskas/grooveshop-media-stream/commit/e29fe12c61a28478dc084c11a073d9aaa8b994d7))
+* Lower threshold for averageDuration in monitoring test ([d8798db](https://github.com/vasilistotskas/grooveshop-media-stream/commit/d8798dbf4f17234d6368c029287675fdb3746b25))
+* MediaStreamImageRESTController dependencies ([42d8cc5](https://github.com/vasilistotskas/grooveshop-media-stream/commit/42d8cc574d3de25d19c27e8861c70a02fc152745))
+* MediaStreamModule import path in tests ([27e12b8](https://github.com/vasilistotskas/grooveshop-media-stream/commit/27e12b871ed9c395a8122ddc07ea2761f9c2f394))
+* metrics service logging format ([aa2c91c](https://github.com/vasilistotskas/grooveshop-media-stream/commit/aa2c91ccf4c58c96f9ff428713db6f424f39f761))
+* Remove test SVG files and update dependencies ([aa9703a](https://github.com/vasilistotskas/grooveshop-media-stream/commit/aa9703ad7f842370bfcf12e0c95afe75cb01ae0b))
+* Update test assertions for Redis and rate limit ([7945def](https://github.com/vasilistotskas/grooveshop-media-stream/commit/7945defdb333eaf8b6b7ba4d259270a3082049dc))
+
+
+### Features
+
+* Add CI-friendly test helpers and improve CI config ([eb58747](https://github.com/vasilistotskas/grooveshop-media-stream/commit/eb587472e19dc26025d3f16d286ce3b7aed8f6c2))
+* Add requested format and original URL to response locals ([d85cf65](https://github.com/vasilistotskas/grooveshop-media-stream/commit/d85cf65c47e8c1686ab70e06ec9c01b6d2fe32ab))
+* Add stopMetricsCollection to MetricsService ([8d33308](https://github.com/vasilistotskas/grooveshop-media-stream/commit/8d33308c5972121978d77cc94dd7fd531b58508d))
+* Bypass adaptive limit in test environment ([918d5dd](https://github.com/vasilistotskas/grooveshop-media-stream/commit/918d5dd30f6cf3ebead4819f9c1b36c976018ae4))
+* Enhance input sanitization and security checks ([cca001b](https://github.com/vasilistotskas/grooveshop-media-stream/commit/cca001b5c7dda84d1bd702b30b557459896affbc))
+* Improve image cache handling and update workflows ([cdc60aa](https://github.com/vasilistotskas/grooveshop-media-stream/commit/cdc60aa795af83c6ce61368fe19959a319c3cd3a))
+* Init prototype ([18554c0](https://github.com/vasilistotskas/grooveshop-media-stream/commit/18554c0797489c6754d67bcda9d04f1e596f68ed))
+* input sanitization service formatting ([7d76c32](https://github.com/vasilistotskas/grooveshop-media-stream/commit/7d76c32a9b528b83ef5238a29e6e4099a3c2fbe1))
+* progress ([f6f879e](https://github.com/vasilistotskas/grooveshop-media-stream/commit/f6f879e6ee4f28f0604488a89460c81f01ec66b0))
+* progress ([db93a39](https://github.com/vasilistotskas/grooveshop-media-stream/commit/db93a390bf550f7e51637a7fbac400f30623bccb))
+* progress ([88bca19](https://github.com/vasilistotskas/grooveshop-media-stream/commit/88bca19097129f75e027e73efb5801d8d784e05b))
+* Remove legacy infrastructure specs and update docs ([6be378a](https://github.com/vasilistotskas/grooveshop-media-stream/commit/6be378a936e8568f0d2ecc17a971c43ce3a11f64))
+* Remove unused scripts and improve type safety ([232103b](https://github.com/vasilistotskas/grooveshop-media-stream/commit/232103bb15015b1524a7d5db0ec031faa842ecc0))
+* Revamp CI workflow with improved jobs and caching ([36d40e5](https://github.com/vasilistotskas/grooveshop-media-stream/commit/36d40e525f3ccaaf54865d83bfc1a591c8433ee7))
+* Update CI to use Node 24.x and Redis 7 only ([53755b3](https://github.com/vasilistotskas/grooveshop-media-stream/commit/53755b31768bc67c12ddb8dcdd055a4c6bf343cf))
+
 # [1.134.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.133.0...v1.134.0) (2025-07-21)
 
 
