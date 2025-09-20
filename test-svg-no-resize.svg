@@ -1,1 +1,0 @@
-{"name":"InvalidRequestError","message":"Invalid width parameter","status":400,"code":"INVALID_REQUEST","context":{"correlationId":"f7dbe196-a9bd-4893-8a0f-9dfd1b02afee","width":"0"},"timestamp":"2025-08-14T15:33:07.017Z","path":"/media_stream-image/media/uploads/blog/100.svg/0/0/fill/entropy/ffffff/5/svg/100","method":"GET","correlationId":"f7dbe196-a9bd-4893-8a0f-9dfd1b02afee"}
