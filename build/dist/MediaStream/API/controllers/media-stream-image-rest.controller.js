@@ -173,7 +173,29 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                     request,
                     correlationId,
                 });
-                await this.fetchAndStreamResource(request, res);
+                await this.cacheImageResourceOperation.execute();
+                const maxWaitTime = 10000;
+                const pollInterval = 100;
+                let waitTime = 0;
+                while (waitTime < maxWaitTime) {
+                    if (await this.cacheImageResourceOperation.resourceExists) {
+                        this._logger.debug('Resource became available after waiting', {
+                            waitTime,
+                            correlationId,
+                        });
+                        await this.streamResource(request, res);
+                        return;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, pollInterval));
+                    waitTime += pollInterval;
+                }
+                if (waitTime >= maxWaitTime) {
+                    this._logger.warn('Timeout waiting for resource to be processed', {
+                        waitTime,
+                        correlationId,
+                    });
+                }
+                await this.defaultImageFallback(request, res);
             }
         }
         catch (error) {
@@ -382,6 +404,10 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                 trimThreshold: Number(trimThreshold),
                 format,
                 quality: Number(quality),
+            });
+            this._logger.debug(`Created ResizeOptions:`, {
+                resizeOptions: JSON.stringify(resizeOptions, null, 2),
+                correlationId,
             });
             const djangoApiUrl = process.env.NEST_PUBLIC_DJANGO_URL || 'http://localhost:8000';
             const resourceUrl = `${djangoApiUrl}/media/uploads/${imageType}/${image}`;

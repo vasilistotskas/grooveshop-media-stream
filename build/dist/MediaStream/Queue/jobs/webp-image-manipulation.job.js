@@ -20,12 +20,10 @@ let WebpImageManipulationJob = WebpImageManipulationJob_1 = class WebpImageManip
         this.logger = new common_1.Logger(WebpImageManipulationJob_1.name);
     }
     async handle(filePathFrom, filePathTo, options) {
-        this.logger.debug(`WebpImageManipulationJob.handle called with format: ${options.format}`, {
+        this.logger.debug(`WebpImageManipulationJob.handle called with all options:`, {
             filePathFrom,
             filePathTo,
-            format: options.format,
-            width: options.width,
-            height: options.height,
+            options: JSON.stringify(options, null, 2),
         });
         if (options.format === 'svg') {
             this.logger.debug(`SVG format requested. Source file: ${filePathFrom}`);
@@ -150,12 +148,16 @@ let WebpImageManipulationJob = WebpImageManipulationJob_1 = class WebpImageManip
                     threshold: Number(options.trimThreshold),
                 });
             }
-            manipulation.resize({
+            const resizeConfig = {
                 ...resizeScales,
                 fit: options.fit,
                 position: options.position,
                 background: options.background,
+            };
+            this.logger.debug(`Applying Sharp resize with config:`, {
+                resizeConfig: JSON.stringify(resizeConfig, null, 2),
             });
+            manipulation.resize(resizeConfig);
         }
         const manipulatedFile = await manipulation.toFile(filePathTo);
         return new manipulation_job_result_dto_1.default({

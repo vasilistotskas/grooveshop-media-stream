@@ -1,7 +1,10 @@
 import { Buffer } from 'node:buffer'
-import { hrtime } from 'node:process'
+import { writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { cwd, hrtime } from 'node:process'
 import { MultiLayerCacheManager } from '@microservice/Cache/services/multi-layer-cache.manager'
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
+import ResourceMetaData from '@microservice/HTTP/dto/resource-meta-data.dto'
 import { HttpClientService } from '@microservice/HTTP/services/http-client.service'
 import { Injectable, Logger } from '@nestjs/common'
 import sharp from 'sharp'
@@ -20,7 +23,7 @@ export class ImageProcessingProcessor {
 
 	async process(job: Job<ImageProcessingJobData>): Promise<JobResult> {
 		const startTime = Date.now()
-		const { imageUrl, width, height, quality, format, cacheKey, correlationId } = job.data
+		const { imageUrl, width, height, quality, format, cacheKey, correlationId, fit, position, background, trimThreshold } = job.data
 
 		return this._correlationService.runWithContext(
 			{
@@ -33,9 +36,19 @@ export class ImageProcessingProcessor {
 			},
 			async () => {
 				try {
-					this._logger.debug(`Processing image job ${job.id} for URL: ${imageUrl}`)
+					this._logger.debug(`Processing image job ${job.id} for URL: ${imageUrl} with options:`, {
+						width,
+						height,
+						quality,
+						format,
+						fit,
+						position,
+						background,
+						trimThreshold,
+					})
 
-					const cached = await this.cacheManager.get('images', cacheKey)
+					// Check the correct cache namespace
+					const cached = await this.cacheManager.get('image', cacheKey)
 					if (cached) {
 						this._logger.debug(`Image already cached for job ${job.id}`)
 						return {
@@ -57,11 +70,40 @@ export class ImageProcessingProcessor {
 						height: height ? Number(height) : undefined,
 						quality: quality ? Number(quality) : undefined,
 						format,
+						fit,
+						position,
+						background,
+						trimThreshold: trimThreshold ? Number(trimThreshold) : undefined,
 					})
 
 					await this.updateProgress(job, 75, 'Caching result')
 
-					await this.cacheManager.set('images', cacheKey, processedBuffer.toString('base64'), 3600)
+					const metadata = new ResourceMetaData({
+						version: 1,
+						size: processedBuffer.length.toString(),
+						format: format || 'webp',
+						dateCreated: Date.now(),
+						publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
+						privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
+					})
+
+					await this.cacheManager.set('image', cacheKey, {
+						data: processedBuffer,
+						metadata,
+					}, metadata.privateTTL)
+
+					const basePath = cwd()
+					const resourcePath = join(basePath, 'storage', `${cacheKey}.rsc`)
+					const metadataPath = join(basePath, 'storage', `${cacheKey}.rsm`)
+
+					try {
+						await writeFile(resourcePath, processedBuffer)
+						await writeFile(metadataPath, JSON.stringify(metadata), 'utf8')
+						this._logger.debug(`Saved processed image to filesystem: ${resourcePath}`)
+					}
+					catch (fsError) {
+						this._logger.warn(`Failed to save to filesystem: ${(fsError as Error).message}`)
+					}
 
 					await this.updateProgress(job, 100, 'Completed')
 
@@ -112,16 +154,44 @@ export class ImageProcessingProcessor {
 			height?: number
 			quality?: number
 			format?: string
+			fit?: string
+			position?: string
+			background?: any
+			trimThreshold?: number
 		},
 	): Promise<Buffer> {
 		try {
 			let pipeline = sharp(buffer)
 
-			if (options.width || options.height) {
-				pipeline = pipeline.resize(options.width, options.height, {
-					fit: 'inside',
-					withoutEnlargement: true,
+			if (options.trimThreshold !== undefined && options.trimThreshold > 0) {
+				pipeline = pipeline.trim({
+					background: options.background,
+					threshold: options.trimThreshold,
 				})
+			}
+
+			if (options.width || options.height) {
+				const resizeOptions: any = {}
+
+				if (options.width)
+					resizeOptions.width = options.width
+				if (options.height)
+					resizeOptions.height = options.height
+
+				if (options.fit) {
+					resizeOptions.fit = options.fit
+				}
+
+				if (options.position) {
+					resizeOptions.position = options.position
+				}
+
+				if (options.background) {
+					resizeOptions.background = options.background
+				}
+
+				this._logger.debug('Applying Sharp resize with options:', resizeOptions)
+				pipeline = pipeline.resize(resizeOptions)
 			}
 
 			switch (options.format) {

@@ -149,16 +149,19 @@ describe('imageProcessingProcessor', () => {
 				timeout: 30000,
 			})
 			expect(mockSharp).toHaveBeenCalledWith(originalImageData)
-			expect(mockSharpInstance.resize).toHaveBeenCalledWith(300, 200, {
-				fit: 'inside',
-				withoutEnlargement: true,
+			expect(mockSharpInstance.resize).toHaveBeenCalledWith({
+				width: 300,
+				height: 200,
 			})
 			expect(mockSharpInstance.webp).toHaveBeenCalledWith({ quality: 80 })
 			expect(mockCacheManager.set).toHaveBeenCalledWith(
-				'images',
+				'image',
 				'test-cache-key',
-				processedImageData.toString('base64'),
-				3600,
+				expect.objectContaining({
+					data: processedImageData,
+					metadata: expect.any(Object),
+				}),
+				expect.any(Number),
 			)
 		})
 

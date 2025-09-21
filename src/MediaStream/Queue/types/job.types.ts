@@ -5,6 +5,10 @@ export interface ImageProcessingJobData {
 	height?: number
 	quality?: number
 	format?: 'webp' | 'jpeg' | 'png'
+	fit?: string
+	position?: string
+	background?: any
+	trimThreshold?: number
 	cacheKey: string
 	priority: JobPriority
 	metadata?: ImageMetadata

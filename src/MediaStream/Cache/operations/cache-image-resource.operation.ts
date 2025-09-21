@@ -72,16 +72,22 @@ export default class CacheImageResourceOperation {
 
 				const cachedResource = await this.cacheManager.get<{ data: Buffer, metadata: ResourceMetaData }>('image', this.id)
 				if (cachedResource) {
-					const isValid = cachedResource.metadata.dateCreated + cachedResource.metadata.privateTTL > Date.now()
-					if (isValid) {
-						CorrelatedLogger.debug(`Resource found in cache and is valid: ${this.id}`, CacheImageResourceOperation.name)
-						const duration = PerformanceTracker.endPhase('resource_exists_check')
-						this.metricsService.recordCacheOperation('get', 'multi-layer', 'hit', duration || 0)
-						return true
+					if (!cachedResource.metadata || typeof cachedResource.metadata.dateCreated !== 'number') {
+						CorrelatedLogger.warn(`Corrupted cache data found, deleting: ${this.id}`, CacheImageResourceOperation.name)
+						await this.cacheManager.delete('image', this.id)
 					}
 					else {
-						CorrelatedLogger.debug(`Resource found in cache but expired: ${this.id}`, CacheImageResourceOperation.name)
-						await this.cacheManager.delete('image', this.id)
+						const isValid = cachedResource.metadata.dateCreated + cachedResource.metadata.privateTTL > Date.now()
+						if (isValid) {
+							CorrelatedLogger.debug(`Resource found in cache and is valid: ${this.id}`, CacheImageResourceOperation.name)
+							const duration = PerformanceTracker.endPhase('resource_exists_check')
+							this.metricsService.recordCacheOperation('get', 'multi-layer', 'hit', duration || 0)
+							return true
+						}
+						else {
+							CorrelatedLogger.debug(`Resource found in cache but expired: ${this.id}`, CacheImageResourceOperation.name)
+							await this.cacheManager.delete('image', this.id)
+						}
 					}
 				}
 
@@ -259,6 +265,10 @@ export default class CacheImageResourceOperation {
 			height: this.request.resizeOptions?.height ?? undefined,
 			quality: this.request.resizeOptions?.quality,
 			format: this.request.resizeOptions?.format as 'webp' | 'jpeg' | 'png',
+			fit: this.request.resizeOptions?.fit,
+			position: this.request.resizeOptions?.position,
+			background: this.request.resizeOptions?.background,
+			trimThreshold: this.request.resizeOptions?.trimThreshold,
 			cacheKey: this.id,
 			priority,
 		})
@@ -488,6 +498,12 @@ export default class CacheImageResourceOperation {
 
 		try {
 			let cachedResource = await this.cacheManager.get<{ data: Buffer, metadata: ResourceMetaData }>('image', this.id)
+
+			if (cachedResource && (!cachedResource.metadata || typeof cachedResource.metadata.dateCreated !== 'number')) {
+				CorrelatedLogger.warn(`Corrupted cache data found in getCachedResource, deleting: ${this.id}`, CacheImageResourceOperation.name)
+				await this.cacheManager.delete('image', this.id)
+				cachedResource = null
+			}
 
 			if (!cachedResource) {
 				const cachedData = await this.cacheManager.get<string>('images', this.id)

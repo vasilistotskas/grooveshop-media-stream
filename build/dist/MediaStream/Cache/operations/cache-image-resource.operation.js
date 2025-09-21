@@ -96,16 +96,22 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
                 logger_util_1.CorrelatedLogger.debug(`Checking if resource exists in cache: ${this.id}`, CacheImageResourceOperation_1.name);
                 const cachedResource = await this.cacheManager.get('image', this.id);
                 if (cachedResource) {
-                    const isValid = cachedResource.metadata.dateCreated + cachedResource.metadata.privateTTL > Date.now();
-                    if (isValid) {
-                        logger_util_1.CorrelatedLogger.debug(`Resource found in cache and is valid: ${this.id}`, CacheImageResourceOperation_1.name);
-                        const duration = performance_tracker_util_1.PerformanceTracker.endPhase('resource_exists_check');
-                        this.metricsService.recordCacheOperation('get', 'multi-layer', 'hit', duration || 0);
-                        return true;
+                    if (!cachedResource.metadata || typeof cachedResource.metadata.dateCreated !== 'number') {
+                        logger_util_1.CorrelatedLogger.warn(`Corrupted cache data found, deleting: ${this.id}`, CacheImageResourceOperation_1.name);
+                        await this.cacheManager.delete('image', this.id);
                     }
                     else {
-                        logger_util_1.CorrelatedLogger.debug(`Resource found in cache but expired: ${this.id}`, CacheImageResourceOperation_1.name);
-                        await this.cacheManager.delete('image', this.id);
+                        const isValid = cachedResource.metadata.dateCreated + cachedResource.metadata.privateTTL > Date.now();
+                        if (isValid) {
+                            logger_util_1.CorrelatedLogger.debug(`Resource found in cache and is valid: ${this.id}`, CacheImageResourceOperation_1.name);
+                            const duration = performance_tracker_util_1.PerformanceTracker.endPhase('resource_exists_check');
+                            this.metricsService.recordCacheOperation('get', 'multi-layer', 'hit', duration || 0);
+                            return true;
+                        }
+                        else {
+                            logger_util_1.CorrelatedLogger.debug(`Resource found in cache but expired: ${this.id}`, CacheImageResourceOperation_1.name);
+                            await this.cacheManager.delete('image', this.id);
+                        }
                     }
                 }
                 const resourcePathExists = await (0, promises_1.access)(this.getResourcePath).then(() => true).catch(() => false);
@@ -255,6 +261,10 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
             height: this.request.resizeOptions?.height ?? undefined,
             quality: this.request.resizeOptions?.quality,
             format: this.request.resizeOptions?.format,
+            fit: this.request.resizeOptions?.fit,
+            position: this.request.resizeOptions?.position,
+            background: this.request.resizeOptions?.background,
+            trimThreshold: this.request.resizeOptions?.trimThreshold,
             cacheKey: this.id,
             priority,
         });
@@ -431,6 +441,11 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
         performance_tracker_util_1.PerformanceTracker.startPhase('get_cached_resource');
         try {
             let cachedResource = await this.cacheManager.get('image', this.id);
+            if (cachedResource && (!cachedResource.metadata || typeof cachedResource.metadata.dateCreated !== 'number')) {
+                logger_util_1.CorrelatedLogger.warn(`Corrupted cache data found in getCachedResource, deleting: ${this.id}`, CacheImageResourceOperation_1.name);
+                await this.cacheManager.delete('image', this.id);
+                cachedResource = null;
+            }
             if (!cachedResource) {
                 const cachedData = await this.cacheManager.get('images', this.id);
                 if (cachedData) {

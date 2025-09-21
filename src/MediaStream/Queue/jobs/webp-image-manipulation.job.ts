@@ -13,12 +13,10 @@ export default class WebpImageManipulationJob {
 		filePathTo: string,
 		options: ResizeOptions,
 	): Promise<ManipulationJobResult> {
-		this.logger.debug(`WebpImageManipulationJob.handle called with format: ${options.format}`, {
+		this.logger.debug(`WebpImageManipulationJob.handle called with all options:`, {
 			filePathFrom,
 			filePathTo,
-			format: options.format,
-			width: options.width,
-			height: options.height,
+			options: JSON.stringify(options, null, 2),
 		})
 
 		if (options.format === 'svg') {
@@ -164,12 +162,18 @@ export default class WebpImageManipulationJob {
 				})
 			}
 
-			manipulation.resize({
+			const resizeConfig = {
 				...resizeScales,
 				fit: options.fit,
 				position: options.position,
 				background: options.background,
+			}
+
+			this.logger.debug(`Applying Sharp resize with config:`, {
+				resizeConfig: JSON.stringify(resizeConfig, null, 2),
 			})
+
+			manipulation.resize(resizeConfig)
 		}
 
 		const manipulatedFile = await manipulation.toFile(filePathTo)

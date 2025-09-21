@@ -15,9 +15,12 @@ var ImageProcessingProcessor_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ImageProcessingProcessor = void 0;
 const node_buffer_1 = require("node:buffer");
+const promises_1 = require("node:fs/promises");
+const node_path_1 = require("node:path");
 const node_process_1 = require("node:process");
 const multi_layer_cache_manager_1 = require("../../Cache/services/multi-layer-cache.manager");
 const correlation_service_1 = require("../../Correlation/services/correlation.service");
+const resource_meta_data_dto_1 = __importDefault(require("../../HTTP/dto/resource-meta-data.dto"));
 const http_client_service_1 = require("../../HTTP/services/http-client.service");
 const common_1 = require("@nestjs/common");
 const sharp_1 = __importDefault(require("sharp"));
@@ -30,7 +33,7 @@ let ImageProcessingProcessor = ImageProcessingProcessor_1 = class ImageProcessin
     }
     async process(job) {
         const startTime = Date.now();
-        const { imageUrl, width, height, quality, format, cacheKey, correlationId } = job.data;
+        const { imageUrl, width, height, quality, format, cacheKey, correlationId, fit, position, background, trimThreshold } = job.data;
         return this._correlationService.runWithContext({
             correlationId,
             timestamp: Date.now(),
@@ -40,8 +43,17 @@ let ImageProcessingProcessor = ImageProcessingProcessor_1 = class ImageProcessin
             startTime: node_process_1.hrtime.bigint(),
         }, async () => {
             try {
-                this._logger.debug(`Processing image job ${job.id} for URL: ${imageUrl}`);
-                const cached = await this.cacheManager.get('images', cacheKey);
+                this._logger.debug(`Processing image job ${job.id} for URL: ${imageUrl} with options:`, {
+                    width,
+                    height,
+                    quality,
+                    format,
+                    fit,
+                    position,
+                    background,
+                    trimThreshold,
+                });
+                const cached = await this.cacheManager.get('image', cacheKey);
                 if (cached) {
                     this._logger.debug(`Image already cached for job ${job.id}`);
                     return {
@@ -59,9 +71,35 @@ let ImageProcessingProcessor = ImageProcessingProcessor_1 = class ImageProcessin
                     height: height ? Number(height) : undefined,
                     quality: quality ? Number(quality) : undefined,
                     format,
+                    fit,
+                    position,
+                    background,
+                    trimThreshold: trimThreshold ? Number(trimThreshold) : undefined,
                 });
                 await this.updateProgress(job, 75, 'Caching result');
-                await this.cacheManager.set('images', cacheKey, processedBuffer.toString('base64'), 3600);
+                const metadata = new resource_meta_data_dto_1.default({
+                    version: 1,
+                    size: processedBuffer.length.toString(),
+                    format: format || 'webp',
+                    dateCreated: Date.now(),
+                    publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
+                    privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
+                });
+                await this.cacheManager.set('image', cacheKey, {
+                    data: processedBuffer,
+                    metadata,
+                }, metadata.privateTTL);
+                const basePath = (0, node_process_1.cwd)();
+                const resourcePath = (0, node_path_1.join)(basePath, 'storage', `${cacheKey}.rsc`);
+                const metadataPath = (0, node_path_1.join)(basePath, 'storage', `${cacheKey}.rsm`);
+                try {
+                    await (0, promises_1.writeFile)(resourcePath, processedBuffer);
+                    await (0, promises_1.writeFile)(metadataPath, JSON.stringify(metadata), 'utf8');
+                    this._logger.debug(`Saved processed image to filesystem: ${resourcePath}`);
+                }
+                catch (fsError) {
+                    this._logger.warn(`Failed to save to filesystem: ${fsError.message}`);
+                }
                 await this.updateProgress(job, 100, 'Completed');
                 const processingTime = Date.now() - startTime;
                 this._logger.debug(`Image processing completed for job ${job.id} in ${processingTime}ms`);
@@ -100,11 +138,29 @@ let ImageProcessingProcessor = ImageProcessingProcessor_1 = class ImageProcessin
     async processImage(buffer, options) {
         try {
             let pipeline = (0, sharp_1.default)(buffer);
-            if (options.width || options.height) {
-                pipeline = pipeline.resize(options.width, options.height, {
-                    fit: 'inside',
-                    withoutEnlargement: true,
+            if (options.trimThreshold !== undefined && options.trimThreshold > 0) {
+                pipeline = pipeline.trim({
+                    background: options.background,
+                    threshold: options.trimThreshold,
                 });
+            }
+            if (options.width || options.height) {
+                const resizeOptions = {};
+                if (options.width)
+                    resizeOptions.width = options.width;
+                if (options.height)
+                    resizeOptions.height = options.height;
+                if (options.fit) {
+                    resizeOptions.fit = options.fit;
+                }
+                if (options.position) {
+                    resizeOptions.position = options.position;
+                }
+                if (options.background) {
+                    resizeOptions.background = options.background;
+                }
+                this._logger.debug('Applying Sharp resize with options:', resizeOptions);
+                pipeline = pipeline.resize(resizeOptions);
             }
             switch (options.format) {
                 case 'webp':

@@ -342,6 +342,10 @@ describe('cacheImageResourceOperation', () => {
 				height: mockRequest.resizeOptions.height,
 				quality: mockRequest.resizeOptions.quality,
 				format: mockRequest.resizeOptions.format,
+				fit: mockRequest.resizeOptions.fit,
+				position: mockRequest.resizeOptions.position,
+				background: mockRequest.resizeOptions.background,
+				trimThreshold: mockRequest.resizeOptions.trimThreshold,
 				cacheKey: operation.id,
 				priority: expect.any(Number),
 			})
