@@ -1,3 +1,15 @@
+# [2.0.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.135.1...v2.0.0) (2025-09-21)
+
+
+### Performance Improvements
+
+* Improve image resource caching and streaming logic ([acf23c6](https://github.com/vasilistotskas/grooveshop-media-stream/commit/acf23c60cc2af85e707d7306a4ff7d71e43a528b))
+
+
+### BREAKING CHANGES
+
+*
+
 ## [1.135.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.135.0...v1.135.1) (2025-09-21)
 
 
