@@ -1,3 +1,10 @@
+# [2.1.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.0.0...v2.1.0) (2025-09-21)
+
+
+### Features
+
+* Add rate limiting configuration to config service ([7e1523b](https://github.com/vasilistotskas/grooveshop-media-stream/commit/7e1523b866f297200bd8179033d8720b320a4075))
+
 # [2.0.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.135.1...v2.0.0) (2025-09-21)
 
 
