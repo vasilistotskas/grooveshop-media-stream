@@ -15,11 +15,13 @@ export class InputSanitizationService implements ISanitizer<any> {
 			this.allowedDomains = this._configService.getOptional<string[]>('validation.allowedDomains', [
 				'localhost',
 				'127.0.0.1',
-				'example.com',
-				'test.com',
-				'grooveshop.com',
-				'cdn.grooveshop.com',
-				'images.grooveshop.com',
+				'backend-service',
+				'webside.gr',
+				'assets.webside.gr',
+				'api.webside.gr',
+				'static.webside.gr',
+				'frontend-nuxt-service',
+				'media-stream-service',
 			])
 		}
 		return this.allowedDomains
