@@ -177,6 +177,27 @@ let ConfigService = ConfigService_1 = class ConfigService {
                     timeout: this.nestConfigService.get('HTTP_HEALTH_CHECK_TIMEOUT'),
                 },
             },
+            rateLimit: {
+                enabled: this.nestConfigService.get('RATE_LIMIT_ENABLED'),
+                default: {
+                    windowMs: this.nestConfigService.get('RATE_LIMIT_DEFAULT_WINDOW_MS'),
+                    max: this.nestConfigService.get('RATE_LIMIT_DEFAULT_MAX'),
+                },
+                imageProcessing: {
+                    windowMs: this.nestConfigService.get('RATE_LIMIT_IMAGE_PROCESSING_WINDOW_MS'),
+                    max: this.nestConfigService.get('RATE_LIMIT_IMAGE_PROCESSING_MAX'),
+                },
+                healthCheck: {
+                    windowMs: this.nestConfigService.get('RATE_LIMIT_HEALTH_CHECK_WINDOW_MS'),
+                    max: this.nestConfigService.get('RATE_LIMIT_HEALTH_CHECK_MAX'),
+                },
+                bypass: {
+                    healthChecks: this.nestConfigService.get('RATE_LIMIT_BYPASS_HEALTH_CHECKS'),
+                    metricsEndpoint: this.nestConfigService.get('RATE_LIMIT_BYPASS_METRICS_ENDPOINT'),
+                    staticAssets: this.nestConfigService.get('RATE_LIMIT_BYPASS_STATIC_ASSETS'),
+                    whitelistedDomains: this.nestConfigService.get('RATE_LIMIT_BYPASS_WHITELISTED_DOMAINS'),
+                },
+            },
         };
     }
     async reload() {
@@ -242,6 +263,29 @@ let ConfigService = ConfigService_1 = class ConfigService {
         const nuxtUrl = this.nestConfigService.get('NEST_PUBLIC_NUXT_URL') || 'http://localhost:3000';
         const externalRequestTimeout = Number.parseInt(this.nestConfigService.get('EXTERNAL_REQUEST_TIMEOUT') || '30000');
         const externalMaxRetries = Number.parseInt(this.nestConfigService.get('EXTERNAL_MAX_RETRIES') || '3');
+        const rateLimitEnabledStr = this.nestConfigService.get('RATE_LIMIT_ENABLED') || 'true';
+        const rateLimitEnabled = typeof rateLimitEnabledStr === 'string'
+            ? rateLimitEnabledStr.toLowerCase() === 'true'
+            : rateLimitEnabledStr;
+        const rateLimitDefaultWindowMs = Number.parseInt(this.nestConfigService.get('RATE_LIMIT_DEFAULT_WINDOW_MS') || '60000');
+        const rateLimitDefaultMax = Number.parseInt(this.nestConfigService.get('RATE_LIMIT_DEFAULT_MAX') || '100');
+        const rateLimitImageProcessingWindowMs = Number.parseInt(this.nestConfigService.get('RATE_LIMIT_IMAGE_PROCESSING_WINDOW_MS') || '60000');
+        const rateLimitImageProcessingMax = Number.parseInt(this.nestConfigService.get('RATE_LIMIT_IMAGE_PROCESSING_MAX') || '50');
+        const rateLimitHealthCheckWindowMs = Number.parseInt(this.nestConfigService.get('RATE_LIMIT_HEALTH_CHECK_WINDOW_MS') || '10000');
+        const rateLimitHealthCheckMax = Number.parseInt(this.nestConfigService.get('RATE_LIMIT_HEALTH_CHECK_MAX') || '1000');
+        const rateLimitBypassHealthChecksStr = this.nestConfigService.get('RATE_LIMIT_BYPASS_HEALTH_CHECKS') || 'true';
+        const rateLimitBypassHealthChecks = typeof rateLimitBypassHealthChecksStr === 'string'
+            ? rateLimitBypassHealthChecksStr.toLowerCase() === 'true'
+            : rateLimitBypassHealthChecksStr;
+        const rateLimitBypassMetricsEndpointStr = this.nestConfigService.get('RATE_LIMIT_BYPASS_METRICS_ENDPOINT') || 'true';
+        const rateLimitBypassMetricsEndpoint = typeof rateLimitBypassMetricsEndpointStr === 'string'
+            ? rateLimitBypassMetricsEndpointStr.toLowerCase() === 'true'
+            : rateLimitBypassMetricsEndpointStr;
+        const rateLimitBypassStaticAssetsStr = this.nestConfigService.get('RATE_LIMIT_BYPASS_STATIC_ASSETS') || 'true';
+        const rateLimitBypassStaticAssets = typeof rateLimitBypassStaticAssetsStr === 'string'
+            ? rateLimitBypassStaticAssetsStr.toLowerCase() === 'true'
+            : rateLimitBypassStaticAssetsStr;
+        const rateLimitBypassWhitelistedDomains = this.nestConfigService.get('RATE_LIMIT_BYPASS_WHITELISTED_DOMAINS') || '';
         return {
             server: {
                 port: serverPort,
@@ -300,6 +344,27 @@ let ConfigService = ConfigService_1 = class ConfigService {
                 nuxtUrl,
                 requestTimeout: externalRequestTimeout,
                 maxRetries: externalMaxRetries,
+            },
+            rateLimit: {
+                enabled: rateLimitEnabled,
+                default: {
+                    windowMs: rateLimitDefaultWindowMs,
+                    max: rateLimitDefaultMax,
+                },
+                imageProcessing: {
+                    windowMs: rateLimitImageProcessingWindowMs,
+                    max: rateLimitImageProcessingMax,
+                },
+                healthCheck: {
+                    windowMs: rateLimitHealthCheckWindowMs,
+                    max: rateLimitHealthCheckMax,
+                },
+                bypass: {
+                    healthChecks: rateLimitBypassHealthChecks,
+                    metricsEndpoint: rateLimitBypassMetricsEndpoint,
+                    staticAssets: rateLimitBypassStaticAssets,
+                    whitelistedDomains: rateLimitBypassWhitelistedDomains,
+                },
             },
         };
     }

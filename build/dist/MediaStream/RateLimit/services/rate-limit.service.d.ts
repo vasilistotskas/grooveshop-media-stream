@@ -40,6 +40,7 @@ export declare class RateLimitService {
     resetRateLimit(key: string): void;
     clearAllRateLimits(): void;
     getRateLimitStatus(key: string): RateLimitInfo | null;
+    getWhitelistedDomains(): string[];
     getDebugInfo(): {
         totalEntries: number;
         entries: Array<{

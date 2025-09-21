@@ -253,6 +253,21 @@ export class RateLimitService {
 	}
 
 	/**
+	 * Get whitelisted domains from configuration
+	 */
+	getWhitelistedDomains(): string[] {
+		const domainsString = this._configService.getOptional<string>('rateLimit.bypass.whitelistedDomains', '')
+		if (!domainsString || typeof domainsString !== 'string') {
+			return []
+		}
+
+		return domainsString
+			.split(',')
+			.map(domain => domain.trim())
+			.filter(domain => domain.length > 0)
+	}
+
+	/**
 	 * Get debug information about current rate limit state (for testing)
 	 */
 	getDebugInfo(): { totalEntries: number, entries: Array<{ key: string, count: number, resetTime: number }> } {

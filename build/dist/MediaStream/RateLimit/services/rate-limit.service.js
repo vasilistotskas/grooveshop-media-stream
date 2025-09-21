@@ -205,6 +205,16 @@ let RateLimitService = RateLimitService_1 = class RateLimitService {
             resetTime: new Date(entry.resetTime),
         };
     }
+    getWhitelistedDomains() {
+        const domainsString = this._configService.getOptional('rateLimit.bypass.whitelistedDomains', '');
+        if (!domainsString || typeof domainsString !== 'string') {
+            return [];
+        }
+        return domainsString
+            .split(',')
+            .map(domain => domain.trim())
+            .filter(domain => domain.length > 0);
+    }
     getDebugInfo() {
         const entries = Array.from(this.requestCounts.entries()).map(([key, entry]) => ({
             key,

@@ -38,6 +38,7 @@ describe('adaptiveRateLimitGuard', () => {
 			calculateAdaptiveLimit: jest.fn(),
 			checkRateLimit: jest.fn(),
 			recordRateLimitMetrics: jest.fn(),
+			getWhitelistedDomains: jest.fn(),
 		}
 
 		const mockRateLimitMetricsService = {
@@ -55,6 +56,7 @@ describe('adaptiveRateLimitGuard', () => {
 		guard = module.get<AdaptiveRateLimitGuard>(AdaptiveRateLimitGuard)
 		rateLimitService = module.get(RateLimitService)
 		rateLimitMetricsService = module.get(RateLimitMetricsService)
+		rateLimitService.getWhitelistedDomains.mockReturnValue([])
 	})
 
 	afterEach(() => {

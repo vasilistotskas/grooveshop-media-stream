@@ -21,6 +21,7 @@ export declare class BypassConfigDto {
     metricsEndpoint: boolean;
     staticAssets: boolean;
     customPaths: string[];
+    whitelistedDomains: string[];
 }
 export declare class RateLimitConfigDto {
     default: RateLimitThrottlerConfigDto;

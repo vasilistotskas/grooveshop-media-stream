@@ -71,10 +71,31 @@ export interface ExternalServicesConfig {
 	maxRetries: number
 }
 
+export interface RateLimitThrottlerConfig {
+	windowMs: number
+	max: number
+}
+
+export interface RateLimitBypassConfig {
+	healthChecks: boolean
+	metricsEndpoint: boolean
+	staticAssets: boolean
+	whitelistedDomains: string
+}
+
+export interface RateLimitConfig {
+	enabled: boolean
+	default: RateLimitThrottlerConfig
+	imageProcessing: RateLimitThrottlerConfig
+	healthCheck: RateLimitThrottlerConfig
+	bypass: RateLimitBypassConfig
+}
+
 export interface AppConfig {
 	server: ServerConfig
 	cache: CacheConfig
 	processing: ProcessingConfig
 	monitoring: MonitoringConfig
 	externalServices: ExternalServicesConfig
+	rateLimit: RateLimitConfig
 }

@@ -11,7 +11,7 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 	constructor(
 		private readonly rateLimitService: RateLimitService,
 		private readonly rateLimitMetricsService: RateLimitMetricsService,
-	) {}
+	) { }
 
 	async canActivate(context: ExecutionContext): Promise<boolean> {
 		if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'dev') {
@@ -83,6 +83,14 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 	private shouldSkipRateLimit(request: any): boolean {
 		const url = request.url || ''
 
+		if (this.isDomainWhitelisted(request)) {
+			this._logger.debug('Skipping rate limiting for whitelisted domain', {
+				referer: request.headers.referer,
+				origin: request.headers.origin,
+			})
+			return true
+		}
+
 		if (url.startsWith('/health')) {
 			return true
 		}
@@ -93,6 +101,88 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 
 		if (url.match(/\.(css|js|png|jpg|jpeg|gif|ico|svg)$/)) {
 			return true
+		}
+
+		return false
+	}
+
+	/**
+	 * Check if the request comes from a whitelisted domain
+	 */
+	private isDomainWhitelisted(request: any): boolean {
+		try {
+			const whitelistedDomains = this.rateLimitService.getWhitelistedDomains()
+
+			if (!whitelistedDomains || whitelistedDomains.length === 0) {
+				return false
+			}
+
+			const referer = request.headers.referer
+			if (referer) {
+				try {
+					const refererUrl = new URL(referer)
+					const refererDomain = refererUrl.hostname
+
+					if (this.matchesDomain(refererDomain, whitelistedDomains)) {
+						return true
+					}
+				}
+				catch {
+					// Invalid referer URL, continue checking other headers
+				}
+			}
+
+			const origin = request.headers.origin
+			if (origin) {
+				try {
+					const originUrl = new URL(origin)
+					const originDomain = originUrl.hostname
+
+					if (this.matchesDomain(originDomain, whitelistedDomains)) {
+						return true
+					}
+				}
+				catch {
+					// Invalid origin URL, continue
+				}
+			}
+
+			const host = request.headers.host
+			if (host) {
+				const hostDomain = host.split(':')[0]
+				if (this.matchesDomain(hostDomain, whitelistedDomains)) {
+					return true
+				}
+			}
+
+			return false
+		}
+		catch (error: unknown) {
+			this._logger.error('Error checking domain whitelist:', error)
+			return false
+		}
+	}
+
+	/**
+	 * Check if a domain matches any of the whitelisted domains
+	 * Supports exact matches and wildcard subdomains (*.example.com)
+	 */
+	private matchesDomain(domain: string, whitelistedDomains: string[]): boolean {
+		for (const whitelistedDomain of whitelistedDomains) {
+			if (domain === whitelistedDomain) {
+				return true
+			}
+
+			if (whitelistedDomain.startsWith('*.')) {
+				const baseDomain = whitelistedDomain.substring(2)
+				if (domain.endsWith(`.${baseDomain}`) || domain === baseDomain) {
+					return true
+				}
+			}
+
+			if (domain.endsWith(`.${whitelistedDomain}`)) {
+				return true
+			}
 		}
 
 		return false

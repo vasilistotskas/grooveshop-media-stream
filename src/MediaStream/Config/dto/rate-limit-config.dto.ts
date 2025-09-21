@@ -82,6 +82,10 @@ export class BypassConfigDto {
 	@IsString({ each: true })
 	@IsOptional()
 	customPaths: string[] = []
+
+	@IsString({ each: true })
+	@IsOptional()
+	whitelistedDomains: string[] = []
 }
 
 export class RateLimitConfigDto {

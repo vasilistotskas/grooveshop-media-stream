@@ -111,6 +111,7 @@ class BypassConfigDto {
         this.metricsEndpoint = true;
         this.staticAssets = true;
         this.customPaths = [];
+        this.whitelistedDomains = [];
     }
 }
 exports.BypassConfigDto = BypassConfigDto;
@@ -134,6 +135,11 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Array)
 ], BypassConfigDto.prototype, "customPaths", void 0);
+__decorate([
+    (0, class_validator_1.IsString)({ each: true }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Array)
+], BypassConfigDto.prototype, "whitelistedDomains", void 0);
 class RateLimitConfigDto {
     constructor() {
         this.default = new RateLimitThrottlerConfigDto();

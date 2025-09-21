@@ -8,6 +8,8 @@ export declare class AdaptiveRateLimitGuard implements CanActivate {
     constructor(rateLimitService: RateLimitService, rateLimitMetricsService: RateLimitMetricsService);
     canActivate(context: ExecutionContext): Promise<boolean>;
     private shouldSkipRateLimit;
+    private isDomainWhitelisted;
+    private matchesDomain;
     private getClientIp;
     private getRequestType;
     private addRateLimitHeaders;

@@ -106,6 +106,13 @@ let AdaptiveRateLimitGuard = AdaptiveRateLimitGuard_1 = class AdaptiveRateLimitG
     }
     shouldSkipRateLimit(request) {
         const url = request.url || '';
+        if (this.isDomainWhitelisted(request)) {
+            this._logger.debug('Skipping rate limiting for whitelisted domain', {
+                referer: request.headers.referer,
+                origin: request.headers.origin,
+            });
+            return true;
+        }
         if (url.startsWith('/health')) {
             return true;
         }
@@ -114,6 +121,67 @@ let AdaptiveRateLimitGuard = AdaptiveRateLimitGuard_1 = class AdaptiveRateLimitG
         }
         if (url.match(/\.(css|js|png|jpg|jpeg|gif|ico|svg)$/)) {
             return true;
+        }
+        return false;
+    }
+    isDomainWhitelisted(request) {
+        try {
+            const whitelistedDomains = this.rateLimitService.getWhitelistedDomains();
+            if (!whitelistedDomains || whitelistedDomains.length === 0) {
+                return false;
+            }
+            const referer = request.headers.referer;
+            if (referer) {
+                try {
+                    const refererUrl = new URL(referer);
+                    const refererDomain = refererUrl.hostname;
+                    if (this.matchesDomain(refererDomain, whitelistedDomains)) {
+                        return true;
+                    }
+                }
+                catch {
+                }
+            }
+            const origin = request.headers.origin;
+            if (origin) {
+                try {
+                    const originUrl = new URL(origin);
+                    const originDomain = originUrl.hostname;
+                    if (this.matchesDomain(originDomain, whitelistedDomains)) {
+                        return true;
+                    }
+                }
+                catch {
+                }
+            }
+            const host = request.headers.host;
+            if (host) {
+                const hostDomain = host.split(':')[0];
+                if (this.matchesDomain(hostDomain, whitelistedDomains)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        catch (error) {
+            this._logger.error('Error checking domain whitelist:', error);
+            return false;
+        }
+    }
+    matchesDomain(domain, whitelistedDomains) {
+        for (const whitelistedDomain of whitelistedDomains) {
+            if (domain === whitelistedDomain) {
+                return true;
+            }
+            if (whitelistedDomain.startsWith('*.')) {
+                const baseDomain = whitelistedDomain.substring(2);
+                if (domain.endsWith(`.${baseDomain}`) || domain === baseDomain) {
+                    return true;
+                }
+            }
+            if (domain.endsWith(`.${whitelistedDomain}`)) {
+                return true;
+            }
         }
         return false;
     }
