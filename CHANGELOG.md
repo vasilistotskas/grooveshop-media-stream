@@ -1,3 +1,10 @@
+## [1.135.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.135.0...v1.135.1) (2025-09-21)
+
+
+### Bug Fixes
+
+* Update allowed domains in input sanitization service ([4b6e0ac](https://github.com/vasilistotskas/grooveshop-media-stream/commit/4b6e0aca8abb61f0e9f00d2fad56a0862822f37b))
+
 # [1.135.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v1.134.0...v1.135.0) (2025-09-20)
 
 
