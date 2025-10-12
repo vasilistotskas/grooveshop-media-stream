@@ -133,13 +133,5 @@
   "_moduleAliases": {
     "@microservice": "./build/dist"
   },
-  "packageManager": "pnpm@10.18.2",
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@nestjs/core",
-      "@swc/core",
-      "sharp",
-      "unrs-resolver"
-    ]
-  }
+  "packageManager": "pnpm@10.18.2"
 }
