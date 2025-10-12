@@ -1,3 +1,10 @@
+## [2.3.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.3.2...v2.3.3) (2025-10-12)
+
+
+### Bug Fixes
+
+* cache config property name in ConfigService ([d1ab788](https://github.com/vasilistotskas/grooveshop-media-stream/commit/d1ab7880d7d8a2e2f921875b1a40dabce1147636))
+
 ## [2.3.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.3.1...v2.3.2) (2025-10-12)
 
 
