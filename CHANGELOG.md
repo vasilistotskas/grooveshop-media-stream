@@ -1,3 +1,10 @@
+# [2.4.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.3.3...v2.4.0) (2025-10-12)
+
+
+### Features
+
+* Move clear-cache.js to scripts directory ([9d0a3c4](https://github.com/vasilistotskas/grooveshop-media-stream/commit/9d0a3c44c87498ec59585d9351c101613481de9b))
+
 ## [2.3.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.3.2...v2.3.3) (2025-10-12)
 
 
