@@ -1,3 +1,10 @@
+# [2.6.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.5.0...v2.6.0) (2025-10-12)
+
+
+### Features
+
+* Add version injection script and update index.html ([02951a8](https://github.com/vasilistotskas/grooveshop-media-stream/commit/02951a85a1cba0b077bdb6c962318b8738d95f32))
+
 # [2.5.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.4.0...v2.5.0) (2025-10-12)
 
 
