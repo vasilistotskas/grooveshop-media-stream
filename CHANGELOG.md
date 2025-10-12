@@ -1,3 +1,10 @@
+## [2.6.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.6.0...v2.6.1) (2025-10-12)
+
+
+### Bug Fixes
+
+* Update version to v2.6.0 in index.html and inject script ([675d388](https://github.com/vasilistotskas/grooveshop-media-stream/commit/675d388f5f857f33d9480304a67db5f6ea872ad9))
+
 # [2.6.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.5.0...v2.6.0) (2025-10-12)
 
 
