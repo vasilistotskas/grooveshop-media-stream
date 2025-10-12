@@ -133,6 +133,7 @@ describe('imageProcessingProcessor', () => {
 			const mockSharpInstance = {
 				resize: jest.fn().mockReturnThis(),
 				webp: jest.fn().mockReturnThis(),
+				withMetadata: jest.fn().mockReturnThis(),
 				toBuffer: jest.fn().mockResolvedValue(processedImageData),
 			}
 			mockSharp.mockReturnValue(mockSharpInstance as any)
@@ -148,12 +149,20 @@ describe('imageProcessingProcessor', () => {
 				responseType: 'arraybuffer',
 				timeout: 30000,
 			})
-			expect(mockSharp).toHaveBeenCalledWith(originalImageData)
-			expect(mockSharpInstance.resize).toHaveBeenCalledWith({
+			expect(mockSharp).toHaveBeenCalledWith(originalImageData, expect.objectContaining({
+				failOn: 'none',
+				sequentialRead: true,
+			}))
+			expect(mockSharpInstance.resize).toHaveBeenCalledWith(expect.objectContaining({
 				width: 300,
 				height: 200,
-			})
-			expect(mockSharpInstance.webp).toHaveBeenCalledWith({ quality: 80 })
+				fastShrinkOnLoad: true,
+				kernel: 'lanczos3',
+			}))
+			expect(mockSharpInstance.webp).toHaveBeenCalledWith(expect.objectContaining({
+				quality: 80,
+				effort: 4,
+			}))
 			expect(mockCacheManager.set).toHaveBeenCalledWith(
 				'image',
 				'test-cache-key',
@@ -189,6 +198,7 @@ describe('imageProcessingProcessor', () => {
 			const mockSharpInstance = {
 				resize: jest.fn().mockReturnThis(),
 				jpeg: jest.fn().mockReturnThis(),
+				withMetadata: jest.fn().mockReturnThis(),
 				toBuffer: jest.fn().mockResolvedValue(processedImageData),
 			}
 			mockSharp.mockReturnValue(mockSharpInstance as any)
@@ -196,7 +206,10 @@ describe('imageProcessingProcessor', () => {
 			const result = await processor.process(job)
 
 			expect(result.success).toBe(true)
-			expect(mockSharpInstance.jpeg).toHaveBeenCalledWith({ quality: 90 })
+			expect(mockSharpInstance.jpeg).toHaveBeenCalledWith(expect.objectContaining({
+				quality: 90,
+				progressive: true,
+			}))
 		})
 
 		it('should handle PNG format processing', async () => {
@@ -220,6 +233,7 @@ describe('imageProcessingProcessor', () => {
 			const processedImageData = Buffer.from('processed-png-data')
 			const mockSharpInstance = {
 				png: jest.fn().mockReturnThis(),
+				withMetadata: jest.fn().mockReturnThis(),
 				toBuffer: jest.fn().mockResolvedValue(processedImageData),
 			}
 			mockSharp.mockReturnValue(mockSharpInstance as any)
@@ -227,7 +241,9 @@ describe('imageProcessingProcessor', () => {
 			const result = await processor.process(job)
 
 			expect(result.success).toBe(true)
-			expect(mockSharpInstance.png).toHaveBeenCalledWith({ quality: 95 })
+			expect(mockSharpInstance.png).toHaveBeenCalledWith(expect.objectContaining({
+				quality: 95,
+			}))
 		})
 
 		it('should handle processing without dimensions', async () => {
@@ -250,6 +266,7 @@ describe('imageProcessingProcessor', () => {
 			const processedImageData = Buffer.from('processed-image-data')
 			const mockSharpInstance = {
 				webp: jest.fn().mockReturnThis(),
+				withMetadata: jest.fn().mockReturnThis(),
 				toBuffer: jest.fn().mockResolvedValue(processedImageData),
 			}
 			mockSharp.mockReturnValue(mockSharpInstance as any)
@@ -257,9 +274,12 @@ describe('imageProcessingProcessor', () => {
 			const result = await processor.process(job)
 
 			expect(result.success).toBe(true)
-			expect(mockSharpInstance.webp).toHaveBeenCalledWith({ quality: 80 })
+			expect(mockSharpInstance.webp).toHaveBeenCalledWith(expect.objectContaining({
+				quality: 80,
+				effort: 4,
+			}))
 			// resize should not be called when no dimensions provided
-			expect(mockSharpInstance).not.toHaveProperty('resize')
+			// (mock doesn't have resize method when dimensions aren't needed)
 		})
 
 		it('should handle unknown format by keeping original', async () => {
@@ -279,6 +299,8 @@ describe('imageProcessingProcessor', () => {
 
 			const processedImageData = Buffer.from('processed-image-data')
 			const mockSharpInstance = {
+				webp: jest.fn().mockReturnThis(),
+				withMetadata: jest.fn().mockReturnThis(),
 				toBuffer: jest.fn().mockResolvedValue(processedImageData),
 			}
 			mockSharp.mockReturnValue(mockSharpInstance as any)
@@ -325,6 +347,8 @@ describe('imageProcessingProcessor', () => {
 			// Mock sharp processing error
 			const mockSharpInstance = {
 				resize: jest.fn().mockReturnThis(),
+				webp: jest.fn().mockReturnThis(),
+				withMetadata: jest.fn().mockReturnThis(),
 				toBuffer: jest.fn().mockRejectedValue(new Error('Invalid image format')),
 			}
 			mockSharp.mockReturnValue(mockSharpInstance as any)
@@ -366,6 +390,8 @@ describe('imageProcessingProcessor', () => {
 
 			const processedImageData = Buffer.from('processed-image-data')
 			const mockSharpInstance = {
+				webp: jest.fn().mockReturnThis(),
+				withMetadata: jest.fn().mockReturnThis(),
 				toBuffer: jest.fn().mockResolvedValue(processedImageData),
 			}
 			mockSharp.mockReturnValue(mockSharpInstance as any)

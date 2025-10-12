@@ -30,6 +30,13 @@ let ImageProcessingProcessor = ImageProcessingProcessor_1 = class ImageProcessin
         this.httpClient = httpClient;
         this.cacheManager = cacheManager;
         this._logger = new common_1.Logger(ImageProcessingProcessor_1.name);
+        sharp_1.default.cache({
+            memory: 100,
+            files: 20,
+            items: 200,
+        });
+        sharp_1.default.concurrency(ImageProcessingProcessor_1.MAX_SHARP_INSTANCES);
+        sharp_1.default.simd(true);
     }
     async process(job) {
         const startTime = Date.now();
@@ -93,8 +100,10 @@ let ImageProcessingProcessor = ImageProcessingProcessor_1 = class ImageProcessin
                 const resourcePath = (0, node_path_1.join)(basePath, 'storage', `${cacheKey}.rsc`);
                 const metadataPath = (0, node_path_1.join)(basePath, 'storage', `${cacheKey}.rsm`);
                 try {
-                    await (0, promises_1.writeFile)(resourcePath, processedBuffer);
-                    await (0, promises_1.writeFile)(metadataPath, JSON.stringify(metadata), 'utf8');
+                    await Promise.all([
+                        (0, promises_1.writeFile)(resourcePath, processedBuffer),
+                        (0, promises_1.writeFile)(metadataPath, JSON.stringify(metadata), 'utf8'),
+                    ]);
                     this._logger.debug(`Saved processed image to filesystem: ${resourcePath}`);
                 }
                 catch (fsError) {
@@ -137,7 +146,12 @@ let ImageProcessingProcessor = ImageProcessingProcessor_1 = class ImageProcessin
     }
     async processImage(buffer, options) {
         try {
-            let pipeline = (0, sharp_1.default)(buffer);
+            let pipeline = (0, sharp_1.default)(buffer, {
+                failOn: 'none',
+                limitInputPixels: 268402689,
+                sequentialRead: true,
+                density: 72,
+            });
             if (options.trimThreshold !== undefined && options.trimThreshold > 0) {
                 pipeline = pipeline.trim({
                     background: options.background,
@@ -145,37 +159,70 @@ let ImageProcessingProcessor = ImageProcessingProcessor_1 = class ImageProcessin
                 });
             }
             if (options.width || options.height) {
-                const resizeOptions = {};
+                const resizeOptions = {
+                    fastShrinkOnLoad: true,
+                    kernel: 'lanczos3',
+                };
                 if (options.width)
                     resizeOptions.width = options.width;
                 if (options.height)
                     resizeOptions.height = options.height;
-                if (options.fit) {
+                if (options.fit)
                     resizeOptions.fit = options.fit;
-                }
-                if (options.position) {
+                if (options.position)
                     resizeOptions.position = options.position;
-                }
-                if (options.background) {
+                if (options.background)
                     resizeOptions.background = options.background;
-                }
                 this._logger.debug('Applying Sharp resize with options:', resizeOptions);
                 pipeline = pipeline.resize(resizeOptions);
             }
+            const qual = options.quality || 80;
             switch (options.format) {
                 case 'webp':
-                    pipeline = pipeline.webp({ quality: options.quality || 80 });
+                    pipeline = pipeline.webp({
+                        quality: Math.min(qual, 85),
+                        effort: 4,
+                        smartSubsample: true,
+                        nearLossless: false,
+                    });
                     break;
                 case 'jpeg':
-                    pipeline = pipeline.jpeg({ quality: options.quality || 80 });
+                case 'jpg':
+                    pipeline = pipeline.jpeg({
+                        quality: qual,
+                        progressive: true,
+                        optimizeCoding: true,
+                        mozjpeg: true,
+                        trellisQuantisation: true,
+                        overshootDeringing: true,
+                    });
                     break;
                 case 'png':
-                    pipeline = pipeline.png({ quality: options.quality || 80 });
+                    pipeline = pipeline.png({
+                        quality: qual,
+                        compressionLevel: 6,
+                        adaptiveFiltering: true,
+                        palette: qual < 95,
+                    });
+                    break;
+                case 'avif':
+                    pipeline = pipeline.avif({
+                        quality: Math.min(qual, 75),
+                        effort: 4,
+                        chromaSubsampling: '4:2:0',
+                    });
                     break;
                 default:
+                    pipeline = pipeline.webp({
+                        quality: 80,
+                        effort: 4,
+                        smartSubsample: true,
+                    });
                     break;
             }
-            return await pipeline.toBuffer();
+            return await pipeline
+                .withMetadata({ density: 72 })
+                .toBuffer();
         }
         catch (error) {
             this._logger.error('Failed to process image:', error);
@@ -192,6 +239,7 @@ let ImageProcessingProcessor = ImageProcessingProcessor_1 = class ImageProcessin
     }
 };
 exports.ImageProcessingProcessor = ImageProcessingProcessor;
+ImageProcessingProcessor.MAX_SHARP_INSTANCES = 4;
 exports.ImageProcessingProcessor = ImageProcessingProcessor = ImageProcessingProcessor_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [correlation_service_1.CorrelationService,

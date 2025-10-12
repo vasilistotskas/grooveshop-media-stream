@@ -1,6 +1,7 @@
 import type ResourceMetaData from '@microservice/HTTP/dto/resource-meta-data.dto'
 import type { Response } from 'express'
 import { Buffer } from 'node:buffer'
+import { createHash } from 'node:crypto'
 import { open } from 'node:fs/promises'
 import * as process from 'node:process'
 import CacheImageRequest, {
@@ -109,13 +110,23 @@ export default class MediaStreamImageRESTController {
 	}
 
 	/**
+	 * Generates an ETag for cache validation
+	 */
+	private generateETag(input: Buffer | string): string {
+		const hash = createHash('md5')
+		hash.update(Buffer.isBuffer(input) ? input : Buffer.from(input))
+		return `"${hash.digest('hex')}"`
+	}
+
+	/**
 	 * Adds required headers to the response with correlation ID
 	 *
 	 * @param res
 	 * @param headers
+	 * @param etag Optional ETag for cache validation
 	 * @protected
 	 */
-	protected addHeadersToRequest(res: Response, headers: ResourceMetaData): Response {
+	protected addHeadersToRequest(res: Response, headers: ResourceMetaData, etag?: string): Response {
 		if (!headers) {
 			const correlationId = this._correlationService.getCorrelationId()
 			throw new InvalidRequestError('Headers object is undefined', {
@@ -132,9 +143,14 @@ export default class MediaStreamImageRESTController {
 
 		res
 			.header('Content-Length', size)
-			.header('Cache-Control', `max-age=${publicTTL / 1000}, public`)
+			.header('Cache-Control', `max-age=${publicTTL / 1000}, public, immutable`)
 			.header('Expires', new Date(expiresAt).toUTCString())
 			.header('X-Correlation-ID', correlationId || 'unknown')
+			.header('Vary', 'Accept-Encoding')
+
+		if (etag) {
+			res.header('ETag', etag)
+		}
 
 		if (format === 'svg') {
 			res.header('Content-Type', 'image/svg+xml')

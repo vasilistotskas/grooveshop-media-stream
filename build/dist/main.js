@@ -41,10 +41,27 @@ const process = __importStar(require("node:process"));
 const config_service_1 = require("./MediaStream/Config/config.service");
 const media_stream_module_1 = __importDefault(require("./MediaStream/media-stream.module"));
 const core_1 = require("@nestjs/core");
+const compression_1 = __importDefault(require("compression"));
+const helmet_1 = __importDefault(require("helmet"));
 async function bootstrap(exitProcess = true) {
     try {
         const app = await core_1.NestFactory.create(media_stream_module_1.default);
         const configService = app.get(config_service_1.ConfigService);
+        app.use((0, helmet_1.default)({
+            contentSecurityPolicy: false,
+            crossOriginResourcePolicy: { policy: 'cross-origin' },
+        }));
+        app.use((0, compression_1.default)({
+            level: 6,
+            threshold: 1024,
+            filter: (req, res) => {
+                const contentType = res.getHeader('Content-Type');
+                if (contentType && typeof contentType === 'string' && contentType.startsWith('image/')) {
+                    return false;
+                }
+                return compression_1.default.filter(req, res);
+            },
+        }));
         app.useStaticAssets('public');
         const serverConfig = configService.get('server');
         app.enableCors({

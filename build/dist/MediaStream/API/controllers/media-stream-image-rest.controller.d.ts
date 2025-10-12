@@ -15,7 +15,8 @@ export default class MediaStreamImageRESTController {
     private readonly _logger;
     constructor(cacheImageResourceOperation: CacheImageResourceOperation, inputSanitizationService: InputSanitizationService, securityCheckerService: SecurityCheckerService, _correlationService: CorrelationService, metricsService: MetricsService);
     private validateRequestParameters;
-    protected addHeadersToRequest(res: Response, headers: ResourceMetaData): Response;
+    private generateETag;
+    protected addHeadersToRequest(res: Response, headers: ResourceMetaData, etag?: string): Response;
     private handleStreamOrFallback;
     private streamFileToResponse;
     private streamResource;

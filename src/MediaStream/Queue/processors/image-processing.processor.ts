@@ -14,12 +14,22 @@ import { ImageProcessingJobData, JobResult } from '../types/job.types'
 @Injectable()
 export class ImageProcessingProcessor {
 	private readonly _logger = new Logger(ImageProcessingProcessor.name)
+	private static readonly MAX_SHARP_INSTANCES = 4
 
 	constructor(
 		private readonly _correlationService: CorrelationService,
 		private readonly httpClient: HttpClientService,
 		private readonly cacheManager: MultiLayerCacheManager,
-	) {}
+	) {
+		sharp.cache({
+			memory: 100,
+			files: 20,
+			items: 200,
+		})
+
+		sharp.concurrency(ImageProcessingProcessor.MAX_SHARP_INSTANCES)
+		sharp.simd(true)
+	}
 
 	async process(job: Job<ImageProcessingJobData>): Promise<JobResult> {
 		const startTime = Date.now()
@@ -47,7 +57,6 @@ export class ImageProcessingProcessor {
 						trimThreshold,
 					})
 
-					// Check the correct cache namespace
 					const cached = await this.cacheManager.get('image', cacheKey)
 					if (cached) {
 						this._logger.debug(`Image already cached for job ${job.id}`)
@@ -97,8 +106,10 @@ export class ImageProcessingProcessor {
 					const metadataPath = join(basePath, 'storage', `${cacheKey}.rsm`)
 
 					try {
-						await writeFile(resourcePath, processedBuffer)
-						await writeFile(metadataPath, JSON.stringify(metadata), 'utf8')
+						await Promise.all([
+							writeFile(resourcePath, processedBuffer),
+							writeFile(metadataPath, JSON.stringify(metadata), 'utf8'),
+						])
 						this._logger.debug(`Saved processed image to filesystem: ${resourcePath}`)
 					}
 					catch (fsError) {
@@ -161,7 +172,12 @@ export class ImageProcessingProcessor {
 		},
 	): Promise<Buffer> {
 		try {
-			let pipeline = sharp(buffer)
+			let pipeline = sharp(buffer, {
+				failOn: 'none',
+				limitInputPixels: 268402689,
+				sequentialRead: true,
+				density: 72,
+			})
 
 			if (options.trimThreshold !== undefined && options.trimThreshold > 0) {
 				pipeline = pipeline.trim({
@@ -171,44 +187,75 @@ export class ImageProcessingProcessor {
 			}
 
 			if (options.width || options.height) {
-				const resizeOptions: any = {}
+				const resizeOptions: any = {
+					fastShrinkOnLoad: true,
+					kernel: 'lanczos3',
+				}
 
 				if (options.width)
 					resizeOptions.width = options.width
 				if (options.height)
 					resizeOptions.height = options.height
-
-				if (options.fit) {
+				if (options.fit)
 					resizeOptions.fit = options.fit
-				}
-
-				if (options.position) {
+				if (options.position)
 					resizeOptions.position = options.position
-				}
-
-				if (options.background) {
+				if (options.background)
 					resizeOptions.background = options.background
-				}
 
 				this._logger.debug('Applying Sharp resize with options:', resizeOptions)
 				pipeline = pipeline.resize(resizeOptions)
 			}
 
+			const qual = options.quality || 80
+
 			switch (options.format) {
 				case 'webp':
-					pipeline = pipeline.webp({ quality: options.quality || 80 })
+					pipeline = pipeline.webp({
+						quality: Math.min(qual, 85),
+						effort: 4,
+						smartSubsample: true,
+						nearLossless: false,
+					})
 					break
 				case 'jpeg':
-					pipeline = pipeline.jpeg({ quality: options.quality || 80 })
+				case 'jpg':
+					pipeline = pipeline.jpeg({
+						quality: qual,
+						progressive: true,
+						optimizeCoding: true,
+						mozjpeg: true,
+						trellisQuantisation: true,
+						overshootDeringing: true,
+					})
 					break
 				case 'png':
-					pipeline = pipeline.png({ quality: options.quality || 80 })
+					pipeline = pipeline.png({
+						quality: qual,
+						compressionLevel: 6,
+						adaptiveFiltering: true,
+						palette: qual < 95,
+					})
+					break
+				case 'avif':
+					pipeline = pipeline.avif({
+						quality: Math.min(qual, 75),
+						effort: 4,
+						chromaSubsampling: '4:2:0',
+					})
 					break
 				default:
+					pipeline = pipeline.webp({
+						quality: 80,
+						effort: 4,
+						smartSubsample: true,
+					})
 					break
 			}
 
-			return await pipeline.toBuffer()
+			return await pipeline
+				.withMetadata({ density: 72 })
+				.toBuffer()
 		}
 		catch (error: unknown) {
 			this._logger.error('Failed to process image:', error)

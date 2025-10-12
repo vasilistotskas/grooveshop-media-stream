@@ -50,6 +50,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 var MediaStreamImageRESTController_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 const node_buffer_1 = require("node:buffer");
+const node_crypto_1 = require("node:crypto");
 const promises_1 = require("node:fs/promises");
 const process = __importStar(require("node:process"));
 const cache_image_request_dto_1 = __importStar(require("../dto/cache-image-request.dto"));
@@ -129,7 +130,12 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
             }
         }
     }
-    addHeadersToRequest(res, headers) {
+    generateETag(input) {
+        const hash = (0, node_crypto_1.createHash)('md5');
+        hash.update(node_buffer_1.Buffer.isBuffer(input) ? input : node_buffer_1.Buffer.from(input));
+        return `"${hash.digest('hex')}"`;
+    }
+    addHeadersToRequest(res, headers, etag) {
         if (!headers) {
             const correlationId = this._correlationService.getCorrelationId();
             throw new media_stream_errors_1.InvalidRequestError('Headers object is undefined', {
@@ -144,9 +150,13 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
         const correlationId = this._correlationService.getCorrelationId();
         res
             .header('Content-Length', size)
-            .header('Cache-Control', `max-age=${publicTTL / 1000}, public`)
+            .header('Cache-Control', `max-age=${publicTTL / 1000}, public, immutable`)
             .header('Expires', new Date(expiresAt).toUTCString())
-            .header('X-Correlation-ID', correlationId || 'unknown');
+            .header('X-Correlation-ID', correlationId || 'unknown')
+            .header('Vary', 'Accept-Encoding');
+        if (etag) {
+            res.header('ETag', etag);
+        }
         if (format === 'svg') {
             res.header('Content-Type', 'image/svg+xml');
         }

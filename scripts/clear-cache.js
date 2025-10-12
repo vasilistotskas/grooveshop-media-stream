@@ -31,10 +31,10 @@ const args = process.argv.slice(2)
 const options = {
 	redisOnly: args.includes('--redis-only'),
 	filesOnly: args.includes('--files-only'),
-	redisHost: getArgValue('--redis-host') || process.env.CACHE_REDIS_HOST || 'localhost',
-	redisPort: Number.parseInt(getArgValue('--redis-port') || process.env.CACHE_REDIS_PORT || '6379'),
-	redisDb: Number.parseInt(getArgValue('--redis-db') || process.env.CACHE_REDIS_DB || '0'),
-	redisPass: getArgValue('--redis-pass') || process.env.CACHE_REDIS_PASSWORD,
+	redisHost: getArgValue('--redis-host') || process.env.CACHE_REDIS_HOST || process.env.REDIS_HOST || 'localhost',
+	redisPort: Number.parseInt(getArgValue('--redis-port') || process.env.CACHE_REDIS_PORT || process.env.REDIS_PORT || '6379'),
+	redisDb: Number.parseInt(getArgValue('--redis-db') || process.env.CACHE_REDIS_DB || process.env.REDIS_DB || '0'),
+	redisPass: getArgValue('--redis-pass') || process.env.CACHE_REDIS_PASSWORD || process.env.REDIS_PASSWORD || '',
 	storagePath: getArgValue('--storage-path') || process.env.CACHE_FILE_DIRECTORY || './storage',
 	help: args.includes('--help') || args.includes('-h'),
 }

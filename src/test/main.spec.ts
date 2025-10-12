@@ -18,6 +18,7 @@ describe('Bootstrap', () => {
 		originalEnv = { ...process.env }
 
 		mockApp = {
+			use: jest.fn().mockReturnThis(),
 			useStaticAssets: jest.fn().mockReturnThis(),
 			enableCors: jest.fn().mockReturnThis(),
 			listen: jest.fn().mockImplementation(() => Promise.resolve()),
