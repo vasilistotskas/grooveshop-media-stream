@@ -490,8 +490,23 @@ export default class MediaStreamImageRESTController {
 		}
 	}
 
+	/**
+	 * Prepares the resource target URL by ensuring proper decoding of URL-encoded characters.
+	 * This is critical for handling Greek and other non-ASCII characters in filenames.
+	 *
+	 * @param resourceTarget The raw resource target URL
+	 * @returns The properly decoded resource target URL
+	 */
 	private static resourceTargetPrepare(resourceTarget: string): string {
-		return resourceTarget
+		try {
+			if (resourceTarget.includes('%')) {
+				return decodeURIComponent(resourceTarget)
+			}
+			return resourceTarget
+		}
+		catch {
+			return resourceTarget
+		}
 	}
 
 	@Get(
@@ -515,9 +530,12 @@ export default class MediaStreamImageRESTController {
 		PerformanceTracker.startPhase('uploaded_image_request')
 
 		try {
+			const decodedImageType = decodeURIComponent(imageType)
+			const decodedImage = decodeURIComponent(image)
+
 			await this.validateRequestParameters({
-				imageType,
-				image,
+				imageType: decodedImageType,
+				image: decodedImage,
 				width,
 				height,
 				quality,
@@ -541,7 +559,7 @@ export default class MediaStreamImageRESTController {
 			})
 
 			const djangoApiUrl = process.env.NEST_PUBLIC_DJANGO_URL || 'http://localhost:8000'
-			const resourceUrl = `${djangoApiUrl}/media/uploads/${imageType}/${image}`
+			const resourceUrl = `${djangoApiUrl}/media/uploads/${decodedImageType}/${decodedImage}`
 
 			const isValidUrl = this.inputSanitizationService.validateUrl(resourceUrl)
 			if (!isValidUrl) {
@@ -558,8 +576,8 @@ export default class MediaStreamImageRESTController {
 
 			this._logger.debug(`Uploaded image request`, {
 				request: {
-					imageType,
-					image,
+					imageType: decodedImageType,
+					image: decodedImage,
 					width,
 					height,
 					format,
@@ -612,8 +630,10 @@ export default class MediaStreamImageRESTController {
 		PerformanceTracker.startPhase('static_image_request')
 
 		try {
+			const decodedImage = decodeURIComponent(image)
+
 			await this.validateRequestParameters({
-				image,
+				image: decodedImage,
 				width,
 				height,
 				quality,
@@ -621,7 +641,7 @@ export default class MediaStreamImageRESTController {
 			})
 
 			const djangoApiUrl = process.env.NEST_PUBLIC_DJANGO_URL || 'http://localhost:8000'
-			const resourceUrl = `${djangoApiUrl}/static/images/${image}`
+			const resourceUrl = `${djangoApiUrl}/static/images/${decodedImage}`
 
 			const isValidUrl = this.inputSanitizationService.validateUrl(resourceUrl)
 			if (!isValidUrl) {
@@ -647,7 +667,7 @@ export default class MediaStreamImageRESTController {
 
 			this._logger.debug(`Static image request`, {
 				request: {
-					image,
+					image: decodedImage,
 					width,
 					height,
 					format,

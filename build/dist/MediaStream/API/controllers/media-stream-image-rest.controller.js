@@ -401,15 +401,25 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
         }
     }
     static resourceTargetPrepare(resourceTarget) {
-        return resourceTarget;
+        try {
+            if (resourceTarget.includes('%')) {
+                return decodeURIComponent(resourceTarget);
+            }
+            return resourceTarget;
+        }
+        catch {
+            return resourceTarget;
+        }
     }
     async uploadedImage(imageType, image, width = null, height = null, fit = cache_image_request_dto_1.FitOptions.contain, position = cache_image_request_dto_1.PositionOptions.entropy, background = cache_image_request_dto_1.BackgroundOptions.transparent, trimThreshold = 5, format = cache_image_request_dto_1.SupportedResizeFormats.webp, quality = 100, res) {
         const correlationId = this._correlationService.getCorrelationId();
         performance_tracker_util_1.PerformanceTracker.startPhase('uploaded_image_request');
         try {
+            const decodedImageType = decodeURIComponent(imageType);
+            const decodedImage = decodeURIComponent(image);
             await this.validateRequestParameters({
-                imageType,
-                image,
+                imageType: decodedImageType,
+                image: decodedImage,
                 width,
                 height,
                 quality,
@@ -430,7 +440,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                 correlationId,
             });
             const djangoApiUrl = process.env.NEST_PUBLIC_DJANGO_URL || 'http://localhost:8000';
-            const resourceUrl = `${djangoApiUrl}/media/uploads/${imageType}/${image}`;
+            const resourceUrl = `${djangoApiUrl}/media/uploads/${decodedImageType}/${decodedImage}`;
             const isValidUrl = this.inputSanitizationService.validateUrl(resourceUrl);
             if (!isValidUrl) {
                 throw new media_stream_errors_1.InvalidRequestError('Invalid resource URL', {
@@ -444,8 +454,8 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
             });
             this._logger.debug(`Uploaded image request`, {
                 request: {
-                    imageType,
-                    image,
+                    imageType: decodedImageType,
+                    image: decodedImage,
                     width,
                     height,
                     format,
@@ -481,15 +491,16 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
         const correlationId = this._correlationService.getCorrelationId();
         performance_tracker_util_1.PerformanceTracker.startPhase('static_image_request');
         try {
+            const decodedImage = decodeURIComponent(image);
             await this.validateRequestParameters({
-                image,
+                image: decodedImage,
                 width,
                 height,
                 quality,
                 trimThreshold,
             });
             const djangoApiUrl = process.env.NEST_PUBLIC_DJANGO_URL || 'http://localhost:8000';
-            const resourceUrl = `${djangoApiUrl}/static/images/${image}`;
+            const resourceUrl = `${djangoApiUrl}/static/images/${decodedImage}`;
             const isValidUrl = this.inputSanitizationService.validateUrl(resourceUrl);
             if (!isValidUrl) {
                 throw new media_stream_errors_1.InvalidRequestError('Invalid resource URL', {
@@ -512,7 +523,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
             });
             this._logger.debug(`Static image request`, {
                 request: {
-                    image,
+                    image: decodedImage,
                     width,
                     height,
                     format,
