@@ -20,25 +20,35 @@ const indexPath = path.join(__dirname, '..', 'public', 'index.html');
 let indexHtml = fs.readFileSync(indexPath, 'utf8');
 
 // Replace both placeholder {{VERSION}} and actual version numbers like v2.5.0
-// This regex matches: v{{VERSION}} OR v followed by semantic version (e.g., v2.5.0, v10.20.30)
-const versionPattern = /MEDIA STREAM API v(?:\{\{VERSION\}\}|\d+\.\d+\.\d+)/g;
-const replacement = `MEDIA STREAM API v${version}`;
+// Pattern 1: MEDIA STREAM API version
+const apiVersionPattern = /MEDIA STREAM API v(?:\{\{VERSION\}\}|\d+\.\d+\.\d+)/g;
+const apiReplacement = `MEDIA STREAM API v${version}`;
+
+// Pattern 2: Terminal title version (grooveshop-media-stream@v2.5.0)
+const terminalTitlePattern = /grooveshop-media-stream@v(?:\{\{VERSION\}\}|\d+\.\d+\.\d+)/g;
+const terminalReplacement = `grooveshop-media-stream@v${version}`;
 
 // Count matches before replacement
-const matchesBefore = (indexHtml.match(versionPattern) || []).length;
+const apiMatches = (indexHtml.match(apiVersionPattern) || []).length;
+const terminalMatches = (indexHtml.match(terminalTitlePattern) || []).length;
+const totalMatches = apiMatches + terminalMatches;
 
-if (matchesBefore === 0) {
+if (totalMatches === 0) {
   console.error('❌ ERROR: Could not find version pattern in index.html');
-  console.error('   Expected: "MEDIA STREAM API v{{VERSION}}" or "MEDIA STREAM API v2.5.0"');
+  console.error('   Expected patterns:');
+  console.error('   - "MEDIA STREAM API v{{VERSION}}" or "MEDIA STREAM API v2.5.0"');
+  console.error('   - "grooveshop-media-stream@v{{VERSION}}" or "grooveshop-media-stream@v2.5.0"');
   process.exit(1);
 }
 
-// Replace version
-indexHtml = indexHtml.replace(versionPattern, replacement);
+// Replace versions
+indexHtml = indexHtml.replace(apiVersionPattern, apiReplacement);
+indexHtml = indexHtml.replace(terminalTitlePattern, terminalReplacement);
 
 // Write back to file
 fs.writeFileSync(indexPath, indexHtml, 'utf8');
 
-console.log(`✅ Injected version ${version} into public/index.html (${matchesBefore} replacement(s))`);
-console.log(`   Pattern matched: ${(indexHtml.match(versionPattern) || []).join(', ')}`);
+console.log(`✅ Injected version ${version} into public/index.html (${totalMatches} replacement(s))`);
+console.log(`   - API version: ${apiMatches} replacement(s)`);
+console.log(`   - Terminal title: ${terminalMatches} replacement(s)`);
 
