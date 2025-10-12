@@ -1,3 +1,10 @@
+# [2.5.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.4.0...v2.5.0) (2025-10-12)
+
+
+### Features
+
+* Add ETag generation and improved caching headers for images ([be2fbb6](https://github.com/vasilistotskas/grooveshop-media-stream/commit/be2fbb636672c443978101489ab81ca0a008314f))
+
 # [2.4.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.3.3...v2.4.0) (2025-10-12)
 
 
