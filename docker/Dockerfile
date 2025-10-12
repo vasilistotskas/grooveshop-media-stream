@@ -22,6 +22,7 @@ FROM node:${NODE_VERSION}-alpine AS production
 WORKDIR /usr/src/app
 
 COPY --from=build --chown=node:node /usr/src/app/build ./build
+COPY --from=build --chown=node:node /usr/src/app/scripts ./scripts
 COPY --from=build --chown=node:node /usr/src/app/public ./public
 COPY --from=build --chown=node:node /usr/src/app/node_modules ./node_modules
 COPY --from=build --chown=node:node /usr/src/app/package*.json ./
