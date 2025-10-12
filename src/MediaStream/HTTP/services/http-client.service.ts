@@ -45,10 +45,10 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 		this.timeout = this._configService.getOptional('http.connectionPool.timeout', 30000)
 
 		this.circuitBreaker = new CircuitBreaker({
-			failureThreshold: this._configService.getOptional('http.circuitBreaker.failureThreshold', 5),
-			resetTimeout: this._configService.getOptional('http.circuitBreaker.resetTimeout', 60000),
-			rollingWindow: this._configService.getOptional('http.circuitBreaker.monitoringPeriod', 30000),
-			minimumRequests: 5,
+			failureThreshold: this._configService.getOptional('http.circuitBreaker.failureThreshold', 50),
+			resetTimeout: this._configService.getOptional('http.circuitBreaker.resetTimeout', 30000),
+			rollingWindow: this._configService.getOptional('http.circuitBreaker.monitoringPeriod', 60000),
+			minimumRequests: this._configService.getOptional('http.circuitBreaker.minimumRequests', 10),
 		})
 
 		const maxSockets = this._configService.getOptional('http.connectionPool.maxSockets', 50)
@@ -83,7 +83,8 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	 * Send a GET request
 	 */
 	async get<T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
-		return this.executeRequest(() => this._httpService.get<T>(url, this.prepareConfig(config)))
+		const encodedUrl = this.encodeUrl(url)
+		return this.executeRequest(() => this._httpService.get<T>(encodedUrl, this.prepareConfig(config)))
 	}
 
 	/**
@@ -273,5 +274,30 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	 */
 	private configureAxios(): void {
 		this._httpService.axiosRef.defaults.timeout = this.timeout
+	}
+
+	/**
+	 * Encode URL to handle non-ASCII characters properly
+	 */
+	private encodeUrl(url: string): string {
+		try {
+			const urlObj = new URL(url)
+
+			const pathSegments = urlObj.pathname.split('/').map((segment) => {
+			// eslint-disable-next-line no-control-regex
+				if (/[^\u0000-\u007F]/.test(segment)) {
+					return encodeURIComponent(segment)
+				}
+				return segment
+			})
+
+			urlObj.pathname = pathSegments.join('/')
+
+			return urlObj.toString()
+		}
+		catch (error) {
+			CorrelatedLogger.warn(`Failed to encode URL: ${url} - ${(error as Error).message}`, HttpClientService.name)
+			return url
+		}
 	}
 }

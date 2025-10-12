@@ -50,6 +50,7 @@ const config_service_1 = require("../../Config/config.service");
 const disk_space_health_indicator_1 = require("../indicators/disk-space-health.indicator");
 const memory_health_indicator_1 = require("../indicators/memory-health.indicator");
 const http_health_indicator_1 = require("../../HTTP/indicators/http-health.indicator");
+const http_client_service_1 = require("../../HTTP/services/http-client.service");
 const alerting_health_indicator_1 = require("../../Monitoring/indicators/alerting-health.indicator");
 const system_health_indicator_1 = require("../../Monitoring/indicators/system-health.indicator");
 const job_queue_health_indicator_1 = require("../../Queue/indicators/job-queue-health.indicator");
@@ -57,7 +58,7 @@ const storage_health_indicator_1 = require("../../Storage/indicators/storage-hea
 const common_1 = require("@nestjs/common");
 const terminus_1 = require("@nestjs/terminus");
 let HealthController = class HealthController {
-    constructor(health, diskSpaceIndicator, memoryIndicator, httpHealthIndicator, cacheHealthIndicator, redisHealthIndicator, alertingHealthIndicator, systemHealthIndicator, jobQueueHealthIndicator, storageHealthIndicator, _configService) {
+    constructor(health, diskSpaceIndicator, memoryIndicator, httpHealthIndicator, cacheHealthIndicator, redisHealthIndicator, alertingHealthIndicator, systemHealthIndicator, jobQueueHealthIndicator, storageHealthIndicator, _configService, httpClientService) {
         this.health = health;
         this.diskSpaceIndicator = diskSpaceIndicator;
         this.memoryIndicator = memoryIndicator;
@@ -69,6 +70,7 @@ let HealthController = class HealthController {
         this.jobQueueHealthIndicator = jobQueueHealthIndicator;
         this.storageHealthIndicator = storageHealthIndicator;
         this._configService = _configService;
+        this.httpClientService = httpClientService;
     }
     async check() {
         return this.health.check([
@@ -163,6 +165,30 @@ let HealthController = class HealthController {
             pid: process.pid,
         };
     }
+    async circuitBreakerStatus() {
+        const isOpen = this.httpClientService.isCircuitOpen();
+        const httpStats = this.httpClientService.getStats();
+        return {
+            timestamp: new Date().toISOString(),
+            circuitBreaker: {
+                isOpen,
+                stats: httpStats,
+            },
+            httpClient: {
+                stats: httpStats,
+            },
+        };
+    }
+    async resetCircuitBreaker() {
+        const previousStats = this.httpClientService.getStats();
+        this.httpClientService.resetCircuitBreaker();
+        this.httpClientService.resetStats();
+        return {
+            timestamp: new Date().toISOString(),
+            message: 'Circuit breaker has been reset successfully',
+            previousState: previousStats,
+        };
+    }
 };
 exports.HealthController = HealthController;
 __decorate([
@@ -190,6 +216,18 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], HealthController.prototype, "liveness", null);
+__decorate([
+    (0, common_1.Get)('circuit-breaker'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], HealthController.prototype, "circuitBreakerStatus", null);
+__decorate([
+    (0, common_1.Post)('circuit-breaker/reset'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], HealthController.prototype, "resetCircuitBreaker", null);
 exports.HealthController = HealthController = __decorate([
     (0, common_1.Controller)('health'),
     __metadata("design:paramtypes", [terminus_1.HealthCheckService,
@@ -202,6 +240,7 @@ exports.HealthController = HealthController = __decorate([
         system_health_indicator_1.SystemHealthIndicator,
         job_queue_health_indicator_1.JobQueueHealthIndicator,
         storage_health_indicator_1.StorageHealthIndicator,
-        config_service_1.ConfigService])
+        config_service_1.ConfigService,
+        http_client_service_1.HttpClientService])
 ], HealthController);
 //# sourceMappingURL=health.controller.js.map

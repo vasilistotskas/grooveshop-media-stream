@@ -5,11 +5,12 @@ import { ConfigService } from '@microservice/Config/config.service'
 import { DiskSpaceHealthIndicator, DiskSpaceInfo } from '@microservice/Health/indicators/disk-space-health.indicator'
 import { MemoryHealthIndicator, MemoryInfo } from '@microservice/Health/indicators/memory-health.indicator'
 import { HttpHealthIndicator } from '@microservice/HTTP/indicators/http-health.indicator'
+import { HttpClientService } from '@microservice/HTTP/services/http-client.service'
 import { AlertingHealthIndicator } from '@microservice/Monitoring/indicators/alerting-health.indicator'
 import { SystemHealthIndicator } from '@microservice/Monitoring/indicators/system-health.indicator'
 import { JobQueueHealthIndicator } from '@microservice/Queue/indicators/job-queue-health.indicator'
 import { StorageHealthIndicator } from '@microservice/Storage/indicators/storage-health.indicator'
-import { Controller, Get } from '@nestjs/common'
+import { Controller, Get, Post } from '@nestjs/common'
 import {
 	HealthCheck,
 	HealthCheckResult,
@@ -32,6 +33,7 @@ export class HealthController {
 		private readonly jobQueueHealthIndicator: JobQueueHealthIndicator,
 		private readonly storageHealthIndicator: StorageHealthIndicator,
 		private readonly _configService: ConfigService,
+		private readonly httpClientService: HttpClientService,
 	) {}
 
 	@Get()
@@ -165,6 +167,50 @@ export class HealthController {
 			timestamp: new Date().toISOString(),
 			uptime: process.uptime(),
 			pid: process.pid,
+		}
+	}
+
+	@Get('circuit-breaker')
+	async circuitBreakerStatus(): Promise<{
+		timestamp: string
+		circuitBreaker: {
+			isOpen: boolean
+			stats: any
+		}
+		httpClient: {
+			stats: any
+		}
+	}> {
+		const isOpen = this.httpClientService.isCircuitOpen()
+		const httpStats = this.httpClientService.getStats()
+
+		return {
+			timestamp: new Date().toISOString(),
+			circuitBreaker: {
+				isOpen,
+				stats: httpStats,
+			},
+			httpClient: {
+				stats: httpStats,
+			},
+		}
+	}
+
+	@Post('circuit-breaker/reset')
+	async resetCircuitBreaker(): Promise<{
+		timestamp: string
+		message: string
+		previousState: any
+	}> {
+		const previousStats = this.httpClientService.getStats()
+
+		this.httpClientService.resetCircuitBreaker()
+		this.httpClientService.resetStats()
+
+		return {
+			timestamp: new Date().toISOString(),
+			message: 'Circuit breaker has been reset successfully',
+			previousState: previousStats,
 		}
 	}
 }

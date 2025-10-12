@@ -74,10 +74,10 @@ let HttpClientService = HttpClientService_1 = class HttpClientService {
         this.maxRetryDelay = this._configService.getOptional('http.retry.maxRetryDelay', 10000);
         this.timeout = this._configService.getOptional('http.connectionPool.timeout', 30000);
         this.circuitBreaker = new circuit_breaker_1.CircuitBreaker({
-            failureThreshold: this._configService.getOptional('http.circuitBreaker.failureThreshold', 5),
-            resetTimeout: this._configService.getOptional('http.circuitBreaker.resetTimeout', 60000),
-            rollingWindow: this._configService.getOptional('http.circuitBreaker.monitoringPeriod', 30000),
-            minimumRequests: 5,
+            failureThreshold: this._configService.getOptional('http.circuitBreaker.failureThreshold', 50),
+            resetTimeout: this._configService.getOptional('http.circuitBreaker.resetTimeout', 30000),
+            rollingWindow: this._configService.getOptional('http.circuitBreaker.monitoringPeriod', 60000),
+            minimumRequests: this._configService.getOptional('http.circuitBreaker.minimumRequests', 10),
         });
         const maxSockets = this._configService.getOptional('http.connectionPool.maxSockets', 50);
         const keepAliveMsecs = this._configService.getOptional('http.connectionPool.keepAliveMsecs', 1000);
@@ -102,7 +102,8 @@ let HttpClientService = HttpClientService_1 = class HttpClientService {
         logger_util_1.CorrelatedLogger.log('HTTP client service destroyed', HttpClientService_1.name);
     }
     async get(url, config) {
-        return this.executeRequest(() => this._httpService.get(url, this.prepareConfig(config)));
+        const encodedUrl = this.encodeUrl(url);
+        return this.executeRequest(() => this._httpService.get(encodedUrl, this.prepareConfig(config)));
     }
     async post(url, data, config) {
         return this.executeRequest(() => this._httpService.post(url, data, this.prepareConfig(config)));
@@ -207,6 +208,23 @@ let HttpClientService = HttpClientService_1 = class HttpClientService {
     }
     configureAxios() {
         this._httpService.axiosRef.defaults.timeout = this.timeout;
+    }
+    encodeUrl(url) {
+        try {
+            const urlObj = new URL(url);
+            const pathSegments = urlObj.pathname.split('/').map((segment) => {
+                if (/[^\u0000-\u007F]/.test(segment)) {
+                    return encodeURIComponent(segment);
+                }
+                return segment;
+            });
+            urlObj.pathname = pathSegments.join('/');
+            return urlObj.toString();
+        }
+        catch (error) {
+            logger_util_1.CorrelatedLogger.warn(`Failed to encode URL: ${url} - ${error.message}`, HttpClientService_1.name);
+            return url;
+        }
     }
 };
 exports.HttpClientService = HttpClientService;

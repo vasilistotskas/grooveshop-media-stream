@@ -4,6 +4,7 @@ import { ConfigService } from '@microservice/Config/config.service';
 import { DiskSpaceHealthIndicator, DiskSpaceInfo } from '@microservice/Health/indicators/disk-space-health.indicator';
 import { MemoryHealthIndicator, MemoryInfo } from '@microservice/Health/indicators/memory-health.indicator';
 import { HttpHealthIndicator } from '@microservice/HTTP/indicators/http-health.indicator';
+import { HttpClientService } from '@microservice/HTTP/services/http-client.service';
 import { AlertingHealthIndicator } from '@microservice/Monitoring/indicators/alerting-health.indicator';
 import { SystemHealthIndicator } from '@microservice/Monitoring/indicators/system-health.indicator';
 import { JobQueueHealthIndicator } from '@microservice/Queue/indicators/job-queue-health.indicator';
@@ -21,7 +22,8 @@ export declare class HealthController {
     private readonly jobQueueHealthIndicator;
     private readonly storageHealthIndicator;
     private readonly _configService;
-    constructor(health: HealthCheckService, diskSpaceIndicator: DiskSpaceHealthIndicator, memoryIndicator: MemoryHealthIndicator, httpHealthIndicator: HttpHealthIndicator, cacheHealthIndicator: CacheHealthIndicator, redisHealthIndicator: RedisHealthIndicator, alertingHealthIndicator: AlertingHealthIndicator, systemHealthIndicator: SystemHealthIndicator, jobQueueHealthIndicator: JobQueueHealthIndicator, storageHealthIndicator: StorageHealthIndicator, _configService: ConfigService);
+    private readonly httpClientService;
+    constructor(health: HealthCheckService, diskSpaceIndicator: DiskSpaceHealthIndicator, memoryIndicator: MemoryHealthIndicator, httpHealthIndicator: HttpHealthIndicator, cacheHealthIndicator: CacheHealthIndicator, redisHealthIndicator: RedisHealthIndicator, alertingHealthIndicator: AlertingHealthIndicator, systemHealthIndicator: SystemHealthIndicator, jobQueueHealthIndicator: JobQueueHealthIndicator, storageHealthIndicator: StorageHealthIndicator, _configService: ConfigService, httpClientService: HttpClientService);
     check(): Promise<HealthCheckResult>;
     getDetailedHealth(): Promise<{
         status: HealthCheckStatus;
@@ -64,5 +66,20 @@ export declare class HealthController {
         timestamp: string;
         uptime: number;
         pid: number;
+    }>;
+    circuitBreakerStatus(): Promise<{
+        timestamp: string;
+        circuitBreaker: {
+            isOpen: boolean;
+            stats: any;
+        };
+        httpClient: {
+            stats: any;
+        };
+    }>;
+    resetCircuitBreaker(): Promise<{
+        timestamp: string;
+        message: string;
+        previousState: any;
     }>;
 }

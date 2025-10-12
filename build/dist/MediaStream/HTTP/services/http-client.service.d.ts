@@ -33,4 +33,5 @@ export declare class HttpClientService implements IHttpClient, OnModuleInit, OnM
     private isRetryableError;
     private prepareConfig;
     private configureAxios;
+    private encodeUrl;
 }

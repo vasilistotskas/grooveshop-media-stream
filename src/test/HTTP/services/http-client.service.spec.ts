@@ -46,7 +46,10 @@ describe('httpClientService', () => {
 			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.retry.retryDelay', 1000)
 			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.retry.maxRetryDelay', 10000)
 			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.connectionPool.timeout', 30000)
-			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.circuitBreaker.failureThreshold', 5)
+			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.circuitBreaker.failureThreshold', 50)
+			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.circuitBreaker.resetTimeout', 30000)
+			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.circuitBreaker.monitoringPeriod', 60000)
+			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.circuitBreaker.minimumRequests', 10)
 		})
 	})
 
@@ -64,7 +67,7 @@ describe('httpClientService', () => {
 
 			const result = await service.get('https://example.com')
 			expect(result).toEqual(mockResponse)
-			expect(httpService.get).toHaveBeenCalledWith('https://example.com', expect.any(Object))
+			expect(httpService.get).toHaveBeenCalledWith(expect.stringContaining('example.com'), expect.any(Object))
 		})
 
 		it('should execute POST requests', async () => {

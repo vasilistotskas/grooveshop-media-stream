@@ -173,8 +173,10 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                     request,
                     correlationId,
                 });
+                const shouldUseQueue = this.cacheImageResourceOperation.shouldUseBackgroundProcessing
+                    && this.cacheImageResourceOperation.shouldUseBackgroundProcessing();
                 await this.cacheImageResourceOperation.execute();
-                const maxWaitTime = 10000;
+                const maxWaitTime = shouldUseQueue ? 3000 : 10000;
                 const pollInterval = 100;
                 let waitTime = 0;
                 while (waitTime < maxWaitTime) {
@@ -193,6 +195,7 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                     this._logger.warn('Timeout waiting for resource to be processed', {
                         waitTime,
                         correlationId,
+                        wasQueued: shouldUseQueue,
                     });
                 }
                 await this.defaultImageFallback(request, res);
@@ -200,9 +203,16 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
         }
         catch (error) {
             const context = { request, error, correlationId };
-            this._logger.error(`Error while processing the image request: ${error.message || error}`, error, context);
-            const errorName = error instanceof Error ? error.constructor.name : 'UnknownError';
-            this.metricsService.recordError('image_request', errorName);
+            const errorMessage = error.message || '';
+            if (errorMessage.includes('Circuit breaker is open')) {
+                this._logger.warn('Circuit breaker is open, serving fallback immediately', context);
+                this.metricsService.recordError('image_request', 'circuit_breaker_open');
+            }
+            else {
+                this._logger.error(`Error while processing the image request: ${errorMessage}`, error, context);
+                const errorName = error instanceof Error ? error.constructor.name : 'UnknownError';
+                this.metricsService.recordError('image_request', errorName);
+            }
             await this.defaultImageFallback(request, res);
         }
         finally {
