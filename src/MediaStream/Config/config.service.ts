@@ -314,7 +314,7 @@ export class ConfigService implements OnModuleInit {
 					defaultTtl: memoryDefaultTtl,
 					checkPeriod: memoryCheckPeriod,
 					maxKeys: memoryMaxKeys,
-					_warningThreshold: memoryWarningThreshold,
+					warningThreshold: memoryWarningThreshold,
 				},
 				redis: {
 					host: redisHost,

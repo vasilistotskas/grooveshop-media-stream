@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grooveshop Media Stream - Terminal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Fira Code', 'Courier New', Consolas, Monaco, monospace;
+            background: #0a0e27;
+            min-height: 100vh;
+            padding: 20px;
+            color: #00ff41;
+            overflow-x: hidden;
+        }
+
+        .terminal-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #0d1117;
+            border: 2px solid #1f2937;
+            border-radius: 8px;
+            box-shadow: 0 0 40px rgba(0, 255, 65, 0.1);
+            animation: fadeIn 0.4s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .terminal-header {
+            background: #161b22;
+            padding: 12px 20px;
+            border-bottom: 1px solid #1f2937;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .terminal-button {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .terminal-button.close { background: #ff5f56; }
+        .terminal-button.minimize { background: #ffbd2e; }
+        .terminal-button.maximize { background: #27c93f; }
+
+        .terminal-title {
+            margin-left: 12px;
+            color: #8b949e;
+            font-size: 0.9em;
+        }
+
+        .terminal-body {
+            padding: 30px;
+        }
+
+        .prompt {
+            color: #00ff41;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .prompt::before {
+            content: '>';
+            color: #58a6ff;
+            font-weight: bold;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 16px;
+            background: #00ff41;
+            animation: blink 1s infinite;
+            margin-left: 4px;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        .section {
+            margin: 30px 0;
+            border-left: 2px solid #1f2937;
+            padding-left: 20px;
+        }
+
+        .section-title {
+            color: #58a6ff;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title::before {
+            content: '//';
+            color: #6e7681;
+        }
+
+        .output-line {
+            color: #c9d1d9;
+            margin: 8px 0;
+            line-height: 1.6;
+            padding-left: 15px;
+        }
+
+        .key {
+            color: #79c0ff;
+            font-weight: bold;
+        }
+
+        .value {
+            color: #a5d6ff;
+        }
+
+        .comment {
+            color: #6e7681;
+            font-style: italic;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .status-box {
+            background: #161b22;
+            border: 1px solid #1f2937;
+            padding: 15px;
+            border-radius: 6px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .status-box::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #00ff41, transparent);
+            animation: scan 3s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .status-label {
+            color: #6e7681;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .status-value {
+            color: #00ff41;
+            font-size: 1.3em;
+            font-weight: bold;
+        }
+
+        .status-value.loading {
+            color: #ffa657;
+        }
+
+        .status-value.error {
+            color: #ff7b72;
+        }
+
+        .endpoint-item {
+            background: #161b22;
+            border: 1px solid #1f2937;
+            padding: 12px 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .endpoint-item:hover {
+            border-color: #58a6ff;
+            background: #1c2128;
+            transform: translateX(5px);
+            box-shadow: 0 0 20px rgba(88, 166, 255, 0.1);
+        }
+
+        .endpoint-item::before {
+            content: '→';
+            position: absolute;
+            left: -20px;
+            color: #58a6ff;
+            opacity: 0;
+            transition: all 0.2s ease;
+        }
+
+        .endpoint-item:hover::before {
+            opacity: 1;
+            left: -10px;
+        }
+
+        .method {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 0.75em;
+            font-weight: bold;
+            margin-right: 10px;
+            letter-spacing: 1px;
+        }
+
+        .method.get {
+            background: #1f6feb;
+            color: #ffffff;
+        }
+
+        .method.post {
+            background: #238636;
+            color: #ffffff;
+        }
+
+        .endpoint-path {
+            color: #c9d1d9;
+            font-size: 0.9em;
+        }
+
+        .endpoint-path .param {
+            color: #ffa657;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: #161b22;
+            border: 1px solid #1f2937;
+            border-radius: 4px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.loading {
+            background: #ffa657;
+            box-shadow: 0 0 10px #ffa657;
+        }
+
+        .status-dot.healthy {
+            background: #00ff41;
+            box-shadow: 0 0 10px #00ff41;
+        }
+
+        .status-dot.unhealthy {
+            background: #ff7b72;
+            box-shadow: 0 0 10px #ff7b72;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.6;
+                transform: scale(1.2);
+            }
+        }
+
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #1f2937;
+            text-align: center;
+            color: #6e7681;
+            font-size: 0.85em;
+        }
+
+        .footer a {
+            color: #58a6ff;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        .ascii-art {
+            color: #58a6ff;
+            font-size: 0.7em;
+            line-height: 1.2;
+            margin: 20px 0;
+            white-space: pre;
+            text-align: center;
+        }
+
+        @keyframes glitch {
+            0% {
+                text-shadow: 2px 2px #ff00ff, -2px -2px #00ffff;
+            }
+            25% {
+                text-shadow: -2px -2px #ff00ff, 2px 2px #00ffff;
+            }
+            50% {
+                text-shadow: 2px -2px #ff00ff, -2px 2px #00ffff;
+            }
+            75% {
+                text-shadow: -2px 2px #ff00ff, 2px -2px #00ffff;
+            }
+            100% {
+                text-shadow: 2px 2px #ff00ff, -2px -2px #00ffff;
+            }
+        }
+
+        .glitch {
+            animation: glitch 3s infinite;
+        }
+
+        .loading-dots::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .terminal-body {
+                padding: 15px;
+            }
+
+            .ascii-art {
+                font-size: 0.5em;
+            }
+
+            .section {
+                padding-left: 10px;
+            }
+
+            .section-title {
+                font-size: 1.1em;
+            }
+
+            .status-grid {
+                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+                gap: 10px;
+            }
+
+            .status-box {
+                padding: 10px;
+            }
+
+            .status-label {
+                font-size: 0.75em;
+            }
+
+            .status-value {
+                font-size: 1em;
+            }
+
+            .endpoint-item {
+                padding: 10px;
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+
+            .endpoint-path {
+                font-size: 0.75em;
+                word-break: break-all;
+                line-height: 1.4;
+            }
+
+            .method {
+                font-size: 0.7em;
+                padding: 2px 6px;
+            }
+
+            .output-line {
+                font-size: 0.85em;
+                padding-left: 10px;
+            }
+
+            .prompt {
+                font-size: 0.9em;
+            }
+
+            .status-indicator {
+                font-size: 0.85em;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 5px;
+            }
+
+            .terminal-body {
+                padding: 10px;
+            }
+
+            .terminal-header {
+                padding: 10px 15px;
+            }
+
+            .terminal-title {
+                font-size: 0.75em;
+            }
+
+            .ascii-art {
+                font-size: 0.4em;
+            }
+
+            .section-title {
+                font-size: 1em;
+            }
+
+            .status-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .endpoint-path {
+                font-size: 0.7em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="terminal-container">
+        <div class="terminal-header">
+            <span class="terminal-button close"></span>
+            <span class="terminal-button minimize"></span>
+            <span class="terminal-button maximize"></span>
+            <span class="terminal-title">grooveshop-media-stream@v2.3.2</span>
+        </div>
+
+        <div class="terminal-body">
+            <div class="ascii-art">
+ _____ _____ _____ _____ _____ _____ _____ _____ _____ 
+|   __|  _  |     |     | __  |   __|  |  |     |  _  |
+|  |  |     |  |  |  |  |    -|__   |     |  |  |   __|
+|_____|__|__|_____|_____|__|__|_____|__|__|_____|__|   
+    MEDIA STREAM API v2.3.2
+            </div>
+
+            <div class="prompt">
+                <span>$ system-status --verbose</span>
+                <span class="cursor"></span>
+            </div>
+
+            <div class="section">
+                <div class="section-title">System Information</div>
+                
+                <div class="status-grid">
+                    <div class="status-box">
+                        <div class="status-label">Status</div>
+                        <div class="status-value loading" id="healthStatus">
+                            <span class="loading-dots">Loading</span>
+                        </div>
+                    </div>
+                    <div class="status-box">
+                        <div class="status-label">Uptime</div>
+                        <div class="status-value" id="uptime">
+                            <span class="loading-dots">Loading</span>
+                        </div>
+                    </div>
+                    <div class="status-box">
+                        <div class="status-label">Environment</div>
+                        <div class="status-value" id="environment">
+                            <span class="loading-dots">Loading</span>
+                        </div>
+                    </div>
+                    <div class="status-box">
+                        <div class="status-label">Node.js</div>
+                        <div class="status-value" id="nodeVersion">
+                            <span class="loading-dots">Loading</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <div class="status-indicator">
+                        <div class="status-dot loading" id="statusDot"></div>
+                        <span style="color: #8b949e; font-size: 0.9em;" id="statusText">Initializing system checks...</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Health Endpoints</div>
+                <div class="output-line comment">// System health monitoring and diagnostics</div>
+                
+                <div class="endpoint-item" onclick="openEndpoint('/health')">
+                    <span class="method get">GET</span>
+                    <span class="endpoint-path">/health</span>
+                </div>
+                <div class="endpoint-item" onclick="openEndpoint('/health/detailed')">
+                    <span class="method get">GET</span>
+                    <span class="endpoint-path">/health/detailed</span>
+                </div>
+                <div class="endpoint-item" onclick="openEndpoint('/health/ready')">
+                    <span class="method get">GET</span>
+                    <span class="endpoint-path">/health/ready</span>
+                </div>
+                <div class="endpoint-item" onclick="openEndpoint('/health/live')">
+                    <span class="method get">GET</span>
+                    <span class="endpoint-path">/health/live</span>
+                </div>
+                <div class="endpoint-item" onclick="openEndpoint('/health/circuit-breaker')">
+                    <span class="method get">GET</span>
+                    <span class="endpoint-path">/health/circuit-breaker</span>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Image Processing API</div>
+                <div class="output-line comment">// On-the-fly image transformation and optimization</div>
+                
+                <div class="endpoint-item">
+                    <span class="method get">GET</span>
+                    <span class="endpoint-path">/v1/image/media/uploads/<span class="param">:imageType</span>/<span class="param">:image</span>/<span class="param">:width</span>/<span class="param">:height</span>/<span class="param">:fit</span>/<span class="param">:position</span>/<span class="param">:background</span>/<span class="param">:trimThreshold</span>/<span class="param">:format</span>/<span class="param">:quality</span></span>
+                </div>
+                <div class="output-line" style="margin-left: 30px; font-size: 0.85em; color: #6e7681;">
+                    <span class="key">fit:</span> <span class="value">contain | cover | fill | inside | outside</span>
+                </div>
+                <div class="output-line" style="margin-left: 30px; font-size: 0.85em; color: #6e7681;">
+                    <span class="key">format:</span> <span class="value">webp | jpeg | png | avif</span>
+                </div>
+                <div class="output-line" style="margin-left: 30px; font-size: 0.85em; color: #6e7681; margin-bottom: 15px;">
+                    <span class="key">quality:</span> <span class="value">1-100</span>
+                </div>
+
+                <div class="endpoint-item">
+                    <span class="method get">GET</span>
+                    <span class="endpoint-path">/v1/image/static/images/<span class="param">:image</span>/<span class="param">:width</span>/<span class="param">:height</span>/<span class="param">:fit</span>/<span class="param">:position</span>/<span class="param">:background</span>/<span class="param">:trimThreshold</span>/<span class="param">:format</span>/<span class="param">:quality</span></span>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Monitoring & Metrics</div>
+                <div class="output-line comment">// Prometheus-compatible metrics endpoint</div>
+                
+                <div class="endpoint-item" onclick="openEndpoint('/metrics')">
+                    <span class="method get">GET</span>
+                    <span class="endpoint-path">/metrics</span>
+                </div>
+            </div>
+
+            <div class="footer">
+                <div class="output-line comment" style="padding-left: 0;">
+                    // Repository: <a href="https://github.com/vasilistotskas/grooveshop-media-stream" target="_blank">github.com/vasilistotskas/grooveshop-media-stream</a>
+                </div>
+                <div class="output-line comment" style="padding-left: 0;">
+                    // License: MIT | © 2025 Grooveshop
+                </div>
+                <div class="output-line comment" style="padding-left: 0; margin-top: 15px;">
+                    // Built with NestJS + Sharp + Redis
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openEndpoint(path) {
+            window.open(path, '_blank');
+        }
+
+        function formatUptime(seconds) {
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            
+            if (days > 0) {
+                return `${days}d ${hours}h ${minutes}m`;
+            } else if (hours > 0) {
+                return `${hours}h ${minutes}m`;
+            } else if (minutes > 0) {
+                return `${minutes}m`;
+            } else {
+                return `${Math.floor(seconds)}s`;
+            }
+        }
+
+        async function loadHealthStatus() {
+            // Try /health/detailed first, fallback to /health/live
+            try {
+                const response = await fetch('/health/detailed');
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Update status indicator
+                    const statusDot = document.getElementById('statusDot');
+                    const statusText = document.getElementById('statusText');
+                    
+                    if (data.status === 'ok') {
+                        statusDot.className = 'status-dot healthy';
+                        statusText.textContent = '✓ All systems operational';
+                        statusText.style.color = '#00ff41';
+                    } else {
+                        statusDot.className = 'status-dot unhealthy';
+                        statusText.textContent = '⚠ System degraded';
+                        statusText.style.color = '#ff7b72';
+                    }
+                    
+                    // Update status cards
+                    const healthStatus = document.getElementById('healthStatus');
+                    healthStatus.textContent = data.status.toUpperCase();
+                    healthStatus.className = 'status-value';
+                    
+                    const uptime = document.getElementById('uptime');
+                    uptime.textContent = formatUptime(data.uptime);
+                    uptime.className = 'status-value';
+                    
+                    const environment = document.getElementById('environment');
+                    environment.textContent = data.environment.toUpperCase();
+                    environment.className = 'status-value';
+                    
+                    const nodeVersion = document.getElementById('nodeVersion');
+                    nodeVersion.textContent = data.systemInfo.nodeVersion;
+                    nodeVersion.className = 'status-value';
+                    
+                    return; // Success!
+                }
+                
+                // If detailed health failed, try the simpler /health/live endpoint
+                const liveResponse = await fetch('/health/live');
+                if (!liveResponse.ok) {
+                    throw new Error('Health checks failed');
+                }
+                
+                const liveData = await liveResponse.json();
+                
+                // Update with limited info from /health/live
+                const statusDot = document.getElementById('statusDot');
+                const statusText = document.getElementById('statusText');
+                
+                statusDot.className = 'status-dot loading';
+                statusText.textContent = '⚠ Limited health info (configuration issue)';
+                statusText.style.color = '#ffa657';
+                
+                const healthStatus = document.getElementById('healthStatus');
+                healthStatus.textContent = 'DEGRADED';
+                healthStatus.className = 'status-value loading';
+                
+                const uptime = document.getElementById('uptime');
+                uptime.textContent = formatUptime(liveData.uptime);
+                uptime.className = 'status-value';
+                
+                const environment = document.getElementById('environment');
+                environment.textContent = 'UNKNOWN';
+                environment.className = 'status-value loading';
+                
+                const nodeVersion = document.getElementById('nodeVersion');
+                nodeVersion.textContent = 'N/A';
+                nodeVersion.className = 'status-value loading';
+                
+            } catch (error) {
+                console.error('Failed to load health status:', error);
+                
+                const statusDot = document.getElementById('statusDot');
+                const statusText = document.getElementById('statusText');
+                
+                statusDot.className = 'status-dot unhealthy';
+                statusText.textContent = '✗ Service unavailable';
+                statusText.style.color = '#ff7b72';
+                
+                const healthStatus = document.getElementById('healthStatus');
+                healthStatus.textContent = 'ERROR';
+                healthStatus.className = 'status-value error';
+                
+                const uptime = document.getElementById('uptime');
+                uptime.textContent = 'N/A';
+                uptime.className = 'status-value error';
+                
+                const environment = document.getElementById('environment');
+                environment.textContent = 'N/A';
+                environment.className = 'status-value error';
+                
+                const nodeVersion = document.getElementById('nodeVersion');
+                nodeVersion.textContent = 'N/A';
+                nodeVersion.className = 'status-value error';
+            }
+        }
+
+        // Add typing effect to prompt
+        function typePrompt() {
+            const prompt = document.querySelector('.prompt span:first-child');
+            const text = '$ system-status --verbose';
+            prompt.textContent = '';
+            let i = 0;
+            
+            const interval = setInterval(() => {
+                if (i < text.length) {
+                    prompt.textContent += text.charAt(i);
+                    i++;
+                } else {
+                    clearInterval(interval);
+                }
+            }, 50);
+        }
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            typePrompt();
+            setTimeout(loadHealthStatus, 500);
+        });
+
+        // Refresh health status every 30 seconds
+        setInterval(loadHealthStatus, 30000);
+    </script>
+</body>
+</html>
+

@@ -302,7 +302,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
                     defaultTtl: memoryDefaultTtl,
                     checkPeriod: memoryCheckPeriod,
                     maxKeys: memoryMaxKeys,
-                    _warningThreshold: memoryWarningThreshold,
+                    warningThreshold: memoryWarningThreshold,
                 },
                 redis: {
                     host: redisHost,
