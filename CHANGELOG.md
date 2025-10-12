@@ -1,3 +1,10 @@
+## [2.3.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.3.0...v2.3.1) (2025-10-12)
+
+
+### Bug Fixes
+
+* Update build artifacts and lockfile ([756948c](https://github.com/vasilistotskas/grooveshop-media-stream/commit/756948c8e2bebe47de03a55f12c5fe2254b5dc55))
+
 # [2.3.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.2.0...v2.3.0) (2025-10-12)
 
 
