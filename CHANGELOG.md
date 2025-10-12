@@ -1,3 +1,10 @@
+# [2.3.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.2.0...v2.3.0) (2025-10-12)
+
+
+### Features
+
+* Improve image REST controller error handling and queue logic ([c279b2a](https://github.com/vasilistotskas/grooveshop-media-stream/commit/c279b2a132f953b6931681d9d3b123982020533e))
+
 # [2.2.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.1.0...v2.2.0) (2025-09-25)
 
 
