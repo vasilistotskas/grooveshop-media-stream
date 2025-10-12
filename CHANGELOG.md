@@ -1,3 +1,10 @@
+## [2.6.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.6.1...v2.6.2) (2025-10-12)
+
+
+### Bug Fixes
+
+* Decode URI components in image REST controller ([d5b508a](https://github.com/vasilistotskas/grooveshop-media-stream/commit/d5b508ae05c60d8858562170a0440e68bc83eae2))
+
 ## [2.6.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.6.0...v2.6.1) (2025-10-12)
 
 
