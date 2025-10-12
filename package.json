@@ -16,7 +16,7 @@
     "build/dist/**/*"
   ],
   "scripts": {
-    "prebuild": "rimraf build/dist",
+    "prebuild": "rimraf build/dist && node scripts/inject-version.js",
     "build": "nest build",
     "start": "nest start",
     "dev": "nest start --tsc --watch",
