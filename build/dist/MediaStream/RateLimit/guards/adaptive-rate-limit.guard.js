@@ -65,6 +65,11 @@ let AdaptiveRateLimitGuard = AdaptiveRateLimitGuard_1 = class AdaptiveRateLimitG
         if (this.shouldSkipRateLimit(request)) {
             return true;
         }
+        const userAgent = request.headers['user-agent'] || '';
+        if (this.shouldBypassBot(userAgent)) {
+            this._logger.debug('Skipping rate limiting for bot', { userAgent });
+            return true;
+        }
         try {
             const clientIp = this.getClientIp(request);
             const requestType = this.getRequestType(request);
@@ -123,6 +128,13 @@ let AdaptiveRateLimitGuard = AdaptiveRateLimitGuard_1 = class AdaptiveRateLimitG
             return true;
         }
         return false;
+    }
+    shouldBypassBot(userAgent) {
+        const bypassBots = this.rateLimitService.getBypassBotsConfig();
+        if (!bypassBots) {
+            return false;
+        }
+        return this.rateLimitService.isBot(userAgent);
     }
     isDomainWhitelisted(request) {
         try {

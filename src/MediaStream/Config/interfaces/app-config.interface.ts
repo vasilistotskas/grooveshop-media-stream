@@ -81,6 +81,7 @@ export interface RateLimitBypassConfig {
 	metricsEndpoint: boolean
 	staticAssets: boolean
 	whitelistedDomains: string
+	bots: boolean
 }
 
 export interface RateLimitConfig {

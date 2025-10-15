@@ -301,4 +301,60 @@ describe('rateLimitService', () => {
 			expect(result.info.current).toBe(1)
 		})
 	})
+
+	describe('isBot', () => {
+		it('should detect Facebook bot', () => {
+			expect(service.isBot('facebookexternalhit/1.1')).toBe(true)
+			expect(service.isBot('Facebot')).toBe(true)
+			expect(service.isBot('facebookcatalog/1.0')).toBe(true)
+		})
+
+		it('should detect Twitter bot', () => {
+			expect(service.isBot('Twitterbot/1.0')).toBe(true)
+		})
+
+		it('should detect LinkedIn bot', () => {
+			expect(service.isBot('LinkedInBot/1.0')).toBe(true)
+		})
+
+		it('should detect search engine bots', () => {
+			expect(service.isBot('Mozilla/5.0 (compatible; Googlebot/2.1)')).toBe(true)
+			expect(service.isBot('Mozilla/5.0 (compatible; bingbot/2.0)')).toBe(true)
+			expect(service.isBot('Mozilla/5.0 (compatible; YandexBot/3.0)')).toBe(true)
+		})
+
+		it('should detect SEO tool bots', () => {
+			expect(service.isBot('AhrefsBot/7.0')).toBe(true)
+			expect(service.isBot('SemrushBot/7~bl')).toBe(true)
+		})
+
+		it('should detect monitoring bots', () => {
+			expect(service.isBot('PingdomBot/1.0')).toBe(true)
+			expect(service.isBot('UptimeRobot/2.0')).toBe(true)
+		})
+
+		it('should not detect regular browsers as bots', () => {
+			expect(service.isBot('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')).toBe(false)
+			expect(service.isBot('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)')).toBe(false)
+		})
+
+		it('should handle empty user agent', () => {
+			expect(service.isBot('')).toBe(false)
+			expect(service.isBot(null as any)).toBe(false)
+			expect(service.isBot(undefined as any)).toBe(false)
+		})
+	})
+
+	describe('getBypassBotsConfig', () => {
+		it('should return bot bypass configuration', () => {
+			configService.getOptional.mockReturnValue(true)
+			expect(service.getBypassBotsConfig()).toBe(true)
+			expect(configService.getOptional).toHaveBeenCalledWith('rateLimit.bypass.bots', true)
+		})
+
+		it('should return default value when not configured', () => {
+			configService.getOptional.mockReturnValue(true)
+			expect(service.getBypassBotsConfig()).toBe(true)
+		})
+	})
 })

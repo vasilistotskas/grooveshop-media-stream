@@ -555,9 +555,15 @@ describe('rate Limiting Integration', () => {
 		})
 
 		it('should handle configuration errors gracefully', async () => {
-			// Mock configuration error
-			jest.spyOn(configService, 'getOptional').mockImplementation(() => {
-				throw new Error('Config error')
+			// Mock configuration error for specific keys only, not bot bypass
+			jest.spyOn(configService, 'getOptional').mockImplementation((key: string, defaultValue?: any) => {
+				if (key === 'rateLimit.bypass.bots') {
+					return true
+				}
+				if (key.startsWith('rateLimit')) {
+					throw new Error('Config error')
+				}
+				return defaultValue
 			})
 
 			// Request should still be allowed

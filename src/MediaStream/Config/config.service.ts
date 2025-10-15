@@ -184,6 +184,7 @@ export class ConfigService implements OnModuleInit {
 					metricsEndpoint: this.nestConfigService.get('RATE_LIMIT_BYPASS_METRICS_ENDPOINT'),
 					staticAssets: this.nestConfigService.get('RATE_LIMIT_BYPASS_STATIC_ASSETS'),
 					whitelistedDomains: this.nestConfigService.get('RATE_LIMIT_BYPASS_WHITELISTED_DOMAINS'),
+					bots: this.nestConfigService.get('RATE_LIMIT_BYPASS_BOTS'),
 				},
 			},
 		}
@@ -297,6 +298,10 @@ export class ConfigService implements OnModuleInit {
 			? rateLimitBypassStaticAssetsStr.toLowerCase() === 'true'
 			: rateLimitBypassStaticAssetsStr
 		const rateLimitBypassWhitelistedDomains = this.nestConfigService.get('RATE_LIMIT_BYPASS_WHITELISTED_DOMAINS') || ''
+		const rateLimitBypassBotsStr = this.nestConfigService.get('RATE_LIMIT_BYPASS_BOTS') || 'true'
+		const rateLimitBypassBots = typeof rateLimitBypassBotsStr === 'string'
+			? rateLimitBypassBotsStr.toLowerCase() === 'true'
+			: rateLimitBypassBotsStr
 
 		return {
 			server: {
@@ -376,6 +381,7 @@ export class ConfigService implements OnModuleInit {
 					metricsEndpoint: rateLimitBypassMetricsEndpoint,
 					staticAssets: rateLimitBypassStaticAssets,
 					whitelistedDomains: rateLimitBypassWhitelistedDomains,
+					bots: rateLimitBypassBots,
 				},
 			},
 		}

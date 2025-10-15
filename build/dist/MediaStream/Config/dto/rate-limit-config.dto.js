@@ -110,6 +110,7 @@ class BypassConfigDto {
         this.healthChecks = true;
         this.metricsEndpoint = true;
         this.staticAssets = true;
+        this.bots = true;
         this.customPaths = [];
         this.whitelistedDomains = [];
     }
@@ -130,6 +131,11 @@ __decorate([
     (0, class_transformer_1.Transform)(({ value }) => value === 'true'),
     __metadata("design:type", Boolean)
 ], BypassConfigDto.prototype, "staticAssets", void 0);
+__decorate([
+    (0, class_validator_1.IsBoolean)(),
+    (0, class_transformer_1.Transform)(({ value }) => value === 'true'),
+    __metadata("design:type", Boolean)
+], BypassConfigDto.prototype, "bots", void 0);
 __decorate([
     (0, class_validator_1.IsString)({ each: true }),
     (0, class_validator_1.IsOptional)(),

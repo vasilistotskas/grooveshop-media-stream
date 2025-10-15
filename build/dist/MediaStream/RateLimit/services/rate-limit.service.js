@@ -70,7 +70,7 @@ let RateLimitService = RateLimitService_1 = class RateLimitService {
     getRateLimitConfig(requestType) {
         const baseConfig = {
             windowMs: this._configService.getOptional('rateLimit.default.windowMs', 60000),
-            max: this._configService.getOptional('rateLimit.default.max', 100),
+            max: this._configService.getOptional('rateLimit.default.max', 500),
             skipSuccessfulRequests: false,
             skipFailedRequests: false,
         };
@@ -79,7 +79,7 @@ let RateLimitService = RateLimitService_1 = class RateLimitService {
                 return {
                     ...baseConfig,
                     windowMs: this._configService.getOptional('rateLimit.imageProcessing.windowMs', 60000),
-                    max: this._configService.getOptional('rateLimit.imageProcessing.max', 50),
+                    max: this._configService.getOptional('rateLimit.imageProcessing.max', 300),
                 };
             case 'health-check':
                 return {
@@ -90,6 +90,48 @@ let RateLimitService = RateLimitService_1 = class RateLimitService {
             default:
                 return baseConfig;
         }
+    }
+    isBot(userAgent) {
+        if (!userAgent) {
+            return false;
+        }
+        const botPatterns = [
+            /facebook/i,
+            /facebookexternalhit/i,
+            /facebookcatalog/i,
+            /Facebot/i,
+            /Twitterbot/i,
+            /LinkedInBot/i,
+            /WhatsApp/i,
+            /TelegramBot/i,
+            /Slackbot/i,
+            /DiscordBot/i,
+            /Discordbot/i,
+            /Slack-ImgProxy/i,
+            /Googlebot/i,
+            /bingbot/i,
+            /Baiduspider/i,
+            /YandexBot/i,
+            /DuckDuckBot/i,
+            /Slurp/i,
+            /Applebot/i,
+            /AhrefsBot/i,
+            /SemrushBot/i,
+            /MJ12bot/i,
+            /DotBot/i,
+            /Screaming Frog/i,
+            /SEOkicks/i,
+            /PingdomBot/i,
+            /UptimeRobot/i,
+            /StatusCake/i,
+            /Lighthouse/i,
+            /PageSpeed/i,
+            /GTmetrix/i,
+            /HeadlessChrome/i,
+            /PhantomJS/i,
+            /Prerender/i,
+        ];
+        return botPatterns.some(pattern => pattern.test(userAgent));
     }
     async checkRateLimit(key, config) {
         const now = Date.now();
@@ -214,6 +256,9 @@ let RateLimitService = RateLimitService_1 = class RateLimitService {
             .split(',')
             .map(domain => domain.trim())
             .filter(domain => domain.length > 0);
+    }
+    getBypassBotsConfig() {
+        return this._configService.getOptional('rateLimit.bypass.bots', true);
     }
     getDebugInfo() {
         const entries = Array.from(this.requestCounts.entries()).map(([key, entry]) => ({

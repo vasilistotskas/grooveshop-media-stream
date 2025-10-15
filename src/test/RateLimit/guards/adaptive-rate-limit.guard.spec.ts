@@ -39,6 +39,8 @@ describe('adaptiveRateLimitGuard', () => {
 			checkRateLimit: jest.fn(),
 			recordRateLimitMetrics: jest.fn(),
 			getWhitelistedDomains: jest.fn(),
+			getBypassBotsConfig: jest.fn(),
+			isBot: jest.fn(),
 		}
 
 		const mockRateLimitMetricsService = {
@@ -57,6 +59,8 @@ describe('adaptiveRateLimitGuard', () => {
 		rateLimitService = module.get(RateLimitService)
 		rateLimitMetricsService = module.get(RateLimitMetricsService)
 		rateLimitService.getWhitelistedDomains.mockReturnValue([])
+		rateLimitService.getBypassBotsConfig.mockReturnValue(true)
+		rateLimitService.isBot.mockReturnValue(false)
 	})
 
 	afterEach(() => {
@@ -137,6 +141,49 @@ describe('adaptiveRateLimitGuard', () => {
 
 			expect(result).toBe(true)
 			expect(rateLimitService.checkRateLimit).not.toHaveBeenCalled()
+		})
+
+		it('should skip rate limiting for bot user agents', async () => {
+			rateLimitService.getBypassBotsConfig.mockReturnValue(true)
+			rateLimitService.isBot.mockReturnValue(true)
+
+			const botContext = {
+				switchToHttp: () => ({
+					getRequest: () => ({ ...mockRequest, headers: { 'user-agent': 'facebookexternalhit/1.1' } }),
+					getResponse: () => mockResponse,
+				}),
+			} as ExecutionContext
+
+			const result = await guard.canActivate(botContext)
+
+			expect(result).toBe(true)
+			expect(rateLimitService.isBot).toHaveBeenCalledWith('facebookexternalhit/1.1')
+			expect(rateLimitService.checkRateLimit).not.toHaveBeenCalled()
+		})
+
+		it('should not skip rate limiting when bot bypass is disabled', async () => {
+			rateLimitService.getBypassBotsConfig.mockReturnValue(false)
+			rateLimitService.isBot.mockReturnValue(true)
+
+			const mockConfig = { windowMs: 60000, max: 100, skipSuccessfulRequests: false, skipFailedRequests: false }
+			const mockInfo = { limit: 100, current: 1, remaining: 99, resetTime: new Date() }
+
+			rateLimitService.generateAdvancedKey.mockReturnValue('192.168.1.1:hash:image-processing')
+			rateLimitService.getRateLimitConfig.mockReturnValue(mockConfig)
+			rateLimitService.calculateAdaptiveLimit.mockResolvedValue(100)
+			rateLimitService.checkRateLimit.mockResolvedValue({ allowed: true, info: mockInfo })
+
+			const botContext = {
+				switchToHttp: () => ({
+					getRequest: () => ({ ...mockRequest, headers: { 'user-agent': 'facebookexternalhit/1.1' } }),
+					getResponse: () => mockResponse,
+				}),
+			} as ExecutionContext
+
+			const result = await guard.canActivate(botContext)
+
+			expect(result).toBe(true)
+			expect(rateLimitService.checkRateLimit).toHaveBeenCalled()
 		})
 
 		it('should apply adaptive rate limiting', async () => {

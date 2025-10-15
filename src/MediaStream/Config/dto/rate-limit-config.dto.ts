@@ -79,6 +79,10 @@ export class BypassConfigDto {
 	@Transform(({ value }) => value === 'true')
 	staticAssets: boolean = true
 
+	@IsBoolean()
+	@Transform(({ value }) => value === 'true')
+	bots: boolean = true
+
 	@IsString({ each: true })
 	@IsOptional()
 	customPaths: string[] = []

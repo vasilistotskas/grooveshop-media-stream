@@ -20,6 +20,7 @@ export declare class BypassConfigDto {
     healthChecks: boolean;
     metricsEndpoint: boolean;
     staticAssets: boolean;
+    bots: boolean;
     customPaths: string[];
     whitelistedDomains: string[];
 }

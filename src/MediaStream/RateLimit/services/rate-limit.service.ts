@@ -60,7 +60,7 @@ export class RateLimitService {
 	getRateLimitConfig(requestType: string): RateLimitConfig {
 		const baseConfig = {
 			windowMs: this._configService.getOptional('rateLimit.default.windowMs', 60000),
-			max: this._configService.getOptional('rateLimit.default.max', 100),
+			max: this._configService.getOptional('rateLimit.default.max', 500),
 			skipSuccessfulRequests: false,
 			skipFailedRequests: false,
 		}
@@ -70,7 +70,7 @@ export class RateLimitService {
 				return {
 					...baseConfig,
 					windowMs: this._configService.getOptional('rateLimit.imageProcessing.windowMs', 60000),
-					max: this._configService.getOptional('rateLimit.imageProcessing.max', 50),
+					max: this._configService.getOptional('rateLimit.imageProcessing.max', 300),
 				}
 			case 'health-check':
 				return {
@@ -81,6 +81,61 @@ export class RateLimitService {
 			default:
 				return baseConfig
 		}
+	}
+
+	/**
+	 * Check if user agent is a known bot/crawler
+	 */
+	isBot(userAgent: string): boolean {
+		if (!userAgent) {
+			return false
+		}
+
+		const botPatterns = [
+			// Social Media Crawlers
+			/facebook/i,
+			/facebookexternalhit/i,
+			/facebookcatalog/i,
+			/Facebot/i,
+			/Twitterbot/i,
+			/LinkedInBot/i,
+			/WhatsApp/i,
+			/TelegramBot/i,
+			/Slackbot/i,
+			/DiscordBot/i,
+			/Discordbot/i,
+			/Slack-ImgProxy/i,
+
+			// Search Engine Crawlers
+			/Googlebot/i,
+			/bingbot/i,
+			/Baiduspider/i,
+			/YandexBot/i,
+			/DuckDuckBot/i,
+			/Slurp/i, // Yahoo
+			/Applebot/i,
+
+			// SEO & Analytics Tools
+			/AhrefsBot/i,
+			/SemrushBot/i,
+			/MJ12bot/i,
+			/DotBot/i,
+			/Screaming Frog/i,
+			/SEOkicks/i,
+
+			// Other Common Bots
+			/PingdomBot/i,
+			/UptimeRobot/i,
+			/StatusCake/i,
+			/Lighthouse/i,
+			/PageSpeed/i,
+			/GTmetrix/i,
+			/HeadlessChrome/i,
+			/PhantomJS/i,
+			/Prerender/i,
+		]
+
+		return botPatterns.some(pattern => pattern.test(userAgent))
 	}
 
 	/**
@@ -265,6 +320,13 @@ export class RateLimitService {
 			.split(',')
 			.map(domain => domain.trim())
 			.filter(domain => domain.length > 0)
+	}
+
+	/**
+	 * Get bot bypass configuration
+	 */
+	getBypassBotsConfig(): boolean {
+		return this._configService.getOptional<boolean>('rateLimit.bypass.bots', true)
 	}
 
 	/**

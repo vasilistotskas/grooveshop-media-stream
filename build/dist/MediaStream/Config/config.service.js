@@ -196,6 +196,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
                     metricsEndpoint: this.nestConfigService.get('RATE_LIMIT_BYPASS_METRICS_ENDPOINT'),
                     staticAssets: this.nestConfigService.get('RATE_LIMIT_BYPASS_STATIC_ASSETS'),
                     whitelistedDomains: this.nestConfigService.get('RATE_LIMIT_BYPASS_WHITELISTED_DOMAINS'),
+                    bots: this.nestConfigService.get('RATE_LIMIT_BYPASS_BOTS'),
                 },
             },
         };
@@ -286,6 +287,10 @@ let ConfigService = ConfigService_1 = class ConfigService {
             ? rateLimitBypassStaticAssetsStr.toLowerCase() === 'true'
             : rateLimitBypassStaticAssetsStr;
         const rateLimitBypassWhitelistedDomains = this.nestConfigService.get('RATE_LIMIT_BYPASS_WHITELISTED_DOMAINS') || '';
+        const rateLimitBypassBotsStr = this.nestConfigService.get('RATE_LIMIT_BYPASS_BOTS') || 'true';
+        const rateLimitBypassBots = typeof rateLimitBypassBotsStr === 'string'
+            ? rateLimitBypassBotsStr.toLowerCase() === 'true'
+            : rateLimitBypassBotsStr;
         return {
             server: {
                 port: serverPort,
@@ -364,6 +369,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
                     metricsEndpoint: rateLimitBypassMetricsEndpoint,
                     staticAssets: rateLimitBypassStaticAssets,
                     whitelistedDomains: rateLimitBypassWhitelistedDomains,
+                    bots: rateLimitBypassBots,
                 },
             },
         };

@@ -28,6 +28,7 @@ export declare class RateLimitService {
     generateKey(ip: string, requestType: string): string;
     generateAdvancedKey(ip: string, userAgent: string, requestType: string): string;
     getRateLimitConfig(requestType: string): RateLimitConfig;
+    isBot(userAgent: string): boolean;
     checkRateLimit(key: string, config: RateLimitConfig): Promise<{
         allowed: boolean;
         info: RateLimitInfo;
@@ -41,6 +42,7 @@ export declare class RateLimitService {
     clearAllRateLimits(): void;
     getRateLimitStatus(key: string): RateLimitInfo | null;
     getWhitelistedDomains(): string[];
+    getBypassBotsConfig(): boolean;
     getDebugInfo(): {
         totalEntries: number;
         entries: Array<{

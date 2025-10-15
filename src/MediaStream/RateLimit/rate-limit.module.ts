@@ -19,12 +19,12 @@ import { RateLimitService } from './services/rate-limit.service'
 					{
 						name: 'default',
 						ttl: _configService.getOptional('rateLimit.default.windowMs', 60000),
-						limit: _configService.getOptional('rateLimit.default.max', 100),
+						limit: _configService.getOptional('rateLimit.default.max', 500),
 					},
 					{
 						name: 'image-processing',
 						ttl: _configService.getOptional('rateLimit.imageProcessing.windowMs', 60000),
-						limit: _configService.getOptional('rateLimit.imageProcessing.max', 50),
+						limit: _configService.getOptional('rateLimit.imageProcessing.max', 300),
 					},
 				],
 				skipIf: (context) => {

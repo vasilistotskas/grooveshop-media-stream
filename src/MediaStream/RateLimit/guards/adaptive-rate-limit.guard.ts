@@ -26,6 +26,12 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 			return true
 		}
 
+		const userAgent = request.headers['user-agent'] || ''
+		if (this.shouldBypassBot(userAgent)) {
+			this._logger.debug('Skipping rate limiting for bot', { userAgent })
+			return true
+		}
+
 		try {
 			const clientIp = this.getClientIp(request)
 			const requestType = this.getRequestType(request)
@@ -104,6 +110,18 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 		}
 
 		return false
+	}
+
+	/**
+	 * Check if bot bypass is enabled and user agent is a bot
+	 */
+	private shouldBypassBot(userAgent: string): boolean {
+		const bypassBots = this.rateLimitService.getBypassBotsConfig()
+		if (!bypassBots) {
+			return false
+		}
+
+		return this.rateLimitService.isBot(userAgent)
 	}
 
 	/**
