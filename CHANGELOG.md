@@ -1,3 +1,10 @@
+# [2.8.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.7.0...v2.8.0) (2025-10-15)
+
+
+### Features
+
+* default rate limit increased and by pass bots configurable ([0915457](https://github.com/vasilistotskas/grooveshop-media-stream/commit/091545709e95d67a5d5ec1c261d601c4248ca7b9))
+
 # [2.7.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.6.2...v2.7.0) (2025-10-15)
 
 
