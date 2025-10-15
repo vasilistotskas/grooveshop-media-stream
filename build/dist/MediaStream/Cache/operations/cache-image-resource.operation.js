@@ -240,16 +240,7 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
         }
     }
     shouldUseBackgroundProcessing() {
-        const resizeOptions = this.request.resizeOptions;
-        if (!resizeOptions)
-            return false;
-        const width = resizeOptions.width || 0;
-        const height = resizeOptions.height || 0;
-        const totalPixels = width * height;
-        if (resizeOptions.format === 'svg') {
-            return false;
-        }
-        return totalPixels > 2000000 || (resizeOptions.quality !== undefined && resizeOptions.quality > 90);
+        return false;
     }
     async queueImageProcessing() {
         const priority = this.request.resizeOptions?.width && this.request.resizeOptions.width > 1920
@@ -264,7 +255,7 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
             fit: this.request.resizeOptions?.fit,
             position: this.request.resizeOptions?.position,
             background: this.request.resizeOptions?.background,
-            trimThreshold: this.request.resizeOptions?.trimThreshold,
+            trimThreshold: this.request.resizeOptions?.trimThreshold ?? undefined,
             cacheKey: this.id,
             priority,
         });

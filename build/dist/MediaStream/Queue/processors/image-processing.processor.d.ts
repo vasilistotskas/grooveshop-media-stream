@@ -10,6 +10,7 @@ export declare class ImageProcessingProcessor {
     private readonly _logger;
     private static readonly MAX_SHARP_INSTANCES;
     constructor(_correlationService: CorrelationService, httpClient: HttpClientService, cacheManager: MultiLayerCacheManager);
+    private processedCount;
     process(job: Job<ImageProcessingJobData>): Promise<JobResult>;
     private downloadImage;
     private processImage;

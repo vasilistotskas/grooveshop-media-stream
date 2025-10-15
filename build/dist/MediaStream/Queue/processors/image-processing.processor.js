@@ -30,10 +30,11 @@ let ImageProcessingProcessor = ImageProcessingProcessor_1 = class ImageProcessin
         this.httpClient = httpClient;
         this.cacheManager = cacheManager;
         this._logger = new common_1.Logger(ImageProcessingProcessor_1.name);
+        this.processedCount = 0;
         sharp_1.default.cache({
-            memory: 100,
-            files: 20,
-            items: 200,
+            memory: 50,
+            files: 10,
+            items: 100,
         });
         sharp_1.default.concurrency(ImageProcessingProcessor_1.MAX_SHARP_INSTANCES);
         sharp_1.default.simd(true);
@@ -41,6 +42,14 @@ let ImageProcessingProcessor = ImageProcessingProcessor_1 = class ImageProcessin
     async process(job) {
         const startTime = Date.now();
         const { imageUrl, width, height, quality, format, cacheKey, correlationId, fit, position, background, trimThreshold } = job.data;
+        this.processedCount++;
+        if (this.processedCount % 20 === 0 && globalThis.gc) {
+            try {
+                globalThis.gc();
+                this._logger.debug(`Triggered garbage collection after ${this.processedCount} processed images`);
+            }
+            catch { }
+        }
         return this._correlationService.runWithContext({
             correlationId,
             timestamp: Date.now(),
@@ -145,8 +154,9 @@ let ImageProcessingProcessor = ImageProcessingProcessor_1 = class ImageProcessin
         }
     }
     async processImage(buffer, options) {
+        let pipeline = null;
         try {
-            let pipeline = (0, sharp_1.default)(buffer, {
+            pipeline = (0, sharp_1.default)(buffer, {
                 failOn: 'none',
                 limitInputPixels: 268402689,
                 sequentialRead: true,
@@ -220,11 +230,21 @@ let ImageProcessingProcessor = ImageProcessingProcessor_1 = class ImageProcessin
                     });
                     break;
             }
-            return await pipeline
+            const result = await pipeline
                 .withMetadata({ density: 72 })
                 .toBuffer();
+            if (pipeline) {
+                pipeline.destroy();
+            }
+            return result;
         }
         catch (error) {
+            if (pipeline) {
+                try {
+                    pipeline.destroy();
+                }
+                catch { }
+            }
             this._logger.error('Failed to process image:', error);
             throw new Error(`Image processing failed: ${error.message}`);
         }
