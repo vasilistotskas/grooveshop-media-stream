@@ -1,3 +1,10 @@
+## [2.8.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.8.0...v2.8.1) (2025-10-15)
+
+
+### Bug Fixes
+
+* allow robots ([cf3300b](https://github.com/vasilistotskas/grooveshop-media-stream/commit/cf3300b201839372f1f102d4e8cb06b710cb7b1f))
+
 # [2.8.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.7.0...v2.8.0) (2025-10-15)
 
 
