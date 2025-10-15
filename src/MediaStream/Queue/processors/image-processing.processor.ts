@@ -22,18 +22,29 @@ export class ImageProcessingProcessor {
 		private readonly cacheManager: MultiLayerCacheManager,
 	) {
 		sharp.cache({
-			memory: 100,
-			files: 20,
-			items: 200,
+			memory: 50,
+			files: 10,
+			items: 100,
 		})
 
 		sharp.concurrency(ImageProcessingProcessor.MAX_SHARP_INSTANCES)
 		sharp.simd(true)
 	}
 
+	private processedCount = 0
+
 	async process(job: Job<ImageProcessingJobData>): Promise<JobResult> {
 		const startTime = Date.now()
 		const { imageUrl, width, height, quality, format, cacheKey, correlationId, fit, position, background, trimThreshold } = job.data
+
+		this.processedCount++
+		if (this.processedCount % 20 === 0 && globalThis.gc) {
+			try {
+				globalThis.gc()
+				this._logger.debug(`Triggered garbage collection after ${this.processedCount} processed images`)
+			}
+			catch {}
+		}
 
 		return this._correlationService.runWithContext(
 			{
@@ -171,8 +182,9 @@ export class ImageProcessingProcessor {
 			trimThreshold?: number
 		},
 	): Promise<Buffer> {
+		let pipeline: sharp.Sharp | null = null
 		try {
-			let pipeline = sharp(buffer, {
+			pipeline = sharp(buffer, {
 				failOn: 'none',
 				limitInputPixels: 268402689,
 				sequentialRead: true,
@@ -253,11 +265,23 @@ export class ImageProcessingProcessor {
 					break
 			}
 
-			return await pipeline
+			const result = await pipeline
 				.withMetadata({ density: 72 })
 				.toBuffer()
+
+			if (pipeline) {
+				pipeline.destroy()
+			}
+
+			return result
 		}
 		catch (error: unknown) {
+			if (pipeline) {
+				try {
+					pipeline.destroy()
+				}
+				catch {}
+			}
 			this._logger.error('Failed to process image:', error)
 			throw new Error(`Image processing failed: ${(error as Error).message}`)
 		}

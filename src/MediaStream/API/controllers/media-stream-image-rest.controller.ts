@@ -196,8 +196,8 @@ export default class MediaStreamImageRESTController {
 
 				await this.cacheImageResourceOperation.execute()
 
-				const maxWaitTime = shouldUseQueue ? 3000 : 10000
-				const pollInterval = 100
+				const maxWaitTime = shouldUseQueue ? 15000 : 10000
+				const pollInterval = 150
 				let waitTime = 0
 
 				while (waitTime < maxWaitTime) {

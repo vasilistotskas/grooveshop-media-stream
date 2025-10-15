@@ -43,7 +43,7 @@ export default class CacheImageResourceOperation {
 		private readonly inputSanitizationService: InputSanitizationService,
 		private readonly jobQueueManager: JobQueueManager,
 		private readonly metricsService: MetricsService,
-	) {}
+	) { }
 
 	request!: CacheImageRequest
 
@@ -239,19 +239,8 @@ export default class CacheImageResourceOperation {
 	}
 
 	public shouldUseBackgroundProcessing(): boolean {
-		const resizeOptions = this.request.resizeOptions
-		if (!resizeOptions)
-			return false
-
-		const width = resizeOptions.width || 0
-		const height = resizeOptions.height || 0
-		const totalPixels = width * height
-
-		if (resizeOptions.format === 'svg') {
-			return false
-		}
-
-		return totalPixels > 2000000 || (resizeOptions.quality !== undefined && resizeOptions.quality > 90)
+		// @TODO / this slows the app too much
+		return false
 	}
 
 	private async queueImageProcessing(): Promise<void> {
@@ -268,7 +257,7 @@ export default class CacheImageResourceOperation {
 			fit: this.request.resizeOptions?.fit,
 			position: this.request.resizeOptions?.position,
 			background: this.request.resizeOptions?.background,
-			trimThreshold: this.request.resizeOptions?.trimThreshold,
+			trimThreshold: this.request.resizeOptions?.trimThreshold ?? undefined,
 			cacheKey: this.id,
 			priority,
 		})

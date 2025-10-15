@@ -83,7 +83,7 @@ export class MemoryHealthIndicator extends BaseHealthIndicator {
 		const memoryUsagePercentage = usedMemory / totalMemory
 
 		const processMemory = process.memoryUsage()
-		const heapUsagePercentage = processMemory.heapUsed / processMemory.heapTotal
+		const heapUsagePercentage = processMemory.heapUsed / processMemory.rss
 
 		return {
 			totalMemory: this.formatBytes(totalMemory),
