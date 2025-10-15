@@ -1,3 +1,4 @@
+import type { OnModuleInit } from '@nestjs/common'
 import { Buffer } from 'node:buffer'
 import { readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -6,7 +7,7 @@ import { MemoryCacheService } from '@microservice/Cache/services/memory-cache.se
 import { ConfigService } from '@microservice/Config/config.service'
 import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
 import { MetricsService } from '@microservice/Metrics/services/metrics.service'
-import { Injectable, OnModuleInit } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 
 interface CacheWarmingConfig {

@@ -6,8 +6,11 @@ export interface IJobQueue {
 
 	/**
 	 * Process jobs of a specific type
+	 * @param name Job type name
+	 * @param processor Job processor function
+	 * @param concurrency Number of parallel workers (default: 5)
 	 */
-	process: <T = any>(name: string, processor: JobProcessor<T>) => void
+	process: <T = any>(name: string, processor: JobProcessor<T>, concurrency?: number) => void
 
 	/**
 	 * Get queue statistics

@@ -23,7 +23,7 @@ import FetchResourceResponseJob from '@microservice/Queue/jobs/fetch-resource-re
 import GenerateResourceIdentityFromRequestJob from '@microservice/Queue/jobs/generate-resource-identity-from-request.job'
 import StoreResourceResponseToFileJob from '@microservice/Queue/jobs/store-resource-response-to-file.job'
 import WebpImageManipulationJob from '@microservice/Queue/jobs/webp-image-manipulation.job'
-import { JobQueueManager } from '@microservice/Queue/services/job-queue.manager'
+import { JobQueueManager } from '@microservice/Queue/services/job-queue.manager.mock'
 import { JobPriority } from '@microservice/Queue/types/job.types'
 import ValidateCacheImageRequestRule from '@microservice/Validation/rules/validate-cache-image-request.rule'
 import { InputSanitizationService } from '@microservice/Validation/services/input-sanitization.service'
@@ -249,6 +249,7 @@ export default class CacheImageResourceOperation {
 			: JobPriority.NORMAL
 
 		await this.jobQueueManager.addImageProcessingJob({
+			correlationId: 'mock-job',
 			imageUrl: this.request.resourceTarget,
 			width: this.request.resizeOptions?.width ?? undefined,
 			height: this.request.resizeOptions?.height ?? undefined,

@@ -16,16 +16,14 @@ export async function bootstrap(exitProcess = true): Promise<void> {
 		const app = await NestFactory.create<NestExpressApplication>(MediaStreamModule)
 		const configService = app.get(ConfigService)
 
-		// Security headers with Helmet
 		app.use(helmet({
-			contentSecurityPolicy: false, // Allow images from any source
-			crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow cross-origin resource sharing
+			contentSecurityPolicy: false,
+			crossOriginResourcePolicy: { policy: 'cross-origin' },
 		}))
 
-		// HTTP Compression (but not for images - they're already compressed)
 		app.use(compression({
-			level: 6, // Balance between speed (1) and compression (9)
-			threshold: 1024, // Only compress responses > 1KB
+			level: 6,
+			threshold: 1024,
 			filter: (req, res) => {
 				const contentType = res.getHeader('Content-Type')
 				// Don't compress images (already compressed formats)

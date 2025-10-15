@@ -10,8 +10,7 @@ import { HttpHealthIndicator } from '@microservice/HTTP/indicators/http-health.i
 import { AlertingHealthIndicator } from '@microservice/Monitoring/indicators/alerting-health.indicator'
 import { SystemHealthIndicator } from '@microservice/Monitoring/indicators/system-health.indicator'
 import { MonitoringModule } from '@microservice/Monitoring/monitoring.module'
-import { JobQueueHealthIndicator } from '@microservice/Queue/indicators/job-queue-health.indicator'
-import { QueueModule } from '@microservice/Queue/queue.module'
+// import { QueueModule } from '@microservice/Queue/queue.module' // Disabled - Bull incompatible with Bun
 import { StorageHealthIndicator } from '@microservice/Storage/indicators/storage-health.indicator'
 import { StorageModule } from '@microservice/Storage/storage.module'
 import { Module } from '@nestjs/common'
@@ -24,7 +23,7 @@ import { TerminusModule } from '@nestjs/terminus'
 		HttpModule,
 		CacheModule,
 		MonitoringModule,
-		QueueModule,
+		// QueueModule, // Disabled - Bull incompatible with Bun
 		StorageModule,
 	],
 	controllers: [HealthController],
@@ -36,7 +35,7 @@ import { TerminusModule } from '@nestjs/terminus'
 		RedisHealthIndicator,
 		AlertingHealthIndicator,
 		SystemHealthIndicator,
-		JobQueueHealthIndicator,
+		// JobQueueHealthIndicator, // Disabled - depends on QueueModule which uses Bull
 		StorageHealthIndicator,
 	],
 	exports: [
@@ -47,7 +46,7 @@ import { TerminusModule } from '@nestjs/terminus'
 		RedisHealthIndicator,
 		AlertingHealthIndicator,
 		SystemHealthIndicator,
-		JobQueueHealthIndicator,
+		// JobQueueHealthIndicator, // Disabled - depends on QueueModule which uses Bull
 		StorageHealthIndicator,
 	],
 })

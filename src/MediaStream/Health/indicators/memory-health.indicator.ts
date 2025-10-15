@@ -83,6 +83,8 @@ export class MemoryHealthIndicator extends BaseHealthIndicator {
 		const memoryUsagePercentage = usedMemory / totalMemory
 
 		const processMemory = process.memoryUsage()
+		// Use RSS (Resident Set Size) as the baseline for heap percentage calculation
+		// This represents the actual memory allocated to the process
 		const heapUsagePercentage = processMemory.heapUsed / processMemory.rss
 
 		return {

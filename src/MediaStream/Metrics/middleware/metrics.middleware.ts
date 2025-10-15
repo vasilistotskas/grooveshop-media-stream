@@ -1,6 +1,7 @@
+import type { NestMiddleware } from '@nestjs/common'
+import type { NextFunction, Request, Response } from 'express'
 import { Buffer } from 'node:buffer'
-import { Injectable, Logger, NestMiddleware } from '@nestjs/common'
-import { NextFunction, Request, Response } from 'express'
+import { Injectable, Logger } from '@nestjs/common'
 import { MetricsService } from '../services/metrics.service'
 
 @Injectable()

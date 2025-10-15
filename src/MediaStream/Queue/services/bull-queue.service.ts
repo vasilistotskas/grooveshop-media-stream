@@ -1,7 +1,8 @@
+import type { OnModuleDestroy } from '@nestjs/common'
+import type { Job as BullJob, JobOptions as BullJobOptions, Queue } from 'bull'
+import type { IJobQueue, Job, JobOptions, JobProcessor, JobStatus, QueueStats } from '../interfaces/job-queue.interface'
 import { InjectQueue } from '@nestjs/bull'
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common'
-import { Job as BullJob, JobOptions as BullJobOptions, Queue } from 'bull'
-import { IJobQueue, Job, JobOptions, JobProcessor, JobStatus, QueueStats } from '../interfaces/job-queue.interface'
+import { Injectable, Logger } from '@nestjs/common'
 import { JobType } from '../types/job.types'
 
 @Injectable()
@@ -31,12 +32,13 @@ export class BullQueueService implements IJobQueue, OnModuleDestroy {
 		}
 	}
 
-	process<T = any>(name: string, processor: JobProcessor<T>): void {
+	process<T = any>(name: string, processor: JobProcessor<T>, concurrency: number = 5): void {
 		this.processors.set(name, processor)
 
 		const queue = this.getQueueForJobType(name)
 
-		queue.process(name, async (bullJob: BullJob<T>) => {
+		// Set concurrency to allow parallel processing
+		queue.process(name, concurrency, async (bullJob: BullJob<T>) => {
 			const job = this.convertFromBullJob(bullJob)
 
 			try {
@@ -50,6 +52,8 @@ export class BullQueueService implements IJobQueue, OnModuleDestroy {
 				throw error
 			}
 		})
+
+		this._logger.log(`Queue processor registered for ${name} with concurrency: ${concurrency}`)
 	}
 
 	async getStats(): Promise<QueueStats> {

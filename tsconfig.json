@@ -1,22 +1,35 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
-    "declaration": true,
-    "removeComments": true,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
-    "target": "ES2021",
-    "sourceMap": true,
-    "outDir": "./build/dist",
-    "baseUrl": "./",
-    "incremental": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
+    // Enable latest features
     "lib": [
       "ESNext",
       "DOM"
     ],
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleDetection": "force",
+    "allowJs": true,
+    // Bundler mode
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    // Best practices
+    "strict": true,
+    "skipLibCheck": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    // Some stricter flags (disabled by default)
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noPropertyAccessFromIndexSignature": false,
+    // For NestJS
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "outDir": "./build/dist",
+    // Path aliases
+    "baseUrl": "./",
     "paths": {
       "@microservice/*": [
         "src/MediaStream/*"
@@ -27,18 +40,22 @@
     },
     "typeRoots": [
       "node_modules/@types"
-    ]
-  },
-  "watchOptions": {
-    "watchFile": "dynamicPriorityPolling",
-    "watchDirectory": "dynamicPriorityPolling",
-    "excludeDirectories": ["**/node_modules", "dist", "build"],
+    ],
   },
   "include": [
-    "src"
+    "src/**/*.ts"
   ],
   "exclude": [
+    "src/test",
+    "test",
+    "**/*.spec.ts",
+    "**/*.test.ts",
     "node_modules",
-    "build"
+    "build",
+    "coverage",
+    "scripts",
+    "*.config.*",
+    "*.mjs",
+    "*.js"
   ]
 }

@@ -1,22 +1,23 @@
+import type { DiskSpaceInfo } from '@microservice/Health/indicators/disk-space-health.indicator'
+import type { MemoryInfo } from '@microservice/Health/indicators/memory-health.indicator'
+import type { HealthCheckResult, HealthCheckStatus, HealthIndicatorResult } from '@nestjs/terminus'
 import * as process from 'node:process'
 import { CacheHealthIndicator } from '@microservice/Cache/indicators/cache-health.indicator'
 import { RedisHealthIndicator } from '@microservice/Cache/indicators/redis-health.indicator'
 import { ConfigService } from '@microservice/Config/config.service'
-import { DiskSpaceHealthIndicator, DiskSpaceInfo } from '@microservice/Health/indicators/disk-space-health.indicator'
-import { MemoryHealthIndicator, MemoryInfo } from '@microservice/Health/indicators/memory-health.indicator'
+import { DiskSpaceHealthIndicator } from '@microservice/Health/indicators/disk-space-health.indicator'
+import { MemoryHealthIndicator } from '@microservice/Health/indicators/memory-health.indicator'
 import { HttpHealthIndicator } from '@microservice/HTTP/indicators/http-health.indicator'
 import { HttpClientService } from '@microservice/HTTP/services/http-client.service'
 import { AlertingHealthIndicator } from '@microservice/Monitoring/indicators/alerting-health.indicator'
 import { SystemHealthIndicator } from '@microservice/Monitoring/indicators/system-health.indicator'
-import { JobQueueHealthIndicator } from '@microservice/Queue/indicators/job-queue-health.indicator'
 import { StorageHealthIndicator } from '@microservice/Storage/indicators/storage-health.indicator'
 import { Controller, Get, Post } from '@nestjs/common'
 import {
 	HealthCheck,
-	HealthCheckResult,
+
 	HealthCheckService,
-	HealthCheckStatus,
-	HealthIndicatorResult,
+
 } from '@nestjs/terminus'
 
 @Controller('health')
@@ -30,11 +31,11 @@ export class HealthController {
 		private readonly redisHealthIndicator: RedisHealthIndicator,
 		private readonly alertingHealthIndicator: AlertingHealthIndicator,
 		private readonly systemHealthIndicator: SystemHealthIndicator,
-		private readonly jobQueueHealthIndicator: JobQueueHealthIndicator,
+		// private readonly jobQueueHealthIndicator: JobQueueHealthIndicator, // Disabled - Bull incompatible with Bun
 		private readonly storageHealthIndicator: StorageHealthIndicator,
 		private readonly _configService: ConfigService,
 		private readonly httpClientService: HttpClientService,
-	) {}
+	) { }
 
 	@Get()
 	@HealthCheck()
@@ -47,7 +48,7 @@ export class HealthController {
 			() => this.redisHealthIndicator.isHealthy(),
 			() => this.alertingHealthIndicator.isHealthy(),
 			() => this.systemHealthIndicator.isHealthy(),
-			() => this.jobQueueHealthIndicator.isHealthy(),
+			// () => this.jobQueueHealthIndicator.isHealthy(), // Disabled - Bull incompatible with Bun
 			() => this.storageHealthIndicator.isHealthy(),
 		])
 	}
@@ -91,7 +92,7 @@ export class HealthController {
 			() => this.redisHealthIndicator.isHealthy(),
 			() => this.alertingHealthIndicator.isHealthy(),
 			() => this.systemHealthIndicator.isHealthy(),
-			() => this.jobQueueHealthIndicator.isHealthy(),
+			// () => this.jobQueueHealthIndicator.isHealthy(), // Disabled - Bull incompatible with Bun
 			() => this.storageHealthIndicator.isHealthy(),
 		])
 
@@ -141,7 +142,7 @@ export class HealthController {
 				() => this.redisHealthIndicator.isHealthy(),
 				() => this.alertingHealthIndicator.isHealthy(),
 				() => this.systemHealthIndicator.isHealthy(),
-				() => this.jobQueueHealthIndicator.isHealthy(),
+				// () => this.jobQueueHealthIndicator.isHealthy(), // Disabled - Bull incompatible with Bun
 				() => this.storageHealthIndicator.isHealthy(),
 			])
 

@@ -1,10 +1,11 @@
+import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
+import type { CacheStats, ICacheManager } from '../interfaces/cache-manager.interface'
 import { Buffer } from 'node:buffer'
 import { ConfigService } from '@microservice/Config/config.service'
 import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
 import { MetricsService } from '@microservice/Metrics/services/metrics.service'
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import Redis from 'ioredis'
-import { CacheStats, ICacheManager } from '../interfaces/cache-manager.interface'
 
 @Injectable()
 export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleDestroy {
@@ -331,7 +332,7 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 		}
 	}
 
-	getConnectionStatus(): { connected: boolean, stats: typeof this.stats } {
+	getConnectionStatus(): { connected: boolean, stats: { hits: number, misses: number, operations: number, errors: number } } {
 		return {
 			connected: this.isConnected,
 			stats: { ...this.stats },

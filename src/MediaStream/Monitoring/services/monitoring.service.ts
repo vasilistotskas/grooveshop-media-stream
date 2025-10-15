@@ -1,13 +1,15 @@
+import type {
+	ComponentHealth,
+	CustomMetric,
+	MonitoringConfig,
+	SystemHealth,
+} from '../interfaces/monitoring.interface'
 import * as process from 'node:process'
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import {
-	ComponentHealth,
-	CustomMetric,
 	MetricType,
-	MonitoringConfig,
-	SystemHealth,
 } from '../interfaces/monitoring.interface'
 
 @Injectable()

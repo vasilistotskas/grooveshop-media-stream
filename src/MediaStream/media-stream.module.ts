@@ -1,3 +1,4 @@
+import type { MiddlewareConsumer, NestModule } from '@nestjs/common'
 import MediaStreamImageRESTController from '@microservice/API/controllers/media-stream-image-rest.controller'
 import { CacheModule } from '@microservice/Cache/cache.module'
 import CacheImageResourceOperation from '@microservice/Cache/operations/cache-image-resource.operation'
@@ -16,7 +17,9 @@ import FetchResourceResponseJob from '@microservice/Queue/jobs/fetch-resource-re
 import GenerateResourceIdentityFromRequestJob from '@microservice/Queue/jobs/generate-resource-identity-from-request.job'
 import StoreResourceResponseToFileJob from '@microservice/Queue/jobs/store-resource-response-to-file.job'
 import WebpImageManipulationJob from '@microservice/Queue/jobs/webp-image-manipulation.job'
-import { QueueModule } from '@microservice/Queue/queue.module'
+// import { QueueModule } from '@microservice/Queue/queue.module' // Disabled - Bull incompatible with Bun
+// Import JobQueueManager from mock file to avoid loading Bull
+import { JobQueueManager } from '@microservice/Queue/services/job-queue.manager.mock'
 import { AdaptiveRateLimitGuard } from '@microservice/RateLimit/guards/adaptive-rate-limit.guard'
 import { RateLimitModule } from '@microservice/RateLimit/rate-limit.module'
 import { StorageModule } from '@microservice/Storage/storage.module'
@@ -24,7 +27,7 @@ import { TasksModule } from '@microservice/Tasks/tasks.module'
 import ValidateCacheImageRequestResizeTargetRule from '@microservice/Validation/rules/validate-cache-image-request-resize-target.rule'
 import ValidateCacheImageRequestRule from '@microservice/Validation/rules/validate-cache-image-request.rule'
 import { ValidationModule } from '@microservice/Validation/validation.module'
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common'
+import { Module } from '@nestjs/common'
 import { APP_FILTER, APP_GUARD, HttpAdapterHost } from '@nestjs/core'
 import { ScheduleModule } from '@nestjs/schedule'
 
@@ -32,6 +35,8 @@ const controllers = [MediaStreamImageRESTController]
 
 const operations = [CacheImageResourceOperation]
 
+// Jobs are kept as providers even though QueueModule is disabled
+// They're used directly by CacheImageResourceOperation for synchronous processing
 const jobs = [
 	GenerateResourceIdentityFromRequestJob,
 	FetchResourceResponseJob,
@@ -54,7 +59,7 @@ const rules = [ValidateCacheImageRequestRule, ValidateCacheImageRequestResizeTar
 		HttpModule,
 		MetricsModule,
 		MonitoringModule,
-		QueueModule,
+		// QueueModule, // Temporarily disabled - Bull has compatibility issues with Bun
 		RateLimitModule,
 		StorageModule,
 		TasksModule,
@@ -66,6 +71,8 @@ const rules = [ValidateCacheImageRequestRule, ValidateCacheImageRequestResizeTar
 		...jobs,
 		...rules,
 		...operations,
+		// JobQueueManager is actually MockJobQueueManager (imported from mock file)
+		JobQueueManager,
 		{
 			provide: APP_FILTER,
 			useFactory: (httpAdapterHost: HttpAdapterHost, _correlationService: CorrelationService) => {

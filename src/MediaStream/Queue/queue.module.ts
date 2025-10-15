@@ -25,6 +25,7 @@ import { JobQueueManager } from './services/job-queue.manager'
 					enableReadyCheck: false,
 					maxRetriesPerRequest: 3,
 				},
+				prefix: 'bull',
 				defaultJobOptions: {
 					removeOnComplete: 10,
 					removeOnFail: 5,

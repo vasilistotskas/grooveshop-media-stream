@@ -8,17 +8,61 @@ import sharp from 'sharp'
 @Injectable({ scope: Scope.REQUEST })
 export default class WebpImageManipulationJob {
 	private readonly logger = new Logger(WebpImageManipulationJob.name)
+	private static processingCount = 0
+	private static readonly MAX_CONCURRENT = 10
+	private static waitingQueue: Array<() => void> = []
+
+	private static async acquireLock(): Promise<void> {
+		if (WebpImageManipulationJob.processingCount < WebpImageManipulationJob.MAX_CONCURRENT) {
+			WebpImageManipulationJob.processingCount++
+			return
+		}
+
+		// Wait for a slot to become available
+		await new Promise<void>((resolve) => {
+			WebpImageManipulationJob.waitingQueue.push(resolve)
+		})
+	}
+
+	private static releaseLock(): void {
+		WebpImageManipulationJob.processingCount--
+		const next = WebpImageManipulationJob.waitingQueue.shift()
+		if (next) {
+			WebpImageManipulationJob.processingCount++
+			next()
+		}
+	}
+
 	async handle(
 		filePathFrom: string,
 		filePathTo: string,
 		options: ResizeOptions,
 	): Promise<ManipulationJobResult> {
-		this.logger.debug(`WebpImageManipulationJob.handle called with all options:`, {
-			filePathFrom,
-			filePathTo,
-			options: JSON.stringify(options, null, 2),
-		})
+		// Acquire lock to limit concurrent processing
+		await WebpImageManipulationJob.acquireLock()
 
+		try {
+			this.logger.debug(`WebpImageManipulationJob.handle called with all options:`, {
+				filePathFrom,
+				filePathTo,
+				options: JSON.stringify(options, null, 2),
+				currentProcessing: WebpImageManipulationJob.processingCount,
+				waiting: WebpImageManipulationJob.waitingQueue.length,
+			})
+
+			return await this.processImage(filePathFrom, filePathTo, options)
+		}
+		finally {
+			// Always release lock
+			WebpImageManipulationJob.releaseLock()
+		}
+	}
+
+	private async processImage(
+		filePathFrom: string,
+		filePathTo: string,
+		options: ResizeOptions,
+	): Promise<ManipulationJobResult> {
 		if (options.format === 'svg') {
 			this.logger.debug(`SVG format requested. Source file: ${filePathFrom}`)
 			const sourceExtension = extname(filePathFrom).toLowerCase()

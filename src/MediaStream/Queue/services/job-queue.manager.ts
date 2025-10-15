@@ -1,16 +1,17 @@
-import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
-import { Job, JobOptions } from '../interfaces/job-queue.interface'
-import { CacheOperationsProcessor } from '../processors/cache-operations.processor'
-import { ImageProcessingProcessor } from '../processors/image-processing.processor'
-import {
+import type { OnModuleInit } from '@nestjs/common'
+import type { Job, JobOptions } from '../interfaces/job-queue.interface'
+import type {
 	CacheCleanupJobData,
 	CacheWarmingJobData,
 	ImageProcessingJobData,
 	JobMetrics,
-	JobPriority,
-	JobType,
 } from '../types/job.types'
+import * as process from 'node:process'
+import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
+import { Injectable, Logger } from '@nestjs/common'
+import { CacheOperationsProcessor } from '../processors/cache-operations.processor'
+import { ImageProcessingProcessor } from '../processors/image-processing.processor'
+import { JobPriority, JobType } from '../types/job.types'
 import { BullQueueService } from './bull-queue.service'
 
 @Injectable()
@@ -28,7 +29,7 @@ export class JobQueueManager implements OnModuleInit {
 		private readonly imageProcessor: ImageProcessingProcessor,
 		private readonly cacheProcessor: CacheOperationsProcessor,
 		private readonly _correlationService: CorrelationService,
-	) {}
+	) { }
 
 	async onModuleInit(): Promise<void> {
 		this.setupJobProcessors()
@@ -161,6 +162,12 @@ export class JobQueueManager implements OnModuleInit {
 	}
 
 	private setupJobProcessors(): void {
+		// Get concurrency settings from environment or use defaults
+		const imageProcessingConcurrency = Number.parseInt(process.env.QUEUE_IMAGE_PROCESSING_CONCURRENCY || '10', 10)
+		const cacheWarmingConcurrency = Number.parseInt(process.env.QUEUE_CACHE_WARMING_CONCURRENCY || '3', 10)
+		const cacheCleanupConcurrency = Number.parseInt(process.env.QUEUE_CACHE_CLEANUP_CONCURRENCY || '1', 10)
+
+		// Process image jobs with higher concurrency
 		this.queueService.process(JobType.IMAGE_PROCESSING, async (job) => {
 			const startTime = Date.now()
 
@@ -178,8 +185,9 @@ export class JobQueueManager implements OnModuleInit {
 
 				throw error
 			}
-		})
+		}, imageProcessingConcurrency)
 
+		// Process cache warming with lower concurrency
 		this.queueService.process(JobType.CACHE_WARMING, async (job) => {
 			const startTime = Date.now()
 
@@ -197,8 +205,9 @@ export class JobQueueManager implements OnModuleInit {
 
 				throw error
 			}
-		})
+		}, cacheWarmingConcurrency)
 
+		// Process cache cleanup with single worker
 		this.queueService.process(JobType.CACHE_CLEANUP, async (job) => {
 			const startTime = Date.now()
 
@@ -216,9 +225,9 @@ export class JobQueueManager implements OnModuleInit {
 
 				throw error
 			}
-		})
+		}, cacheCleanupConcurrency)
 
-		this._logger.debug('Job processors configured')
+		this._logger.log(`Job processors configured - Image: ${imageProcessingConcurrency}, Cache Warming: ${cacheWarmingConcurrency}, Cleanup: ${cacheCleanupConcurrency}`)
 	}
 
 	private updateMetrics(success: boolean, processingTime: number): void {
