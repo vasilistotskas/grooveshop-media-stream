@@ -1,3 +1,15 @@
+# [2.7.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.6.2...v2.7.0) (2025-10-15)
+
+
+### Bug Fixes
+
+* pnpm lock ([9008770](https://github.com/vasilistotskas/grooveshop-media-stream/commit/900877026741476c312c95adf79fb0bd3e0f1975))
+
+
+### Features
+
+* Bump Versions ([779db82](https://github.com/vasilistotskas/grooveshop-media-stream/commit/779db82c895a0cf631f7d7a951af03e40384bd3f))
+
 ## [2.6.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.6.1...v2.6.2) (2025-10-12)
 
 
