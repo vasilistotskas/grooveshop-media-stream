@@ -3,5 +3,9 @@
   "exclude": [
     "node_modules",
     "build",
+    "test",
+    "**/*spec.ts",
+    "**/*test.ts",
+    "vitest.config.ts"
   ]
 }

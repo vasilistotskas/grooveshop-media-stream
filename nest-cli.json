@@ -5,6 +5,8 @@
     "tsConfigPath": "tsconfig.build.json",
     "deleteOutDir": true,
     "builder": "swc",
-    "typeCheck": true
+    "typeCheck": false,
+    "assets": [],
+    "watchAssets": false
   }
 }

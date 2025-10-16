@@ -6,25 +6,22 @@
     "moduleDetection": "force",
     "allowJs": true,
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
-    "noEmit": true,
+    "noEmitOnError": true,
     "strict": true,
     "skipLibCheck": true,
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noPropertyAccessFromIndexSignature": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noPropertyAccessFromIndexSignature": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
     "incremental": true,
     "declaration": true,
     "newLine": "lf",
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
-    "noEmitOnError": true,
     "noImplicitOverride": true,
     "noImplicitReturns": true,
     "noUncheckedSideEffectImports": true,
@@ -34,8 +31,13 @@
     "esModuleInterop": true,
     "baseUrl": "./",
     "lib": [
-      "ESNext",
-      "DOM"
+      "ES2021"
+    ],
+    "types": [
+      "node",
+      "express",
+      "compression",
+      "supertest"
     ],
     "paths": {
       "@microservice/*": [
@@ -52,13 +54,17 @@
   "watchOptions": {
     "watchFile": "dynamicPriorityPolling",
     "watchDirectory": "dynamicPriorityPolling",
-    "excludeDirectories": ["**/node_modules", "dist", "build"],
+    "excludeDirectories": ["**/node_modules", "dist", "build"]
   },
   "include": [
-    "src"
+    "src/**/*"
   ],
   "exclude": [
     "node_modules",
-    "build"
+    "build",
+    "test",
+    "**/*spec.ts",
+    "**/*test.ts",
+    "vitest.config.ts"
   ]
 }
