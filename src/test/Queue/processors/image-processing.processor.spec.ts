@@ -1,22 +1,25 @@
+import type { Job } from '@microservice/Queue/interfaces/job-queue.interface'
+import type { ImageProcessingJobData } from '@microservice/Queue/types/job.types'
+import type { MockedFunction, MockedObject } from 'vitest'
 import { Buffer } from 'node:buffer'
 import { MultiLayerCacheManager } from '@microservice/Cache/services/multi-layer-cache.manager'
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
 import { HttpClientService } from '@microservice/HTTP/services/http-client.service'
-import { Job } from '@microservice/Queue/interfaces/job-queue.interface'
 import { ImageProcessingProcessor } from '@microservice/Queue/processors/image-processing.processor'
-import { ImageProcessingJobData, JobPriority } from '@microservice/Queue/types/job.types'
+import { JobPriority } from '@microservice/Queue/types/job.types'
 import { Logger } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import sharp from 'sharp'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock sharp
-jest.mock('sharp')
-const mockSharp = sharp as jest.MockedFunction<typeof sharp>
+vi.mock('sharp')
+const mockSharp = sharp as MockedFunction<typeof sharp>
 
 describe('imageProcessingProcessor', () => {
 	let processor: ImageProcessingProcessor
-	let mockCacheManager: jest.Mocked<MultiLayerCacheManager>
-	let mockHttpClient: jest.Mocked<HttpClientService>
+	let mockCacheManager: MockedObject<MultiLayerCacheManager>
+	let mockHttpClient: MockedObject<HttpClientService>
 
 	const createMockJob = (data: Partial<ImageProcessingJobData>): Job<ImageProcessingJobData> => ({
 		id: 'test-job',
@@ -37,18 +40,18 @@ describe('imageProcessingProcessor', () => {
 
 	beforeEach(async () => {
 		const mockCacheManagerFactory = {
-			get: jest.fn(),
-			set: jest.fn(),
+			get: vi.fn(),
+			set: vi.fn(),
 		}
 
 		const mockCorrelationServiceFactory = {
-			getCorrelationId: jest.fn(),
-			setCorrelationId: jest.fn(),
-			runWithContext: jest.fn((context, fn) => fn()),
+			getCorrelationId: vi.fn(),
+			setCorrelationId: vi.fn(),
+			runWithContext: vi.fn((context, fn) => fn()),
 		}
 
 		const mockHttpClientFactory = {
-			get: jest.fn(),
+			get: vi.fn(),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -74,15 +77,15 @@ describe('imageProcessingProcessor', () => {
 		mockHttpClient = module.get(HttpClientService)
 
 		// Mock logger to avoid console output during tests
-		jest.spyOn(Logger.prototype, 'debug').mockImplementation()
-		jest.spyOn(Logger.prototype, 'log').mockImplementation()
-		jest.spyOn(Logger.prototype, 'warn').mockImplementation()
-		jest.spyOn(Logger.prototype, 'error').mockImplementation()
+		vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => {})
+		vi.spyOn(Logger.prototype, 'log').mockImplementation(() => {})
+		vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => {})
+		vi.spyOn(Logger.prototype, 'error').mockImplementation(() => {})
 	})
 
 	afterEach(() => {
-		jest.clearAllMocks()
-		jest.resetAllMocks()
+		vi.clearAllMocks()
+		vi.resetAllMocks()
 	})
 
 	describe('process', () => {
@@ -131,11 +134,11 @@ describe('imageProcessingProcessor', () => {
 			// Mock sharp processing
 			const processedImageData = Buffer.from('processed-image-data')
 			const mockSharpInstance = {
-				resize: jest.fn().mockReturnThis(),
-				webp: jest.fn().mockReturnThis(),
-				withMetadata: jest.fn().mockReturnThis(),
-				toBuffer: jest.fn().mockResolvedValue(processedImageData),
-				destroy: jest.fn(),
+				resize: vi.fn().mockReturnThis(),
+				webp: vi.fn().mockReturnThis(),
+				withMetadata: vi.fn().mockReturnThis(),
+				toBuffer: vi.fn().mockResolvedValue(processedImageData),
+				destroy: vi.fn(),
 			}
 			mockSharp.mockReturnValue(mockSharpInstance as any)
 
@@ -197,11 +200,11 @@ describe('imageProcessingProcessor', () => {
 
 			const processedImageData = Buffer.from('processed-jpeg-data')
 			const mockSharpInstance = {
-				resize: jest.fn().mockReturnThis(),
-				jpeg: jest.fn().mockReturnThis(),
-				withMetadata: jest.fn().mockReturnThis(),
-				toBuffer: jest.fn().mockResolvedValue(processedImageData),
-				destroy: jest.fn(),
+				resize: vi.fn().mockReturnThis(),
+				jpeg: vi.fn().mockReturnThis(),
+				withMetadata: vi.fn().mockReturnThis(),
+				toBuffer: vi.fn().mockResolvedValue(processedImageData),
+				destroy: vi.fn(),
 			}
 			mockSharp.mockReturnValue(mockSharpInstance as any)
 
@@ -234,10 +237,10 @@ describe('imageProcessingProcessor', () => {
 
 			const processedImageData = Buffer.from('processed-png-data')
 			const mockSharpInstance = {
-				png: jest.fn().mockReturnThis(),
-				withMetadata: jest.fn().mockReturnThis(),
-				toBuffer: jest.fn().mockResolvedValue(processedImageData),
-				destroy: jest.fn(),
+				png: vi.fn().mockReturnThis(),
+				withMetadata: vi.fn().mockReturnThis(),
+				toBuffer: vi.fn().mockResolvedValue(processedImageData),
+				destroy: vi.fn(),
 			}
 			mockSharp.mockReturnValue(mockSharpInstance as any)
 
@@ -268,10 +271,10 @@ describe('imageProcessingProcessor', () => {
 
 			const processedImageData = Buffer.from('processed-image-data')
 			const mockSharpInstance = {
-				webp: jest.fn().mockReturnThis(),
-				withMetadata: jest.fn().mockReturnThis(),
-				toBuffer: jest.fn().mockResolvedValue(processedImageData),
-				destroy: jest.fn(),
+				webp: vi.fn().mockReturnThis(),
+				withMetadata: vi.fn().mockReturnThis(),
+				toBuffer: vi.fn().mockResolvedValue(processedImageData),
+				destroy: vi.fn(),
 			}
 			mockSharp.mockReturnValue(mockSharpInstance as any)
 
@@ -303,10 +306,10 @@ describe('imageProcessingProcessor', () => {
 
 			const processedImageData = Buffer.from('processed-image-data')
 			const mockSharpInstance = {
-				webp: jest.fn().mockReturnThis(),
-				withMetadata: jest.fn().mockReturnThis(),
-				toBuffer: jest.fn().mockResolvedValue(processedImageData),
-				destroy: jest.fn(),
+				webp: vi.fn().mockReturnThis(),
+				withMetadata: vi.fn().mockReturnThis(),
+				toBuffer: vi.fn().mockResolvedValue(processedImageData),
+				destroy: vi.fn(),
 			}
 			mockSharp.mockReturnValue(mockSharpInstance as any)
 
@@ -351,11 +354,11 @@ describe('imageProcessingProcessor', () => {
 
 			// Mock sharp processing error
 			const mockSharpInstance = {
-				resize: jest.fn().mockReturnThis(),
-				webp: jest.fn().mockReturnThis(),
-				withMetadata: jest.fn().mockReturnThis(),
-				toBuffer: jest.fn().mockRejectedValue(new Error('Invalid image format')),
-				destroy: jest.fn(),
+				resize: vi.fn().mockReturnThis(),
+				webp: vi.fn().mockReturnThis(),
+				withMetadata: vi.fn().mockReturnThis(),
+				toBuffer: vi.fn().mockRejectedValue(new Error('Invalid image format')),
+				destroy: vi.fn(),
 			}
 			mockSharp.mockReturnValue(mockSharpInstance as any)
 
@@ -396,10 +399,10 @@ describe('imageProcessingProcessor', () => {
 
 			const processedImageData = Buffer.from('processed-image-data')
 			const mockSharpInstance = {
-				webp: jest.fn().mockReturnThis(),
-				withMetadata: jest.fn().mockReturnThis(),
-				toBuffer: jest.fn().mockResolvedValue(processedImageData),
-				destroy: jest.fn(),
+				webp: vi.fn().mockReturnThis(),
+				withMetadata: vi.fn().mockReturnThis(),
+				toBuffer: vi.fn().mockResolvedValue(processedImageData),
+				destroy: vi.fn(),
 			}
 			mockSharp.mockReturnValue(mockSharpInstance as any)
 
@@ -414,7 +417,7 @@ describe('imageProcessingProcessor', () => {
 		it('should log progress updates', async () => {
 			const job = createMockJob({})
 
-			const logSpy = jest.spyOn(Logger.prototype, 'debug')
+			const logSpy = vi.spyOn(Logger.prototype, 'debug')
 
 			await (processor as any).updateProgress(job, 50, 'Processing')
 

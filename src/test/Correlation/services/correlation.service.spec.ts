@@ -1,6 +1,7 @@
-import { RequestContext } from '@microservice/Correlation/interfaces/correlation.interface'
+import type { RequestContext } from '@microservice/Correlation/interfaces/correlation.interface'
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
 import { Test, TestingModule } from '@nestjs/testing'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 describe('correlationService', () => {
 	let service: CorrelationService

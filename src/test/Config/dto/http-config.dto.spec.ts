@@ -6,6 +6,7 @@ import {
 } from '@microservice/Config/dto/http-config.dto'
 import { plainToClass } from 'class-transformer'
 import { validate } from 'class-validator'
+import { describe, expect, it } from 'vitest'
 
 describe('hTTP Config DTOs', () => {
 	describe('circuitBreakerConfigDto', () => {

@@ -1,22 +1,24 @@
+import type { MockedObject } from 'vitest'
 import { promises as fs } from 'node:fs'
 import { ConfigService } from '@microservice/Config/config.service'
 import { IntelligentEvictionService } from '@microservice/Storage/services/intelligent-eviction.service'
 import { StorageMonitoringService } from '@microservice/Storage/services/storage-monitoring.service'
 import { Test, TestingModule } from '@nestjs/testing'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock fs module
-jest.mock('node:fs', () => ({
+vi.mock('node:fs', () => ({
 	promises: {
-		unlink: jest.fn(),
+		unlink: vi.fn(),
 	},
 }))
 
-const mockFs = fs as jest.Mocked<typeof fs>
+const mockFs = fs as MockedObject<typeof fs>
 
 describe('intelligentEvictionService', () => {
 	let service: IntelligentEvictionService
-	let storageMonitoring: jest.Mocked<StorageMonitoringService>
-	let configService: jest.Mocked<ConfigService>
+	let storageMonitoring: MockedObject<StorageMonitoringService>
+	let configService: MockedObject<ConfigService>
 
 	const mockAccessPatterns = [
 		{
@@ -44,19 +46,19 @@ describe('intelligentEvictionService', () => {
 
 	beforeEach(async () => {
 		const mockStorageMonitoring = {
-			getStorageStats: jest.fn(),
-			getEvictionCandidates: jest.fn(),
-			checkThresholds: jest.fn(),
+			getStorageStats: vi.fn(),
+			getEvictionCandidates: vi.fn(),
+			checkThresholds: vi.fn(),
 		}
 
 		const mockConfigService = {
-			get: jest.fn().mockImplementation((key: string) => {
+			get: vi.fn().mockImplementation((key: string) => {
 				if (key === 'cache.file.directory')
 					return '/test/storage'
 				return undefined
 			}),
-			getOptional: jest.fn().mockImplementation((key: string, defaultValue: any) => {
-				const defaults = {
+			getOptional: vi.fn().mockImplementation((key: string, defaultValue: any) => {
+				const defaults: Record<string, any> = {
 					'storage.eviction.strategy': 'intelligent',
 					'storage.eviction.aggressiveness': 'moderate',
 					'storage.eviction.preservePopular': true,
@@ -102,7 +104,7 @@ describe('intelligentEvictionService', () => {
 	})
 
 	afterEach(() => {
-		jest.clearAllMocks()
+		vi.clearAllMocks()
 	})
 
 	describe('performEviction', () => {
@@ -242,7 +244,7 @@ describe('intelligentEvictionService', () => {
 			configService.getOptional.mockImplementation((key: string, defaultValue: any) => {
 				if (key === 'storage.eviction.strategy')
 					return 'lru'
-				const defaults = {
+				const defaults: Record<string, any> = {
 					'storage.eviction.aggressiveness': 'moderate',
 					'storage.eviction.preservePopular': true,
 					'storage.eviction.minAccessCount': 5,
@@ -276,7 +278,7 @@ describe('intelligentEvictionService', () => {
 			configService.getOptional.mockImplementation((key: string, defaultValue: any) => {
 				if (key === 'storage.eviction.strategy')
 					return 'size-based'
-				const defaults = {
+				const defaults: Record<string, any> = {
 					'storage.eviction.aggressiveness': 'moderate',
 					'storage.eviction.preservePopular': true,
 					'storage.eviction.minAccessCount': 5,
@@ -312,7 +314,7 @@ describe('intelligentEvictionService', () => {
 					return 40
 				if (key === 'storage.eviction.preservePopular')
 					return true
-				const defaults = {
+				const defaults: Record<string, any> = {
 					'storage.eviction.strategy': 'intelligent',
 					'storage.eviction.aggressiveness': 'moderate',
 					'storage.eviction.maxFileAge': 7,
@@ -333,15 +335,15 @@ describe('intelligentEvictionService', () => {
 		it('should handle unknown strategy gracefully', async () => {
 			// Create a new service instance with unknown strategy configuration
 			const unknownStrategyConfigService = {
-				get: jest.fn().mockImplementation((key: string) => {
+				get: vi.fn().mockImplementation((key: string) => {
 					if (key === 'cache.file.directory')
 						return '/test/storage'
 					return undefined
 				}),
-				getOptional: jest.fn().mockImplementation((key: string, defaultValue: any) => {
+				getOptional: vi.fn().mockImplementation((key: string, defaultValue: any) => {
 					if (key === 'storage.eviction.strategy')
 						return 'unknown-strategy'
-					const defaults = {
+					const defaults: Record<string, any> = {
 						'storage.eviction.aggressiveness': 'moderate',
 						'storage.eviction.preservePopular': true,
 						'storage.eviction.minAccessCount': 5,

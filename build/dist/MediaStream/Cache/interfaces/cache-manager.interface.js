@@ -1,3 +1,3 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+export { };
+
 //# sourceMappingURL=cache-manager.interface.js.map

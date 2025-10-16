@@ -1,17 +1,19 @@
+import type { MockedObject } from 'vitest'
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
 import { MetricType } from '@microservice/Monitoring/interfaces/monitoring.interface'
 import { MonitoringService } from '@microservice/Monitoring/services/monitoring.service'
 import { ConfigService } from '@nestjs/config'
 import { Test, TestingModule } from '@nestjs/testing'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('monitoringService', () => {
 	let service: MonitoringService
-	let configService: jest.Mocked<ConfigService>
-	let correlationService: jest.Mocked<CorrelationService>
+	let configService: MockedObject<ConfigService>
+	let correlationService: MockedObject<CorrelationService>
 
 	beforeEach(async () => {
 		const mockConfigService = {
-			get: jest.fn().mockReturnValue({
+			get: vi.fn().mockReturnValue({
 				enabled: true,
 				metricsRetentionMs: 24 * 60 * 60 * 1000,
 				alertsRetentionMs: 7 * 24 * 60 * 60 * 1000,
@@ -26,7 +28,7 @@ describe('monitoringService', () => {
 		}
 
 		const mockCorrelationService = {
-			getCorrelationId: jest.fn().mockReturnValue('test-correlation-id'),
+			getCorrelationId: vi.fn().mockReturnValue('test-correlation-id'),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({

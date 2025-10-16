@@ -1,3 +1,4 @@
+import type { MockedObject } from 'vitest'
 import { Buffer } from 'node:buffer'
 import { promises as fs } from 'node:fs'
 import { ConfigService } from '@microservice/Config/config.service'
@@ -8,24 +9,25 @@ import { StorageMonitoringService } from '@microservice/Storage/services/storage
 import { StorageOptimizationService } from '@microservice/Storage/services/storage-optimization.service'
 import { StorageModule } from '@microservice/Storage/storage.module'
 import { Test, TestingModule } from '@nestjs/testing'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock fs module for integration tests
-jest.mock('node:fs', () => ({
+vi.mock('node:fs', () => ({
 	promises: {
-		readdir: jest.fn(),
-		stat: jest.fn(),
-		unlink: jest.fn(),
-		mkdir: jest.fn(),
-		readFile: jest.fn(),
-		writeFile: jest.fn(),
-		copyFile: jest.fn(),
-		link: jest.fn(),
+		readdir: vi.fn(),
+		stat: vi.fn(),
+		unlink: vi.fn(),
+		mkdir: vi.fn(),
+		readFile: vi.fn(),
+		writeFile: vi.fn(),
+		copyFile: vi.fn(),
+		link: vi.fn(),
 	},
-	existsSync: jest.fn().mockReturnValue(true),
-	readFileSync: jest.fn().mockReturnValue(''),
+	existsSync: vi.fn().mockReturnValue(true),
+	readFileSync: vi.fn().mockReturnValue(''),
 }))
 
-const mockFs = fs as jest.Mocked<typeof fs>
+const mockFs = fs as MockedObject<typeof fs>
 
 describe('storage Management Integration', () => {
 	let module: TestingModule
@@ -46,12 +48,12 @@ describe('storage Management Integration', () => {
 
 	beforeAll(async () => {
 		const mockConfigService = {
-			get: jest.fn().mockImplementation((key: string) => {
+			get: vi.fn().mockImplementation((key: string) => {
 				if (key === 'cache.file.directory')
 					return testStorageDir
 				return undefined
 			}),
-			getOptional: jest.fn().mockImplementation((key: string, defaultValue: any) => {
+			getOptional: vi.fn().mockImplementation((key: string, defaultValue: any) => {
 				const defaults = {
 					// Storage monitoring
 					'storage.warningSize': 800 * 1024 * 1024,
@@ -108,10 +110,10 @@ describe('storage Management Integration', () => {
 	})
 
 	beforeEach(() => {
-		jest.clearAllMocks()
+		vi.clearAllMocks()
 
 		// Setup file stats with different characteristics
-		mockFs.stat.mockImplementation((filePath: string) => {
+		mockFs.stat.mockImplementation((filePath: any) => {
 			const filename = filePath.split(/[/\\]/).pop()
 			let stats: any
 
@@ -341,7 +343,7 @@ describe('storage Management Integration', () => {
 				await storageMonitoring.getStorageStats()
 			}
 			catch (error) {
-				expect(error.message).toContain('Disk full')
+				expect((error as any).message).toContain('Disk full')
 			}
 
 			// Health check should reflect the error

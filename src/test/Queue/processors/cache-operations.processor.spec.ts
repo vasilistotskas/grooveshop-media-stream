@@ -1,24 +1,27 @@
+import type { Job } from '@microservice/Queue/interfaces/job-queue.interface'
+import type { CacheCleanupJobData, CacheWarmingJobData } from '@microservice/Queue/types/job.types'
+import type { MockedObject } from 'vitest'
 import { Buffer } from 'node:buffer'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { MultiLayerCacheManager } from '@microservice/Cache/services/multi-layer-cache.manager'
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
 import { HttpClientService } from '@microservice/HTTP/services/http-client.service'
-import { Job } from '@microservice/Queue/interfaces/job-queue.interface'
 import { CacheOperationsProcessor } from '@microservice/Queue/processors/cache-operations.processor'
-import { CacheCleanupJobData, CacheWarmingJobData, JobPriority } from '@microservice/Queue/types/job.types'
+import { JobPriority } from '@microservice/Queue/types/job.types'
 import { Logger } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock fs module
-jest.mock('node:fs/promises')
-const mockFs = fs as jest.Mocked<typeof fs>
+vi.mock('node:fs/promises')
+const mockFs = fs as MockedObject<typeof fs>
 
 describe('cacheOperationsProcessor', () => {
 	let processor: CacheOperationsProcessor
-	let mockCacheManager: jest.Mocked<MultiLayerCacheManager>
-	let mockCorrelationService: jest.Mocked<CorrelationService>
-	let mockHttpClient: jest.Mocked<HttpClientService>
+	let mockCacheManager: MockedObject<MultiLayerCacheManager>
+	let mockCorrelationService: MockedObject<CorrelationService>
+	let mockHttpClient: MockedObject<HttpClientService>
 
 	const createMockWarmingJob = (data: Partial<CacheWarmingJobData>): Job<CacheWarmingJobData> => ({
 		id: 'test-job',
@@ -56,19 +59,19 @@ describe('cacheOperationsProcessor', () => {
 
 	beforeEach(async () => {
 		const mockCacheManagerFactory = {
-			get: jest.fn(),
-			set: jest.fn(),
-			getStats: jest.fn(),
+			get: vi.fn(),
+			set: vi.fn(),
+			getStats: vi.fn(),
 		}
 
 		const mockCorrelationServiceFactory = {
-			getCorrelationId: jest.fn(),
-			setCorrelationId: jest.fn(),
-			runWithContext: jest.fn((context, fn) => fn()),
+			getCorrelationId: vi.fn(),
+			setCorrelationId: vi.fn(),
+			runWithContext: vi.fn((context, fn) => fn()),
 		}
 
 		const mockHttpClientFactory = {
-			get: jest.fn(),
+			get: vi.fn(),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -95,15 +98,15 @@ describe('cacheOperationsProcessor', () => {
 		mockHttpClient = module.get(HttpClientService)
 
 		// Mock logger to avoid console output during tests
-		jest.spyOn(Logger.prototype, 'debug').mockImplementation()
-		jest.spyOn(Logger.prototype, 'log').mockImplementation()
-		jest.spyOn(Logger.prototype, 'warn').mockImplementation()
-		jest.spyOn(Logger.prototype, 'error').mockImplementation()
+		vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => {})
+		vi.spyOn(Logger.prototype, 'log').mockImplementation(() => {})
+		vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => {})
+		vi.spyOn(Logger.prototype, 'error').mockImplementation(() => {})
 	})
 
 	afterEach(() => {
-		jest.clearAllMocks()
-		jest.resetAllMocks()
+		vi.clearAllMocks()
+		vi.resetAllMocks()
 	})
 
 	describe('processCacheWarming', () => {
@@ -359,7 +362,7 @@ describe('cacheOperationsProcessor', () => {
 			)
 
 			// Override the private method to throw an error
-			jest.spyOn(processor as any, 'cleanupMemoryCache').mockImplementation(() => {
+			vi.spyOn(processor as any, 'cleanupMemoryCache').mockImplementation(() => {
 				throw new Error('Critical cache error')
 			})
 

@@ -1,11 +1,10 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-class ManipulationJobResult {
-    constructor(data) {
+let ManipulationJobResult = class ManipulationJobResult {
+    constructor(data){
         this.size = '';
         this.format = '';
         Object.assign(this, data);
     }
-}
-exports.default = ManipulationJobResult;
+};
+export { ManipulationJobResult as default };
+
 //# sourceMappingURL=manipulation-job-result.dto.js.map

@@ -1,14 +1,16 @@
+import type { MockedObject } from 'vitest'
 import { ConfigService } from '@microservice/Config/config.service'
 import { InputSanitizationService } from '@microservice/Validation/services/input-sanitization.service'
 import { Test, TestingModule } from '@nestjs/testing'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('inputSanitizationService', () => {
 	let service: InputSanitizationService
-	let configService: jest.Mocked<ConfigService>
+	let configService: MockedObject<ConfigService>
 
 	beforeEach(async () => {
 		const mockConfigService = {
-			getOptional: jest.fn(),
+			getOptional: vi.fn(),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -23,7 +25,7 @@ describe('inputSanitizationService', () => {
 
 		// Setup default config responses
 		configService.getOptional.mockImplementation((key, defaultValue) => {
-			const configs = {
+			const configs: Record<string, any> = {
 				'validation.allowedDomains': ['localhost', '127.0.0.1', 'example.com', 'test.com', 'grooveshop.com'],
 				'validation.maxFileSizes': {
 					default: 10 * 1024 * 1024,

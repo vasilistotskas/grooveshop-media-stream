@@ -1,17 +1,13 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.ResizeOptions = exports.FitOptions = exports.BackgroundOptions = exports.PositionOptions = exports.SupportedResizeFormats = void 0;
-var SupportedResizeFormats;
-(function (SupportedResizeFormats) {
+export var SupportedResizeFormats = /*#__PURE__*/ function(SupportedResizeFormats) {
     SupportedResizeFormats["webp"] = "webp";
     SupportedResizeFormats["jpeg"] = "jpeg";
     SupportedResizeFormats["png"] = "png";
     SupportedResizeFormats["gif"] = "gif";
     SupportedResizeFormats["tiff"] = "tiff";
     SupportedResizeFormats["svg"] = "svg";
-})(SupportedResizeFormats || (exports.SupportedResizeFormats = SupportedResizeFormats = {}));
-var PositionOptions;
-(function (PositionOptions) {
+    return SupportedResizeFormats;
+}({});
+export var PositionOptions = /*#__PURE__*/ function(PositionOptions) {
     PositionOptions["centre"] = "centre";
     PositionOptions["center"] = "center";
     PositionOptions["left"] = "left";
@@ -28,21 +24,22 @@ var PositionOptions;
     PositionOptions["southeast"] = "southeast";
     PositionOptions["entropy"] = "entropy";
     PositionOptions["attention"] = "attention";
-})(PositionOptions || (exports.PositionOptions = PositionOptions = {}));
-var BackgroundOptions;
-(function (BackgroundOptions) {
+    return PositionOptions;
+}({});
+export var BackgroundOptions = /*#__PURE__*/ function(BackgroundOptions) {
     BackgroundOptions["white"] = "#FFFFFF";
     BackgroundOptions["black"] = "#000000";
     BackgroundOptions["transparent"] = "transparent";
-})(BackgroundOptions || (exports.BackgroundOptions = BackgroundOptions = {}));
-var FitOptions;
-(function (FitOptions) {
+    return BackgroundOptions;
+}({});
+export var FitOptions = /*#__PURE__*/ function(FitOptions) {
     FitOptions["contain"] = "contain";
     FitOptions["cover"] = "cover";
     FitOptions["fill"] = "fill";
     FitOptions["inside"] = "inside";
     FitOptions["outside"] = "outside";
-})(FitOptions || (exports.FitOptions = FitOptions = {}));
+    return FitOptions;
+}({});
 function parseColor(color) {
     if (typeof color === 'string') {
         if (color === 'transparent') {
@@ -50,62 +47,62 @@ function parseColor(color) {
                 r: 0,
                 g: 0,
                 b: 0,
-                alpha: 0,
+                alpha: 0
             };
         }
         if (color[0] === '#') {
             color = color.slice(1);
         }
         if (color.length === 3) {
-            color = color
-                .split('')
-                .map(char => char + char)
-                .join('');
+            color = color.split('').map((char)=>char + char).join('');
         }
         const num = Number.parseInt(color, 16);
         return {
             r: num >> 16,
-            g: (num >> 8) & 255,
+            g: num >> 8 & 255,
             b: num & 255,
-            alpha: 1,
+            alpha: 1
         };
     }
     return color;
 }
-class ResizeOptions {
-    constructor(data) {
+export class ResizeOptions {
+    constructor(data){
         this.width = null;
         this.height = null;
-        this.fit = FitOptions.contain;
-        this.position = PositionOptions.entropy;
-        this.format = SupportedResizeFormats.webp;
-        this.background = BackgroundOptions.white;
+        this.fit = "contain";
+        this.position = "entropy";
+        this.format = "webp";
+        this.background = "#FFFFFF";
         this.trimThreshold = null;
         this.quality = 100;
         const { width, height, trimThreshold, background, fit, position, format, quality, ...rest } = data || {};
         this.width = width ?? null;
         this.height = height ?? null;
         this.trimThreshold = trimThreshold ? Number(trimThreshold) : null;
-        this.background = background ? parseColor(String(background)) : BackgroundOptions.white;
-        this.fit = fit ?? FitOptions.contain;
-        this.position = position ?? PositionOptions.entropy;
-        this.format = format ?? SupportedResizeFormats.webp;
+        this.background = background ? parseColor(String(background)) : "#FFFFFF";
+        this.fit = fit ?? "contain";
+        this.position = position ?? "entropy";
+        this.format = format ?? "webp";
         this.quality = quality !== undefined ? Number(quality) : 100;
         Object.assign(this, rest);
-        ['width', 'height'].forEach((sizeOption) => {
+        [
+            'width',
+            'height'
+        ].forEach((sizeOption)=>{
             if (data && data[sizeOption] === null) {
                 delete this[sizeOption];
             }
         });
     }
 }
-exports.ResizeOptions = ResizeOptions;
-class CacheImageRequest {
-    constructor(data) {
+let CacheImageRequest = class CacheImageRequest {
+    constructor(data){
         this.resourceTarget = '';
         this.resizeOptions = new ResizeOptions();
         Object.assign(this, data);
     }
-}
-exports.default = CacheImageRequest;
+};
+export { CacheImageRequest as default };
+
 //# sourceMappingURL=cache-image-request.dto.js.map

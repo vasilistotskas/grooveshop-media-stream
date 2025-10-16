@@ -11,6 +11,7 @@ import ValidateCacheImageRequestRule from '@microservice/Validation/rules/valida
 import { HttpModule } from '@nestjs/axios'
 import { ScheduleModule } from '@nestjs/schedule'
 import { Test, TestingModule } from '@nestjs/testing'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 describe('mediaStreamModule', () => {
 	let module: TestingModule

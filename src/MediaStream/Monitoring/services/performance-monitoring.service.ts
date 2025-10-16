@@ -1,7 +1,7 @@
+import type { MonitoringConfig, PerformanceMetrics } from '../interfaces/monitoring.interface'
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { MonitoringConfig, PerformanceMetrics } from '../interfaces/monitoring.interface'
 import { MonitoringService } from './monitoring.service'
 
 @Injectable()

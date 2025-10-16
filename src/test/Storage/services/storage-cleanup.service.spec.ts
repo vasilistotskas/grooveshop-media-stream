@@ -1,26 +1,28 @@
+import type { MockedObject } from 'vitest'
 import { promises as fs } from 'node:fs'
 import { ConfigService } from '@microservice/Config/config.service'
 import { IntelligentEvictionService } from '@microservice/Storage/services/intelligent-eviction.service'
 import { StorageCleanupService } from '@microservice/Storage/services/storage-cleanup.service'
 import { StorageMonitoringService } from '@microservice/Storage/services/storage-monitoring.service'
 import { Test, TestingModule } from '@nestjs/testing'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock fs module
-jest.mock('node:fs', () => ({
+vi.mock('node:fs', () => ({
 	promises: {
-		readdir: jest.fn(),
-		stat: jest.fn(),
-		unlink: jest.fn().mockResolvedValue(undefined),
+		readdir: vi.fn(),
+		stat: vi.fn(),
+		unlink: vi.fn().mockResolvedValue(undefined),
 	},
 }))
 
-const mockFs = fs as jest.Mocked<typeof fs>
+const mockFs = fs as MockedObject<typeof fs>
 
 describe('storageCleanupService', () => {
 	let service: StorageCleanupService
-	let storageMonitoring: jest.Mocked<StorageMonitoringService>
-	let intelligentEviction: jest.Mocked<IntelligentEvictionService>
-	let configService: jest.Mocked<ConfigService>
+	let storageMonitoring: MockedObject<StorageMonitoringService>
+	let intelligentEviction: MockedObject<IntelligentEvictionService>
+	let configService: MockedObject<ConfigService>
 
 	const mockFiles = [
 		'old-image.jpg',
@@ -32,21 +34,21 @@ describe('storageCleanupService', () => {
 
 	beforeEach(async () => {
 		const mockStorageMonitoring = {
-			checkThresholds: jest.fn(),
+			checkThresholds: vi.fn(),
 		}
 
 		const mockIntelligentEviction = {
-			performThresholdBasedEviction: jest.fn(),
+			performThresholdBasedEviction: vi.fn(),
 		}
 
 		const mockConfigService = {
-			get: jest.fn().mockImplementation((key: string) => {
+			get: vi.fn().mockImplementation((key: string) => {
 				if (key === 'cache.file.directory')
 					return '/test/storage'
 				return undefined
 			}),
-			getOptional: jest.fn().mockImplementation((key: string, defaultValue: any) => {
-				const defaults = {
+			getOptional: vi.fn().mockImplementation((key: string, defaultValue: any) => {
+				const defaults: Record<string, any> = {
 					'storage.cleanup.enabled': true,
 					'storage.cleanup.cronSchedule': '0 2 * * *',
 					'storage.cleanup.dryRun': false,
@@ -84,12 +86,12 @@ describe('storageCleanupService', () => {
 		mockFs.unlink.mockResolvedValue(undefined)
 
 		// Add spies to track calls
-		jest.spyOn(mockFs, 'readdir')
-		jest.spyOn(mockFs, 'stat')
-		jest.spyOn(mockFs, 'unlink')
+		vi.spyOn(mockFs, 'readdir')
+		vi.spyOn(mockFs, 'stat')
+		vi.spyOn(mockFs, 'unlink')
 
 		// Mock file stats - create old files that should be cleaned up
-		mockFs.stat.mockImplementation((filePath: string) => {
+		mockFs.stat.mockImplementation((filePath: any) => {
 			const fileName = filePath.split('/').pop() || ''
 			const size = fileName.includes('large') ? 10 * 1024 * 1024 : 1024 * 1024 // 10MB or 1MB
 
@@ -141,13 +143,13 @@ describe('storageCleanupService', () => {
 	})
 
 	afterEach(() => {
-		jest.clearAllMocks()
+		vi.clearAllMocks()
 	})
 
 	describe('performCleanup', () => {
 		beforeEach(() => {
 			// Mock file stats for different ages
-			mockFs.stat.mockImplementation((filePath: string) => {
+			mockFs.stat.mockImplementation((filePath: any) => {
 				const filename = filePath.split('/').pop()
 				let mtime: Date
 
@@ -177,7 +179,7 @@ describe('storageCleanupService', () => {
 			// Mock files that match policy patterns and are old enough
 			mockFs.readdir.mockResolvedValue(['old-cache.json', 'temp-file.tmp'] as any)
 
-			mockFs.stat.mockImplementation((filePath: string) => {
+			mockFs.stat.mockImplementation((filePath: any) => {
 				const filename = filePath.split(/[/\\]/).pop() // Handle both Unix and Windows paths
 				let ageInDays = 0
 
@@ -218,7 +220,7 @@ describe('storageCleanupService', () => {
 			// Mock files that match policy patterns and are old enough
 			mockFs.readdir.mockResolvedValue(['old-cache.json', 'temp-file.tmp'] as any)
 
-			mockFs.stat.mockImplementation((filePath: string) => {
+			mockFs.stat.mockImplementation((filePath: any) => {
 				const filename = filePath.split(/[/\\]/).pop() // Handle both Unix and Windows paths
 				let ageInDays = 0
 
@@ -311,7 +313,7 @@ describe('storageCleanupService', () => {
 
 			// Clear previous mock and set up new implementation
 			mockFs.stat.mockReset()
-			mockFs.stat.mockImplementation((filePath: string) => {
+			mockFs.stat.mockImplementation((filePath: any) => {
 				const filename = filePath.split(/[/\\]/).pop() // Handle both Unix and Windows paths
 				const isOld = filename === 'old-file.json'
 

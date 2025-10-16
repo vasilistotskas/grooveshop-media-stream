@@ -1,58 +1,48 @@
-"use strict";
-var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    else for(var i = decorators.length - 1; i >= 0; i--)if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __metadata = (this && this.__metadata) || function (k, v) {
+}
+function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.RedisCacheLayer = void 0;
-const common_1 = require("@nestjs/common");
-const redis_cache_service_1 = require("../services/redis-cache.service");
-let RedisCacheLayer = class RedisCacheLayer {
-    constructor(redisCacheService) {
-        this.redisCacheService = redisCacheService;
-        this.layerName = 'redis';
-        this.priority = 2;
-    }
+}
+import { Injectable } from "@nestjs/common";
+import { RedisCacheService } from "../services/redis-cache.service.js";
+export class RedisCacheLayer {
     async get(key) {
         try {
             return await this.redisCacheService.get(key);
-        }
-        catch {
+        } catch  {
             return null;
         }
     }
     async set(key, value, ttl) {
         try {
             await this.redisCacheService.set(key, value, ttl);
-        }
-        catch {
+        } catch  {
+        // Silently fail for Redis layer
         }
     }
     async delete(key) {
         try {
             await this.redisCacheService.delete(key);
-        }
-        catch {
+        } catch  {
+        // Silently fail for Redis layer
         }
     }
     async exists(key) {
         try {
             return await this.redisCacheService.has(key);
-        }
-        catch {
+        } catch  {
             return false;
         }
     }
     async clear() {
         try {
             await this.redisCacheService.clear();
-        }
-        catch {
+        } catch  {
+        // Silently fail for Redis layer
         }
     }
     async getStats() {
@@ -64,16 +54,15 @@ let RedisCacheLayer = class RedisCacheLayer {
                 misses: stats.misses,
                 keys: stats.keys,
                 hitRate: stats.hitRate,
-                errors: connectionStatus.stats.errors,
+                errors: connectionStatus.stats.errors
             };
-        }
-        catch {
+        } catch  {
             return {
                 hits: 0,
                 misses: 0,
                 keys: 0,
                 hitRate: 0,
-                errors: 1,
+                errors: 1
             };
         }
     }
@@ -83,10 +72,18 @@ let RedisCacheLayer = class RedisCacheLayer {
     getPriority() {
         return this.priority;
     }
-};
-exports.RedisCacheLayer = RedisCacheLayer;
-exports.RedisCacheLayer = RedisCacheLayer = __decorate([
-    (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [redis_cache_service_1.RedisCacheService])
+    constructor(redisCacheService){
+        this.redisCacheService = redisCacheService;
+        this.layerName = 'redis';
+        this.priority = 2;
+    }
+}
+RedisCacheLayer = _ts_decorate([
+    Injectable(),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof RedisCacheService === "undefined" ? Object : RedisCacheService
+    ])
 ], RedisCacheLayer);
+
 //# sourceMappingURL=redis-cache.layer.js.map

@@ -10,6 +10,7 @@ import { SystemHealthIndicator } from '@microservice/Monitoring/indicators/syste
 import { JobQueueHealthIndicator } from '@microservice/Queue/indicators/job-queue-health.indicator'
 import { StorageHealthIndicator } from '@microservice/Storage/indicators/storage-health.indicator'
 import { Test, TestingModule } from '@nestjs/testing'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 describe('health Indicators Integration', () => {
 	let module: TestingModule

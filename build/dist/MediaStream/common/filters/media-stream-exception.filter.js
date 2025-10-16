@@ -1,26 +1,18 @@
-"use strict";
-var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    else for(var i = decorators.length - 1; i >= 0; i--)if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __metadata = (this && this.__metadata) || function (k, v) {
+}
+function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-var MediaStreamExceptionFilter_1;
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.MediaStreamExceptionFilter = void 0;
-const media_stream_errors_1 = require("../errors/media-stream.errors");
-const correlation_service_1 = require("../../Correlation/services/correlation.service");
-const logger_util_1 = require("../../Correlation/utils/logger.util");
-const common_1 = require("@nestjs/common");
-const core_1 = require("@nestjs/core");
-let MediaStreamExceptionFilter = MediaStreamExceptionFilter_1 = class MediaStreamExceptionFilter {
-    constructor(httpAdapterHost, _correlationService) {
-        this.httpAdapterHost = httpAdapterHost;
-        this._correlationService = _correlationService;
-    }
+}
+import { MediaStreamError } from "../errors/media-stream.errors.js";
+import { CorrelationService } from "../../Correlation/services/correlation.service.js";
+import { CorrelatedLogger } from "../../Correlation/utils/logger.util.js";
+import { Catch, HttpException, HttpStatus } from "@nestjs/common";
+import { HttpAdapterHost } from "@nestjs/core";
+export class MediaStreamExceptionFilter {
     catch(exception, host) {
         const { httpAdapter } = this.httpAdapterHost;
         const ctx = host.switchToHttp();
@@ -28,17 +20,14 @@ let MediaStreamExceptionFilter = MediaStreamExceptionFilter_1 = class MediaStrea
         const request = ctx.getRequest();
         let status;
         let errorResponse;
-        if (exception instanceof media_stream_errors_1.MediaStreamError) {
+        if (exception instanceof MediaStreamError) {
             status = exception.status;
             errorResponse = this.formatErrorResponse(exception, request);
-            logger_util_1.CorrelatedLogger.error(`MediaStream Error: ${exception.message}`, JSON.stringify(exception.toJSON()), MediaStreamExceptionFilter_1.name);
-        }
-        else if (exception instanceof common_1.HttpException) {
+            CorrelatedLogger.error(`MediaStream Error: ${exception.message}`, JSON.stringify(exception.toJSON()), MediaStreamExceptionFilter.name);
+        } else if (exception instanceof HttpException) {
             status = exception.getStatus();
             const exceptionResponse = exception.getResponse();
-            const message = typeof exceptionResponse === 'object' && 'message' in exceptionResponse
-                ? exceptionResponse.message
-                : exception.message;
+            const message = typeof exceptionResponse === 'object' && 'message' in exceptionResponse ? exceptionResponse.message : exception.message;
             errorResponse = this.formatErrorResponse({
                 name: exception.name,
                 message,
@@ -46,13 +35,12 @@ let MediaStreamExceptionFilter = MediaStreamExceptionFilter_1 = class MediaStrea
                 code: `HTTP_${status}`,
                 context: {
                     path: request.url,
-                    method: request.method,
-                },
+                    method: request.method
+                }
             }, request);
-            logger_util_1.CorrelatedLogger.error(`HTTP Exception: ${exception.message}`, JSON.stringify(errorResponse), MediaStreamExceptionFilter_1.name);
-        }
-        else {
-            status = common_1.HttpStatus.INTERNAL_SERVER_ERROR;
+            CorrelatedLogger.error(`HTTP Exception: ${exception.message}`, JSON.stringify(errorResponse), MediaStreamExceptionFilter.name);
+        } else {
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
             errorResponse = this.formatErrorResponse({
                 name: 'InternalServerError',
                 message: 'An unexpected error occurred',
@@ -60,26 +48,28 @@ let MediaStreamExceptionFilter = MediaStreamExceptionFilter_1 = class MediaStrea
                 code: 'INTERNAL_SERVER_ERROR',
                 context: {
                     path: request.url,
-                    method: request.method,
-                },
+                    method: request.method
+                }
             }, request);
-            logger_util_1.CorrelatedLogger.error(`Unexpected Error: ${exception.message}`, exception.stack || '', MediaStreamExceptionFilter_1.name);
+            CorrelatedLogger.error(`Unexpected Error: ${exception.message}`, exception.stack || '', MediaStreamExceptionFilter.name);
         }
         httpAdapter.reply(response, errorResponse, status);
     }
-    formatErrorResponse(error, request) {
+    /**
+	 * Formats the error response with consistent structure
+	 */ formatErrorResponse(error, request) {
         const timestamp = new Date().toISOString();
         const path = request.url;
         const method = request.method;
         const correlationId = this._correlationService.getCorrelationId();
-        if (error instanceof media_stream_errors_1.MediaStreamError) {
+        if (error instanceof MediaStreamError) {
             const { stack, ...errorDetails } = error.toJSON();
             return {
                 ...errorDetails,
                 timestamp,
                 path,
                 method,
-                correlationId,
+                correlationId
             };
         }
         return {
@@ -91,14 +81,21 @@ let MediaStreamExceptionFilter = MediaStreamExceptionFilter_1 = class MediaStrea
             path,
             method,
             correlationId,
-            context: error.context || {},
+            context: error.context || {}
         };
     }
-};
-exports.MediaStreamExceptionFilter = MediaStreamExceptionFilter;
-exports.MediaStreamExceptionFilter = MediaStreamExceptionFilter = MediaStreamExceptionFilter_1 = __decorate([
-    (0, common_1.Catch)(),
-    __metadata("design:paramtypes", [core_1.HttpAdapterHost,
-        correlation_service_1.CorrelationService])
+    constructor(httpAdapterHost, _correlationService){
+        this.httpAdapterHost = httpAdapterHost;
+        this._correlationService = _correlationService;
+    }
+}
+MediaStreamExceptionFilter = _ts_decorate([
+    Catch(),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof HttpAdapterHost === "undefined" ? Object : HttpAdapterHost,
+        typeof CorrelationService === "undefined" ? Object : CorrelationService
+    ])
 ], MediaStreamExceptionFilter);
+
 //# sourceMappingURL=media-stream-exception.filter.js.map

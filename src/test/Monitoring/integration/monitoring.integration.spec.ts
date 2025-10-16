@@ -11,6 +11,7 @@ import { MonitoringService } from '@microservice/Monitoring/services/monitoring.
 import { PerformanceMonitoringService } from '@microservice/Monitoring/services/performance-monitoring.service'
 import { ConfigModule } from '@nestjs/config'
 import { Test, TestingModule } from '@nestjs/testing'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 describe('monitoring Integration', () => {
 	let app: TestingModule

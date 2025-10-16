@@ -1,24 +1,25 @@
+import type { AxiosResponse } from 'axios'
 import { ConfigService } from '@microservice/Config/config.service'
 import { HttpHealthIndicator } from '@microservice/HTTP/indicators/http-health.indicator'
 import { HttpClientService } from '@microservice/HTTP/services/http-client.service'
 import { Test, TestingModule } from '@nestjs/testing'
-import { AxiosResponse } from 'axios'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('httpHealthIndicator', () => {
 	let indicator: HttpHealthIndicator
 
 	const mockHttpClientService = {
-		getStats: jest.fn(),
-		isCircuitOpen: jest.fn(),
-		get: jest.fn(),
+		getStats: vi.fn(),
+		isCircuitOpen: vi.fn(),
+		get: vi.fn(),
 	}
 
 	const mockConfigService = {
-		getOptional: jest.fn(),
+		getOptional: vi.fn(),
 	}
 
 	beforeEach(async () => {
-		jest.clearAllMocks()
+		vi.clearAllMocks()
 
 		// Set default mock behavior
 		mockConfigService.getOptional.mockImplementation((key: string, defaultValue: any) => {
@@ -113,7 +114,7 @@ describe('httpHealthIndicator', () => {
 	describe('health Check - With URLs Configured', () => {
 		beforeEach(async () => {
 			// Reset all mocks
-			jest.clearAllMocks()
+			vi.clearAllMocks()
 
 			mockConfigService.getOptional.mockImplementation((key: string, defaultValue: any) => {
 				if (key === 'http.healthCheck.urls')

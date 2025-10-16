@@ -1,70 +1,24 @@
-"use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    else for(var i = decorators.length - 1; i >= 0; i--)if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-var __metadata = (this && this.__metadata) || function (k, v) {
+}
+function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-var ConfigService_1;
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.ConfigService = void 0;
-const common_1 = require("@nestjs/common");
-const config_1 = require("@nestjs/config");
-let ConfigService = ConfigService_1 = class ConfigService {
-    constructor(nestConfigService) {
-        this.nestConfigService = nestConfigService;
-        this._logger = new common_1.Logger(ConfigService_1.name);
-        this.hotReloadableKeys = new Set([
-            'MONITORING_ENABLED',
-            'PROCESSING_MAX_CONCURRENT',
-            'CACHE_MEMORY_TTL',
-            'CACHE_FILE_CLEANUP_INTERVAL',
-        ]);
-        this.config = this.loadAndValidateConfig();
-    }
+}
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService as NestConfigService } from "@nestjs/config";
+export class ConfigService {
     async onModuleInit() {
         this._logger.log('Configuration loaded and validated successfully');
     }
-    get(key) {
+    /**
+	 * Get a configuration value by key with type safety
+	 */ get(key) {
         const keys = key.split('.');
         let value = this.config;
-        for (const k of keys) {
+        for (const k of keys){
             value = value?.[k];
         }
         if (value === undefined) {
@@ -72,37 +26,46 @@ let ConfigService = ConfigService_1 = class ConfigService {
         }
         return value;
     }
-    getOptional(key, defaultValue) {
+    /**
+	 * Get an optional configuration value with default fallback
+	 */ getOptional(key, defaultValue) {
         try {
             return this.get(key);
-        }
-        catch {
+        } catch  {
             return defaultValue;
         }
     }
-    getAll() {
-        return { ...this.config };
+    /**
+	 * Get the entire configuration object
+	 */ getAll() {
+        return {
+            ...this.config
+        };
     }
-    async validate() {
-        const { plainToClass } = await Promise.resolve().then(() => __importStar(require('class-transformer')));
-        const { validate } = await Promise.resolve().then(() => __importStar(require('class-validator')));
-        const { AppConfigDto } = await Promise.resolve().then(() => __importStar(require('@microservice/Config/dto/app-config.dto')));
+    /**
+	 * Validate the current configuration
+	 */ async validate() {
+        const { plainToClass } = await import("class-transformer");
+        const { validate } = await import("class-validator");
+        const { AppConfigDto } = await import("./dto/app-config.dto.js");
         const rawConfig = this.createRawConfigForValidation();
         const dto = plainToClass(AppConfigDto, rawConfig, {
             enableImplicitConversion: true,
-            excludeExtraneousValues: false,
+            excludeExtraneousValues: false
         });
         const errors = await validate(dto, {
             whitelist: false,
-            forbidNonWhitelisted: false,
+            forbidNonWhitelisted: false
         });
         if (errors.length > 0) {
-            const errorMessages = errors.map(error => Object.values(error.constraints || {}).join(', ')).join('; ');
+            const errorMessages = errors.map((error)=>Object.values(error.constraints || {}).join(', ')).join('; ');
             throw new Error(`Configuration validation failed: ${errorMessages}`);
         }
         this._logger.log('Configuration validation passed');
     }
-    createRawConfigForValidation() {
+    /**
+	 * Create raw configuration object for validation
+	 */ createRawConfigForValidation() {
         return {
             server: {
                 port: this.nestConfigService.get('PORT'),
@@ -110,8 +73,8 @@ let ConfigService = ConfigService_1 = class ConfigService {
                 cors: {
                     origin: this.nestConfigService.get('CORS_ORIGIN'),
                     methods: this.nestConfigService.get('CORS_METHODS'),
-                    maxAge: this.nestConfigService.get('CORS_MAX_AGE'),
-                },
+                    maxAge: this.nestConfigService.get('CORS_MAX_AGE')
+                }
             },
             cache: {
                 memory: {
@@ -119,7 +82,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
                     defaultTtl: this.nestConfigService.get('CACHE_MEMORY_DEFAULT_TTL'),
                     checkPeriod: this.nestConfigService.get('CACHE_MEMORY_CHECK_PERIOD'),
                     maxKeys: this.nestConfigService.get('CACHE_MEMORY_MAX_KEYS'),
-                    warningThreshold: this.nestConfigService.get('CACHE_MEMORY_WARNING_THRESHOLD'),
+                    warningThreshold: this.nestConfigService.get('CACHE_MEMORY_WARNING_THRESHOLD')
                 },
                 redis: {
                     host: this.nestConfigService.get('REDIS_HOST'),
@@ -128,39 +91,39 @@ let ConfigService = ConfigService_1 = class ConfigService {
                     db: this.nestConfigService.get('REDIS_DB'),
                     ttl: this.nestConfigService.get('REDIS_TTL'),
                     maxRetries: this.nestConfigService.get('REDIS_MAX_RETRIES'),
-                    retryDelayOnFailover: this.nestConfigService.get('REDIS_RETRY_DELAY'),
+                    retryDelayOnFailover: this.nestConfigService.get('REDIS_RETRY_DELAY')
                 },
                 file: {
                     directory: this.nestConfigService.get('CACHE_FILE_DIRECTORY'),
                     maxSize: this.nestConfigService.get('CACHE_FILE_MAX_SIZE'),
-                    cleanupInterval: this.nestConfigService.get('CACHE_FILE_CLEANUP_INTERVAL'),
+                    cleanupInterval: this.nestConfigService.get('CACHE_FILE_CLEANUP_INTERVAL')
                 },
                 warming: {
                     enabled: this.nestConfigService.get('CACHE_WARMING_ENABLED'),
                     warmupOnStart: this.nestConfigService.get('CACHE_WARMING_ON_START'),
                     maxFilesToWarm: this.nestConfigService.get('CACHE_WARMING_MAX_FILES'),
                     warmupCron: this.nestConfigService.get('CACHE_WARMING_CRON'),
-                    popularImageThreshold: this.nestConfigService.get('CACHE_WARMING_THRESHOLD'),
-                },
+                    popularImageThreshold: this.nestConfigService.get('CACHE_WARMING_THRESHOLD')
+                }
             },
             processing: {
                 maxConcurrent: this.nestConfigService.get('PROCESSING_MAX_CONCURRENT'),
                 timeout: this.nestConfigService.get('PROCESSING_TIMEOUT'),
                 retries: this.nestConfigService.get('PROCESSING_RETRIES'),
                 maxFileSize: this.nestConfigService.get('PROCESSING_MAX_FILE_SIZE'),
-                allowedFormats: this.nestConfigService.get('PROCESSING_ALLOWED_FORMATS'),
+                allowedFormats: this.nestConfigService.get('PROCESSING_ALLOWED_FORMATS')
             },
             monitoring: {
                 enabled: this.nestConfigService.get('MONITORING_ENABLED'),
                 metricsPort: this.nestConfigService.get('MONITORING_METRICS_PORT'),
                 healthPath: this.nestConfigService.get('MONITORING_HEALTH_PATH'),
-                metricsPath: this.nestConfigService.get('MONITORING_METRICS_PATH'),
+                metricsPath: this.nestConfigService.get('MONITORING_METRICS_PATH')
             },
             externalServices: {
                 djangoUrl: this.nestConfigService.get('NEST_PUBLIC_DJANGO_URL'),
                 nuxtUrl: this.nestConfigService.get('NEST_PUBLIC_NUXT_URL'),
                 requestTimeout: this.nestConfigService.get('EXTERNAL_REQUEST_TIMEOUT'),
-                maxRetries: this.nestConfigService.get('EXTERNAL_MAX_RETRIES'),
+                maxRetries: this.nestConfigService.get('EXTERNAL_MAX_RETRIES')
             },
             http: {
                 timeout: this.nestConfigService.get('HTTP_TIMEOUT'),
@@ -169,45 +132,49 @@ let ConfigService = ConfigService_1 = class ConfigService {
                 circuitBreaker: {
                     enabled: this.nestConfigService.get('HTTP_CIRCUIT_BREAKER_ENABLED'),
                     failureThreshold: this.nestConfigService.get('HTTP_CIRCUIT_BREAKER_FAILURE_THRESHOLD'),
-                    resetTimeout: this.nestConfigService.get('HTTP_CIRCUIT_BREAKER_RESET_TIMEOUT'),
+                    resetTimeout: this.nestConfigService.get('HTTP_CIRCUIT_BREAKER_RESET_TIMEOUT')
                 },
                 healthCheck: {
                     enabled: this.nestConfigService.get('HTTP_HEALTH_CHECK_ENABLED'),
                     urls: this.nestConfigService.get('HTTP_HEALTH_CHECK_URLS'),
-                    timeout: this.nestConfigService.get('HTTP_HEALTH_CHECK_TIMEOUT'),
-                },
+                    timeout: this.nestConfigService.get('HTTP_HEALTH_CHECK_TIMEOUT')
+                }
             },
             rateLimit: {
                 enabled: this.nestConfigService.get('RATE_LIMIT_ENABLED'),
                 default: {
                     windowMs: this.nestConfigService.get('RATE_LIMIT_DEFAULT_WINDOW_MS'),
-                    max: this.nestConfigService.get('RATE_LIMIT_DEFAULT_MAX'),
+                    max: this.nestConfigService.get('RATE_LIMIT_DEFAULT_MAX')
                 },
                 imageProcessing: {
                     windowMs: this.nestConfigService.get('RATE_LIMIT_IMAGE_PROCESSING_WINDOW_MS'),
-                    max: this.nestConfigService.get('RATE_LIMIT_IMAGE_PROCESSING_MAX'),
+                    max: this.nestConfigService.get('RATE_LIMIT_IMAGE_PROCESSING_MAX')
                 },
                 healthCheck: {
                     windowMs: this.nestConfigService.get('RATE_LIMIT_HEALTH_CHECK_WINDOW_MS'),
-                    max: this.nestConfigService.get('RATE_LIMIT_HEALTH_CHECK_MAX'),
+                    max: this.nestConfigService.get('RATE_LIMIT_HEALTH_CHECK_MAX')
                 },
                 bypass: {
                     healthChecks: this.nestConfigService.get('RATE_LIMIT_BYPASS_HEALTH_CHECKS'),
                     metricsEndpoint: this.nestConfigService.get('RATE_LIMIT_BYPASS_METRICS_ENDPOINT'),
                     staticAssets: this.nestConfigService.get('RATE_LIMIT_BYPASS_STATIC_ASSETS'),
                     whitelistedDomains: this.nestConfigService.get('RATE_LIMIT_BYPASS_WHITELISTED_DOMAINS'),
-                    bots: this.nestConfigService.get('RATE_LIMIT_BYPASS_BOTS'),
-                },
-            },
+                    bots: this.nestConfigService.get('RATE_LIMIT_BYPASS_BOTS')
+                }
+            }
         };
     }
-    async reload() {
+    /**
+	 * Reload configuration for hot-reloadable settings
+	 */ async reload() {
         this._logger.log('Reloading hot-reloadable configuration...');
         const newConfig = this.loadConfig();
         this.updateHotReloadableSettings(newConfig);
         this._logger.log('Hot-reloadable configuration updated successfully');
     }
-    isHotReloadable(key) {
+    /**
+	 * Check if a configuration key supports hot-reload
+	 */ isHotReloadable(key) {
         return this.hotReloadableKeys.has(key);
     }
     loadAndValidateConfig() {
@@ -235,13 +202,9 @@ let ConfigService = ConfigService_1 = class ConfigService {
         const fileMaxSize = Number.parseInt(this.nestConfigService.get('CACHE_FILE_MAX_SIZE') || '1073741824');
         const fileCleanupInterval = Number.parseInt(this.nestConfigService.get('CACHE_FILE_CLEANUP_INTERVAL') || '3600');
         const warmingEnabledStr = this.nestConfigService.get('CACHE_WARMING_ENABLED') || 'true';
-        const warmingEnabled = typeof warmingEnabledStr === 'string'
-            ? warmingEnabledStr.toLowerCase() === 'true'
-            : warmingEnabledStr;
+        const warmingEnabled = typeof warmingEnabledStr === 'string' ? warmingEnabledStr.toLowerCase() === 'true' : warmingEnabledStr;
         const warmingOnStartStr = this.nestConfigService.get('CACHE_WARMING_ON_START') || 'true';
-        const warmingOnStart = typeof warmingOnStartStr === 'string'
-            ? warmingOnStartStr.toLowerCase() === 'true'
-            : warmingOnStartStr;
+        const warmingOnStart = typeof warmingOnStartStr === 'string' ? warmingOnStartStr.toLowerCase() === 'true' : warmingOnStartStr;
         const warmingMaxFiles = Number.parseInt(this.nestConfigService.get('CACHE_WARMING_MAX_FILES') || '50');
         const warmingCron = this.nestConfigService.get('CACHE_WARMING_CRON') || '0 */6 * * *';
         const warmingThreshold = Number.parseInt(this.nestConfigService.get('CACHE_WARMING_THRESHOLD') || '5');
@@ -250,13 +213,9 @@ let ConfigService = ConfigService_1 = class ConfigService {
         const processingRetries = Number.parseInt(this.nestConfigService.get('PROCESSING_RETRIES') || '3');
         const processingMaxFileSize = Number.parseInt(this.nestConfigService.get('PROCESSING_MAX_FILE_SIZE') || '10485760');
         const allowedFormatsStr = this.nestConfigService.get('PROCESSING_ALLOWED_FORMATS') || 'jpg,jpeg,png,webp,gif,svg';
-        const allowedFormats = typeof allowedFormatsStr === 'string'
-            ? allowedFormatsStr.split(',').map(format => format.trim().toLowerCase())
-            : allowedFormatsStr;
+        const allowedFormats = typeof allowedFormatsStr === 'string' ? allowedFormatsStr.split(',').map((format)=>format.trim().toLowerCase()) : allowedFormatsStr;
         const monitoringEnabledStr = this.nestConfigService.get('MONITORING_ENABLED') || 'true';
-        const monitoringEnabled = typeof monitoringEnabledStr === 'string'
-            ? monitoringEnabledStr.toLowerCase() === 'true'
-            : monitoringEnabledStr;
+        const monitoringEnabled = typeof monitoringEnabledStr === 'string' ? monitoringEnabledStr.toLowerCase() === 'true' : monitoringEnabledStr;
         const monitoringMetricsPort = Number.parseInt(this.nestConfigService.get('MONITORING_METRICS_PORT') || '9090');
         const monitoringHealthPath = this.nestConfigService.get('MONITORING_HEALTH_PATH') || '/health';
         const monitoringMetricsPath = this.nestConfigService.get('MONITORING_METRICS_PATH') || '/metrics';
@@ -265,9 +224,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
         const externalRequestTimeout = Number.parseInt(this.nestConfigService.get('EXTERNAL_REQUEST_TIMEOUT') || '30000');
         const externalMaxRetries = Number.parseInt(this.nestConfigService.get('EXTERNAL_MAX_RETRIES') || '3');
         const rateLimitEnabledStr = this.nestConfigService.get('RATE_LIMIT_ENABLED') || 'true';
-        const rateLimitEnabled = typeof rateLimitEnabledStr === 'string'
-            ? rateLimitEnabledStr.toLowerCase() === 'true'
-            : rateLimitEnabledStr;
+        const rateLimitEnabled = typeof rateLimitEnabledStr === 'string' ? rateLimitEnabledStr.toLowerCase() === 'true' : rateLimitEnabledStr;
         const rateLimitDefaultWindowMs = Number.parseInt(this.nestConfigService.get('RATE_LIMIT_DEFAULT_WINDOW_MS') || '60000');
         const rateLimitDefaultMax = Number.parseInt(this.nestConfigService.get('RATE_LIMIT_DEFAULT_MAX') || '100');
         const rateLimitImageProcessingWindowMs = Number.parseInt(this.nestConfigService.get('RATE_LIMIT_IMAGE_PROCESSING_WINDOW_MS') || '60000');
@@ -275,22 +232,14 @@ let ConfigService = ConfigService_1 = class ConfigService {
         const rateLimitHealthCheckWindowMs = Number.parseInt(this.nestConfigService.get('RATE_LIMIT_HEALTH_CHECK_WINDOW_MS') || '10000');
         const rateLimitHealthCheckMax = Number.parseInt(this.nestConfigService.get('RATE_LIMIT_HEALTH_CHECK_MAX') || '1000');
         const rateLimitBypassHealthChecksStr = this.nestConfigService.get('RATE_LIMIT_BYPASS_HEALTH_CHECKS') || 'true';
-        const rateLimitBypassHealthChecks = typeof rateLimitBypassHealthChecksStr === 'string'
-            ? rateLimitBypassHealthChecksStr.toLowerCase() === 'true'
-            : rateLimitBypassHealthChecksStr;
+        const rateLimitBypassHealthChecks = typeof rateLimitBypassHealthChecksStr === 'string' ? rateLimitBypassHealthChecksStr.toLowerCase() === 'true' : rateLimitBypassHealthChecksStr;
         const rateLimitBypassMetricsEndpointStr = this.nestConfigService.get('RATE_LIMIT_BYPASS_METRICS_ENDPOINT') || 'true';
-        const rateLimitBypassMetricsEndpoint = typeof rateLimitBypassMetricsEndpointStr === 'string'
-            ? rateLimitBypassMetricsEndpointStr.toLowerCase() === 'true'
-            : rateLimitBypassMetricsEndpointStr;
+        const rateLimitBypassMetricsEndpoint = typeof rateLimitBypassMetricsEndpointStr === 'string' ? rateLimitBypassMetricsEndpointStr.toLowerCase() === 'true' : rateLimitBypassMetricsEndpointStr;
         const rateLimitBypassStaticAssetsStr = this.nestConfigService.get('RATE_LIMIT_BYPASS_STATIC_ASSETS') || 'true';
-        const rateLimitBypassStaticAssets = typeof rateLimitBypassStaticAssetsStr === 'string'
-            ? rateLimitBypassStaticAssetsStr.toLowerCase() === 'true'
-            : rateLimitBypassStaticAssetsStr;
+        const rateLimitBypassStaticAssets = typeof rateLimitBypassStaticAssetsStr === 'string' ? rateLimitBypassStaticAssetsStr.toLowerCase() === 'true' : rateLimitBypassStaticAssetsStr;
         const rateLimitBypassWhitelistedDomains = this.nestConfigService.get('RATE_LIMIT_BYPASS_WHITELISTED_DOMAINS') || '';
         const rateLimitBypassBotsStr = this.nestConfigService.get('RATE_LIMIT_BYPASS_BOTS') || 'true';
-        const rateLimitBypassBots = typeof rateLimitBypassBotsStr === 'string'
-            ? rateLimitBypassBotsStr.toLowerCase() === 'true'
-            : rateLimitBypassBotsStr;
+        const rateLimitBypassBots = typeof rateLimitBypassBotsStr === 'string' ? rateLimitBypassBotsStr.toLowerCase() === 'true' : rateLimitBypassBotsStr;
         return {
             server: {
                 port: serverPort,
@@ -298,8 +247,8 @@ let ConfigService = ConfigService_1 = class ConfigService {
                 cors: {
                     origin: corsOrigin,
                     methods: corsMethods,
-                    maxAge: corsMaxAge,
-                },
+                    maxAge: corsMaxAge
+                }
             },
             cache: {
                 memory: {
@@ -307,7 +256,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
                     defaultTtl: memoryDefaultTtl,
                     checkPeriod: memoryCheckPeriod,
                     maxKeys: memoryMaxKeys,
-                    warningThreshold: memoryWarningThreshold,
+                    warningThreshold: memoryWarningThreshold
                 },
                 redis: {
                     host: redisHost,
@@ -316,62 +265,62 @@ let ConfigService = ConfigService_1 = class ConfigService {
                     db: redisDb,
                     ttl: redisTtl,
                     maxRetries: redisMaxRetries,
-                    retryDelayOnFailover: redisRetryDelay,
+                    retryDelayOnFailover: redisRetryDelay
                 },
                 file: {
                     directory: fileDirectory,
                     maxSize: fileMaxSize,
-                    cleanupInterval: fileCleanupInterval,
+                    cleanupInterval: fileCleanupInterval
                 },
                 warming: {
                     enabled: warmingEnabled,
                     warmupOnStart: warmingOnStart,
                     maxFilesToWarm: warmingMaxFiles,
                     warmupCron: warmingCron,
-                    popularImageThreshold: warmingThreshold,
-                },
+                    popularImageThreshold: warmingThreshold
+                }
             },
             processing: {
                 maxConcurrent: processingMaxConcurrent,
                 timeout: processingTimeout,
                 retries: processingRetries,
                 maxFileSize: processingMaxFileSize,
-                allowedFormats,
+                allowedFormats
             },
             monitoring: {
                 enabled: monitoringEnabled,
                 metricsPort: monitoringMetricsPort,
                 healthPath: monitoringHealthPath,
-                metricsPath: monitoringMetricsPath,
+                metricsPath: monitoringMetricsPath
             },
             externalServices: {
                 djangoUrl,
                 nuxtUrl,
                 requestTimeout: externalRequestTimeout,
-                maxRetries: externalMaxRetries,
+                maxRetries: externalMaxRetries
             },
             rateLimit: {
                 enabled: rateLimitEnabled,
                 default: {
                     windowMs: rateLimitDefaultWindowMs,
-                    max: rateLimitDefaultMax,
+                    max: rateLimitDefaultMax
                 },
                 imageProcessing: {
                     windowMs: rateLimitImageProcessingWindowMs,
-                    max: rateLimitImageProcessingMax,
+                    max: rateLimitImageProcessingMax
                 },
                 healthCheck: {
                     windowMs: rateLimitHealthCheckWindowMs,
-                    max: rateLimitHealthCheckMax,
+                    max: rateLimitHealthCheckMax
                 },
                 bypass: {
                     healthChecks: rateLimitBypassHealthChecks,
                     metricsEndpoint: rateLimitBypassMetricsEndpoint,
                     staticAssets: rateLimitBypassStaticAssets,
                     whitelistedDomains: rateLimitBypassWhitelistedDomains,
-                    bots: rateLimitBypassBots,
-                },
-            },
+                    bots: rateLimitBypassBots
+                }
+            }
         };
     }
     updateHotReloadableSettings(newConfig) {
@@ -388,10 +337,24 @@ let ConfigService = ConfigService_1 = class ConfigService {
             this.config.cache.file.cleanupInterval = newConfig.cache.file.cleanupInterval;
         }
     }
-};
-exports.ConfigService = ConfigService;
-exports.ConfigService = ConfigService = ConfigService_1 = __decorate([
-    (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [config_1.ConfigService])
+    constructor(nestConfigService){
+        this.nestConfigService = nestConfigService;
+        this._logger = new Logger(ConfigService.name);
+        this.hotReloadableKeys = new Set([
+            'MONITORING_ENABLED',
+            'PROCESSING_MAX_CONCURRENT',
+            'CACHE_MEMORY_TTL',
+            'CACHE_FILE_CLEANUP_INTERVAL'
+        ]);
+        this.config = this.loadAndValidateConfig();
+    }
+}
+ConfigService = _ts_decorate([
+    Injectable(),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof NestConfigService === "undefined" ? Object : NestConfigService
+    ])
 ], ConfigService);
+
 //# sourceMappingURL=config.service.js.map

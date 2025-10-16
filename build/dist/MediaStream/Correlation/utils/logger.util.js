@@ -1,14 +1,11 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.CorrelatedLogger = void 0;
-const correlation_service_1 = require("../services/correlation.service");
-class CorrelatedLogger {
+import { CorrelationService } from "../services/correlation.service.js";
+export class CorrelatedLogger {
     static setCorrelationService(service) {
         this._correlationService = service;
     }
     static getCorrelationService() {
         if (!this._correlationService) {
-            this._correlationService = new correlation_service_1.CorrelationService();
+            this._correlationService = new CorrelationService();
         }
         return this._correlationService;
     }
@@ -46,6 +43,6 @@ class CorrelatedLogger {
         console.log(`${prefix}${contextStr} VERBOSE: ${message}`);
     }
 }
-exports.CorrelatedLogger = CorrelatedLogger;
 CorrelatedLogger._correlationService = null;
+
 //# sourceMappingURL=logger.util.js.map

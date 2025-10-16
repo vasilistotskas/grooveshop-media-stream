@@ -1,15 +1,17 @@
+import type { MockedObject } from 'vitest'
 import { ConfigService } from '@microservice/Config/config.service'
 import { DiskSpaceHealthIndicator } from '@microservice/Health/indicators/disk-space-health.indicator'
 import { Test, TestingModule } from '@nestjs/testing'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import 'reflect-metadata'
 
 describe('diskSpaceHealthIndicator', () => {
 	let indicator: DiskSpaceHealthIndicator
-	let configService: jest.Mocked<ConfigService>
+	let configService: MockedObject<ConfigService>
 
 	beforeEach(async () => {
 		const mockConfigService = {
-			get: jest.fn((key: string) => {
+			get: vi.fn((key: string) => {
 				if (key === 'cache.file.directory')
 					return './test-storage'
 				return undefined
@@ -38,7 +40,7 @@ describe('diskSpaceHealthIndicator', () => {
 
 		it('should return healthy status when disk space is sufficient', async () => {
 			// Mock getDiskSpaceInfo to return healthy values
-			jest.spyOn(indicator as any, 'getDiskSpaceInfo').mockResolvedValue({
+			vi.spyOn(indicator as any, 'getDiskSpaceInfo').mockResolvedValue({
 				total: 1000,
 				free: 500,
 				used: 500,
@@ -54,7 +56,7 @@ describe('diskSpaceHealthIndicator', () => {
 		})
 
 		it('should return warning status when disk usage is above warning threshold', async () => {
-			jest.spyOn(indicator as any, 'getDiskSpaceInfo').mockResolvedValue({
+			vi.spyOn(indicator as any, 'getDiskSpaceInfo').mockResolvedValue({
 				total: 1000,
 				free: 150,
 				used: 850,
@@ -70,7 +72,7 @@ describe('diskSpaceHealthIndicator', () => {
 		})
 
 		it('should return unhealthy status when disk usage is critical', async () => {
-			jest.spyOn(indicator as any, 'getDiskSpaceInfo').mockResolvedValue({
+			vi.spyOn(indicator as any, 'getDiskSpaceInfo').mockResolvedValue({
 				total: 1000,
 				free: 50,
 				used: 950,
@@ -87,7 +89,7 @@ describe('diskSpaceHealthIndicator', () => {
 		})
 
 		it('should handle errors gracefully', async () => {
-			jest.spyOn(indicator as any, 'getDiskSpaceInfo').mockRejectedValue(new Error('Disk access error'))
+			vi.spyOn(indicator as any, 'getDiskSpaceInfo').mockRejectedValue(new Error('Disk access error'))
 
 			const result = await indicator.isHealthy()
 
@@ -97,7 +99,7 @@ describe('diskSpaceHealthIndicator', () => {
 		})
 
 		it('should timeout if check takes too long', async () => {
-			jest.spyOn(indicator as any, 'getDiskSpaceInfo').mockImplementation(() =>
+			vi.spyOn(indicator as any, 'getDiskSpaceInfo').mockImplementation(() =>
 				new Promise(resolve => setTimeout(resolve, 5000)), // 5 second delay
 			)
 
@@ -123,7 +125,7 @@ describe('diskSpaceHealthIndicator', () => {
 
 	describe('getCurrentDiskInfo', () => {
 		it('should return current disk information', async () => {
-			jest.spyOn(indicator as any, 'getDiskSpaceInfo').mockResolvedValue({
+			vi.spyOn(indicator as any, 'getDiskSpaceInfo').mockResolvedValue({
 				total: 1000,
 				free: 500,
 				used: 500,

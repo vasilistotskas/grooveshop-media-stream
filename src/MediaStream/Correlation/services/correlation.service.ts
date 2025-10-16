@@ -1,7 +1,7 @@
+import type { CorrelationService as ICorrelationService, RequestContext } from '../interfaces/correlation.interface'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { randomUUID } from 'node:crypto'
 import { Injectable } from '@nestjs/common'
-import { CorrelationService as ICorrelationService, RequestContext } from '../interfaces/correlation.interface'
 
 @Injectable()
 export class CorrelationService implements ICorrelationService {

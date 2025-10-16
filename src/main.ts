@@ -59,9 +59,15 @@ export async function bootstrap(exitProcess = true): Promise<void> {
 	}
 }
 
-if (require.main === module) {
-	bootstrap(true).catch((error: unknown) => {
-		console.error('Unhandled error during bootstrap:', error)
-		process.exit(1)
-	})
+// Only run bootstrap if not in test environment
+if (process.env.NODE_ENV !== 'test') {
+	void (async () => {
+		try {
+			await bootstrap(true)
+		}
+		catch (error) {
+			console.error('Unhandled error during bootstrap:', error)
+			process.exit(1)
+		}
+	})()
 }

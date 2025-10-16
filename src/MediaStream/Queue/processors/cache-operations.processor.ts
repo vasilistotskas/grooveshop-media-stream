@@ -1,3 +1,5 @@
+import type { Job } from '../interfaces/job-queue.interface'
+import type { CacheCleanupJobData, CacheWarmingJobData, JobResult } from '../types/job.types'
 import { Buffer } from 'node:buffer'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
@@ -6,8 +8,6 @@ import { MultiLayerCacheManager } from '@microservice/Cache/services/multi-layer
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
 import { HttpClientService } from '@microservice/HTTP/services/http-client.service'
 import { Injectable, Logger } from '@nestjs/common'
-import { Job } from '../interfaces/job-queue.interface'
-import { CacheCleanupJobData, CacheWarmingJobData, JobResult } from '../types/job.types'
 
 @Injectable()
 export class CacheOperationsProcessor {

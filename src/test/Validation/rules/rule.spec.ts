@@ -2,6 +2,7 @@ import CacheImageRequest, { ResizeOptions } from '@microservice/API/dto/cache-im
 import RequestedResizeTargetTooLargeException from '@microservice/API/exceptions/requested-resize-target-too-large.exception'
 import ValidateCacheImageRequestResizeTargetRule from '@microservice/Validation/rules/validate-cache-image-request-resize-target.rule'
 import ValidateCacheImageRequestRule from '@microservice/Validation/rules/validate-cache-image-request.rule'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('validateCacheImageRequestResizeTargetRule', () => {
 	let rule: ValidateCacheImageRequestResizeTargetRule
@@ -60,7 +61,7 @@ describe('validateCacheImageRequestRule', () => {
 			}),
 		})
 
-		const setupSpy = jest.spyOn(validateCacheImageRequestResizeTargetRule, 'setup')
+		const setupSpy = vi.spyOn(validateCacheImageRequestResizeTargetRule, 'setup')
 
 		await rule.setup(mockRequest)
 
@@ -75,7 +76,7 @@ describe('validateCacheImageRequestRule', () => {
 			}),
 		})
 
-		const applySpy = jest.spyOn(validateCacheImageRequestResizeTargetRule, 'apply').mockResolvedValue(undefined)
+		const applySpy = vi.spyOn(validateCacheImageRequestResizeTargetRule, 'apply').mockResolvedValue(undefined)
 
 		await rule.setup(mockRequest)
 		await expect(rule.apply()).resolves.not.toThrow()
@@ -90,7 +91,7 @@ describe('validateCacheImageRequestRule', () => {
 			}),
 		})
 
-		jest.spyOn(validateCacheImageRequestResizeTargetRule, 'apply').mockRejectedValue(new Error('Resize error'))
+		vi.spyOn(validateCacheImageRequestResizeTargetRule, 'apply').mockRejectedValue(new Error('Resize error'))
 
 		await rule.setup(mockRequest)
 		await expect(rule.apply()).rejects.toThrow('Resize error')

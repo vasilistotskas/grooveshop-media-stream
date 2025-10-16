@@ -1,22 +1,24 @@
+import type { Request, Response } from 'express'
+import type { Mock, MockedObject } from 'vitest'
 import { MetricsMiddleware } from '@microservice/Metrics/middleware/metrics.middleware'
 import { MetricsService } from '@microservice/Metrics/services/metrics.service'
 import { Test, TestingModule } from '@nestjs/testing'
-import { Request, Response } from 'express'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import 'reflect-metadata'
 
 describe('metricsMiddleware', () => {
 	let middleware: MetricsMiddleware
-	let metricsService: jest.Mocked<MetricsService>
+	let metricsService: MockedObject<MetricsService>
 	let mockRequest: Partial<Request>
 	let mockResponse: Partial<Response>
-	let nextFunction: jest.Mock
+	let nextFunction: Mock
 
 	beforeEach(async () => {
 		const mockMetricsService = {
-			incrementRequestsInFlight: jest.fn(),
-			decrementRequestsInFlight: jest.fn(),
-			recordHttpRequest: jest.fn(),
-			recordError: jest.fn(),
+			incrementRequestsInFlight: vi.fn(),
+			decrementRequestsInFlight: vi.fn(),
+			recordHttpRequest: vi.fn(),
+			recordError: vi.fn(),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -39,7 +41,7 @@ describe('metricsMiddleware', () => {
 				'content-type': 'application/json',
 				'user-agent': 'test-agent',
 			},
-			get: jest.fn((header: string) => {
+			get: vi.fn((header: string) => {
 				if (header === 'content-length')
 					return '100'
 				if (header === 'set-cookie')
@@ -50,18 +52,18 @@ describe('metricsMiddleware', () => {
 
 		mockResponse = {
 			statusCode: 200,
-			end: jest.fn(),
-			on: jest.fn().mockReturnValue({} as any),
+			end: vi.fn(),
+			on: vi.fn().mockReturnValue({} as any),
 		}
 
-		nextFunction = jest.fn()
+		nextFunction = vi.fn()
 	})
 
 	describe('use', () => {
-		it('should track request metrics on successful request', (done) => {
-			const finishCallback = jest.fn()
+		it('should track request metrics on successful request', async () => {
+			const finishCallback = vi.fn()
 
-			mockResponse.on = jest.fn((event: string, callback: (...args: any[]) => any) => {
+			mockResponse.on = vi.fn((event: string, callback: (...args: any[]) => any) => {
 				if (event === 'finish') {
 					finishCallback.mockImplementation(callback)
 				}
@@ -74,24 +76,22 @@ describe('metricsMiddleware', () => {
 			expect(nextFunction).toHaveBeenCalledTimes(1)
 
 			// Simulate response finish
-			setTimeout(() => {
-				finishCallback()
+			await new Promise(resolve => setTimeout(resolve, 10))
+			finishCallback()
 
-				expect(metricsService.recordHttpRequest).toHaveBeenCalledWith(
-					'GET',
-					'/test',
-					200,
-					expect.any(Number),
-					100,
-					0,
-				)
-				expect(metricsService.decrementRequestsInFlight).toHaveBeenCalledTimes(1)
-				done()
-			}, 10)
+			expect(metricsService.recordHttpRequest).toHaveBeenCalledWith(
+				'GET',
+				'/test',
+				200,
+				expect.any(Number),
+				100,
+				0,
+			)
+			expect(metricsService.decrementRequestsInFlight).toHaveBeenCalledTimes(1)
 		})
 
 		it('should handle request without content-length header', () => {
-			mockRequest.get = jest.fn(() => undefined)
+			mockRequest.get = vi.fn(() => undefined)
 
 			middleware.use(mockRequest as Request, mockResponse as Response, nextFunction)
 

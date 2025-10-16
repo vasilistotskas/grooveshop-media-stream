@@ -1,3 +1,4 @@
+import type { MockedObject } from 'vitest'
 import CacheImageRequest, { ResizeOptions, SupportedResizeFormats } from '@microservice/API/dto/cache-image-request.dto'
 import { ConfigService } from '@microservice/Config/config.service'
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
@@ -5,32 +6,33 @@ import { InputSanitizationService } from '@microservice/Validation/services/inpu
 import { SecurityCheckerService } from '@microservice/Validation/services/security-checker.service'
 import { SimpleValidationService } from '@microservice/Validation/services/simple-validation.service'
 import { Test, TestingModule } from '@nestjs/testing'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('simpleValidationService', () => {
 	let service: SimpleValidationService
-	let sanitizationService: jest.Mocked<InputSanitizationService>
-	let securityChecker: jest.Mocked<SecurityCheckerService>
+	let sanitizationService: MockedObject<InputSanitizationService>
+	let securityChecker: MockedObject<SecurityCheckerService>
 
 	beforeEach(async () => {
 		const mockConfigService = {
-			getOptional: jest.fn(),
+			getOptional: vi.fn(),
 		}
 
 		const mockCorrelationService = {
-			getCorrelationId: jest.fn().mockReturnValue('test-correlation-id'),
-			getClientIp: jest.fn().mockReturnValue('127.0.0.1'),
-			getUserAgent: jest.fn().mockReturnValue('test-agent'),
+			getCorrelationId: vi.fn().mockReturnValue('test-correlation-id'),
+			getClientIp: vi.fn().mockReturnValue('127.0.0.1'),
+			getUserAgent: vi.fn().mockReturnValue('test-agent'),
 		}
 
 		const mockSanitizationService = {
-			sanitize: jest.fn(),
-			validateUrl: jest.fn(),
-			validateImageDimensions: jest.fn(),
+			sanitize: vi.fn(),
+			validateUrl: vi.fn(),
+			validateImageDimensions: vi.fn(),
 		}
 
 		const mockSecurityChecker = {
-			checkForMaliciousContent: jest.fn(),
-			logSecurityEvent: jest.fn(),
+			checkForMaliciousContent: vi.fn(),
+			logSecurityEvent: vi.fn(),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({

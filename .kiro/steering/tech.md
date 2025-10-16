@@ -19,7 +19,7 @@
 
 ## Development Tools
 - **ESLint**: Antfu config with tab indentation and single quotes
-- **Jest**: Testing framework with ts-jest transformer
+- **Vite**: Testing framework with vitest
 - **SWC**: Fast TypeScript/JavaScript compiler
 - **Semantic Release**: Automated versioning and publishing
 

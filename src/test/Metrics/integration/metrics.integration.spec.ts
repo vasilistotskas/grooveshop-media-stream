@@ -1,9 +1,10 @@
+import type { INestApplication } from '@nestjs/common'
 import { ConfigModule } from '@microservice/Config/config.module'
 import { MetricsModule } from '@microservice/Metrics/metrics.module'
 import { MetricsService } from '@microservice/Metrics/services/metrics.service'
-import { INestApplication } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import request from 'supertest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import 'reflect-metadata'
 
 describe('metrics Integration', () => {

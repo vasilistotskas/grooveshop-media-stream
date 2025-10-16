@@ -1,9 +1,8 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-class RequestedResizeTargetTooLargeException extends Error {
-    constructor(resizeRequest, allowedPixelCount) {
+let RequestedResizeTargetTooLargeException = class RequestedResizeTargetTooLargeException extends Error {
+    constructor(resizeRequest, allowedPixelCount){
         super(`Requested resize target (${resizeRequest.width}x${resizeRequest.height}) exceeded maximum allowed size of ${allowedPixelCount} total pixels`);
     }
-}
-exports.default = RequestedResizeTargetTooLargeException;
+};
+export { RequestedResizeTargetTooLargeException as default };
+
 //# sourceMappingURL=requested-resize-target-too-large.exception.js.map

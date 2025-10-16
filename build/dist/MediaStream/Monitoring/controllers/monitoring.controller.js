@@ -1,227 +1,283 @@
-"use strict";
-var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    else for(var i = decorators.length - 1; i >= 0; i--)if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __metadata = (this && this.__metadata) || function (k, v) {
+}
+function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-var __param = (this && this.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.MonitoringController = void 0;
-const common_1 = require("@nestjs/common");
-const alert_service_1 = require("../services/alert.service");
-const monitoring_service_1 = require("../services/monitoring.service");
-const performance_monitoring_service_1 = require("../services/performance-monitoring.service");
-let MonitoringController = class MonitoringController {
-    constructor(monitoringService, alertService, performanceService) {
-        this.monitoringService = monitoringService;
-        this.alertService = alertService;
-        this.performanceService = performanceService;
-    }
-    async getSystemHealth() {
+}
+function _ts_param(paramIndex, decorator) {
+    return function(target, key) {
+        decorator(target, key, paramIndex);
+    };
+}
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from "@nestjs/common";
+import { AlertService } from "../services/alert.service.js";
+import { MonitoringService } from "../services/monitoring.service.js";
+import { PerformanceMonitoringService } from "../services/performance-monitoring.service.js";
+export class MonitoringController {
+    /**
+	 * Get system health overview
+	 */ async getSystemHealth() {
         return await this.monitoringService.getSystemHealth();
     }
-    async getDashboard(since) {
+    /**
+	 * Get monitoring dashboard data
+	 */ async getDashboard(since) {
         const sinceTimestamp = since ? Number.parseInt(since) : Date.now() - 24 * 60 * 60 * 1000;
         const [systemHealth, alertStats, performanceOverview, monitoringStats] = await Promise.all([
             this.monitoringService.getSystemHealth(),
             this.alertService.getAlertStats(),
             this.performanceService.getPerformanceOverview(sinceTimestamp),
-            this.monitoringService.getStats(),
+            this.monitoringService.getStats()
         ]);
         return {
             timestamp: Date.now(),
             systemHealth,
             alerts: {
                 ...alertStats,
-                activeAlerts: this.alertService.getActiveAlerts(),
+                activeAlerts: this.alertService.getActiveAlerts()
             },
             performance: performanceOverview,
-            monitoring: monitoringStats,
+            monitoring: monitoringStats
         };
     }
-    getMetrics(name, since, aggregated) {
+    /**
+	 * Get metrics by name
+	 */ getMetrics(name, since, aggregated) {
         const sinceTimestamp = since ? Number.parseInt(since) : undefined;
         if (aggregated === 'true' && sinceTimestamp !== undefined) {
             return this.monitoringService.getAggregatedMetrics(name, sinceTimestamp);
         }
         return {
             name,
-            metrics: this.monitoringService.getMetrics(name, sinceTimestamp),
+            metrics: this.monitoringService.getMetrics(name, sinceTimestamp)
         };
     }
-    getMetricNames() {
+    /**
+	 * Get all metric names
+	 */ getMetricNames() {
         return {
-            metrics: this.monitoringService.getMetricNames(),
+            metrics: this.monitoringService.getMetricNames()
         };
     }
-    getAlertRules() {
+    /**
+	 * Get alert rules
+	 */ getAlertRules() {
         return {
-            rules: this.alertService.getAlertRules(),
+            rules: this.alertService.getAlertRules()
         };
     }
-    addAlertRule(rule) {
+    /**
+	 * Add or update alert rule
+	 */ addAlertRule(rule) {
         this.alertService.addAlertRule(rule);
-        return { success: true, message: 'Alert rule added successfully' };
-    }
-    getActiveAlerts() {
         return {
-            alerts: this.alertService.getActiveAlerts(),
+            success: true,
+            message: 'Alert rule added successfully'
         };
     }
-    getAlertHistory(since) {
+    /**
+	 * Get active alerts
+	 */ getActiveAlerts() {
+        return {
+            alerts: this.alertService.getActiveAlerts()
+        };
+    }
+    /**
+	 * Get alert history
+	 */ getAlertHistory(since) {
         const sinceTimestamp = since ? Number.parseInt(since) : undefined;
         return {
-            alerts: this.alertService.getAlertHistory(sinceTimestamp),
+            alerts: this.alertService.getAlertHistory(sinceTimestamp)
         };
     }
-    triggerAlert(alertData) {
+    /**
+	 * Trigger manual alert
+	 */ triggerAlert(alertData) {
         this.alertService.triggerAlert(alertData.ruleName, alertData.message, alertData.severity, alertData.metadata);
-        return { success: true, message: 'Alert triggered successfully' };
+        return {
+            success: true,
+            message: 'Alert triggered successfully'
+        };
     }
-    resolveAlert(alertId) {
+    /**
+	 * Resolve alert
+	 */ resolveAlert(alertId) {
         const resolved = this.alertService.resolveAlert(alertId);
         return {
             success: resolved,
-            message: resolved ? 'Alert resolved successfully' : 'Alert not found or already resolved',
+            message: resolved ? 'Alert resolved successfully' : 'Alert not found or already resolved'
         };
     }
-    getPerformanceMetrics(operationName, since, stats) {
+    /**
+	 * Get performance metrics for an operation
+	 */ getPerformanceMetrics(operationName, since, stats) {
         const sinceTimestamp = since ? Number.parseInt(since) : undefined;
         if (stats === 'true') {
             return this.performanceService.getPerformanceStats(operationName, sinceTimestamp);
         }
         return {
             operationName,
-            metrics: this.performanceService.getPerformanceMetrics(operationName, sinceTimestamp),
+            metrics: this.performanceService.getPerformanceMetrics(operationName, sinceTimestamp)
         };
     }
-    getTrackedOperations() {
+    /**
+	 * Get all tracked operations
+	 */ getTrackedOperations() {
         return {
             operations: this.performanceService.getTrackedOperations(),
-            activeOperations: this.performanceService.getActiveOperations(),
+            activeOperations: this.performanceService.getActiveOperations()
         };
     }
-    getPerformanceOverview(since) {
+    /**
+	 * Get performance overview
+	 */ getPerformanceOverview(since) {
         const sinceTimestamp = since ? Number.parseInt(since) : undefined;
         return this.performanceService.getPerformanceOverview(sinceTimestamp);
     }
-    getMonitoringStats() {
+    /**
+	 * Get monitoring statistics
+	 */ getMonitoringStats() {
         return {
             monitoring: this.monitoringService.getStats(),
-            alerts: this.alertService.getAlertStats(),
+            alerts: this.alertService.getAlertStats()
         };
     }
-};
-exports.MonitoringController = MonitoringController;
-__decorate([
-    (0, common_1.Get)('health'),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", Promise)
+    constructor(monitoringService, alertService, performanceService){
+        this.monitoringService = monitoringService;
+        this.alertService = alertService;
+        this.performanceService = performanceService;
+    }
+}
+_ts_decorate([
+    Get('health'),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", []),
+    _ts_metadata("design:returntype", Promise)
 ], MonitoringController.prototype, "getSystemHealth", null);
-__decorate([
-    (0, common_1.Get)('dashboard'),
-    __param(0, (0, common_1.Query)('since')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", Promise)
+_ts_decorate([
+    Get('dashboard'),
+    _ts_param(0, Query('since')),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String
+    ]),
+    _ts_metadata("design:returntype", Promise)
 ], MonitoringController.prototype, "getDashboard", null);
-__decorate([
-    (0, common_1.Get)('metrics/:name'),
-    __param(0, (0, common_1.Param)('name')),
-    __param(1, (0, common_1.Query)('since')),
-    __param(2, (0, common_1.Query)('aggregated')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String]),
-    __metadata("design:returntype", Object)
+_ts_decorate([
+    Get('metrics/:name'),
+    _ts_param(0, Param('name')),
+    _ts_param(1, Query('since')),
+    _ts_param(2, Query('aggregated')),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String,
+        String,
+        String
+    ]),
+    _ts_metadata("design:returntype", Object)
 ], MonitoringController.prototype, "getMetrics", null);
-__decorate([
-    (0, common_1.Get)('metrics'),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", Object)
+_ts_decorate([
+    Get('metrics'),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", []),
+    _ts_metadata("design:returntype", Object)
 ], MonitoringController.prototype, "getMetricNames", null);
-__decorate([
-    (0, common_1.Get)('alerts/rules'),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", Object)
+_ts_decorate([
+    Get('alerts/rules'),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", []),
+    _ts_metadata("design:returntype", Object)
 ], MonitoringController.prototype, "getAlertRules", null);
-__decorate([
-    (0, common_1.Post)('alerts/rules'),
-    (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
-    __param(0, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", Object)
+_ts_decorate([
+    Post('alerts/rules'),
+    HttpCode(HttpStatus.CREATED),
+    _ts_param(0, Body()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof AlertRule === "undefined" ? Object : AlertRule
+    ]),
+    _ts_metadata("design:returntype", Object)
 ], MonitoringController.prototype, "addAlertRule", null);
-__decorate([
-    (0, common_1.Get)('alerts/active'),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", Object)
+_ts_decorate([
+    Get('alerts/active'),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", []),
+    _ts_metadata("design:returntype", Object)
 ], MonitoringController.prototype, "getActiveAlerts", null);
-__decorate([
-    (0, common_1.Get)('alerts/history'),
-    __param(0, (0, common_1.Query)('since')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", Object)
+_ts_decorate([
+    Get('alerts/history'),
+    _ts_param(0, Query('since')),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String
+    ]),
+    _ts_metadata("design:returntype", Object)
 ], MonitoringController.prototype, "getAlertHistory", null);
-__decorate([
-    (0, common_1.Post)('alerts/trigger'),
-    (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
-    __param(0, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", Object)
+_ts_decorate([
+    Post('alerts/trigger'),
+    HttpCode(HttpStatus.CREATED),
+    _ts_param(0, Body()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object
+    ]),
+    _ts_metadata("design:returntype", Object)
 ], MonitoringController.prototype, "triggerAlert", null);
-__decorate([
-    (0, common_1.Post)('alerts/:alertId/resolve'),
-    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
-    __param(0, (0, common_1.Param)('alertId')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", Object)
+_ts_decorate([
+    Post('alerts/:alertId/resolve'),
+    HttpCode(HttpStatus.OK),
+    _ts_param(0, Param('alertId')),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String
+    ]),
+    _ts_metadata("design:returntype", Object)
 ], MonitoringController.prototype, "resolveAlert", null);
-__decorate([
-    (0, common_1.Get)('performance/:operationName'),
-    __param(0, (0, common_1.Param)('operationName')),
-    __param(1, (0, common_1.Query)('since')),
-    __param(2, (0, common_1.Query)('stats')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String]),
-    __metadata("design:returntype", Object)
+_ts_decorate([
+    Get('performance/:operationName'),
+    _ts_param(0, Param('operationName')),
+    _ts_param(1, Query('since')),
+    _ts_param(2, Query('stats')),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String,
+        String,
+        String
+    ]),
+    _ts_metadata("design:returntype", Object)
 ], MonitoringController.prototype, "getPerformanceMetrics", null);
-__decorate([
-    (0, common_1.Get)('performance'),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", Object)
+_ts_decorate([
+    Get('performance'),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", []),
+    _ts_metadata("design:returntype", Object)
 ], MonitoringController.prototype, "getTrackedOperations", null);
-__decorate([
-    (0, common_1.Get)('performance/overview'),
-    __param(0, (0, common_1.Query)('since')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", Object)
+_ts_decorate([
+    Get('performance/overview'),
+    _ts_param(0, Query('since')),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String
+    ]),
+    _ts_metadata("design:returntype", Object)
 ], MonitoringController.prototype, "getPerformanceOverview", null);
-__decorate([
-    (0, common_1.Get)('stats'),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", Object)
+_ts_decorate([
+    Get('stats'),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", []),
+    _ts_metadata("design:returntype", Object)
 ], MonitoringController.prototype, "getMonitoringStats", null);
-exports.MonitoringController = MonitoringController = __decorate([
-    (0, common_1.Controller)('monitoring'),
-    __metadata("design:paramtypes", [monitoring_service_1.MonitoringService,
-        alert_service_1.AlertService,
-        performance_monitoring_service_1.PerformanceMonitoringService])
+MonitoringController = _ts_decorate([
+    Controller('monitoring'),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof MonitoringService === "undefined" ? Object : MonitoringService,
+        typeof AlertService === "undefined" ? Object : AlertService,
+        typeof PerformanceMonitoringService === "undefined" ? Object : PerformanceMonitoringService
+    ])
 ], MonitoringController);
+
 //# sourceMappingURL=monitoring.controller.js.map

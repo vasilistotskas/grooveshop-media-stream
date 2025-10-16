@@ -2,26 +2,29 @@ import { Buffer } from 'node:buffer'
 import { BackgroundOptions, FitOptions, PositionOptions, ResizeOptions, SupportedResizeFormats } from '@microservice/API/dto/cache-image-request.dto'
 import ManipulationJobResult from '@microservice/Queue/dto/manipulation-job-result.dto'
 import WebpImageManipulationJob from '@microservice/Queue/jobs/webp-image-manipulation.job'
-import * as sharp from 'sharp'
+import sharp from 'sharp'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-jest.mock('sharp')
+vi.mock('sharp', () => ({
+	default: vi.fn(),
+}))
 
 describe('webpImageManipulationJob', () => {
 	let job: WebpImageManipulationJob
 	const mockManipulation = {
-		webp: jest.fn().mockReturnThis(),
-		jpeg: jest.fn().mockReturnThis(),
-		png: jest.fn().mockReturnThis(),
-		gif: jest.fn().mockReturnThis(),
-		tiff: jest.fn().mockReturnThis(),
-		resize: jest.fn().mockReturnThis(),
-		trim: jest.fn().mockReturnThis(),
-		toBuffer: jest.fn().mockResolvedValue(Buffer.from('test')),
-		toFile: jest.fn().mockResolvedValue({ size: 1000, format: 'webp' }),
+		webp: vi.fn().mockReturnThis(),
+		jpeg: vi.fn().mockReturnThis(),
+		png: vi.fn().mockReturnThis(),
+		gif: vi.fn().mockReturnThis(),
+		tiff: vi.fn().mockReturnThis(),
+		resize: vi.fn().mockReturnThis(),
+		trim: vi.fn().mockReturnThis(),
+		toBuffer: vi.fn().mockResolvedValue(Buffer.from('test')),
+		toFile: vi.fn().mockResolvedValue({ size: 1000, format: 'webp' }),
 	}
 
 	beforeEach(() => {
-		;(sharp as unknown as jest.Mock).mockReturnValue(mockManipulation)
+		;(sharp as any).mockReturnValue(mockManipulation)
 		job = new WebpImageManipulationJob()
 	})
 

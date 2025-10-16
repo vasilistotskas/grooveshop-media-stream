@@ -1,17 +1,20 @@
+import type { AlertRule } from '@microservice/Monitoring/interfaces/monitoring.interface'
+import type { MockedObject } from 'vitest'
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
 import {
 	AlertCondition,
-	AlertRule,
+
 	AlertSeverity,
 } from '@microservice/Monitoring/interfaces/monitoring.interface'
 import { AlertService } from '@microservice/Monitoring/services/alert.service'
 import { MonitoringService } from '@microservice/Monitoring/services/monitoring.service'
 import { ConfigService } from '@nestjs/config'
 import { Test, TestingModule } from '@nestjs/testing'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('alertService', () => {
 	let service: AlertService
-	let monitoringService: jest.Mocked<MonitoringService>
+	let monitoringService: MockedObject<MonitoringService>
 
 	const mockAlertRule: AlertRule = {
 		id: 'test-rule',
@@ -27,7 +30,7 @@ describe('alertService', () => {
 
 	beforeEach(async () => {
 		const mockConfigService = {
-			get: jest.fn().mockReturnValue({
+			get: vi.fn().mockReturnValue({
 				enabled: true,
 				metricsRetentionMs: 24 * 60 * 60 * 1000,
 				alertsRetentionMs: 7 * 24 * 60 * 60 * 1000,
@@ -42,11 +45,11 @@ describe('alertService', () => {
 		}
 
 		const mockCorrelationService = {
-			getCorrelationId: jest.fn().mockReturnValue('test-correlation-id'),
+			getCorrelationId: vi.fn().mockReturnValue('test-correlation-id'),
 		}
 
 		const mockMonitoringService = {
-			getAggregatedMetrics: jest.fn().mockReturnValue({
+			getAggregatedMetrics: vi.fn().mockReturnValue({
 				count: 1,
 				sum: 150,
 				avg: 150,
@@ -210,7 +213,7 @@ describe('alertService', () => {
 			expect(activeAlerts.length).toBeGreaterThan(0)
 		})
 
-		it('should not trigger alert when threshold not exceeded', (done) => {
+		it('should not trigger alert when threshold not exceeded', async () => {
 			// Mock metrics below threshold
 			monitoringService.getAggregatedMetrics.mockReturnValue({
 				count: 1,
@@ -221,11 +224,9 @@ describe('alertService', () => {
 				latest: 50, // Below threshold of 100
 			})
 
-			setTimeout(() => {
-				const activeAlerts = service.getActiveAlerts()
-				expect(activeAlerts).toHaveLength(0)
-				done()
-			}, 100)
+			await new Promise(resolve => setTimeout(resolve, 100))
+			const activeAlerts = service.getActiveAlerts()
+			expect(activeAlerts).toHaveLength(0)
 		})
 	})
 

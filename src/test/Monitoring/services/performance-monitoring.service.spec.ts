@@ -1,18 +1,20 @@
+import type { MockedObject } from 'vitest'
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
 import { MonitoringService } from '@microservice/Monitoring/services/monitoring.service'
 import { PerformanceMonitoringService } from '@microservice/Monitoring/services/performance-monitoring.service'
 import { ConfigService } from '@nestjs/config'
 import { Test, TestingModule } from '@nestjs/testing'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('performanceMonitoringService', () => {
 	let service: PerformanceMonitoringService
-	let monitoringService: jest.Mocked<MonitoringService>
-	let configService: jest.Mocked<ConfigService>
-	let correlationService: jest.Mocked<CorrelationService>
+	let monitoringService: MockedObject<MonitoringService>
+	let configService: MockedObject<ConfigService>
+	let correlationService: MockedObject<CorrelationService>
 
 	beforeEach(async () => {
 		const mockConfigService = {
-			get: jest.fn().mockReturnValue({
+			get: vi.fn().mockReturnValue({
 				enabled: true,
 				metricsRetentionMs: 24 * 60 * 60 * 1000,
 				alertsRetentionMs: 7 * 24 * 60 * 60 * 1000,
@@ -27,12 +29,12 @@ describe('performanceMonitoringService', () => {
 		}
 
 		const mockCorrelationService = {
-			getCorrelationId: jest.fn().mockReturnValue('test-correlation-id'),
+			getCorrelationId: vi.fn().mockReturnValue('test-correlation-id'),
 		}
 
 		const mockMonitoringService = {
-			recordTimer: jest.fn(),
-			incrementCounter: jest.fn(),
+			recordTimer: vi.fn(),
+			incrementCounter: vi.fn(),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -55,22 +57,20 @@ describe('performanceMonitoringService', () => {
 	})
 
 	describe('startOperation and endOperation', () => {
-		it('should track operation duration', (done) => {
+		it('should track operation duration', async () => {
 			const operationId = service.startOperation('test-operation', { userId: '123' })
 			expect(operationId).toBeTruthy()
 
 			// Simulate some processing time
-			setTimeout(() => {
-				service.endOperation(operationId, true)
+			await new Promise(resolve => setTimeout(resolve, 10))
+			service.endOperation(operationId, true)
 
-				const metrics = service.getPerformanceMetrics('test-operation')
-				expect(metrics).toHaveLength(1)
-				expect(metrics[0].operationName).toBe('test-operation')
-				expect(metrics[0].success).toBe(true)
-				expect(metrics[0].duration).toBeGreaterThan(0)
-				expect(metrics[0].metadata).toEqual({ userId: '123' })
-				done()
-			}, 10)
+			const metrics = service.getPerformanceMetrics('test-operation')
+			expect(metrics).toHaveLength(1)
+			expect(metrics[0].operationName).toBe('test-operation')
+			expect(metrics[0].success).toBe(true)
+			expect(metrics[0].duration).toBeGreaterThan(0)
+			expect(metrics[0].metadata).toEqual({ userId: '123' })
 		})
 
 		it('should handle operation failure', () => {
@@ -215,29 +215,27 @@ describe('performanceMonitoringService', () => {
 	})
 
 	describe('getActiveOperations', () => {
-		it('should return active operations', (done) => {
+		it('should return active operations', async () => {
 			const op1 = service.startOperation('active-op-1', { user: 'test1' })
 			const op2 = service.startOperation('active-op-2', { user: 'test2' })
 
 			// Wait a bit to ensure duration > 0
-			setTimeout(() => {
-				const activeOps = service.getActiveOperations()
-				expect(activeOps).toHaveLength(2)
+			await new Promise(resolve => setTimeout(resolve, 10))
+			const activeOps = service.getActiveOperations()
+			expect(activeOps).toHaveLength(2)
 
-				const op1Data = activeOps.find(op => op.operationId === op1)
-				expect(op1Data).toBeDefined()
-				expect(op1Data!.operationName).toBe('active-op-1')
-				expect(op1Data!.metadata).toEqual({ user: 'test1' })
-				expect(op1Data!.duration).toBeGreaterThan(0)
+			const op1Data = activeOps.find(op => op.operationId === op1)
+			expect(op1Data).toBeDefined()
+			expect(op1Data!.operationName).toBe('active-op-1')
+			expect(op1Data!.metadata).toEqual({ user: 'test1' })
+			expect(op1Data!.duration).toBeGreaterThan(0)
 
-				// End one operation
-				service.endOperation(op1, true)
+			// End one operation
+			service.endOperation(op1, true)
 
-				const remainingOps = service.getActiveOperations()
-				expect(remainingOps).toHaveLength(1)
-				expect(remainingOps[0].operationId).toBe(op2)
-				done()
-			}, 10)
+			const remainingOps = service.getActiveOperations()
+			expect(remainingOps).toHaveLength(1)
+			expect(remainingOps[0].operationId).toBe(op2)
 		})
 	})
 

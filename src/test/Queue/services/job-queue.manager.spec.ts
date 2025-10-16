@@ -1,5 +1,6 @@
+import type { JobOptions } from '@microservice/Queue/interfaces/job-queue.interface'
+import type { MockedObject } from 'vitest'
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
-import { JobOptions } from '@microservice/Queue/interfaces/job-queue.interface'
 import { CacheOperationsProcessor } from '@microservice/Queue/processors/cache-operations.processor'
 import { ImageProcessingProcessor } from '@microservice/Queue/processors/image-processing.processor'
 import { BullQueueService } from '@microservice/Queue/services/bull-queue.service'
@@ -7,37 +8,38 @@ import { JobQueueManager } from '@microservice/Queue/services/job-queue.manager'
 import { JobPriority, JobType } from '@microservice/Queue/types/job.types'
 import { Logger } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('jobQueueManager', () => {
 	let manager: JobQueueManager
-	let mockQueueService: jest.Mocked<BullQueueService>
-	let mockImageProcessor: jest.Mocked<ImageProcessingProcessor>
-	let mockCacheProcessor: jest.Mocked<CacheOperationsProcessor>
-	let mockCorrelationService: jest.Mocked<CorrelationService>
+	let mockQueueService: MockedObject<BullQueueService>
+	let mockImageProcessor: MockedObject<ImageProcessingProcessor>
+	let mockCacheProcessor: MockedObject<CacheOperationsProcessor>
+	let mockCorrelationService: MockedObject<CorrelationService>
 
 	beforeEach(async () => {
 		const mockQueueServiceFactory = {
-			add: jest.fn(),
-			process: jest.fn(),
-			getJob: jest.fn(),
-			removeJob: jest.fn(),
-			pause: jest.fn(),
-			resume: jest.fn(),
-			getStats: jest.fn(),
-			clean: jest.fn(),
+			add: vi.fn(),
+			process: vi.fn(),
+			getJob: vi.fn(),
+			removeJob: vi.fn(),
+			pause: vi.fn(),
+			resume: vi.fn(),
+			getStats: vi.fn(),
+			clean: vi.fn(),
 		}
 
 		const mockImageProcessorFactory = {
-			process: jest.fn(),
+			process: vi.fn(),
 		}
 
 		const mockCacheProcessorFactory = {
-			processCacheWarming: jest.fn(),
-			processCacheCleanup: jest.fn(),
+			processCacheWarming: vi.fn(),
+			processCacheCleanup: vi.fn(),
 		}
 
 		const mockCorrelationServiceFactory = {
-			getCorrelationId: jest.fn(),
+			getCorrelationId: vi.fn(),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -69,15 +71,15 @@ describe('jobQueueManager', () => {
 		mockCorrelationService = module.get(CorrelationService)
 
 		// Mock logger to avoid console output during tests
-		jest.spyOn(Logger.prototype, 'debug').mockImplementation()
-		jest.spyOn(Logger.prototype, 'log').mockImplementation()
-		jest.spyOn(Logger.prototype, 'warn').mockImplementation()
-		jest.spyOn(Logger.prototype, 'error').mockImplementation()
+		vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => {})
+		vi.spyOn(Logger.prototype, 'log').mockImplementation(() => {})
+		vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => {})
+		vi.spyOn(Logger.prototype, 'error').mockImplementation(() => {})
 	})
 
 	afterEach(() => {
-		jest.clearAllMocks()
-		jest.resetAllMocks()
+		vi.clearAllMocks()
+		vi.resetAllMocks()
 	})
 
 	describe('onModuleInit', () => {

@@ -1,3 +1,4 @@
+import type { INestApplication } from '@nestjs/common'
 import { MultiLayerCacheManager } from '@microservice/Cache/services/multi-layer-cache.manager'
 import { ConfigService } from '@microservice/Config/config.service'
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
@@ -10,8 +11,8 @@ import { MonitoringController } from '@microservice/Monitoring/controllers/monit
 import { JobQueueManager } from '@microservice/Queue/services/job-queue.manager'
 import { AdaptiveRateLimitGuard } from '@microservice/RateLimit/guards/adaptive-rate-limit.guard'
 import { SimpleValidationService } from '@microservice/Validation/services/simple-validation.service'
-import { INestApplication } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 describe('module Integration', () => {
 	let app: INestApplication

@@ -78,7 +78,7 @@ pnpm run test:e2e
 
 ### Writing Tests
 
-The project uses Jest for testing. Unit tests are located in `src/test` and end-to-end tests are in the `test` directory.
+The project uses Vite for testing. Unit tests are located in `src/test` and end-to-end tests are in the `test` directory.
 
 #### Unit Tests
 
@@ -86,7 +86,7 @@ Unit tests should be placed in the `src/test` directory and follow the naming co
 
 ```typescript
 // src/test/SimpleUtility.spec.ts
-import { describe, it, expect } from '@jest/globals'
+import { describe, it, expect } from 'vitest'
 
 describe('SimpleUtility', () => {
   it('should add two numbers correctly', () => {

@@ -1,6 +1,7 @@
 import { AppConfigDto } from '@microservice/Config/dto/app-config.dto'
 import { plainToClass } from 'class-transformer'
 import { validate } from 'class-validator'
+import { describe, expect, it } from 'vitest'
 import 'reflect-metadata'
 
 describe('appConfigDto', () => {

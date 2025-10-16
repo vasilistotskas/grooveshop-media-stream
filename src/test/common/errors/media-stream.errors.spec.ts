@@ -1,4 +1,3 @@
-import { describe, expect, it } from '@jest/globals'
 import {
 	DefaultImageFallbackError,
 	InvalidRequestError,
@@ -8,9 +7,10 @@ import {
 	ResourceStreamingError,
 } from '@microservice/common/errors/media-stream.errors'
 import { HttpStatus } from '@nestjs/common'
+import { describe, expect, it } from 'vitest'
 
-describe('MediaStreamErrors', () => {
-	describe('MediaStreamError', () => {
+describe('mediaStreamErrors', () => {
+	describe('mediaStreamError', () => {
 		it('should create a base error with default values', () => {
 			const error = new MediaStreamError('Test error')
 
@@ -50,7 +50,7 @@ describe('MediaStreamErrors', () => {
 		})
 	})
 
-	describe('ResourceNotFoundError', () => {
+	describe('resourceNotFoundError', () => {
 		it('should create a not found error with default values', () => {
 			const error = new ResourceNotFoundError()
 
@@ -70,7 +70,7 @@ describe('MediaStreamErrors', () => {
 		})
 	})
 
-	describe('ResourceProcessingError', () => {
+	describe('resourceProcessingError', () => {
 		it('should create a processing error with default values', () => {
 			const error = new ResourceProcessingError()
 
@@ -82,7 +82,7 @@ describe('MediaStreamErrors', () => {
 		})
 	})
 
-	describe('ResourceStreamingError', () => {
+	describe('resourceStreamingError', () => {
 		it('should create a streaming error with default values', () => {
 			const error = new ResourceStreamingError()
 
@@ -94,7 +94,7 @@ describe('MediaStreamErrors', () => {
 		})
 	})
 
-	describe('DefaultImageFallbackError', () => {
+	describe('defaultImageFallbackError', () => {
 		it('should create a fallback error with default values', () => {
 			const error = new DefaultImageFallbackError()
 
@@ -106,7 +106,7 @@ describe('MediaStreamErrors', () => {
 		})
 	})
 
-	describe('InvalidRequestError', () => {
+	describe('invalidRequestError', () => {
 		it('should create an invalid request error with default values', () => {
 			const error = new InvalidRequestError()
 

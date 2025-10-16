@@ -1,56 +1,74 @@
-"use strict";
-var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    else for(var i = decorators.length - 1; i >= 0; i--)if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.CorrelationService = void 0;
-const node_async_hooks_1 = require("node:async_hooks");
-const node_crypto_1 = require("node:crypto");
-const common_1 = require("@nestjs/common");
-let CorrelationService = class CorrelationService {
-    constructor() {
-        this.asyncLocalStorage = new node_async_hooks_1.AsyncLocalStorage();
+}
+import { AsyncLocalStorage } from "node:async_hooks";
+import { randomUUID } from "node:crypto";
+import { Injectable } from "@nestjs/common";
+export class CorrelationService {
+    /**
+	 * Generate a new correlation ID using UUID v4
+	 */ generateCorrelationId() {
+        return randomUUID();
     }
-    generateCorrelationId() {
-        return (0, node_crypto_1.randomUUID)();
-    }
-    setContext(context) {
+    /**
+	 * Set the request context for the current async context
+	 */ setContext(context) {
         this.asyncLocalStorage.enterWith(context);
     }
-    getContext() {
+    /**
+	 * Get the current request context
+	 */ getContext() {
         return this.asyncLocalStorage.getStore() || null;
     }
-    getCorrelationId() {
+    /**
+	 * Get the correlation ID from the current context
+	 */ getCorrelationId() {
         const context = this.getContext();
         return context?.correlationId || null;
     }
-    clearContext() {
+    /**
+	 * Clear the current context (mainly for testing)
+	 */ clearContext() {
         this.asyncLocalStorage.disable();
     }
-    runWithContext(context, fn) {
+    /**
+	 * Run a function within a specific correlation context
+	 */ runWithContext(context, fn) {
         return this.asyncLocalStorage.run(context, fn);
     }
-    updateContext(updates) {
+    /**
+	 * Update the current context with additional data
+	 */ updateContext(updates) {
         const currentContext = this.getContext();
         if (currentContext) {
-            const updatedContext = { ...currentContext, ...updates };
+            const updatedContext = {
+                ...currentContext,
+                ...updates
+            };
             this.setContext(updatedContext);
         }
     }
-    getClientIp() {
+    /**
+	 * Get the client IP from the current context
+	 */ getClientIp() {
         const context = this.getContext();
         return context?.clientIp || 'unknown';
     }
-    getUserAgent() {
+    /**
+	 * Get the user agent from the current context
+	 */ getUserAgent() {
         const context = this.getContext();
         return context?.userAgent || 'unknown';
     }
-};
-exports.CorrelationService = CorrelationService;
-exports.CorrelationService = CorrelationService = __decorate([
-    (0, common_1.Injectable)()
+    constructor(){
+        this.asyncLocalStorage = new AsyncLocalStorage();
+    }
+}
+CorrelationService = _ts_decorate([
+    Injectable()
 ], CorrelationService);
+
 //# sourceMappingURL=correlation.service.js.map

@@ -1,11 +1,13 @@
+import type { SystemHealth } from '@microservice/Monitoring/interfaces/monitoring.interface'
+import type { MockedObject } from 'vitest'
 import { SystemHealthIndicator } from '@microservice/Monitoring/indicators/system-health.indicator'
-import { SystemHealth } from '@microservice/Monitoring/interfaces/monitoring.interface'
 import { MonitoringService } from '@microservice/Monitoring/services/monitoring.service'
 import { Test, TestingModule } from '@nestjs/testing'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('systemHealthIndicator', () => {
 	let indicator: SystemHealthIndicator
-	let monitoringService: jest.Mocked<MonitoringService>
+	let monitoringService: MockedObject<MonitoringService>
 
 	const mockHealthySystem: SystemHealth = {
 		status: 'healthy',
@@ -46,8 +48,8 @@ describe('systemHealthIndicator', () => {
 
 	beforeEach(async () => {
 		const mockMonitoringService = {
-			getSystemHealth: jest.fn().mockResolvedValue(mockHealthySystem),
-			getStats: jest.fn().mockReturnValue({
+			getSystemHealth: vi.fn().mockResolvedValue(mockHealthySystem),
+			getStats: vi.fn().mockReturnValue({
 				totalMetrics: 100,
 				metricTypes: { counter: 50, gauge: 30, timer: 20 },
 				oldestMetric: Date.now() - 86400000,

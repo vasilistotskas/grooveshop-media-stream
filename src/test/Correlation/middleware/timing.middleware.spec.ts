@@ -1,7 +1,8 @@
+import type { NextFunction, Request, Response } from 'express'
 import { TimingMiddleware } from '@microservice/Correlation/middleware/timing.middleware'
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
 import { Test, TestingModule } from '@nestjs/testing'
-import { NextFunction, Request, Response } from 'express'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('timingMiddleware', () => {
 	let middleware: TimingMiddleware
@@ -24,10 +25,10 @@ describe('timingMiddleware', () => {
 		}
 
 		mockResponse = {
-			setHeader: jest.fn(),
+			setHeader: vi.fn(),
 			statusCode: 200,
 			headersSent: false,
-			end: jest.fn().mockImplementation(function (this: any, chunk?: any, encoding?: any, cb?: any) {
+			end: vi.fn().mockImplementation(function (this: any, chunk?: any, encoding?: any, cb?: any) {
 				if (typeof chunk === 'function')
 					cb = chunk
 				if (typeof encoding === 'function')
@@ -36,18 +37,18 @@ describe('timingMiddleware', () => {
 					setTimeout(cb, 0)
 				return this
 			}),
-			on: jest.fn((event, callback) => {
+			on: vi.fn((event, callback) => {
 				if (event === 'finish') {
 					setTimeout(callback, 10)
 				}
 			}),
-			emit: jest.fn((_event) => {
+			emit: vi.fn((_event) => {
 				// Simulate event emission
 				return true
 			}),
 		}
 
-		mockNext = jest.fn()
+		mockNext = vi.fn()
 	})
 
 	afterEach(() => {
@@ -62,8 +63,8 @@ describe('timingMiddleware', () => {
 		})
 
 		it('should set response time header on finish event', () => {
-			jest.spyOn(correlationService, 'updateContext')
-			jest.spyOn(correlationService, 'getContext').mockReturnValue({
+			vi.spyOn(correlationService, 'updateContext')
+			vi.spyOn(correlationService, 'getContext').mockReturnValue({
 				correlationId: 'test-id',
 				timestamp: Date.now(),
 				clientIp: '127.0.0.1',
@@ -88,10 +89,10 @@ describe('timingMiddleware', () => {
 			expect(correlationService.updateContext).toHaveBeenCalled()
 		})
 
-		it('should log request completion with timing info', (done) => {
-			const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
+		it('should log request completion with timing info', async () => {
+			const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
 
-			jest.spyOn(correlationService, 'getContext').mockReturnValue({
+			vi.spyOn(correlationService, 'getContext').mockReturnValue({
 				correlationId: 'test-correlation-id',
 				timestamp: Date.now(),
 				clientIp: '127.0.0.1',
@@ -102,17 +103,17 @@ describe('timingMiddleware', () => {
 
 			middleware.use(mockRequest as Request, mockResponse as Response, mockNext)
 
-			setTimeout(() => {
-				// The actual logging is done by the CorrelatedLogger, not console.log
-				// So we should check if the logger was called instead
-				consoleSpy.mockRestore()
-				done()
-			}, 20)
+			await new Promise(resolve => setTimeout(resolve, 20))
+			// The actual logging is done by the CorrelatedLogger, not console.log
+			// So we should check if the logger was called instead
+			expect(mockNext).toHaveBeenCalled()
+
+			consoleSpy.mockRestore()
 		}, 10000)
 
 		it('should handle missing correlation context gracefully', () => {
-			const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
-			jest.spyOn(correlationService, 'getContext').mockReturnValue(null)
+			const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+			vi.spyOn(correlationService, 'getContext').mockReturnValue(null)
 
 			middleware.use(mockRequest as Request, mockResponse as Response, mockNext)
 
@@ -128,12 +129,14 @@ describe('timingMiddleware', () => {
 				expect.stringMatching(/^\d+(\.\d+)?ms$/),
 			)
 
+			expect(mockNext).toHaveBeenCalled()
+
 			consoleSpy.mockRestore()
 		})
 
 		it('should update context with start time', () => {
-			const updateContextSpy = jest.spyOn(correlationService, 'updateContext')
-			jest.spyOn(correlationService, 'getContext').mockReturnValue({
+			const updateContextSpy = vi.spyOn(correlationService, 'updateContext')
+			vi.spyOn(correlationService, 'getContext').mockReturnValue({
 				correlationId: 'test-id',
 				timestamp: Date.now(),
 				clientIp: '127.0.0.1',

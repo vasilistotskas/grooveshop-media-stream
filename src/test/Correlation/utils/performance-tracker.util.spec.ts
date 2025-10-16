@@ -1,35 +1,37 @@
+import type { Mock } from 'vitest'
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
 import { PerformanceTracker } from '@microservice/Correlation/utils/performance-tracker.util'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock the CorrelatedLogger
-jest.mock('@microservice/Correlation/utils/logger.util', () => ({
+vi.mock('@microservice/Correlation/utils/logger.util', () => ({
 	CorrelatedLogger: {
-		debug: jest.fn(),
-		warn: jest.fn(),
-		log: jest.fn(),
+		debug: vi.fn(),
+		warn: vi.fn(),
+		log: vi.fn(),
 	},
 }))
 
 // Mock the CorrelationService to return a consistent correlation ID
 const mockCorrelationService = {
-	setContext: jest.fn(),
-	getContext: jest.fn(),
-	getCorrelationId: jest.fn().mockReturnValue('test-correlation-id'),
-	updateContext: jest.fn(),
-	clearContext: jest.fn(),
+	setContext: vi.fn(),
+	getContext: vi.fn(),
+	getCorrelationId: vi.fn().mockReturnValue('test-correlation-id'),
+	updateContext: vi.fn(),
+	clearContext: vi.fn(),
 }
 
 // Mock the CorrelationService class
-jest.mock('@microservice/Correlation/services/correlation.service', () => {
+vi.mock('@microservice/Correlation/services/correlation.service', () => {
 	return {
-		CorrelationService: jest.fn().mockImplementation(() => mockCorrelationService),
+		CorrelationService: vi.fn().mockImplementation(() => mockCorrelationService),
 	}
 })
 
 // Ensure the mock is applied before importing PerformanceTracker
-jest.doMock('@microservice/Correlation/services/correlation.service', () => {
+vi.doMock('@microservice/Correlation/services/correlation.service', () => {
 	return {
-		CorrelationService: jest.fn().mockImplementation(() => mockCorrelationService),
+		CorrelationService: vi.fn().mockImplementation(() => mockCorrelationService),
 	}
 })
 
@@ -38,7 +40,7 @@ describe('performanceTracker', () => {
 
 	beforeEach(() => {
 		// Reset all mocks
-		jest.clearAllMocks()
+		vi.clearAllMocks()
 
 		// Ensure the mock returns the correlation ID consistently
 		mockCorrelationService.getCorrelationId.mockReturnValue('test-correlation-id')
@@ -56,7 +58,7 @@ describe('performanceTracker', () => {
 	afterEach(() => {
 		// Clear phases directly since clearPhases() also depends on correlation ID
 		;(PerformanceTracker as any).phases = new Map()
-		jest.clearAllMocks()
+		vi.clearAllMocks()
 	})
 
 	describe('phase Tracking', () => {
@@ -238,9 +240,9 @@ describe('performanceTracker', () => {
 		it('should handle missing correlation context gracefully', () => {
 			// Clear correlation context and mock to return null
 			correlationService.clearContext()
-			;(correlationService.getCorrelationId as jest.Mock).mockReturnValue(null)
+			;(correlationService.getCorrelationId as unknown as Mock).mockReturnValue(null)
 			if (mockCorrelationService) {
-				;(mockCorrelationService.getCorrelationId as jest.Mock).mockReturnValue(null)
+				;(mockCorrelationService.getCorrelationId as unknown as Mock).mockReturnValue(null)
 			}
 
 			PerformanceTracker.startPhase('no-context-phase')

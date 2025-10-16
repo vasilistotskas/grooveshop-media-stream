@@ -1,25 +1,16 @@
-"use strict";
-var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    else for(var i = decorators.length - 1; i >= 0; i--)if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __metadata = (this && this.__metadata) || function (k, v) {
+}
+function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-var SimpleValidationService_1;
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.SimpleValidationService = void 0;
-const common_1 = require("@nestjs/common");
-const input_sanitization_service_1 = require("./input-sanitization.service");
-const security_checker_service_1 = require("./security-checker.service");
-let SimpleValidationService = SimpleValidationService_1 = class SimpleValidationService {
-    constructor(sanitizationService, securityChecker) {
-        this.sanitizationService = sanitizationService;
-        this.securityChecker = securityChecker;
-        this._logger = new common_1.Logger(SimpleValidationService_1.name);
-    }
+}
+import { Injectable, Logger } from "@nestjs/common";
+import { InputSanitizationService } from "./input-sanitization.service.js";
+import { SecurityCheckerService } from "./security-checker.service.js";
+export class SimpleValidationService {
     async validateCacheImageRequest(request) {
         const errors = [];
         try {
@@ -29,8 +20,10 @@ let SimpleValidationService = SimpleValidationService_1 = class SimpleValidation
                 await this.securityChecker.logSecurityEvent({
                     type: 'malicious_content',
                     source: 'simple_validation_service',
-                    details: { resourceTarget: request.resourceTarget },
-                    timestamp: new Date(),
+                    details: {
+                        resourceTarget: request.resourceTarget
+                    },
+                    timestamp: new Date()
                 });
             }
             if (!this.sanitizationService.validateUrl(request.resourceTarget)) {
@@ -46,14 +39,15 @@ let SimpleValidationService = SimpleValidationService_1 = class SimpleValidation
             return {
                 isValid: errors.length === 0,
                 errors,
-                sanitizedInput,
+                sanitizedInput
             };
-        }
-        catch (error) {
+        } catch (error) {
             this._logger.error('Validation error', error);
             return {
                 isValid: false,
-                errors: ['Validation service error'],
+                errors: [
+                    'Validation service error'
+                ]
             };
         }
     }
@@ -68,22 +62,31 @@ let SimpleValidationService = SimpleValidationService_1 = class SimpleValidation
             return {
                 isValid: errors.length === 0,
                 errors,
-                sanitizedInput,
+                sanitizedInput
             };
-        }
-        catch (error) {
+        } catch (error) {
             this._logger.error('Input validation error', error);
             return {
                 isValid: false,
-                errors: ['Input validation service error'],
+                errors: [
+                    'Input validation service error'
+                ]
             };
         }
     }
-};
-exports.SimpleValidationService = SimpleValidationService;
-exports.SimpleValidationService = SimpleValidationService = SimpleValidationService_1 = __decorate([
-    (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [input_sanitization_service_1.InputSanitizationService,
-        security_checker_service_1.SecurityCheckerService])
+    constructor(sanitizationService, securityChecker){
+        this.sanitizationService = sanitizationService;
+        this.securityChecker = securityChecker;
+        this._logger = new Logger(SimpleValidationService.name);
+    }
+}
+SimpleValidationService = _ts_decorate([
+    Injectable(),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof InputSanitizationService === "undefined" ? Object : InputSanitizationService,
+        typeof SecurityCheckerService === "undefined" ? Object : SecurityCheckerService
+    ])
 ], SimpleValidationService);
+
 //# sourceMappingURL=simple-validation.service.js.map

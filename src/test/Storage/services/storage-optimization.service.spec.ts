@@ -1,42 +1,44 @@
+import type { MockedObject } from 'vitest'
 import { Buffer } from 'node:buffer'
 import { promises as fs } from 'node:fs'
 import { ConfigService } from '@microservice/Config/config.service'
 import { StorageMonitoringService } from '@microservice/Storage/services/storage-monitoring.service'
 import { StorageOptimizationService } from '@microservice/Storage/services/storage-optimization.service'
 import { Test, TestingModule } from '@nestjs/testing'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock fs and zlib modules
-jest.mock('node:fs', () => ({
+vi.mock('node:fs', () => ({
 	promises: {
-		readFile: jest.fn(),
-		writeFile: jest.fn(),
-		unlink: jest.fn(),
-		copyFile: jest.fn(),
-		link: jest.fn(),
+		readFile: vi.fn(),
+		writeFile: vi.fn(),
+		unlink: vi.fn(),
+		copyFile: vi.fn(),
+		link: vi.fn(),
 	},
 }))
 
-jest.mock('node:zlib', () => ({
-	gzip: jest.fn((data, options, callback) => {
+vi.mock('node:zlib', () => ({
+	gzip: vi.fn((data, options, callback) => {
 		// Simulate successful compression with 50% reduction
 		const compressedData = Buffer.from('compressed-data')
 		setImmediate(() => callback(null, compressedData))
 	}),
 }))
 
-jest.mock('node:crypto', () => ({
-	createHash: jest.fn(() => ({
-		update: jest.fn().mockReturnThis(),
-		digest: jest.fn().mockReturnValue('mock-hash-123'),
+vi.mock('node:crypto', () => ({
+	createHash: vi.fn(() => ({
+		update: vi.fn().mockReturnThis(),
+		digest: vi.fn().mockReturnValue('mock-hash-123'),
 	})),
 }))
 
-const mockFs = fs as jest.Mocked<typeof fs>
+const mockFs = fs as MockedObject<typeof fs>
 
 describe('storageOptimizationService', () => {
 	let service: StorageOptimizationService
-	let storageMonitoring: jest.Mocked<StorageMonitoringService>
-	let configService: jest.Mocked<ConfigService>
+	let storageMonitoring: MockedObject<StorageMonitoringService>
+	let configService: MockedObject<ConfigService>
 
 	const mockAccessPatterns = [
 		{
@@ -64,17 +66,17 @@ describe('storageOptimizationService', () => {
 
 	beforeEach(async () => {
 		const mockStorageMonitoring = {
-			getStorageStats: jest.fn(),
+			getStorageStats: vi.fn(),
 		}
 
 		const mockConfigService = {
-			get: jest.fn().mockImplementation((key: string) => {
+			get: vi.fn().mockImplementation((key: string) => {
 				if (key === 'cache.file.directory')
 					return '/test/storage'
 				return undefined
 			}),
-			getOptional: jest.fn().mockImplementation((key: string, defaultValue: any) => {
-				const defaults = {
+			getOptional: vi.fn().mockImplementation((key: string, defaultValue: any) => {
+				const defaults: Record<string, any> = {
 					'storage.optimization.enabled': true,
 					'storage.optimization.strategies': ['compression', 'deduplication'],
 					'storage.optimization.popularityThreshold': 10,
@@ -111,7 +113,7 @@ describe('storageOptimizationService', () => {
 		})
 
 		configService.getOptional.mockImplementation((key: string, defaultValue: any) => {
-			const defaults = {
+			const defaults: Record<string, any> = {
 				'storage.optimization.enabled': true,
 				'storage.optimization.strategies': ['compression', 'deduplication'],
 				'storage.optimization.popularThreshold': 10,
@@ -142,7 +144,7 @@ describe('storageOptimizationService', () => {
 	})
 
 	afterEach(() => {
-		jest.clearAllMocks()
+		vi.clearAllMocks()
 	})
 
 	describe('optimizeFrequentlyAccessedFiles', () => {
@@ -204,7 +206,7 @@ describe('storageOptimizationService', () => {
 		beforeEach(async () => {
 			// Mock zlib.gzip to return compressed data
 			const mockZlib = await import('node:zlib')
-			jest.mocked(mockZlib.gzip).mockImplementation((data, options, callback) => {
+			vi.mocked(mockZlib.gzip).mockImplementation((data, options, callback) => {
 				// Simulate 50% compression
 				const compressedData = Buffer.alloc(Buffer.byteLength(data) / 2)
 				callback(null, compressedData)
@@ -267,7 +269,7 @@ describe('storageOptimizationService', () => {
 			configService.getOptional.mockImplementation((key: string, defaultValue: any) => {
 				if (key === 'storage.optimization.createBackups')
 					return true
-				const defaults = {
+				const defaults: Record<string, any> = {
 					'storage.optimization.enabled': true,
 					'storage.optimization.strategies': ['compression'],
 					'storage.optimization.popularThreshold': 10,
@@ -288,10 +290,10 @@ describe('storageOptimizationService', () => {
 			// Mock crypto.createHash for deduplication
 			const mockCrypto = await import('node:crypto')
 			const mockHash = {
-				update: jest.fn().mockReturnThis(),
-				digest: jest.fn(),
+				update: vi.fn().mockReturnThis(),
+				digest: vi.fn(),
 			}
-			jest.mocked(mockCrypto.createHash).mockReturnValue(mockHash as any)
+			vi.mocked(mockCrypto.createHash).mockReturnValue(mockHash as any)
 
 			// Simulate duplicate files by returning same hash
 			mockHash.digest.mockReturnValue('same-hash-for-duplicates')
@@ -368,12 +370,12 @@ describe('storageOptimizationService', () => {
 		it('should not run when disabled', async () => {
 			// Create a new service instance with optimization disabled
 			const disabledConfigService = {
-				get: jest.fn().mockImplementation((key: string) => {
+				get: vi.fn().mockImplementation((key: string) => {
 					if (key === 'cache.file.directory')
 						return '/test/storage'
 					return undefined
 				}),
-				getOptional: jest.fn().mockImplementation((key: string, defaultValue: any) => {
+				getOptional: vi.fn().mockImplementation((key: string, defaultValue: any) => {
 					if (key === 'storage.optimization.enabled')
 						return false
 					return defaultValue
@@ -429,15 +431,15 @@ describe('storageOptimizationService', () => {
 		it('should use only configured strategies', async () => {
 			// Create a new service instance with different configuration
 			const customConfigService = {
-				get: jest.fn().mockImplementation((key: string) => {
+				get: vi.fn().mockImplementation((key: string) => {
 					if (key === 'cache.file.directory')
 						return '/test/storage'
 					return undefined
 				}),
-				getOptional: jest.fn().mockImplementation((key: string, defaultValue: any) => {
+				getOptional: vi.fn().mockImplementation((key: string, defaultValue: any) => {
 					if (key === 'storage.optimization.strategies')
 						return ['compression']
-					const defaults = {
+					const defaults: Record<string, any> = {
 						'storage.optimization.enabled': true,
 						'storage.optimization.popularThreshold': 10,
 						'storage.optimization.compressionLevel': 6,
@@ -472,15 +474,15 @@ describe('storageOptimizationService', () => {
 		it('should respect popularity threshold configuration', async () => {
 			// Create a new service instance with high threshold
 			const customConfigService = {
-				get: jest.fn().mockImplementation((key: string) => {
+				get: vi.fn().mockImplementation((key: string) => {
 					if (key === 'cache.file.directory')
 						return '/test/storage'
 					return undefined
 				}),
-				getOptional: jest.fn().mockImplementation((key: string, defaultValue: any) => {
+				getOptional: vi.fn().mockImplementation((key: string, defaultValue: any) => {
 					if (key === 'storage.optimization.popularThreshold')
 						return 100 // Very high threshold
-					const defaults = {
+					const defaults: Record<string, any> = {
 						'storage.optimization.enabled': true,
 						'storage.optimization.strategies': ['compression'],
 						'storage.optimization.compressionLevel': 6,

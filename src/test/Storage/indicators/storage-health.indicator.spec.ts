@@ -1,14 +1,16 @@
+import type { MockedObject } from 'vitest'
 import { ConfigService } from '@microservice/Config/config.service'
 import { StorageHealthIndicator } from '@microservice/Storage/indicators/storage-health.indicator'
 import { StorageCleanupService } from '@microservice/Storage/services/storage-cleanup.service'
 import { StorageMonitoringService } from '@microservice/Storage/services/storage-monitoring.service'
 import { Test, TestingModule } from '@nestjs/testing'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('storageHealthIndicator', () => {
 	let indicator: StorageHealthIndicator
-	let storageMonitoring: jest.Mocked<StorageMonitoringService>
-	let storageCleanup: jest.Mocked<StorageCleanupService>
-	let configService: jest.Mocked<ConfigService>
+	let storageMonitoring: MockedObject<StorageMonitoringService>
+	let storageCleanup: MockedObject<StorageCleanupService>
+	let configService: MockedObject<ConfigService>
 
 	const mockStorageStats = {
 		totalFiles: 100,
@@ -28,17 +30,17 @@ describe('storageHealthIndicator', () => {
 
 	beforeEach(async () => {
 		const mockStorageMonitoringService = {
-			getStorageStats: jest.fn(),
-			checkThresholds: jest.fn(),
-			getEvictionCandidates: jest.fn(),
+			getStorageStats: vi.fn(),
+			checkThresholds: vi.fn(),
+			getEvictionCandidates: vi.fn(),
 		}
 
 		const mockStorageCleanupService = {
-			getCleanupStatus: jest.fn(),
+			getCleanupStatus: vi.fn(),
 		}
 
 		const mockConfigService = {
-			getOptional: jest.fn(),
+			getOptional: vi.fn(),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -96,7 +98,7 @@ describe('storageHealthIndicator', () => {
 	})
 
 	afterEach(() => {
-		jest.clearAllMocks()
+		vi.clearAllMocks()
 	})
 
 	describe('initialization', () => {

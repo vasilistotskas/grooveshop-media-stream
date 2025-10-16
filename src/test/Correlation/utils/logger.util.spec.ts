@@ -1,29 +1,31 @@
+import type { MockedObject } from 'vitest'
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
 import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock the CorrelationService
-jest.mock('@microservice/Correlation/services/correlation.service')
+vi.mock('@microservice/Correlation/services/correlation.service')
 
 describe('correlatedLogger', () => {
-	let mockCorrelationService: jest.Mocked<CorrelationService>
+	let mockCorrelationService: MockedObject<CorrelationService>
 	let consoleSpy: {
-		log: jest.SpyInstance
-		error: jest.SpyInstance
-		warn: jest.SpyInstance
-		debug: jest.SpyInstance
+		log: ReturnType<typeof vi.spyOn>
+		error: ReturnType<typeof vi.spyOn>
+		warn: ReturnType<typeof vi.spyOn>
+		debug: ReturnType<typeof vi.spyOn>
 	}
 
 	beforeEach(() => {
 		// Setup console spies
 		consoleSpy = {
-			log: jest.spyOn(console, 'log').mockImplementation(),
-			error: jest.spyOn(console, 'error').mockImplementation(),
-			warn: jest.spyOn(console, 'warn').mockImplementation(),
-			debug: jest.spyOn(console, 'debug').mockImplementation(),
+			log: vi.spyOn(console, 'log').mockImplementation(() => {}),
+			error: vi.spyOn(console, 'error').mockImplementation(() => {}),
+			warn: vi.spyOn(console, 'warn').mockImplementation(() => {}),
+			debug: vi.spyOn(console, 'debug').mockImplementation(() => {}),
 		}
 
 		// Mock the static correlation service instance
-		mockCorrelationService = new CorrelationService() as jest.Mocked<CorrelationService>
+		mockCorrelationService = new CorrelationService() as MockedObject<CorrelationService>
 		CorrelatedLogger.setCorrelationService(mockCorrelationService)
 	})
 

@@ -1,12 +1,15 @@
+import type { Alert } from '@microservice/Monitoring/interfaces/monitoring.interface'
+import type { MockedObject } from 'vitest'
 import { AlertingHealthIndicator } from '@microservice/Monitoring/indicators/alerting-health.indicator'
-import { Alert, AlertSeverity } from '@microservice/Monitoring/interfaces/monitoring.interface'
+import { AlertSeverity } from '@microservice/Monitoring/interfaces/monitoring.interface'
 import { AlertService } from '@microservice/Monitoring/services/alert.service'
 import { HealthIndicatorService } from '@nestjs/terminus'
 import { Test, TestingModule } from '@nestjs/testing'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('alertingHealthIndicator', () => {
 	let indicator: AlertingHealthIndicator
-	let alertService: jest.Mocked<AlertService>
+	let alertService: MockedObject<AlertService>
 
 	const mockAlertStats = {
 		totalRules: 5,
@@ -56,20 +59,20 @@ describe('alertingHealthIndicator', () => {
 
 	beforeEach(async () => {
 		const mockAlertService = {
-			getAlertStats: jest.fn().mockReturnValue(mockAlertStats),
-			getActiveAlerts: jest.fn().mockReturnValue(mockActiveAlerts),
-			getAlertHistory: jest.fn().mockReturnValue([]),
+			getAlertStats: vi.fn().mockReturnValue(mockAlertStats),
+			getActiveAlerts: vi.fn().mockReturnValue(mockActiveAlerts),
+			getAlertHistory: vi.fn().mockReturnValue([]),
 		}
 
 		const mockHealthIndicatorService = {
-			check: jest.fn(key => ({
-				up: jest.fn(details => ({
+			check: vi.fn(key => ({
+				up: vi.fn(details => ({
 					[key]: {
 						status: 'up',
 						...details,
 					},
 				})),
-				down: jest.fn(details => ({
+				down: vi.fn(details => ({
 					[key]: {
 						status: 'down',
 						...details,

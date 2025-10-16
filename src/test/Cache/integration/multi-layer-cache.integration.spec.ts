@@ -1,3 +1,4 @@
+import type { MockedObject } from 'vitest'
 import { FileCacheLayer } from '@microservice/Cache/layers/file-cache.layer'
 import { MemoryCacheLayer } from '@microservice/Cache/layers/memory-cache.layer'
 import { RedisCacheLayer } from '@microservice/Cache/layers/redis-cache.layer'
@@ -7,42 +8,43 @@ import { RedisCacheService } from '@microservice/Cache/services/redis-cache.serv
 import { ConfigService } from '@microservice/Config/config.service'
 import { MetricsService } from '@microservice/Metrics/services/metrics.service'
 import { Test, TestingModule } from '@nestjs/testing'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import 'reflect-metadata'
 
 describe('multiLayerCacheManager Integration', () => {
 	let cacheManager: MultiLayerCacheManager
-	let mockConfigService: jest.Mocked<ConfigService>
-	let mockMetricsService: jest.Mocked<MetricsService>
-	let mockMemoryCacheService: jest.Mocked<MemoryCacheService>
-	let mockRedisCacheService: jest.Mocked<RedisCacheService>
+	let mockConfigService: MockedObject<ConfigService>
+	let mockMetricsService: MockedObject<MetricsService>
+	let mockMemoryCacheService: MockedObject<MemoryCacheService>
+	let mockRedisCacheService: MockedObject<RedisCacheService>
 
 	beforeEach(async () => {
 		mockConfigService = {
-			get: jest.fn(),
-			getOptional: jest.fn(),
+			get: vi.fn(),
+			getOptional: vi.fn(),
 		} as any
 
 		mockMetricsService = {
-			recordCacheOperation: jest.fn(),
+			recordCacheOperation: vi.fn(),
 		} as any
 
 		mockMemoryCacheService = {
-			get: jest.fn(),
-			set: jest.fn(),
-			delete: jest.fn(),
-			has: jest.fn(),
-			clear: jest.fn(),
-			getStats: jest.fn(),
+			get: vi.fn(),
+			set: vi.fn(),
+			delete: vi.fn(),
+			has: vi.fn(),
+			clear: vi.fn(),
+			getStats: vi.fn(),
 		} as any
 
 		mockRedisCacheService = {
-			get: jest.fn(),
-			set: jest.fn(),
-			delete: jest.fn(),
-			has: jest.fn(),
-			clear: jest.fn(),
-			getStats: jest.fn(),
-			getConnectionStatus: jest.fn(),
+			get: vi.fn(),
+			set: vi.fn(),
+			delete: vi.fn(),
+			has: vi.fn(),
+			clear: vi.fn(),
+			getStats: vi.fn(),
+			getConnectionStatus: vi.fn(),
 		} as any
 
 		// Default config values

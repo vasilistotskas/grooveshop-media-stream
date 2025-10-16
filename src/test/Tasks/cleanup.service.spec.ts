@@ -1,26 +1,28 @@
+import type { MockedObject } from 'vitest'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import * as process from 'node:process'
 import { CleanupService } from '@microservice/Tasks/cleanup.service'
 import { Logger } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-jest.mock('node:fs/promises', () => ({
-	readdir: jest.fn(),
-	unlink: jest.fn(),
+vi.mock('node:fs/promises', () => ({
+	readdir: vi.fn(),
+	unlink: vi.fn(),
 }))
 
-jest.mock('node:path', () => ({
-	join: jest.fn(),
+vi.mock('node:path', () => ({
+	join: vi.fn(),
 }))
 
-jest.mock('node:process', () => ({
-	cwd: jest.fn(),
+vi.mock('node:process', () => ({
+	cwd: vi.fn(),
 }))
 
 describe('cleanupService', () => {
 	let service: CleanupService
-	let mockLogger: jest.Mocked<Logger>
+	let mockLogger: MockedObject<Logger>
 	const mockStoragePath = '/mock/cwd/storage'
 	const mockFiles = [
 		'file1.rst',
@@ -39,14 +41,14 @@ describe('cleanupService', () => {
 
 	beforeEach(async () => {
 		mockLogger = {
-			debug: jest.fn(),
-			error: jest.fn(),
+			debug: vi.fn(),
+			error: vi.fn(),
 		} as any
 
-		jest.mocked(process.cwd).mockReturnValue('/mock/cwd')
-		jest.mocked(path.join).mockReturnValue(mockStoragePath)
-		jest.mocked(fs.readdir).mockResolvedValue(mockFiles as any)
-		jest.mocked(fs.unlink).mockResolvedValue(undefined)
+		vi.mocked(process.cwd).mockReturnValue('/mock/cwd')
+		vi.mocked(path.join).mockReturnValue(mockStoragePath)
+		vi.mocked(fs.readdir).mockResolvedValue(mockFiles as any)
+		vi.mocked(fs.unlink).mockResolvedValue(undefined)
 
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [
@@ -62,7 +64,7 @@ describe('cleanupService', () => {
 	})
 
 	afterEach(() => {
-		jest.clearAllMocks()
+		vi.clearAllMocks()
 	})
 
 	describe('handleCleanup', () => {
@@ -80,7 +82,7 @@ describe('cleanupService', () => {
 		})
 
 		it('should handle empty directory', async () => {
-			jest.mocked(fs.readdir).mockResolvedValueOnce([])
+			vi.mocked(fs.readdir).mockResolvedValueOnce([])
 
 			await service.handleCleanup()
 
@@ -93,7 +95,7 @@ describe('cleanupService', () => {
 
 		it('should handle errors during cleanup', async () => {
 			const error = new Error('Failed to read directory')
-			jest.mocked(fs.readdir).mockRejectedValueOnce(error)
+			vi.mocked(fs.readdir).mockRejectedValueOnce(error)
 
 			await service.handleCleanup()
 

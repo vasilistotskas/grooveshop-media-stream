@@ -1,5 +1,6 @@
 import { MemoryHealthIndicator } from '@microservice/Health/indicators/memory-health.indicator'
 import { Test, TestingModule } from '@nestjs/testing'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import 'reflect-metadata'
 
 describe('memoryHealthIndicator', () => {
@@ -21,7 +22,7 @@ describe('memoryHealthIndicator', () => {
 
 		it('should return healthy status when memory usage is normal', async () => {
 			// Mock getMemoryInfo to return healthy values
-			jest.spyOn(indicator as any, 'getMemoryInfo').mockReturnValue({
+			vi.spyOn(indicator as any, 'getMemoryInfo').mockReturnValue({
 				totalMemory: 1000,
 				freeMemory: 600,
 				usedMemory: 400,
@@ -44,7 +45,7 @@ describe('memoryHealthIndicator', () => {
 		})
 
 		it('should return warning status when memory usage is above warning threshold', async () => {
-			jest.spyOn(indicator as any, 'getMemoryInfo').mockReturnValue({
+			vi.spyOn(indicator as any, 'getMemoryInfo').mockReturnValue({
 				totalMemory: 1000,
 				freeMemory: 150,
 				usedMemory: 850,
@@ -67,7 +68,7 @@ describe('memoryHealthIndicator', () => {
 		})
 
 		it('should return unhealthy status when system memory usage is critical', async () => {
-			jest.spyOn(indicator as any, 'getMemoryInfo').mockReturnValue({
+			vi.spyOn(indicator as any, 'getMemoryInfo').mockReturnValue({
 				totalMemory: 1000,
 				freeMemory: 50,
 				usedMemory: 950,
@@ -91,7 +92,7 @@ describe('memoryHealthIndicator', () => {
 		})
 
 		it('should return unhealthy status when heap memory usage is critical', async () => {
-			jest.spyOn(indicator as any, 'getMemoryInfo').mockReturnValue({
+			vi.spyOn(indicator as any, 'getMemoryInfo').mockReturnValue({
 				totalMemory: 1000,
 				freeMemory: 600,
 				usedMemory: 400,
@@ -115,7 +116,7 @@ describe('memoryHealthIndicator', () => {
 		})
 
 		it('should include threshold information in healthy response', async () => {
-			jest.spyOn(indicator as any, 'getMemoryInfo').mockReturnValue({
+			vi.spyOn(indicator as any, 'getMemoryInfo').mockReturnValue({
 				totalMemory: 1000,
 				freeMemory: 600,
 				usedMemory: 400,
@@ -177,7 +178,7 @@ describe('memoryHealthIndicator', () => {
 		it('should return true when gc is available', () => {
 			// Mock global.gc
 			const originalGc = globalThis.gc
-			globalThis.gc = jest.fn()
+			globalThis.gc = vi.fn()
 
 			const result = indicator.forceGarbageCollection()
 			expect(result).toBe(true)

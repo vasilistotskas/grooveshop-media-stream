@@ -1,3 +1,4 @@
+import type { MiddlewareConsumer, NestModule } from '@nestjs/common'
 import MediaStreamImageRESTController from '@microservice/API/controllers/media-stream-image-rest.controller'
 import { CacheModule } from '@microservice/Cache/cache.module'
 import CacheImageResourceOperation from '@microservice/Cache/operations/cache-image-resource.operation'
@@ -24,7 +25,7 @@ import { TasksModule } from '@microservice/Tasks/tasks.module'
 import ValidateCacheImageRequestResizeTargetRule from '@microservice/Validation/rules/validate-cache-image-request-resize-target.rule'
 import ValidateCacheImageRequestRule from '@microservice/Validation/rules/validate-cache-image-request.rule'
 import { ValidationModule } from '@microservice/Validation/validation.module'
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common'
+import { Module } from '@nestjs/common'
 import { APP_FILTER, APP_GUARD, HttpAdapterHost } from '@nestjs/core'
 import { ScheduleModule } from '@nestjs/schedule'
 

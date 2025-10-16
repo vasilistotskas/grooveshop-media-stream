@@ -3,6 +3,7 @@ import FetchResourceResponseJob from '@microservice/Queue/jobs/fetch-resource-re
 import { HttpService } from '@nestjs/axios'
 import { Test, TestingModule } from '@nestjs/testing'
 import { AxiosError, AxiosHeaders } from 'axios'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('fetchResourceResponseJob', () => {
 	let job: FetchResourceResponseJob
@@ -15,7 +16,7 @@ describe('fetchResourceResponseJob', () => {
 				{
 					provide: HttpService,
 					useValue: {
-						axiosRef: jest.fn(),
+						axiosRef: vi.fn(),
 					},
 				},
 			],
@@ -40,7 +41,7 @@ describe('fetchResourceResponseJob', () => {
 				resizeOptions: new ResizeOptions(),
 			})
 
-			const mockAxiosRef = jest.fn().mockResolvedValue(mockResponse)
+			const mockAxiosRef = vi.fn().mockResolvedValue(mockResponse)
 			Object.defineProperty(httpService, 'axiosRef', { value: mockAxiosRef })
 
 			const result = await job.handle(request)
@@ -64,7 +65,7 @@ describe('fetchResourceResponseJob', () => {
 				resizeOptions: new ResizeOptions(),
 			})
 
-			const mockAxiosRef = jest.fn().mockRejectedValue(mockError)
+			const mockAxiosRef = vi.fn().mockRejectedValue(mockError)
 			Object.defineProperty(httpService, 'axiosRef', { value: mockAxiosRef })
 
 			const result = await job.handle(request)

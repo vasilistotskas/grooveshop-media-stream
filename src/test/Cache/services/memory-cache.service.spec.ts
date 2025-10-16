@@ -1,16 +1,18 @@
+import type { MockedObject } from 'vitest'
 import { MemoryCacheService } from '@microservice/Cache/services/memory-cache.service'
 import { ConfigService } from '@microservice/Config/config.service'
 import { MetricsService } from '@microservice/Metrics/services/metrics.service'
 import { Test, TestingModule } from '@nestjs/testing'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('memoryCacheService', () => {
 	let service: MemoryCacheService
-	let configService: jest.Mocked<ConfigService>
-	let metricsService: jest.Mocked<MetricsService>
+	let configService: MockedObject<ConfigService>
+	let metricsService: MockedObject<MetricsService>
 
 	beforeEach(async () => {
 		const mockConfigService = {
-			get: jest.fn().mockImplementation((key: string) => {
+			get: vi.fn().mockImplementation((key: string) => {
 				if (key === 'cache.memory') {
 					return {
 						defaultTtl: 3600,
@@ -24,8 +26,8 @@ describe('memoryCacheService', () => {
 		}
 
 		const mockMetricsService = {
-			recordCacheOperation: jest.fn(),
-			updateCacheHitRatio: jest.fn(),
+			recordCacheOperation: vi.fn(),
+			updateCacheHitRatio: vi.fn(),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -62,7 +64,7 @@ describe('memoryCacheService', () => {
 
 	afterEach(async () => {
 		await service.clear()
-		jest.clearAllMocks()
+		vi.clearAllMocks()
 	})
 
 	describe('basic Cache Operations', () => {
@@ -215,7 +217,7 @@ describe('memoryCacheService', () => {
 		it('should handle get errors gracefully', async () => {
 			// Mock cache to throw error
 			const originalGet = (service as any).cache.get
-			;(service as any).cache.get = jest.fn().mockImplementation(() => {
+			;(service as any).cache.get = vi.fn().mockImplementation(() => {
 				throw new Error('Cache error')
 			})
 
@@ -231,7 +233,7 @@ describe('memoryCacheService', () => {
 		it('should handle set errors gracefully', async () => {
 			// Mock cache to throw error
 			const originalSet = (service as any).cache.set
-			;(service as any).cache.set = jest.fn().mockImplementation(() => {
+			;(service as any).cache.set = vi.fn().mockImplementation(() => {
 				throw new Error('Cache error')
 			})
 
@@ -245,7 +247,7 @@ describe('memoryCacheService', () => {
 		it('should handle stats errors gracefully', async () => {
 			// Mock cache to throw error
 			const originalGetStats = (service as any).cache.getStats
-			;(service as any).cache.getStats = jest.fn().mockImplementation(() => {
+			;(service as any).cache.getStats = vi.fn().mockImplementation(() => {
 				throw new Error('Stats error')
 			})
 
@@ -296,7 +298,7 @@ describe('memoryCacheService', () => {
 	describe('metrics Integration', () => {
 		it('should record cache operations in metrics', async () => {
 			// Clear any previous calls
-			jest.clearAllMocks()
+			vi.clearAllMocks()
 
 			await service.set('key1', 'value1')
 			const value = await service.get('key1') // This should be a hit since we just set it

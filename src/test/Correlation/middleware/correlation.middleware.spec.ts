@@ -1,7 +1,8 @@
+import type { NextFunction, Request, Response } from 'express'
 import { CORRELATION_ID_HEADER, CorrelationMiddleware } from '@microservice/Correlation/middleware/correlation.middleware'
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
 import { Test, TestingModule } from '@nestjs/testing'
-import { NextFunction, Request, Response } from 'express'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('correlationMiddleware', () => {
 	let middleware: CorrelationMiddleware
@@ -27,10 +28,10 @@ describe('correlationMiddleware', () => {
 		}
 
 		mockResponse = {
-			setHeader: jest.fn(),
+			setHeader: vi.fn(),
 		}
 
-		mockNext = jest.fn()
+		mockNext = vi.fn()
 	})
 
 	afterEach(() => {
@@ -39,8 +40,8 @@ describe('correlationMiddleware', () => {
 
 	describe('use', () => {
 		it('should generate correlation ID when not provided in header', () => {
-			jest.spyOn(correlationService, 'generateCorrelationId').mockReturnValue('generated-id')
-			jest.spyOn(correlationService, 'runWithContext').mockImplementation((context, fn) => fn())
+			vi.spyOn(correlationService, 'generateCorrelationId').mockReturnValue('generated-id')
+			vi.spyOn(correlationService, 'runWithContext').mockImplementation((context, fn) => fn())
 
 			middleware.use(mockRequest as Request, mockResponse as Response, mockNext)
 
@@ -53,8 +54,8 @@ describe('correlationMiddleware', () => {
 			const existingId = 'existing-correlation-id'
 			mockRequest.headers = { [CORRELATION_ID_HEADER]: existingId }
 
-			jest.spyOn(correlationService, 'generateCorrelationId')
-			jest.spyOn(correlationService, 'runWithContext').mockImplementation((context, fn) => fn())
+			vi.spyOn(correlationService, 'generateCorrelationId')
+			vi.spyOn(correlationService, 'runWithContext').mockImplementation((context, fn) => fn())
 
 			middleware.use(mockRequest as Request, mockResponse as Response, mockNext)
 
@@ -71,7 +72,7 @@ describe('correlationMiddleware', () => {
 			}
 
 			let capturedContext: any = null
-			jest.spyOn(correlationService, 'runWithContext').mockImplementation((context, fn) => {
+			vi.spyOn(correlationService, 'runWithContext').mockImplementation((context, fn) => {
 				capturedContext = context
 				return fn()
 			})
@@ -95,7 +96,7 @@ describe('correlationMiddleware', () => {
 			}
 
 			let capturedContext: any = null
-			jest.spyOn(correlationService, 'runWithContext').mockImplementation((context, fn) => {
+			vi.spyOn(correlationService, 'runWithContext').mockImplementation((context, fn) => {
 				capturedContext = context
 				return fn()
 			})
@@ -111,7 +112,7 @@ describe('correlationMiddleware', () => {
 			}
 
 			let capturedContext: any = null
-			jest.spyOn(correlationService, 'runWithContext').mockImplementation((context, fn) => {
+			vi.spyOn(correlationService, 'runWithContext').mockImplementation((context, fn) => {
 				capturedContext = context
 				return fn()
 			})
@@ -125,7 +126,7 @@ describe('correlationMiddleware', () => {
 			mockRequest.connection = { remoteAddress: '192.168.1.3' } as any
 
 			let capturedContext: any = null
-			jest.spyOn(correlationService, 'runWithContext').mockImplementation((context, fn) => {
+			vi.spyOn(correlationService, 'runWithContext').mockImplementation((context, fn) => {
 				capturedContext = context
 				return fn()
 			})
@@ -140,7 +141,7 @@ describe('correlationMiddleware', () => {
 			mockRequest.socket = {} as any
 
 			let capturedContext: any = null
-			jest.spyOn(correlationService, 'runWithContext').mockImplementation((context, fn) => {
+			vi.spyOn(correlationService, 'runWithContext').mockImplementation((context, fn) => {
 				capturedContext = context
 				return fn()
 			})

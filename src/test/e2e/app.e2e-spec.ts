@@ -1,13 +1,18 @@
+import type { INestApplication } from '@nestjs/common'
+import * as process from 'node:process'
 import MediaStreamModule from '@microservice/media-stream.module'
-import { INestApplication } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import request from 'supertest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 describe('MediaStreamModule (e2e)', () => {
 	let app: INestApplication
 	let moduleFixture: TestingModule
 
 	beforeAll(async () => {
+		// Disable scheduled tasks in e2e tests
+		process.env.DISABLE_CRON = 'true'
+
 		moduleFixture = await Test.createTestingModule({
 			imports: [MediaStreamModule],
 		}).compile()
@@ -17,52 +22,74 @@ describe('MediaStreamModule (e2e)', () => {
 	})
 
 	afterAll(async () => {
+		// Close the application first
 		try {
 			if (app) {
 				await app.close()
 			}
 		}
-		catch {
-			// Ignore cleanup errors in tests
+		catch (error) {
+			// Ignore "Connection is closed" errors - they're expected in cleanup
+			if (!(error instanceof Error) || !error.message.includes('Connection is closed')) {
+				console.error('Error closing app:', error)
+			}
 		}
 
+		// Close the module fixture
 		try {
 			if (moduleFixture) {
 				await moduleFixture.close()
 			}
 		}
-		catch {
-			// Ignore cleanup errors in tests
+		catch (error) {
+			// Ignore "Connection is closed" errors - they're expected in cleanup
+			if (!(error instanceof Error) || !error.message.includes('Connection is closed')) {
+				console.error('Error closing module:', error)
+			}
 		}
 
-		// Give time for async cleanup
-		await new Promise(resolve => setTimeout(resolve, 500))
+		// Give extra time for all async operations to complete
+		// This includes Redis disconnection, Bull queue cleanup, and scheduled tasks
+		await new Promise(resolve => setTimeout(resolve, 1000))
 	})
 
+	// eslint-disable-next-line test/expect-expect
 	it('/metrics (GET)', () => {
 		return request(app.getHttpServer())
+
 			.get('/metrics')
+
 			.expect(200)
+
 			.expect('Content-Type', /text\/plain/)
 	})
 
 	it('/metrics/health (GET)', () => {
 		return request(app.getHttpServer())
+
 			.get('/metrics/health')
+
 			.expect(200)
+
 			.expect((res) => {
 				expect(res.body).toHaveProperty('status')
+
 				expect(res.body).toHaveProperty('timestamp')
+
 				expect(res.body).toHaveProperty('service')
 			})
 	})
 
 	it('/health/live (GET)', () => {
 		return request(app.getHttpServer())
+
 			.get('/health/live')
+
 			.expect(200)
+
 			.expect((res) => {
 				expect(res.body).toHaveProperty('status', 'alive')
+
 				expect(res.body).toHaveProperty('uptime')
 			})
 	})

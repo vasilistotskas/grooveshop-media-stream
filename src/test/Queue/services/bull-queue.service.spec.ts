@@ -1,31 +1,33 @@
-import { JobOptions, JobProcessor } from '@microservice/Queue/interfaces/job-queue.interface'
+import type { JobOptions, JobProcessor } from '@microservice/Queue/interfaces/job-queue.interface'
+import type { Job as BullJob, Queue } from 'bull'
+import type { MockedObject } from 'vitest'
 import { BullQueueService } from '@microservice/Queue/services/bull-queue.service'
 import { JobType } from '@microservice/Queue/types/job.types'
 import { getQueueToken } from '@nestjs/bull'
 import { Logger } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
-import { Job as BullJob, Queue } from 'bull'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('bullQueueService', () => {
 	let service: BullQueueService
-	let mockImageQueue: jest.Mocked<Queue>
-	let mockCacheQueue: jest.Mocked<Queue>
+	let mockImageQueue: MockedObject<Queue>
+	let mockCacheQueue: MockedObject<Queue>
 
 	beforeEach(async () => {
 		const mockQueueFactory = () => ({
-			add: jest.fn(),
-			process: jest.fn(),
-			getJob: jest.fn(),
-			getWaiting: jest.fn(),
-			getActive: jest.fn(),
-			getCompleted: jest.fn(),
-			getFailed: jest.fn(),
-			getDelayed: jest.fn(),
-			isPaused: jest.fn(),
-			pause: jest.fn(),
-			resume: jest.fn(),
-			clean: jest.fn(),
-			close: jest.fn(),
+			add: vi.fn(),
+			process: vi.fn(),
+			getJob: vi.fn(),
+			getWaiting: vi.fn(),
+			getActive: vi.fn(),
+			getCompleted: vi.fn(),
+			getFailed: vi.fn(),
+			getDelayed: vi.fn(),
+			isPaused: vi.fn(),
+			pause: vi.fn(),
+			resume: vi.fn(),
+			clean: vi.fn(),
+			close: vi.fn(),
 		})
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -47,15 +49,15 @@ describe('bullQueueService', () => {
 		mockCacheQueue = module.get(getQueueToken('cache-operations'))
 
 		// Mock logger to avoid console output during tests
-		jest.spyOn(Logger.prototype, 'debug').mockImplementation()
-		jest.spyOn(Logger.prototype, 'log').mockImplementation()
-		jest.spyOn(Logger.prototype, 'warn').mockImplementation()
-		jest.spyOn(Logger.prototype, 'error').mockImplementation()
+		vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => {})
+		vi.spyOn(Logger.prototype, 'log').mockImplementation(() => {})
+		vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => {})
+		vi.spyOn(Logger.prototype, 'error').mockImplementation(() => {})
 	})
 
 	afterEach(() => {
-		jest.clearAllMocks()
-		jest.resetAllMocks()
+		vi.clearAllMocks()
+		vi.resetAllMocks()
 	})
 
 	describe('add', () => {
@@ -68,7 +70,7 @@ describe('bullQueueService', () => {
 				name: JobType.IMAGE_PROCESSING,
 				data: jobData,
 				opts: options,
-				progress: jest.fn().mockReturnValue(0),
+				progress: vi.fn().mockReturnValue(0),
 				timestamp: Date.now(),
 				attemptsMade: 0,
 				failedReason: null,
@@ -108,7 +110,7 @@ describe('bullQueueService', () => {
 				name: 'cache-warming',
 				data: jobData,
 				opts: options,
-				progress: jest.fn().mockReturnValue(0),
+				progress: vi.fn().mockReturnValue(0),
 				timestamp: Date.now(),
 				attemptsMade: 0,
 				failedReason: null,
@@ -148,7 +150,7 @@ describe('bullQueueService', () => {
 
 	describe('process', () => {
 		it('should register job processor', () => {
-			const mockProcessor: JobProcessor = jest.fn().mockResolvedValue({ success: true })
+			const mockProcessor: JobProcessor = vi.fn().mockResolvedValue({ success: true })
 
 			service.process(JobType.IMAGE_PROCESSING, mockProcessor)
 
@@ -159,7 +161,7 @@ describe('bullQueueService', () => {
 		})
 
 		it('should execute processor when job is processed', async () => {
-			const mockProcessor: JobProcessor = jest.fn().mockResolvedValue({ success: true })
+			const mockProcessor: JobProcessor = vi.fn().mockResolvedValue({ success: true })
 			const jobData = { imageUrl: 'https://example.com/image.jpg' }
 
 			const mockBullJob = {
@@ -167,7 +169,7 @@ describe('bullQueueService', () => {
 				name: JobType.IMAGE_PROCESSING,
 				data: jobData,
 				opts: {},
-				progress: jest.fn().mockReturnValue(50),
+				progress: vi.fn().mockReturnValue(50),
 				timestamp: Date.now(),
 				attemptsMade: 1,
 				failedReason: null,
@@ -199,7 +201,7 @@ describe('bullQueueService', () => {
 		})
 
 		it('should handle processor errors', async () => {
-			const mockProcessor: JobProcessor = jest.fn().mockRejectedValue(new Error('Processing failed'))
+			const mockProcessor: JobProcessor = vi.fn().mockRejectedValue(new Error('Processing failed'))
 			const jobData = { imageUrl: 'https://example.com/image.jpg' }
 
 			const mockBullJob = {
@@ -207,7 +209,7 @@ describe('bullQueueService', () => {
 				name: JobType.IMAGE_PROCESSING,
 				data: jobData,
 				opts: {},
-				progress: jest.fn().mockReturnValue(0),
+				progress: vi.fn().mockReturnValue(0),
 				timestamp: Date.now(),
 				attemptsMade: 1,
 				failedReason: null,
@@ -274,7 +276,7 @@ describe('bullQueueService', () => {
 				name: JobType.IMAGE_PROCESSING,
 				data: { imageUrl: 'https://example.com/image.jpg' },
 				opts: {},
-				progress: jest.fn().mockReturnValue(75),
+				progress: vi.fn().mockReturnValue(75),
 				timestamp: Date.now(),
 				attemptsMade: 1,
 				failedReason: null,
@@ -300,7 +302,7 @@ describe('bullQueueService', () => {
 				name: 'cache-warming',
 				data: { imageUrls: [] },
 				opts: {},
-				progress: jest.fn().mockReturnValue(100),
+				progress: vi.fn().mockReturnValue(100),
 				timestamp: Date.now(),
 				attemptsMade: 1,
 				failedReason: null,
@@ -344,11 +346,11 @@ describe('bullQueueService', () => {
 			const mockBullJob = {
 				id: 'job-123',
 				name: JobType.IMAGE_PROCESSING,
-				remove: jest.fn().mockResolvedValue(undefined),
+				remove: vi.fn().mockResolvedValue(undefined),
 			} as any
 
 			// Mock getJob to return a job
-			jest.spyOn(service, 'getJob').mockResolvedValue({
+			vi.spyOn(service, 'getJob').mockResolvedValue({
 				id: 'job-123',
 				name: JobType.IMAGE_PROCESSING,
 				data: {},
@@ -362,7 +364,7 @@ describe('bullQueueService', () => {
 		})
 
 		it('should throw error when job not found', async () => {
-			jest.spyOn(service, 'getJob').mockResolvedValue(null)
+			vi.spyOn(service, 'getJob').mockResolvedValue(null)
 
 			await expect(service.removeJob('nonexistent-job')).rejects.toThrow(
 				'Job nonexistent-job not found',
@@ -373,10 +375,10 @@ describe('bullQueueService', () => {
 			const mockBullJob = {
 				id: 'job-123',
 				name: JobType.IMAGE_PROCESSING,
-				remove: jest.fn().mockRejectedValue(new Error('Removal failed')),
+				remove: vi.fn().mockRejectedValue(new Error('Removal failed')),
 			} as any
 
-			jest.spyOn(service, 'getJob').mockResolvedValue({
+			vi.spyOn(service, 'getJob').mockResolvedValue({
 				id: 'job-123',
 				name: JobType.IMAGE_PROCESSING,
 				data: {},

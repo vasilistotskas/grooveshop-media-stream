@@ -1,21 +1,23 @@
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
+import type { ArgumentsHost } from '@nestjs/common'
+import type { Mock } from 'vitest'
 import { MediaStreamError, ResourceNotFoundError } from '@microservice/common/errors/media-stream.errors'
 import { MediaStreamExceptionFilter } from '@microservice/common/filters/media-stream-exception.filter'
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
-import { ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common'
+import { HttpException, HttpStatus } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-describe('MediaStreamExceptionFilter', () => {
+describe('mediaStreamExceptionFilter', () => {
 	let filter: MediaStreamExceptionFilter
 	let mockArgumentsHost: ArgumentsHost
 	let mockResponse: any
 	let mockRequest: any
 	let mockHttpContext: any
-	let mockGetResponseFn: jest.Mock
-	let mockGetRequestFn: jest.Mock
-	let mockSwitchToHttpFn: jest.Mock
+	let mockGetResponseFn: Mock
+	let mockGetRequestFn: Mock
+	let mockSwitchToHttpFn: Mock
 	let mockHttpAdapterHost: HttpAdapterHost
-	let mockHttpAdapterReply: jest.Mock
+	let mockHttpAdapterReply: Mock
 	let mockCorrelationService: CorrelationService
 
 	beforeEach(() => {
@@ -26,38 +28,38 @@ describe('MediaStreamExceptionFilter', () => {
 
 		mockResponse = {}
 
-		mockGetResponseFn = jest.fn().mockReturnValue(mockResponse)
-		mockGetRequestFn = jest.fn().mockReturnValue(mockRequest)
+		mockGetResponseFn = vi.fn().mockReturnValue(mockResponse)
+		mockGetRequestFn = vi.fn().mockReturnValue(mockRequest)
 		mockHttpContext = {
 			getResponse: mockGetResponseFn,
 			getRequest: mockGetRequestFn,
 		}
 
-		mockSwitchToHttpFn = jest.fn().mockReturnValue(mockHttpContext)
+		mockSwitchToHttpFn = vi.fn().mockReturnValue(mockHttpContext)
 		mockArgumentsHost = {
 			switchToHttp: mockSwitchToHttpFn,
 		} as unknown as ArgumentsHost
 
-		mockHttpAdapterReply = jest.fn()
+		mockHttpAdapterReply = vi.fn()
 
 		mockHttpAdapterHost = {
 			httpAdapter: {
 				reply: mockHttpAdapterReply,
-				getRequestUrl: jest.fn().mockReturnValue('/test/url'),
+				getRequestUrl: vi.fn().mockReturnValue('/test/url'),
 			},
 		} as unknown as HttpAdapterHost
 
 		mockCorrelationService = {
-			getCorrelationId: jest.fn().mockReturnValue('test-correlation-id'),
+			getCorrelationId: vi.fn().mockReturnValue('test-correlation-id'),
 		} as unknown as CorrelationService
 
 		filter = new MediaStreamExceptionFilter(mockHttpAdapterHost, mockCorrelationService)
 
-		jest.spyOn(console, 'error').mockImplementation(() => {})
+		vi.spyOn(console, 'error').mockImplementation(() => {})
 	})
 
 	afterEach(() => {
-		jest.restoreAllMocks()
+		vi.restoreAllMocks()
 	})
 
 	describe('catch', () => {

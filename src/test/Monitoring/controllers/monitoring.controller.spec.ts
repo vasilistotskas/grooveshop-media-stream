@@ -1,15 +1,18 @@
+import type { SystemHealth } from '@microservice/Monitoring/interfaces/monitoring.interface'
+import type { MockedObject } from 'vitest'
 import { MonitoringController } from '@microservice/Monitoring/controllers/monitoring.controller'
-import { AlertCondition, AlertSeverity, SystemHealth } from '@microservice/Monitoring/interfaces/monitoring.interface'
+import { AlertCondition, AlertSeverity } from '@microservice/Monitoring/interfaces/monitoring.interface'
 import { AlertService } from '@microservice/Monitoring/services/alert.service'
 import { MonitoringService } from '@microservice/Monitoring/services/monitoring.service'
 import { PerformanceMonitoringService } from '@microservice/Monitoring/services/performance-monitoring.service'
 import { Test, TestingModule } from '@nestjs/testing'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('monitoringController', () => {
 	let controller: MonitoringController
-	let monitoringService: jest.Mocked<MonitoringService>
-	let alertService: jest.Mocked<AlertService>
-	let performanceService: jest.Mocked<PerformanceMonitoringService>
+	let monitoringService: MockedObject<MonitoringService>
+	let alertService: MockedObject<AlertService>
+	let performanceService: MockedObject<PerformanceMonitoringService>
 
 	const mockSystemHealth: SystemHealth = {
 		status: 'healthy',
@@ -28,16 +31,16 @@ describe('monitoringController', () => {
 
 	beforeEach(async () => {
 		const mockMonitoringService = {
-			getSystemHealth: jest.fn().mockResolvedValue(mockSystemHealth),
-			getStats: jest.fn().mockReturnValue({
+			getSystemHealth: vi.fn().mockResolvedValue(mockSystemHealth),
+			getStats: vi.fn().mockReturnValue({
 				totalMetrics: 100,
 				metricTypes: { counter: 50, gauge: 30, timer: 20 },
 				oldestMetric: Date.now() - 86400000,
 				newestMetric: Date.now(),
 				memoryUsage: 1024000,
 			}),
-			getMetrics: jest.fn().mockReturnValue([]),
-			getAggregatedMetrics: jest.fn().mockReturnValue({
+			getMetrics: vi.fn().mockReturnValue([]),
+			getAggregatedMetrics: vi.fn().mockReturnValue({
 				count: 10,
 				sum: 1000,
 				avg: 100,
@@ -45,11 +48,11 @@ describe('monitoringController', () => {
 				max: 200,
 				latest: 150,
 			}),
-			getMetricNames: jest.fn().mockReturnValue(['metric.one', 'metric.two']),
+			getMetricNames: vi.fn().mockReturnValue(['metric.one', 'metric.two']),
 		}
 
 		const mockAlertService = {
-			getAlertStats: jest.fn().mockReturnValue({
+			getAlertStats: vi.fn().mockReturnValue({
 				totalRules: 5,
 				activeAlerts: 2,
 				alertsBySeverity: {
@@ -61,16 +64,16 @@ describe('monitoringController', () => {
 				alertsLast24h: 3,
 				averageResolutionTime: 300000,
 			}),
-			getAlertRules: jest.fn().mockReturnValue([]),
-			addAlertRule: jest.fn(),
-			getActiveAlerts: jest.fn().mockReturnValue([]),
-			getAlertHistory: jest.fn().mockReturnValue([]),
-			triggerAlert: jest.fn(),
-			resolveAlert: jest.fn().mockReturnValue(true),
+			getAlertRules: vi.fn().mockReturnValue([]),
+			addAlertRule: vi.fn(),
+			getActiveAlerts: vi.fn().mockReturnValue([]),
+			getAlertHistory: vi.fn().mockReturnValue([]),
+			triggerAlert: vi.fn(),
+			resolveAlert: vi.fn().mockReturnValue(true),
 		}
 
 		const mockPerformanceService = {
-			getPerformanceOverview: jest.fn().mockReturnValue({
+			getPerformanceOverview: vi.fn().mockReturnValue({
 				totalOperations: 1000,
 				averageResponseTime: 150,
 				successRate: 95.5,
@@ -78,8 +81,8 @@ describe('monitoringController', () => {
 				mostFrequentOperations: [],
 				errorRates: [],
 			}),
-			getPerformanceMetrics: jest.fn().mockReturnValue([]),
-			getPerformanceStats: jest.fn().mockReturnValue({
+			getPerformanceMetrics: vi.fn().mockReturnValue([]),
+			getPerformanceStats: vi.fn().mockReturnValue({
 				totalOperations: 100,
 				successfulOperations: 95,
 				failedOperations: 5,
@@ -91,8 +94,8 @@ describe('monitoringController', () => {
 				p95Duration: 300,
 				p99Duration: 450,
 			}),
-			getTrackedOperations: jest.fn().mockReturnValue(['operation1', 'operation2']),
-			getActiveOperations: jest.fn().mockReturnValue([]),
+			getTrackedOperations: vi.fn().mockReturnValue(['operation1', 'operation2']),
+			getActiveOperations: vi.fn().mockReturnValue([]),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({

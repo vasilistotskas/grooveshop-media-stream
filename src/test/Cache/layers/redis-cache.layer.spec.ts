@@ -1,20 +1,22 @@
+import type { MockedObject } from 'vitest'
 import { RedisCacheLayer } from '@microservice/Cache/layers/redis-cache.layer'
 import { RedisCacheService } from '@microservice/Cache/services/redis-cache.service'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('redisCacheLayer', () => {
 	let layer: RedisCacheLayer
-	let mockRedisCacheService: jest.Mocked<RedisCacheService>
+	let mockRedisCacheService: MockedObject<RedisCacheService>
 
 	beforeEach(() => {
 		mockRedisCacheService = {
-			get: jest.fn(),
-			set: jest.fn(),
-			delete: jest.fn(),
-			has: jest.fn(),
-			exists: jest.fn(),
-			clear: jest.fn(),
-			getStats: jest.fn(),
-			getConnectionStatus: jest.fn(),
+			get: vi.fn(),
+			set: vi.fn(),
+			delete: vi.fn(),
+			has: vi.fn(),
+			exists: vi.fn(),
+			clear: vi.fn(),
+			getStats: vi.fn(),
+			getConnectionStatus: vi.fn(),
 		} as any
 
 		layer = new RedisCacheLayer(mockRedisCacheService)

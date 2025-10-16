@@ -1,11 +1,13 @@
+import type { MockedObject } from 'vitest'
 import { RedisHealthIndicator } from '@microservice/Cache/indicators/redis-health.indicator'
 import { RedisCacheService } from '@microservice/Cache/services/redis-cache.service'
 import { ConfigService } from '@microservice/Config/config.service'
 import { Test, TestingModule } from '@nestjs/testing'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('redisHealthIndicator', () => {
 	let indicator: RedisHealthIndicator
-	let redisCacheService: jest.Mocked<RedisCacheService>
+	let redisCacheService: MockedObject<RedisCacheService>
 
 	const mockConfig = {
 		host: 'localhost',
@@ -17,19 +19,19 @@ describe('redisHealthIndicator', () => {
 
 	beforeEach(async () => {
 		const mockRedisCacheService = {
-			ping: jest.fn(),
-			get: jest.fn(),
-			set: jest.fn(),
-			delete: jest.fn(),
-			getTtl: jest.fn(),
-			getStats: jest.fn(),
-			getMemoryUsage: jest.fn(),
-			getConnectionStatus: jest.fn(),
-			keys: jest.fn(),
+			ping: vi.fn(),
+			get: vi.fn(),
+			set: vi.fn(),
+			delete: vi.fn(),
+			getTtl: vi.fn(),
+			getStats: vi.fn(),
+			getMemoryUsage: vi.fn(),
+			getConnectionStatus: vi.fn(),
+			keys: vi.fn(),
 		}
 
 		const mockConfigService = {
-			get: jest.fn().mockImplementation((key: string) => {
+			get: vi.fn().mockImplementation((key: string) => {
 				if (key === 'cache.redis.host')
 					return mockConfig.host
 				if (key === 'cache.redis.port')
@@ -57,7 +59,7 @@ describe('redisHealthIndicator', () => {
 	})
 
 	afterEach(() => {
-		jest.clearAllMocks()
+		vi.clearAllMocks()
 	})
 
 	describe('performHealthCheck', () => {

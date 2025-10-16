@@ -1,14 +1,16 @@
+import type { ExecutionContext } from '@nestjs/common'
+import type { MockedObject } from 'vitest'
 import { AdaptiveRateLimitGuard } from '@microservice/RateLimit/guards/adaptive-rate-limit.guard'
 import { RateLimitMetricsService } from '@microservice/RateLimit/services/rate-limit-metrics.service'
 import { RateLimitService } from '@microservice/RateLimit/services/rate-limit.service'
-import { ExecutionContext } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { ThrottlerException } from '@nestjs/throttler'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('adaptiveRateLimitGuard', () => {
 	let guard: AdaptiveRateLimitGuard
-	let rateLimitService: jest.Mocked<RateLimitService>
-	let rateLimitMetricsService: jest.Mocked<RateLimitMetricsService>
+	let rateLimitService: MockedObject<RateLimitService>
+	let rateLimitMetricsService: MockedObject<RateLimitMetricsService>
 
 	const mockRequest = {
 		url: '/api/v1/image/media/uploads/test.jpg/100/100/contain/entropy/transparent/5/webp/100',
@@ -21,7 +23,7 @@ describe('adaptiveRateLimitGuard', () => {
 	}
 
 	const mockResponse = {
-		setHeader: jest.fn(),
+		setHeader: vi.fn(),
 	}
 
 	const mockExecutionContext = {
@@ -33,18 +35,18 @@ describe('adaptiveRateLimitGuard', () => {
 
 	beforeEach(async () => {
 		const mockRateLimitService = {
-			generateAdvancedKey: jest.fn(),
-			getRateLimitConfig: jest.fn(),
-			calculateAdaptiveLimit: jest.fn(),
-			checkRateLimit: jest.fn(),
-			recordRateLimitMetrics: jest.fn(),
-			getWhitelistedDomains: jest.fn(),
-			getBypassBotsConfig: jest.fn(),
-			isBot: jest.fn(),
+			generateAdvancedKey: vi.fn(),
+			getRateLimitConfig: vi.fn(),
+			calculateAdaptiveLimit: vi.fn(),
+			checkRateLimit: vi.fn(),
+			recordRateLimitMetrics: vi.fn(),
+			getWhitelistedDomains: vi.fn(),
+			getBypassBotsConfig: vi.fn(),
+			isBot: vi.fn(),
 		}
 
 		const mockRateLimitMetricsService = {
-			recordRateLimitAttempt: jest.fn(),
+			recordRateLimitAttempt: vi.fn(),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -64,7 +66,7 @@ describe('adaptiveRateLimitGuard', () => {
 	})
 
 	afterEach(() => {
-		jest.clearAllMocks()
+		vi.clearAllMocks()
 	})
 
 	describe('canActivate', () => {
@@ -248,7 +250,7 @@ describe('adaptiveRateLimitGuard', () => {
 					'image-processing',
 				)
 
-				jest.clearAllMocks()
+				vi.clearAllMocks()
 			}
 		})
 
@@ -286,7 +288,7 @@ describe('adaptiveRateLimitGuard', () => {
 
 				expect(rateLimitService.getRateLimitConfig).toHaveBeenCalledWith(testCase.expectedType)
 
-				jest.clearAllMocks()
+				vi.clearAllMocks()
 			}
 		})
 	})

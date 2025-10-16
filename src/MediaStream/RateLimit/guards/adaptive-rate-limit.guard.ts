@@ -1,5 +1,6 @@
+import type { CanActivate, ExecutionContext } from '@nestjs/common'
 import * as process from 'node:process'
-import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { ThrottlerException } from '@nestjs/throttler'
 import { RateLimitMetricsService } from '../services/rate-limit-metrics.service'
 import { RateLimitService } from '../services/rate-limit.service'

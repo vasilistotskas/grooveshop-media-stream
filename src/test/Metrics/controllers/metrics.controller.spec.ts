@@ -1,16 +1,18 @@
+import type { MockedObject } from 'vitest'
 import { MetricsController } from '@microservice/Metrics/controllers/metrics.controller'
 import { MetricsService } from '@microservice/Metrics/services/metrics.service'
 import { Test, TestingModule } from '@nestjs/testing'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import 'reflect-metadata'
 
 describe('metricsController', () => {
 	let controller: MetricsController
-	let metricsService: jest.Mocked<MetricsService>
+	let metricsService: MockedObject<MetricsService>
 
 	beforeEach(async () => {
 		const mockMetricsService = {
-			getMetrics: jest.fn(),
-			getRegistry: jest.fn(),
+			getMetrics: vi.fn(),
+			getRegistry: vi.fn(),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -60,7 +62,7 @@ mediastream_http_requests_total{method="GET",route="/test",status_code="200"} 1`
 	describe('getMetricsHealth', () => {
 		it('should return health status', () => {
 			const mockRegistry = {
-				getMetricsAsArray: jest.fn().mockReturnValue([
+				getMetricsAsArray: vi.fn().mockReturnValue([
 					{ name: 'metric1' },
 					{ name: 'metric2' },
 				]),
@@ -82,7 +84,7 @@ mediastream_http_requests_total{method="GET",route="/test",status_code="200"} 1`
 
 		it('should handle registry errors gracefully', () => {
 			const mockRegistry = {
-				getMetricsAsArray: jest.fn().mockImplementation(() => {
+				getMetricsAsArray: vi.fn().mockImplementation(() => {
 					throw new Error('Registry error')
 				}),
 			}

@@ -1,10 +1,11 @@
 import { CircuitBreaker, CircuitState } from '@microservice/HTTP/utils/circuit-breaker'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('circuitBreaker', () => {
 	let circuitBreaker: CircuitBreaker
 
 	beforeEach(() => {
-		jest.useFakeTimers()
+		vi.useFakeTimers()
 		circuitBreaker = new CircuitBreaker({
 			failureThreshold: 50,
 			resetTimeout: 1000,
@@ -14,7 +15,7 @@ describe('circuitBreaker', () => {
 	})
 
 	afterEach(() => {
-		jest.useRealTimers()
+		vi.useRealTimers()
 	})
 
 	describe('initialization', () => {
@@ -53,7 +54,7 @@ describe('circuitBreaker', () => {
 			expect(circuitBreaker.getState()).toBe(CircuitState.OPEN)
 
 			// Wait for reset timeout and check if circuit transitions to half-open
-			jest.advanceTimersByTime(1000)
+			vi.advanceTimersByTime(1000)
 			const isOpen = circuitBreaker.isOpen() // This should transition to half-open
 			expect(isOpen).toBe(false) // Should return false when in half-open state
 			expect(circuitBreaker.getState()).toBe(CircuitState.HALF_OPEN)
@@ -99,11 +100,11 @@ describe('circuitBreaker', () => {
 
 	describe('circuit States', () => {
 		beforeEach(() => {
-			jest.useFakeTimers()
+			vi.useFakeTimers()
 		})
 
 		afterEach(() => {
-			jest.useRealTimers()
+			vi.useRealTimers()
 		})
 
 		it('should transition from open to half-open after reset timeout', () => {
@@ -114,7 +115,7 @@ describe('circuitBreaker', () => {
 			expect(circuitBreaker.getState()).toBe(CircuitState.OPEN)
 
 			// Advance time to trigger half-open
-			jest.advanceTimersByTime(1000)
+			vi.advanceTimersByTime(1000)
 
 			// Check if circuit transitions to half-open
 			const isOpen = circuitBreaker.isOpen()
@@ -129,7 +130,7 @@ describe('circuitBreaker', () => {
 			}
 
 			// Wait for reset timeout
-			jest.advanceTimersByTime(1000)
+			vi.advanceTimersByTime(1000)
 			circuitBreaker.isOpen() // Transition to half-open
 
 			// Record failure in half-open state
@@ -141,7 +142,7 @@ describe('circuitBreaker', () => {
 
 	describe('execute Method', () => {
 		it('should execute function when circuit is closed', async () => {
-			const mockFn = jest.fn().mockResolvedValue('success')
+			const mockFn = vi.fn().mockResolvedValue('success')
 
 			const result = await circuitBreaker.execute(mockFn)
 
@@ -155,7 +156,7 @@ describe('circuitBreaker', () => {
 				circuitBreaker.recordFailure()
 			}
 
-			const mockFn = jest.fn().mockResolvedValue('success')
+			const mockFn = vi.fn().mockResolvedValue('success')
 
 			await expect(circuitBreaker.execute(mockFn)).rejects.toThrow('Circuit breaker is open')
 			expect(mockFn).not.toHaveBeenCalled()
@@ -167,8 +168,8 @@ describe('circuitBreaker', () => {
 				circuitBreaker.recordFailure()
 			}
 
-			const mockFn = jest.fn().mockResolvedValue('success')
-			const fallbackFn = jest.fn().mockResolvedValue('fallback')
+			const mockFn = vi.fn().mockResolvedValue('success')
+			const fallbackFn = vi.fn().mockResolvedValue('fallback')
 
 			const result = await circuitBreaker.execute(mockFn, fallbackFn)
 
@@ -178,7 +179,7 @@ describe('circuitBreaker', () => {
 		})
 
 		it('should record success when function succeeds', async () => {
-			const mockFn = jest.fn().mockResolvedValue('success')
+			const mockFn = vi.fn().mockResolvedValue('success')
 
 			await circuitBreaker.execute(mockFn)
 
@@ -188,7 +189,7 @@ describe('circuitBreaker', () => {
 		})
 
 		it('should record failure when function throws', async () => {
-			const mockFn = jest.fn().mockRejectedValue(new Error('test error'))
+			const mockFn = vi.fn().mockRejectedValue(new Error('test error'))
 
 			await expect(circuitBreaker.execute(mockFn)).rejects.toThrow('test error')
 
@@ -198,8 +199,8 @@ describe('circuitBreaker', () => {
 		})
 
 		it('should use fallback when function throws and fallback is provided', async () => {
-			const mockFn = jest.fn().mockRejectedValue(new Error('test error'))
-			const fallbackFn = jest.fn().mockResolvedValue('fallback')
+			const mockFn = vi.fn().mockRejectedValue(new Error('test error'))
+			const fallbackFn = vi.fn().mockResolvedValue('fallback')
 
 			const result = await circuitBreaker.execute(mockFn, fallbackFn)
 
@@ -237,11 +238,11 @@ describe('circuitBreaker', () => {
 
 	describe('rolling Window', () => {
 		beforeEach(() => {
-			jest.useFakeTimers()
+			vi.useFakeTimers()
 		})
 
 		afterEach(() => {
-			jest.useRealTimers()
+			vi.useRealTimers()
 		})
 
 		it('should prune old entries from rolling window', () => {
@@ -250,7 +251,7 @@ describe('circuitBreaker', () => {
 			circuitBreaker.recordFailure()
 
 			// Advance time beyond rolling window
-			jest.advanceTimersByTime(6000) // Beyond 5000ms rolling window
+			vi.advanceTimersByTime(6000) // Beyond 5000ms rolling window
 
 			// Record more failures
 			circuitBreaker.recordFailure()

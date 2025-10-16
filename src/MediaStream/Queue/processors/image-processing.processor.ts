@@ -1,3 +1,5 @@
+import type { Job } from '../interfaces/job-queue.interface'
+import type { ImageProcessingJobData, JobResult } from '../types/job.types'
 import { Buffer } from 'node:buffer'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -8,8 +10,6 @@ import ResourceMetaData from '@microservice/HTTP/dto/resource-meta-data.dto'
 import { HttpClientService } from '@microservice/HTTP/services/http-client.service'
 import { Injectable, Logger } from '@nestjs/common'
 import sharp from 'sharp'
-import { Job } from '../interfaces/job-queue.interface'
-import { ImageProcessingJobData, JobResult } from '../types/job.types'
 
 @Injectable()
 export class ImageProcessingProcessor {

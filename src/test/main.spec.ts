@@ -1,16 +1,20 @@
 import * as process from 'node:process'
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import MediaStreamModule from '@microservice/media-stream.module'
 import { NestFactory } from '@nestjs/core'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { bootstrap } from '../main'
 
-jest.mock('@nestjs/core', () => ({
-	NestFactory: {
-		create: jest.fn(),
-	},
-}))
+vi.mock('@nestjs/core', async () => {
+	const actual = await vi.importActual('@nestjs/core')
+	return {
+		...actual,
+		NestFactory: {
+			create: vi.fn(),
+		},
+	}
+})
 
-describe('Bootstrap', () => {
+describe('bootstrap', () => {
 	let mockApp: any
 	let originalEnv: NodeJS.ProcessEnv
 
@@ -18,12 +22,12 @@ describe('Bootstrap', () => {
 		originalEnv = { ...process.env }
 
 		mockApp = {
-			use: jest.fn().mockReturnThis(),
-			useStaticAssets: jest.fn().mockReturnThis(),
-			enableCors: jest.fn().mockReturnThis(),
-			listen: jest.fn().mockImplementation(() => Promise.resolve()),
-			get: jest.fn().mockReturnValue({
-				get: jest.fn().mockImplementation((key: any) => {
+			use: vi.fn().mockReturnThis(),
+			useStaticAssets: vi.fn().mockReturnThis(),
+			enableCors: vi.fn().mockReturnThis(),
+			listen: vi.fn().mockImplementation(() => Promise.resolve()),
+			get: vi.fn().mockReturnValue({
+				get: vi.fn().mockImplementation((key: any) => {
 					if (key === 'server') {
 						return {
 							port: Number.parseInt(process.env.PORT || '3003'),
@@ -40,15 +44,15 @@ describe('Bootstrap', () => {
 			}),
 		}
 
-		jest.mocked(NestFactory.create).mockResolvedValue(mockApp)
+		;(NestFactory.create as any).mockResolvedValue(mockApp)
 
-		jest.resetModules()
+		vi.resetModules()
 	})
 
 	afterEach(() => {
 		Object.assign(process.env, originalEnv)
 
-		jest.clearAllMocks()
+		vi.clearAllMocks()
 	})
 
 	it('should bootstrap the application successfully', async () => {
@@ -79,16 +83,18 @@ describe('Bootstrap', () => {
 
 	it('should handle errors during bootstrap', async () => {
 		const error = new Error('Test error')
-		jest.mocked(NestFactory.create).mockRejectedValue(error)
+		vi.mocked(NestFactory.create).mockRejectedValue(error)
 
 		await expect(bootstrap(false)).rejects.toThrow('Test error')
 	})
 
+	// eslint-disable-next-line test/expect-expect
 	it('should handle unhandled errors in bootstrap promise', async () => {
-		const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+		const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
 		const error = new Error('Unhandled error')
-		jest.mocked(NestFactory.create).mockRejectedValue(error)
+
+		vi.mocked(NestFactory.create).mockRejectedValue(error)
 
 		const bootstrapPromise = bootstrap(false)
 

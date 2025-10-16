@@ -1,23 +1,25 @@
+import type { MockedObject } from 'vitest'
 import { ConfigService } from '@microservice/Config/config.service'
 import { MetricsService } from '@microservice/Metrics/services/metrics.service'
 import { RateLimitService } from '@microservice/RateLimit/services/rate-limit.service'
 import { Test, TestingModule } from '@nestjs/testing'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('rateLimitService', () => {
 	let service: RateLimitService
-	let configService: jest.Mocked<ConfigService>
-	let metricsService: jest.Mocked<MetricsService>
+	let configService: MockedObject<ConfigService>
+	let metricsService: MockedObject<MetricsService>
 
 	beforeEach(async () => {
 		const mockConfigService = {
-			get: jest.fn(),
-			getOptional: jest.fn(),
+			get: vi.fn(),
+			getOptional: vi.fn(),
 		}
 
 		const mockMetricsService = {
-			recordCacheOperation: jest.fn(),
-			recordError: jest.fn(),
-			getRegistry: jest.fn().mockReturnValue({}),
+			recordCacheOperation: vi.fn(),
+			recordError: vi.fn(),
+			getRegistry: vi.fn().mockReturnValue({}),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -34,7 +36,7 @@ describe('rateLimitService', () => {
 	})
 
 	afterEach(() => {
-		jest.clearAllMocks()
+		vi.clearAllMocks()
 	})
 
 	describe('generateKey', () => {
@@ -59,7 +61,7 @@ describe('rateLimitService', () => {
 	describe('getRateLimitConfig', () => {
 		beforeEach(() => {
 			configService.getOptional.mockImplementation((key: string, defaultValue?: any) => {
-				const configs = {
+				const configs: Record<string, any> = {
 					'rateLimit.default.windowMs': 60000,
 					'rateLimit.default.max': 100,
 					'rateLimit.imageProcessing.windowMs': 60000,
@@ -188,7 +190,7 @@ describe('rateLimitService', () => {
 
 			try {
 				// Mock low system load
-				jest.spyOn(service, 'getSystemLoad').mockResolvedValue({
+				vi.spyOn(service, 'getSystemLoad').mockResolvedValue({
 					cpuUsage: 50,
 					memoryUsage: 60,
 					activeConnections: 100,
@@ -210,7 +212,7 @@ describe('rateLimitService', () => {
 
 			try {
 				// Mock high memory usage
-				jest.spyOn(service, 'getSystemLoad').mockResolvedValue({
+				vi.spyOn(service, 'getSystemLoad').mockResolvedValue({
 					cpuUsage: 50,
 					memoryUsage: 90, // Above 85% threshold
 					activeConnections: 100,
@@ -233,7 +235,7 @@ describe('rateLimitService', () => {
 
 			try {
 				// Mock extremely high system load
-				jest.spyOn(service, 'getSystemLoad').mockResolvedValue({
+				vi.spyOn(service, 'getSystemLoad').mockResolvedValue({
 					cpuUsage: 95,
 					memoryUsage: 95,
 					activeConnections: 2000,

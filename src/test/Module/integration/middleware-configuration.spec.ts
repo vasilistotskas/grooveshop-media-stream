@@ -1,3 +1,4 @@
+import type { INestApplication } from '@nestjs/common'
 import { CacheHealthIndicator } from '@microservice/Cache/indicators/cache-health.indicator'
 import { RedisHealthIndicator } from '@microservice/Cache/indicators/redis-health.indicator'
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
@@ -10,9 +11,9 @@ import { AlertingHealthIndicator } from '@microservice/Monitoring/indicators/ale
 import { SystemHealthIndicator } from '@microservice/Monitoring/indicators/system-health.indicator'
 import { JobQueueHealthIndicator } from '@microservice/Queue/indicators/job-queue-health.indicator'
 import { StorageHealthIndicator } from '@microservice/Storage/indicators/storage-health.indicator'
-import { INestApplication } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import request from 'supertest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 describe('middleware Configuration', () => {
 	let app: INestApplication
@@ -68,41 +69,41 @@ describe('middleware Configuration', () => {
 		})
 			.overrideProvider(CacheHealthIndicator)
 			.useValue({
-				isHealthy: jest.fn().mockResolvedValue({ cache: { status: 'up' } }),
+				isHealthy: vi.fn().mockResolvedValue({ cache: { status: 'up' } }),
 			})
 			.overrideProvider(RedisHealthIndicator)
 			.useValue({
-				isHealthy: jest.fn().mockResolvedValue({ redis: { status: 'up' } }),
+				isHealthy: vi.fn().mockResolvedValue({ redis: { status: 'up' } }),
 			})
 			.overrideProvider(DiskSpaceHealthIndicator)
 			.useValue({
-				isHealthy: jest.fn().mockResolvedValue({ disk: { status: 'up', free: '10GB', used: '5GB' } }),
-				getCurrentDiskInfo: jest.fn().mockResolvedValue({ free: '10GB', used: '5GB', total: '15GB' }),
+				isHealthy: vi.fn().mockResolvedValue({ disk: { status: 'up', free: '10GB', used: '5GB' } }),
+				getCurrentDiskInfo: vi.fn().mockResolvedValue({ free: '10GB', used: '5GB', total: '15GB' }),
 			})
 			.overrideProvider(MemoryHealthIndicator)
 			.useValue({
-				isHealthy: jest.fn().mockResolvedValue({ memory: { status: 'up', used: '100MB', free: '900MB' } }),
-				getCurrentMemoryInfo: jest.fn().mockReturnValue({ used: '100MB', free: '900MB', total: '1GB' }),
+				isHealthy: vi.fn().mockResolvedValue({ memory: { status: 'up', used: '100MB', free: '900MB' } }),
+				getCurrentMemoryInfo: vi.fn().mockReturnValue({ used: '100MB', free: '900MB', total: '1GB' }),
 			})
 			.overrideProvider(HttpHealthIndicator)
 			.useValue({
-				isHealthy: jest.fn().mockResolvedValue({ http: { status: 'up' } }),
+				isHealthy: vi.fn().mockResolvedValue({ http: { status: 'up' } }),
 			})
 			.overrideProvider(AlertingHealthIndicator)
 			.useValue({
-				isHealthy: jest.fn().mockResolvedValue({ alerting: { status: 'up' } }),
+				isHealthy: vi.fn().mockResolvedValue({ alerting: { status: 'up' } }),
 			})
 			.overrideProvider(SystemHealthIndicator)
 			.useValue({
-				isHealthy: jest.fn().mockResolvedValue({ system: { status: 'up' } }),
+				isHealthy: vi.fn().mockResolvedValue({ system: { status: 'up' } }),
 			})
 			.overrideProvider(JobQueueHealthIndicator)
 			.useValue({
-				isHealthy: jest.fn().mockResolvedValue({ jobQueue: { status: 'up' } }),
+				isHealthy: vi.fn().mockResolvedValue({ jobQueue: { status: 'up' } }),
 			})
 			.overrideProvider(StorageHealthIndicator)
 			.useValue({
-				isHealthy: jest.fn().mockResolvedValue({ storage: { status: 'up' } }),
+				isHealthy: vi.fn().mockResolvedValue({ storage: { status: 'up' } }),
 			})
 			.compile()
 

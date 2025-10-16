@@ -1,19 +1,21 @@
+import type { MockedObject } from 'vitest'
 import { ConfigService } from '@microservice/Config/config.service'
 import { RateLimitMetricsService } from '@microservice/RateLimit/services/rate-limit-metrics.service'
 import { Test, TestingModule } from '@nestjs/testing'
 import * as promClient from 'prom-client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('rateLimitMetricsService', () => {
 	let service: RateLimitMetricsService
-	let configService: jest.Mocked<ConfigService>
+	let configService: MockedObject<ConfigService>
 
 	beforeEach(async () => {
 		// Clear the default registry before each test
 		promClient.register.clear()
 
 		const mockConfigService = {
-			get: jest.fn().mockReturnValue(true), // monitoring.enabled = true
-			getOptional: jest.fn(),
+			get: vi.fn().mockReturnValue(true), // monitoring.enabled = true
+			getOptional: vi.fn(),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -31,7 +33,7 @@ describe('rateLimitMetricsService', () => {
 
 	afterEach(() => {
 		promClient.register.clear()
-		jest.clearAllMocks()
+		vi.clearAllMocks()
 	})
 
 	describe('onModuleInit', () => {
@@ -161,7 +163,7 @@ describe('rateLimitMetricsService', () => {
 
 		it('should handle errors gracefully', async () => {
 			// Mock an error scenario
-			jest.spyOn(service, 'getRateLimitStats').mockRejectedValueOnce(new Error('Test error'))
+			vi.spyOn(service, 'getRateLimitStats').mockRejectedValueOnce(new Error('Test error'))
 
 			await expect(service.getRateLimitStats()).rejects.toThrow('Test error')
 		})
@@ -170,7 +172,7 @@ describe('rateLimitMetricsService', () => {
 	describe('getCurrentRateLimitConfig', () => {
 		beforeEach(() => {
 			configService.getOptional.mockImplementation((key: string, defaultValue?: any) => {
-				const configs = {
+				const configs: Record<string, any> = {
 					'rateLimit.default.max': 100,
 					'rateLimit.imageProcessing.max': 50,
 					'rateLimit.healthCheck.max': 1000,

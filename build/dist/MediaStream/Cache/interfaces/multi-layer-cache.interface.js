@@ -1,3 +1,3 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+export { };
+
 //# sourceMappingURL=multi-layer-cache.interface.js.map

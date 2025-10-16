@@ -1,50 +1,55 @@
+import type { ExecutionContext } from '@nestjs/common'
+import type { MockedClass, MockedObject } from 'vitest'
+
 // Import decorators after mocking
 import { CorrelationId, RequestContext } from '@microservice/Correlation/decorators/correlation.decorator'
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
-
-import { ExecutionContext } from '@nestjs/common'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock createParamDecorator to return the factory function directly
-jest.mock('@nestjs/common', () => ({
-	...jest.requireActual('@nestjs/common'),
-	createParamDecorator: (factory: any) => factory,
-}))
+vi.mock('@nestjs/common', async () => {
+	const actual = await vi.importActual('@nestjs/common')
+	return {
+		...actual,
+		createParamDecorator: (factory: any) => factory,
+	}
+})
 
 // Mock the CorrelationService
-jest.mock('@microservice/Correlation/services/correlation.service')
+vi.mock('@microservice/Correlation/services/correlation.service')
 
 describe('correlation Decorators', () => {
-	let mockCorrelationService: jest.Mocked<CorrelationService>
-	let mockExecutionContext: jest.Mocked<ExecutionContext>
+	let mockCorrelationService: MockedObject<CorrelationService>
+	let mockExecutionContext: MockedObject<ExecutionContext>
 
 	beforeEach(() => {
 		// Create mock execution context
 		mockExecutionContext = {
-			switchToHttp: jest.fn(),
-			getArgs: jest.fn(),
-			getArgByIndex: jest.fn(),
-			switchToRpc: jest.fn(),
-			switchToWs: jest.fn(),
-			getType: jest.fn(),
-			getClass: jest.fn(),
-			getHandler: jest.fn(),
+			switchToHttp: vi.fn(),
+			getArgs: vi.fn(),
+			getArgByIndex: vi.fn(),
+			switchToRpc: vi.fn(),
+			switchToWs: vi.fn(),
+			getType: vi.fn(),
+			getClass: vi.fn(),
+			getHandler: vi.fn(),
 		} as any
 
 		// Mock CorrelationService constructor and methods
 		mockCorrelationService = {
-			getCorrelationId: jest.fn(),
-			getContext: jest.fn(),
-			setCorrelationId: jest.fn(),
-			generateCorrelationId: jest.fn(),
+			getCorrelationId: vi.fn(),
+			getContext: vi.fn(),
+			setCorrelationId: vi.fn(),
+			generateCorrelationId: vi.fn(),
 		} as any
 
-		;(CorrelationService as jest.MockedClass<typeof CorrelationService>).mockImplementation(
+		;(CorrelationService as MockedClass<typeof CorrelationService>).mockImplementation(
 			() => mockCorrelationService,
 		)
 	})
 
 	afterEach(() => {
-		jest.clearAllMocks()
+		vi.clearAllMocks()
 	})
 
 	describe('correlationId decorator', () => {

@@ -1,14 +1,16 @@
+import type { MockedObject } from 'vitest'
 import { ConfigService } from '@microservice/Config/config.service'
 import { SecurityCheckerService } from '@microservice/Validation/services/security-checker.service'
 import { Test, TestingModule } from '@nestjs/testing'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('securityCheckerService', () => {
 	let service: SecurityCheckerService
-	let configService: jest.Mocked<ConfigService>
+	let configService: MockedObject<ConfigService>
 
 	beforeEach(async () => {
 		const mockConfigService = {
-			getOptional: jest.fn(),
+			getOptional: vi.fn(),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -23,7 +25,7 @@ describe('securityCheckerService', () => {
 
 		// Setup default config responses
 		configService.getOptional.mockImplementation((key, defaultValue) => {
-			const configs = {
+			const configs: Record<string, any> = {
 				'validation.maxStringLength': 10000,
 			}
 			return configs[key] || defaultValue

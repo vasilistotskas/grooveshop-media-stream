@@ -1,3 +1,4 @@
+import type { AxiosResponse } from 'axios'
 import { Buffer } from 'node:buffer'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
@@ -24,11 +25,12 @@ import { InputSanitizationService } from '@microservice/Validation/services/inpu
 import { HttpService } from '@nestjs/axios'
 import { Logger } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
-import { AxiosHeaders, AxiosResponse } from 'axios'
+import { AxiosHeaders } from 'axios'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-jest.mock('node:fs/promises')
-jest.mock('node:process', () => ({
-	cwd: jest.fn(() => '/mock/cwd'),
+vi.mock('node:fs/promises')
+vi.mock('node:process', () => ({
+	cwd: vi.fn(() => '/mock/cwd'),
 }))
 
 describe('cacheImageResourceOperation', () => {
@@ -66,12 +68,12 @@ describe('cacheImageResourceOperation', () => {
 		mockHttpService = {} as HttpService
 
 		mockGenerateResourceIdentityFromRequestJob = {
-			handle: jest.fn(),
+			handle: vi.fn(),
 		} as unknown as GenerateResourceIdentityFromRequestJob
-		jest.spyOn(mockGenerateResourceIdentityFromRequestJob, 'handle').mockResolvedValue('mock-resource-id')
+		vi.spyOn(mockGenerateResourceIdentityFromRequestJob, 'handle').mockResolvedValue('mock-resource-id')
 
 		mockFetchResourceResponseJob = {
-			handle: jest.fn(),
+			handle: vi.fn(),
 		} as unknown as FetchResourceResponseJob
 
 		const axiosHeaders = new AxiosHeaders()
@@ -89,75 +91,75 @@ describe('cacheImageResourceOperation', () => {
 			},
 		} as unknown as AxiosResponse
 
-		jest.spyOn(mockFetchResourceResponseJob, 'handle').mockResolvedValue(mockResponse)
+		vi.spyOn(mockFetchResourceResponseJob, 'handle').mockResolvedValue(mockResponse)
 
 		mockStoreResourceResponseToFileJob = {
-			handle: jest.fn(),
+			handle: vi.fn(),
 		} as unknown as StoreResourceResponseToFileJob
-		jest.spyOn(mockStoreResourceResponseToFileJob, 'handle').mockResolvedValue()
+		vi.spyOn(mockStoreResourceResponseToFileJob, 'handle').mockResolvedValue()
 
 		mockWebpImageManipulationJob = {
-			handle: jest.fn(),
+			handle: vi.fn(),
 		} as unknown as WebpImageManipulationJob
-		jest.spyOn(mockWebpImageManipulationJob, 'handle').mockResolvedValue({
+		vi.spyOn(mockWebpImageManipulationJob, 'handle').mockResolvedValue({
 			format: 'webp',
 			size: '1000',
 		} as ManipulationJobResult)
 
 		mockValidateCacheImageRequestRule = {
-			setup: jest.fn(),
-			apply: jest.fn(),
+			setup: vi.fn(),
+			apply: vi.fn(),
 		} as unknown as ValidateCacheImageRequestRule
 
 		mockValidateCacheImageRequestResizeTargetRule = {
-			setup: jest.fn(),
-			apply: jest.fn(),
+			setup: vi.fn(),
+			apply: vi.fn(),
 		} as unknown as ValidateCacheImageRequestResizeTargetRule
 
 		mockCacheManager = {
-			get: jest.fn(),
-			set: jest.fn(),
-			delete: jest.fn(),
-			exists: jest.fn(),
+			get: vi.fn(),
+			set: vi.fn(),
+			delete: vi.fn(),
+			exists: vi.fn(),
 		} as unknown as MultiLayerCacheManager
 
 		mockInputSanitizationService = {
-			sanitize: jest.fn(),
-			validateUrl: jest.fn(),
-			validateFileSize: jest.fn(),
-			validateImageDimensions: jest.fn(),
+			sanitize: vi.fn(),
+			validateUrl: vi.fn(),
+			validateFileSize: vi.fn(),
+			validateImageDimensions: vi.fn(),
 		} as unknown as InputSanitizationService
 
 		mockJobQueueManager = {
-			addImageProcessingJob: jest.fn(),
+			addImageProcessingJob: vi.fn(),
 		} as unknown as JobQueueManager
 
 		mockMetricsService = {
-			recordCacheOperation: jest.fn(),
-			recordImageProcessing: jest.fn(),
-			recordError: jest.fn(),
+			recordCacheOperation: vi.fn(),
+			recordImageProcessing: vi.fn(),
+			recordError: vi.fn(),
 		} as unknown as MetricsService
 
 		mockLogger = {
-			log: jest.fn(),
-			error: jest.fn(),
-			warn: jest.fn(),
-			debug: jest.fn(),
-			verbose: jest.fn(),
+			log: vi.fn(),
+			error: vi.fn(),
+			warn: vi.fn(),
+			debug: vi.fn(),
+			verbose: vi.fn(),
 		} as unknown as Logger
 
 		// Setup default mock behaviors
-		jest.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
-		jest.spyOn(mockCacheManager, 'set').mockResolvedValue()
-		jest.spyOn(mockCacheManager, 'delete').mockResolvedValue()
-		jest.spyOn(mockCacheManager, 'exists').mockResolvedValue(false)
+		vi.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
+		vi.spyOn(mockCacheManager, 'set').mockResolvedValue()
+		vi.spyOn(mockCacheManager, 'delete').mockResolvedValue()
+		vi.spyOn(mockCacheManager, 'exists').mockResolvedValue(false)
 
-		jest.spyOn(mockInputSanitizationService, 'sanitize').mockImplementation(async input => input)
-		jest.spyOn(mockInputSanitizationService, 'validateUrl').mockReturnValue(true)
-		jest.spyOn(mockInputSanitizationService, 'validateFileSize').mockReturnValue(true)
-		jest.spyOn(mockInputSanitizationService, 'validateImageDimensions').mockReturnValue(true)
+		vi.spyOn(mockInputSanitizationService, 'sanitize').mockImplementation(async input => input)
+		vi.spyOn(mockInputSanitizationService, 'validateUrl').mockReturnValue(true)
+		vi.spyOn(mockInputSanitizationService, 'validateFileSize').mockReturnValue(true)
+		vi.spyOn(mockInputSanitizationService, 'validateImageDimensions').mockReturnValue(true)
 
-		jest.spyOn(mockJobQueueManager, 'addImageProcessingJob').mockResolvedValue({} as any)
+		vi.spyOn(mockJobQueueManager, 'addImageProcessingJob').mockResolvedValue({} as any)
 
 		moduleRef = await Test.createTestingModule({
 			providers: [
@@ -215,14 +217,14 @@ describe('cacheImageResourceOperation', () => {
 		})
 
 		it('should throw error for invalid URL', async () => {
-			jest.spyOn(mockInputSanitizationService, 'validateUrl').mockReturnValue(false)
+			vi.spyOn(mockInputSanitizationService, 'validateUrl').mockReturnValue(false)
 
 			await expect(operation.setup(mockRequest)).rejects.toThrow('Invalid or disallowed URL')
 			expect(mockMetricsService.recordError).toHaveBeenCalledWith('validation', 'setup')
 		})
 
 		it('should throw error for invalid dimensions', async () => {
-			jest.spyOn(mockInputSanitizationService, 'validateImageDimensions').mockReturnValue(false)
+			vi.spyOn(mockInputSanitizationService, 'validateImageDimensions').mockReturnValue(false)
 
 			await expect(operation.setup(mockRequest)).rejects.toThrow('Invalid image dimensions')
 			expect(mockMetricsService.recordError).toHaveBeenCalledWith('validation', 'setup')
@@ -247,7 +249,7 @@ describe('cacheImageResourceOperation', () => {
 				}),
 			}
 
-			jest.spyOn(mockCacheManager, 'get').mockResolvedValue(mockCachedResource)
+			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(mockCachedResource)
 
 			const result = await operation.resourceExists
 			expect(result).toBe(true)
@@ -268,8 +270,8 @@ describe('cacheImageResourceOperation', () => {
 				}),
 			}
 
-			jest.spyOn(mockCacheManager, 'get').mockResolvedValue(expiredResource)
-			const mockedFs = jest.mocked(fs)
+			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(expiredResource)
+			const mockedFs = vi.mocked(fs)
 			mockedFs.access.mockResolvedValue()
 
 			await operation.resourceExists
@@ -277,8 +279,8 @@ describe('cacheImageResourceOperation', () => {
 		})
 
 		it('should fallback to filesystem when cache miss', async () => {
-			jest.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
-			const mockedFs = jest.mocked(fs)
+			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
+			const mockedFs = vi.mocked(fs)
 			mockedFs.access.mockResolvedValue()
 			mockedFs.readFile.mockResolvedValue(JSON.stringify({
 				version: 1,
@@ -313,7 +315,7 @@ describe('cacheImageResourceOperation', () => {
 				}),
 			}
 
-			jest.spyOn(mockCacheManager, 'get').mockResolvedValue(mockCachedResource)
+			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(mockCachedResource)
 
 			await operation.execute()
 
@@ -328,13 +330,13 @@ describe('cacheImageResourceOperation', () => {
 			await operation.setup(mockRequest)
 
 			// Mock shouldUseBackgroundProcessing to return true for this test
-			jest.spyOn(operation, 'shouldUseBackgroundProcessing').mockReturnValue(true)
+			vi.spyOn(operation, 'shouldUseBackgroundProcessing').mockReturnValue(true)
 
 			// Ensure cache returns null so resource doesn't exist
-			jest.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
+			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
 
 			// Mock filesystem access to return false (resource doesn't exist)
-			const mockedFs = jest.mocked(fs)
+			const mockedFs = vi.mocked(fs)
 			mockedFs.access.mockRejectedValue(new Error('File not found'))
 
 			await operation.execute()
@@ -355,8 +357,8 @@ describe('cacheImageResourceOperation', () => {
 		})
 
 		it('should process small images synchronously', async () => {
-			jest.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
-			const mockedFs = jest.mocked(fs)
+			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
+			const mockedFs = vi.mocked(fs)
 			mockedFs.readFile.mockResolvedValue(Buffer.from('processed-image-data'))
 
 			await operation.execute()
@@ -367,8 +369,8 @@ describe('cacheImageResourceOperation', () => {
 		})
 
 		it('should validate file size during processing', async () => {
-			jest.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
-			jest.spyOn(mockInputSanitizationService, 'validateFileSize').mockReturnValue(false)
+			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
+			vi.spyOn(mockInputSanitizationService, 'validateFileSize').mockReturnValue(false)
 
 			const mockResponse = {
 				status: 200,
@@ -378,7 +380,7 @@ describe('cacheImageResourceOperation', () => {
 				config: {} as any,
 			} as AxiosResponse
 
-			jest.spyOn(mockFetchResourceResponseJob, 'handle').mockResolvedValue(mockResponse)
+			vi.spyOn(mockFetchResourceResponseJob, 'handle').mockResolvedValue(mockResponse)
 
 			await expect(operation.execute()).rejects.toThrow('Error fetching or processing image.')
 			expect(mockMetricsService.recordImageProcessing).toHaveBeenCalledWith('execute', 'unknown', 'error', expect.any(Number))
@@ -403,7 +405,7 @@ describe('cacheImageResourceOperation', () => {
 				}),
 			}
 
-			jest.spyOn(mockCacheManager, 'get').mockResolvedValue(mockCachedResource)
+			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(mockCachedResource)
 
 			const result = await operation.getCachedResource()
 
@@ -412,8 +414,8 @@ describe('cacheImageResourceOperation', () => {
 		})
 
 		it('should fallback to filesystem and cache result', async () => {
-			jest.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
-			const mockedFs = jest.mocked(fs)
+			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
+			const mockedFs = vi.mocked(fs)
 			mockedFs.access.mockResolvedValue()
 			mockedFs.readFile
 				.mockResolvedValueOnce(Buffer.from('file-data'))
@@ -435,8 +437,8 @@ describe('cacheImageResourceOperation', () => {
 		})
 
 		it('should return null when resource not found', async () => {
-			jest.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
-			const mockedFs = jest.mocked(fs)
+			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
+			const mockedFs = vi.mocked(fs)
 			mockedFs.access.mockRejectedValue(new Error('File not found'))
 
 			const result = await operation.getCachedResource()
@@ -446,7 +448,7 @@ describe('cacheImageResourceOperation', () => {
 		})
 
 		it('should handle errors gracefully', async () => {
-			jest.spyOn(mockCacheManager, 'get').mockRejectedValue(new Error('Cache error'))
+			vi.spyOn(mockCacheManager, 'get').mockRejectedValue(new Error('Cache error'))
 
 			const result = await operation.getCachedResource()
 
@@ -468,7 +470,7 @@ describe('cacheImageResourceOperation', () => {
 			customOptions.trimThreshold = 5
 			customOptions.quality = 100
 
-			const mockedFs = jest.mocked(fs)
+			const mockedFs = vi.mocked(fs)
 			mockedFs.access.mockRejectedValueOnce({ code: 'ENOENT' } as NodeJS.ErrnoException)
 
 			const result = await operation.optimizeAndServeDefaultImage(customOptions)

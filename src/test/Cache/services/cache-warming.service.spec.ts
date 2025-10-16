@@ -1,3 +1,4 @@
+import type { MockedFunction, MockedObject } from 'vitest'
 import { Buffer } from 'node:buffer'
 import { readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -6,35 +7,36 @@ import { MemoryCacheService } from '@microservice/Cache/services/memory-cache.se
 import { ConfigService } from '@microservice/Config/config.service'
 import { MetricsService } from '@microservice/Metrics/services/metrics.service'
 import { Test, TestingModule } from '@nestjs/testing'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock fs promises
-jest.mock('node:fs/promises')
-jest.mock('node:path')
+vi.mock('node:fs/promises')
+vi.mock('node:path')
 
-const mockReaddir = readdir as jest.MockedFunction<typeof readdir>
-const mockStat = stat as jest.MockedFunction<typeof stat>
-const mockReadFile = readFile as jest.MockedFunction<typeof readFile>
-const mockJoin = join as jest.MockedFunction<typeof join>
+const mockReaddir = readdir as unknown as MockedFunction<typeof readdir>
+const mockStat = stat as unknown as MockedFunction<typeof stat>
+const mockReadFile = readFile as unknown as MockedFunction<typeof readFile>
+const mockJoin = join as unknown as MockedFunction<typeof join>
 
 describe('cacheWarmingService', () => {
 	let service: CacheWarmingService
-	let memoryCacheService: jest.Mocked<MemoryCacheService>
-	let configService: jest.Mocked<ConfigService>
-	let metricsService: jest.Mocked<MetricsService>
+	let memoryCacheService: MockedObject<MemoryCacheService>
+	let configService: MockedObject<ConfigService>
+	let metricsService: MockedObject<MetricsService>
 
 	beforeEach(async () => {
 		const mockMemoryCacheService = {
-			has: jest.fn(),
-			set: jest.fn(),
-			getStats: jest.fn(),
+			has: vi.fn(),
+			set: vi.fn(),
+			getStats: vi.fn(),
 		}
 
 		const mockConfigService = {
-			get: jest.fn(),
+			get: vi.fn(),
 		}
 
 		const mockMetricsService = {
-			recordCacheOperation: jest.fn(),
+			recordCacheOperation: vi.fn(),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -87,7 +89,7 @@ describe('cacheWarmingService', () => {
 	})
 
 	afterEach(() => {
-		jest.clearAllMocks()
+		vi.clearAllMocks()
 	})
 
 	describe('initialization', () => {

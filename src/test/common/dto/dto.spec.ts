@@ -5,6 +5,7 @@ import ResourceMetaData, {
 	resourceMetaVersion,
 } from '@microservice/HTTP/dto/resource-meta-data.dto'
 import ManipulationJobResult from '@microservice/Queue/dto/manipulation-job-result.dto'
+import { describe, expect, it } from 'vitest'
 
 describe('resizeOptions', () => {
 	it('should set default values', () => {

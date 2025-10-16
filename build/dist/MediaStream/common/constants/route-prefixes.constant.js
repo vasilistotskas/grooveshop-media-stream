@@ -1,7 +1,5 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.IMAGE = exports.VERSION = exports.MODULE = void 0;
-exports.MODULE = 'media_stream';
-exports.VERSION = '1';
-exports.IMAGE = `${exports.MODULE}-image`;
+export const MODULE = 'media_stream';
+export const VERSION = '1';
+export const IMAGE = `${MODULE}-image`;
+
 //# sourceMappingURL=route-prefixes.constant.js.map

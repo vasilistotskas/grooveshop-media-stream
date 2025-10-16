@@ -1,7 +1,9 @@
+import type { OnModuleDestroy } from '@nestjs/common'
+import type { Job as BullJob, JobOptions as BullJobOptions, Queue } from 'bull'
+
+import type { IJobQueue, Job, JobOptions, JobProcessor, JobStatus, QueueStats } from '../interfaces/job-queue.interface'
 import { InjectQueue } from '@nestjs/bull'
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common'
-import { Job as BullJob, JobOptions as BullJobOptions, Queue } from 'bull'
-import { IJobQueue, Job, JobOptions, JobProcessor, JobStatus, QueueStats } from '../interfaces/job-queue.interface'
+import { Injectable, Logger } from '@nestjs/common'
 import { JobType } from '../types/job.types'
 
 @Injectable()

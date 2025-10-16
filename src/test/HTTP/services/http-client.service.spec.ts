@@ -1,20 +1,22 @@
+import type { AxiosResponse } from 'axios'
 import { ConfigService } from '@microservice/Config/config.service'
 import { HttpClientService } from '@microservice/HTTP/services/http-client.service'
 import { HttpService, HttpModule as NestHttpModule } from '@nestjs/axios'
 import { Test, TestingModule } from '@nestjs/testing'
-import { AxiosError, AxiosResponse } from 'axios'
+import { AxiosError } from 'axios'
 import { Observable, of, throwError } from 'rxjs'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('httpClientService', () => {
 	let service: HttpClientService
 	let httpService: HttpService
 
 	const mockConfigService = {
-		getOptional: jest.fn(),
+		getOptional: vi.fn(),
 	}
 
 	beforeEach(async () => {
-		jest.clearAllMocks()
+		vi.clearAllMocks()
 
 		// Setup default config values
 		mockConfigService.getOptional.mockImplementation((_key: string, defaultValue: any) => {
@@ -63,7 +65,7 @@ describe('httpClientService', () => {
 				config: { url: 'https://example.com', method: 'get' } as any,
 			}
 
-			jest.spyOn(httpService, 'get').mockReturnValueOnce(of(mockResponse))
+			vi.spyOn(httpService, 'get').mockReturnValueOnce(of(mockResponse))
 
 			const result = await service.get('https://example.com')
 			expect(result).toEqual(mockResponse)
@@ -80,7 +82,7 @@ describe('httpClientService', () => {
 			}
 
 			const postData = { foo: 'bar' }
-			jest.spyOn(httpService, 'post').mockReturnValueOnce(of(mockResponse))
+			vi.spyOn(httpService, 'post').mockReturnValueOnce(of(mockResponse))
 
 			const result = await service.post('https://example.com', postData)
 			expect(result).toEqual(mockResponse)
@@ -90,11 +92,11 @@ describe('httpClientService', () => {
 
 	describe('error Handling', () => {
 		beforeEach(() => {
-			jest.useFakeTimers()
+			vi.useFakeTimers()
 		})
 
 		afterEach(() => {
-			jest.useRealTimers()
+			vi.useRealTimers()
 		})
 
 		it('should handle network errors', async () => {
@@ -102,11 +104,11 @@ describe('httpClientService', () => {
 			mockError.code = 'ECONNRESET'
 			mockError.message = 'Connection reset'
 
-			jest.spyOn(httpService, 'get').mockReturnValueOnce(throwError(() => mockError))
+			vi.spyOn(httpService, 'get').mockReturnValueOnce(throwError(() => mockError))
 
 			const promise = service.get('https://example.com')
 
-			jest.runAllTimers()
+			vi.runAllTimers()
 
 			await expect(promise).rejects.toThrow()
 		})
@@ -115,11 +117,11 @@ describe('httpClientService', () => {
 			const mockError = new Error('HTTP Error') as AxiosError
 			mockError.response = { status: 500, data: 'Server Error' } as any
 
-			jest.spyOn(httpService, 'get').mockReturnValueOnce(throwError(() => mockError))
+			vi.spyOn(httpService, 'get').mockReturnValueOnce(throwError(() => mockError))
 
 			const promise = service.get('https://example.com')
 
-			jest.runAllTimers()
+			vi.runAllTimers()
 
 			await expect(promise).rejects.toThrow()
 		})
@@ -135,7 +137,7 @@ describe('httpClientService', () => {
 				config: { url: 'https://example.com', method: 'get' } as any,
 			}
 
-			jest.spyOn(httpService, 'get').mockReturnValue(of(mockResponse))
+			vi.spyOn(httpService, 'get').mockReturnValue(of(mockResponse))
 
 			// Execute several successful requests
 			await service.get('https://example.com')
@@ -152,7 +154,7 @@ describe('httpClientService', () => {
 			const mockError = new Error('HTTP Error') as AxiosError
 			mockError.response = { status: 500, data: 'Server Error' } as any
 
-			jest.spyOn(httpService, 'get').mockReturnValue(throwError(() => mockError))
+			vi.spyOn(httpService, 'get').mockReturnValue(throwError(() => mockError))
 
 			// Execute several failed requests
 			try {
@@ -182,7 +184,7 @@ describe('httpClientService', () => {
 				config: { url: 'https://example.com', method: 'get' } as any,
 			}
 
-			jest.spyOn(httpService, 'get').mockReturnValue(of(mockResponse))
+			vi.spyOn(httpService, 'get').mockReturnValue(of(mockResponse))
 
 			// Execute a successful request
 			await service.get('https://example.com')
@@ -208,7 +210,7 @@ describe('httpClientService', () => {
 			}
 
 			// Create a delayed response
-			jest.spyOn(httpService, 'get').mockImplementation(() => {
+			vi.spyOn(httpService, 'get').mockImplementation(() => {
 				return new Observable((subscriber) => {
 					setTimeout(() => {
 						subscriber.next(mockResponse)

@@ -1,11 +1,13 @@
+import type { MockedObject } from 'vitest'
 import { ConfigService } from '@microservice/Config/config.service'
 import { ConfigService as NestConfigService } from '@nestjs/config'
 import { Test, TestingModule } from '@nestjs/testing'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import 'reflect-metadata'
 
 describe('configService', () => {
 	let service: ConfigService
-	let nestConfigService: jest.Mocked<NestConfigService>
+	let nestConfigService: MockedObject<NestConfigService>
 
 	const mockEnvVars = {
 		PORT: '3003',
@@ -53,7 +55,7 @@ describe('configService', () => {
 
 	beforeEach(async () => {
 		const mockNestConfigService = {
-			get: jest.fn((key: string) => mockEnvVars[key as keyof typeof mockEnvVars]),
+			get: vi.fn((key: string) => mockEnvVars[key as keyof typeof mockEnvVars]),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -181,7 +183,7 @@ describe('configService', () => {
 	describe('default Values', () => {
 		it('should use default values when environment variables are not set', async () => {
 			const emptyNestConfigService = {
-				get: jest.fn(() => undefined),
+				get: vi.fn(() => undefined),
 			}
 
 			const serviceWithDefaults = new ConfigService(emptyNestConfigService as any)

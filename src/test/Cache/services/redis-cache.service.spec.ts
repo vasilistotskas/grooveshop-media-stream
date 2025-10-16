@@ -1,17 +1,19 @@
+import type { MockedClass, MockedObject } from 'vitest'
 import { Buffer } from 'node:buffer'
 import { RedisCacheService } from '@microservice/Cache/services/redis-cache.service'
 import { ConfigService } from '@microservice/Config/config.service'
 import { MetricsService } from '@microservice/Metrics/services/metrics.service'
 import { Test, TestingModule } from '@nestjs/testing'
 import Redis from 'ioredis'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock ioredis
-jest.mock('ioredis')
+vi.mock('ioredis')
 
 describe('redisCacheService', () => {
 	let service: RedisCacheService
-	let metricsService: jest.Mocked<MetricsService>
-	let mockRedis: jest.Mocked<Redis>
+	let metricsService: MockedObject<MetricsService>
+	let mockRedis: MockedObject<Redis>
 
 	const mockConfig = {
 		host: 'localhost',
@@ -26,28 +28,28 @@ describe('redisCacheService', () => {
 	beforeEach(async () => {
 		// Create mock Redis instance
 		mockRedis = {
-			connect: jest.fn().mockResolvedValue(undefined),
-			quit: jest.fn().mockResolvedValue('OK'),
-			get: jest.fn(),
-			set: jest.fn().mockResolvedValue('OK'),
-			setex: jest.fn().mockResolvedValue('OK'),
-			del: jest.fn().mockResolvedValue(1),
-			flushdb: jest.fn().mockResolvedValue('OK'),
-			flushall: jest.fn().mockResolvedValue('OK'),
-			exists: jest.fn(),
-			keys: jest.fn().mockResolvedValue(['key1', 'key2']),
-			ping: jest.fn().mockResolvedValue('PONG'),
-			ttl: jest.fn().mockResolvedValue(3600),
-			expire: jest.fn().mockResolvedValue(1),
-			info: jest.fn(),
-			on: jest.fn(),
+			connect: vi.fn().mockResolvedValue(undefined),
+			quit: vi.fn().mockResolvedValue('OK'),
+			get: vi.fn(),
+			set: vi.fn().mockResolvedValue('OK'),
+			setex: vi.fn().mockResolvedValue('OK'),
+			del: vi.fn().mockResolvedValue(1),
+			flushdb: vi.fn().mockResolvedValue('OK'),
+			flushall: vi.fn().mockResolvedValue('OK'),
+			exists: vi.fn(),
+			keys: vi.fn().mockResolvedValue(['key1', 'key2']),
+			ping: vi.fn().mockResolvedValue('PONG'),
+			ttl: vi.fn().mockResolvedValue(3600),
+			expire: vi.fn().mockResolvedValue(1),
+			info: vi.fn(),
+			on: vi.fn(),
 		} as any
 
 		// Mock Redis constructor
-		;(Redis as jest.MockedClass<typeof Redis>).mockImplementation(() => mockRedis)
+		;(Redis as MockedClass<typeof Redis>).mockImplementation(() => mockRedis)
 
 		const mockConfigService = {
-			get: jest.fn().mockImplementation((key: string) => {
+			get: vi.fn().mockImplementation((key: string) => {
 				if (key === 'cache.redis')
 					return mockConfig
 				if (key === 'cache.redis.ttl')
@@ -57,9 +59,9 @@ describe('redisCacheService', () => {
 		}
 
 		const mockMetricsService = {
-			recordCacheOperation: jest.fn(),
-			updateCacheHitRatio: jest.fn(),
-			updateActiveConnections: jest.fn(),
+			recordCacheOperation: vi.fn(),
+			updateCacheHitRatio: vi.fn(),
+			updateActiveConnections: vi.fn(),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -75,7 +77,7 @@ describe('redisCacheService', () => {
 	})
 
 	afterEach(() => {
-		jest.clearAllMocks()
+		vi.clearAllMocks()
 	})
 
 	describe('initialization', () => {

@@ -1,9 +1,10 @@
+import type { ArgumentsHost, ExceptionFilter } from '@nestjs/common'
+import type { Request, Response } from 'express'
 import { MediaStreamError } from '@microservice/common/errors/media-stream.errors'
 import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
 import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
-import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common'
+import { Catch, HttpException, HttpStatus } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
-import { Request, Response } from 'express'
 
 /**
  * Global exception filter for handling MediaStream errors

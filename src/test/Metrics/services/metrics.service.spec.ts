@@ -1,15 +1,17 @@
+import type { MockedObject } from 'vitest'
 import { ConfigService } from '@microservice/Config/config.service'
 import { MetricsService } from '@microservice/Metrics/services/metrics.service'
 import { Test, TestingModule } from '@nestjs/testing'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import 'reflect-metadata'
 
 describe('metricsService', () => {
 	let service: MetricsService
-	let configService: jest.Mocked<ConfigService>
+	let configService: MockedObject<ConfigService>
 
 	beforeEach(async () => {
 		const mockConfigService = {
-			get: jest.fn((key: string) => {
+			get: vi.fn((key: string) => {
 				if (key === 'monitoring.enabled')
 					return true
 				return undefined

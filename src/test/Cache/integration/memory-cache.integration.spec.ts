@@ -2,6 +2,7 @@ import { MemoryCacheService } from '@microservice/Cache/services/memory-cache.se
 import { ConfigService } from '@microservice/Config/config.service'
 import { MetricsService } from '@microservice/Metrics/services/metrics.service'
 import { Test, TestingModule } from '@nestjs/testing'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 describe('memoryCacheService Integration', () => {
 	let service: MemoryCacheService
@@ -21,7 +22,7 @@ describe('memoryCacheService Integration', () => {
 				{
 					provide: ConfigService,
 					useValue: {
-						get: jest.fn().mockImplementation((key: string) => {
+						get: vi.fn().mockImplementation((key: string) => {
 							if (key === 'cache.memory') {
 								return {
 									defaultTtl: 3600,
@@ -38,8 +39,8 @@ describe('memoryCacheService Integration', () => {
 				{
 					provide: MetricsService,
 					useValue: {
-						recordCacheOperation: jest.fn(),
-						updateCacheHitRatio: jest.fn(),
+						recordCacheOperation: vi.fn(),
+						updateCacheHitRatio: vi.fn(),
 					},
 				},
 			],

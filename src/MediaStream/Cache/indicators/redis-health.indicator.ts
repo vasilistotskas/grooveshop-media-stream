@@ -1,8 +1,8 @@
+import type { HealthIndicatorResult } from '@nestjs/terminus'
 import { ConfigService } from '@microservice/Config/config.service'
 import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
 import { BaseHealthIndicator } from '@microservice/Health/base/base-health-indicator'
 import { Injectable } from '@nestjs/common'
-import { HealthIndicatorResult } from '@nestjs/terminus'
 import { RedisCacheService } from '../services/redis-cache.service'
 
 @Injectable()

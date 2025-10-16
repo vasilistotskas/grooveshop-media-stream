@@ -1,19 +1,21 @@
+import type { MockedObject } from 'vitest'
 import { MemoryCacheLayer } from '@microservice/Cache/layers/memory-cache.layer'
 import { MemoryCacheService } from '@microservice/Cache/services/memory-cache.service'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('memoryCacheLayer', () => {
 	let layer: MemoryCacheLayer
-	let mockMemoryCacheService: jest.Mocked<MemoryCacheService>
+	let mockMemoryCacheService: MockedObject<MemoryCacheService>
 
 	beforeEach(() => {
 		mockMemoryCacheService = {
-			get: jest.fn(),
-			set: jest.fn(),
-			delete: jest.fn(),
-			has: jest.fn(),
-			exists: jest.fn(),
-			clear: jest.fn(),
-			getStats: jest.fn(),
+			get: vi.fn(),
+			set: vi.fn(),
+			delete: vi.fn(),
+			has: vi.fn(),
+			exists: vi.fn(),
+			clear: vi.fn(),
+			getStats: vi.fn(),
 		} as any
 
 		layer = new MemoryCacheLayer(mockMemoryCacheService)

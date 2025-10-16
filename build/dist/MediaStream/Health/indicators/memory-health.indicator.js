@@ -1,66 +1,19 @@
-"use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    else for(var i = decorators.length - 1; i >= 0; i--)if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-var __metadata = (this && this.__metadata) || function (k, v) {
+}
+function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.MemoryHealthIndicator = void 0;
-const os = __importStar(require("node:os"));
-const process = __importStar(require("node:process"));
-const common_1 = require("@nestjs/common");
-const base_health_indicator_1 = require("../base/base-health-indicator");
-let MemoryHealthIndicator = class MemoryHealthIndicator extends base_health_indicator_1.BaseHealthIndicator {
-    constructor() {
-        const options = {
-            timeout: 1000,
-            threshold: 0.95,
-        };
-        super('memory', options);
-        this._warningThreshold = 0.85;
-        this._criticalThreshold = 0.95;
-        this.heapWarningThreshold = 0.90;
-        this.heapCriticalThreshold = 0.98;
-    }
+}
+import * as os from "node:os";
+import * as process from "node:process";
+import { Injectable } from "@nestjs/common";
+import { BaseHealthIndicator } from "../base/base-health-indicator.js";
+export class MemoryHealthIndicator extends BaseHealthIndicator {
     async performHealthCheck() {
-        return this.executeWithTimeout(async () => {
+        return this.executeWithTimeout(async ()=>{
             const memoryInfo = this.getMemoryInfo();
             if (memoryInfo.memoryUsagePercentage >= this._criticalThreshold) {
                 return this.createUnhealthyResult(`System memory critically high: ${(memoryInfo.memoryUsagePercentage * 100).toFixed(1)}% used`, memoryInfo);
@@ -69,8 +22,7 @@ let MemoryHealthIndicator = class MemoryHealthIndicator extends base_health_indi
                 return this.createUnhealthyResult(`Heap memory critically high: ${(memoryInfo.heapUsagePercentage * 100).toFixed(1)}% used`, memoryInfo);
             }
             let detailStatus = 'healthy';
-            if (memoryInfo.memoryUsagePercentage >= this._warningThreshold
-                || memoryInfo.heapUsagePercentage >= this.heapWarningThreshold) {
+            if (memoryInfo.memoryUsagePercentage >= this._warningThreshold || memoryInfo.heapUsagePercentage >= this.heapWarningThreshold) {
                 detailStatus = 'warning';
             }
             return this.createHealthyResult({
@@ -80,8 +32,8 @@ let MemoryHealthIndicator = class MemoryHealthIndicator extends base_health_indi
                     systemMemoryWarning: this._warningThreshold,
                     systemMemoryCritical: this._criticalThreshold,
                     heapMemoryWarning: this.heapWarningThreshold,
-                    heapMemoryCritical: this.heapCriticalThreshold,
-                },
+                    heapMemoryCritical: this.heapCriticalThreshold
+                }
             });
         });
     }
@@ -105,28 +57,44 @@ let MemoryHealthIndicator = class MemoryHealthIndicator extends base_health_indi
                 heapTotal: this.formatBytes(processMemory.heapTotal),
                 heapUsed: this.formatBytes(processMemory.heapUsed),
                 external: this.formatBytes(processMemory.external),
-                arrayBuffers: this.formatBytes(processMemory.arrayBuffers),
+                arrayBuffers: this.formatBytes(processMemory.arrayBuffers)
             },
-            heapUsagePercentage,
+            heapUsagePercentage
         };
     }
     formatBytes(bytes) {
         return Math.round(bytes / (1024 * 1024));
     }
-    getCurrentMemoryInfo() {
+    /**
+	 * Get current memory information without health check wrapper
+	 */ getCurrentMemoryInfo() {
         return this.getMemoryInfo();
     }
-    forceGarbageCollection() {
+    /**
+	 * Force garbage collection if available (for testing/debugging)
+	 */ forceGarbageCollection() {
         if (globalThis.gc) {
             globalThis.gc();
             return true;
         }
         return false;
     }
-};
-exports.MemoryHealthIndicator = MemoryHealthIndicator;
-exports.MemoryHealthIndicator = MemoryHealthIndicator = __decorate([
-    (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [])
+    constructor(){
+        const options = {
+            timeout: 1000,
+            threshold: 0.95
+        };
+        super('memory', options);
+        this._warningThreshold = 0.85;
+        this._criticalThreshold = 0.95;
+        this.heapWarningThreshold = 0.90;
+        this.heapCriticalThreshold = 0.98;
+    }
+}
+MemoryHealthIndicator = _ts_decorate([
+    Injectable(),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [])
 ], MemoryHealthIndicator);
+
 //# sourceMappingURL=memory-health.indicator.js.map

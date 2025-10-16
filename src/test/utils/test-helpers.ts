@@ -1,5 +1,5 @@
+import type { INestApplication } from '@nestjs/common'
 import * as process from 'node:process'
-import { INestApplication } from '@nestjs/common'
 
 /**
  * Utility to help with graceful app shutdown in tests

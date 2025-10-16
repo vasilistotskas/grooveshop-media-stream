@@ -1,3 +1,5 @@
+import type { Response } from 'express'
+import type { MockedObject } from 'vitest'
 import { Buffer } from 'node:buffer'
 import { Readable } from 'node:stream'
 import MediaStreamImageRESTController from '@microservice/API/controllers/media-stream-image-rest.controller'
@@ -11,33 +13,33 @@ import { InputSanitizationService } from '@microservice/Validation/services/inpu
 import { SecurityCheckerService } from '@microservice/Validation/services/security-checker.service'
 import { HttpService } from '@nestjs/axios'
 import { Test, TestingModule } from '@nestjs/testing'
-import { Response } from 'express'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-jest.mock('@nestjs/axios')
-jest.mock('@microservice/Queue/jobs/generate-resource-identity-from-request.job')
-jest.mock('@microservice/Cache/operations/cache-image-resource.operation')
-jest.mock('@microservice/Validation/services/input-sanitization.service')
-jest.mock('@microservice/Validation/services/security-checker.service')
-jest.mock('@microservice/Correlation/services/correlation.service')
-jest.mock('@microservice/Metrics/services/metrics.service')
-jest.mock('@microservice/RateLimit/guards/adaptive-rate-limit.guard')
-jest.mock('@microservice/Correlation/utils/performance-tracker.util', () => ({
+vi.mock('@nestjs/axios')
+vi.mock('@microservice/Queue/jobs/generate-resource-identity-from-request.job')
+vi.mock('@microservice/Cache/operations/cache-image-resource.operation')
+vi.mock('@microservice/Validation/services/input-sanitization.service')
+vi.mock('@microservice/Validation/services/security-checker.service')
+vi.mock('@microservice/Correlation/services/correlation.service')
+vi.mock('@microservice/Metrics/services/metrics.service')
+vi.mock('@microservice/RateLimit/guards/adaptive-rate-limit.guard')
+vi.mock('@microservice/Correlation/utils/performance-tracker.util', () => ({
 	PerformanceTracker: {
-		startPhase: jest.fn(),
-		endPhase: jest.fn().mockReturnValue(100),
+		startPhase: vi.fn(),
+		endPhase: vi.fn().mockReturnValue(100),
 	},
 }))
-jest.mock('node:fs/promises', () => {
+vi.mock('node:fs/promises', () => {
 	return {
-		open: jest.fn().mockImplementation(() => {
+		open: vi.fn().mockImplementation(() => {
 			return Promise.resolve({
-				createReadStream: jest.fn().mockImplementation(() => {
+				createReadStream: vi.fn().mockImplementation(() => {
 					const mockReadStream = new Readable()
 					mockReadStream.push('mock file content')
 					mockReadStream.push(null)
 
 					// Mock the pipe method to simulate successful streaming
-					mockReadStream.pipe = jest.fn().mockImplementation((dest) => {
+					mockReadStream.pipe = vi.fn().mockImplementation((dest) => {
 						// Simulate successful streaming by calling end event
 						setTimeout(() => {
 							if (mockReadStream.listenerCount('end') > 0) {
@@ -49,7 +51,7 @@ jest.mock('node:fs/promises', () => {
 
 					return mockReadStream
 				}),
-				close: jest.fn().mockResolvedValue(undefined),
+				close: vi.fn().mockResolvedValue(undefined),
 			})
 		}),
 	}
@@ -63,45 +65,45 @@ class TestMediaStreamImageRESTController extends MediaStreamImageRESTController 
 
 describe('mediaStreamImageRESTController', () => {
 	let controller: TestMediaStreamImageRESTController
-	let mockHttpService: jest.Mocked<HttpService>
-	let mockGenerateResourceIdentityFromRequestJob: jest.Mocked<GenerateResourceIdentityFromRequestJob>
-	let mockCacheImageResourceOperation: jest.Mocked<CacheImageResourceOperation>
-	let mockInputSanitizationService: jest.Mocked<InputSanitizationService>
-	let mockSecurityCheckerService: jest.Mocked<SecurityCheckerService>
-	let mockCorrelationService: jest.Mocked<CorrelationService>
-	let mockMetricsService: jest.Mocked<MetricsService>
-	let mockResponse: jest.Mocked<Response>
+	let mockHttpService: MockedObject<HttpService>
+	let mockGenerateResourceIdentityFromRequestJob: MockedObject<GenerateResourceIdentityFromRequestJob>
+	let mockCacheImageResourceOperation: MockedObject<CacheImageResourceOperation>
+	let mockInputSanitizationService: MockedObject<InputSanitizationService>
+	let mockSecurityCheckerService: MockedObject<SecurityCheckerService>
+	let mockCorrelationService: MockedObject<CorrelationService>
+	let mockMetricsService: MockedObject<MetricsService>
+	let mockResponse: MockedObject<Response>
 
 	beforeEach(async () => {
 		mockHttpService = {
-			get: jest.fn(),
+			get: vi.fn(),
 		} as any
 
 		mockGenerateResourceIdentityFromRequestJob = {
-			handle: jest.fn(),
+			handle: vi.fn(),
 		} as any
 
 		mockCacheImageResourceOperation = {
-			setup: jest.fn(),
-			execute: jest.fn(),
-			optimizeAndServeDefaultImage: jest.fn(),
+			setup: vi.fn(),
+			execute: vi.fn(),
+			optimizeAndServeDefaultImage: vi.fn(),
 		} as any
 
 		mockInputSanitizationService = {
-			sanitize: jest.fn().mockImplementation(str => Promise.resolve(str)),
-			validateUrl: jest.fn().mockReturnValue(true),
+			sanitize: vi.fn().mockImplementation(str => Promise.resolve(str)),
+			validateUrl: vi.fn().mockReturnValue(true),
 		} as any
 
 		mockSecurityCheckerService = {
-			checkForMaliciousContent: jest.fn().mockResolvedValue(false),
+			checkForMaliciousContent: vi.fn().mockResolvedValue(false),
 		} as any
 
 		mockCorrelationService = {
-			getCorrelationId: jest.fn().mockReturnValue('test-correlation-id'),
+			getCorrelationId: vi.fn().mockReturnValue('test-correlation-id'),
 		} as any
 
 		mockMetricsService = {
-			recordError: jest.fn(),
+			recordError: vi.fn(),
 		} as any
 
 		Object.defineProperty(mockCacheImageResourceOperation, 'resourceExists', {
@@ -120,14 +122,14 @@ describe('mediaStreamImageRESTController', () => {
 		})
 
 		mockResponse = {
-			header: jest.fn().mockReturnThis(),
-			sendFile: jest.fn(),
-			pipe: jest.fn(),
-			on: jest.fn(),
-			once: jest.fn(),
-			end: jest.fn(),
-			write: jest.fn(),
-			destroy: jest.fn(),
+			header: vi.fn().mockReturnThis(),
+			sendFile: vi.fn(),
+			pipe: vi.fn(),
+			on: vi.fn(),
+			once: vi.fn(),
+			end: vi.fn(),
+			write: vi.fn(),
+			destroy: vi.fn(),
 			writable: true,
 			writableEnded: false,
 			writableFinished: false,
@@ -172,7 +174,7 @@ describe('mediaStreamImageRESTController', () => {
 	})
 
 	afterEach(() => {
-		jest.clearAllMocks()
+		vi.clearAllMocks()
 	})
 
 	describe('addHeadersToRequest', () => {
@@ -242,7 +244,7 @@ describe('mediaStreamImageRESTController', () => {
 			})
 
 			// Mock getCachedResource to return cached data so headers are set
-			mockCacheImageResourceOperation.getCachedResource = jest.fn().mockResolvedValue({
+			mockCacheImageResourceOperation.getCachedResource = vi.fn().mockResolvedValue({
 				data: Buffer.from('fake-image-data').toString('base64'),
 			})
 
@@ -348,7 +350,7 @@ describe('mediaStreamImageRESTController', () => {
 			})
 
 			// Mock getCachedResource to return cached data so headers are set
-			mockCacheImageResourceOperation.getCachedResource = jest.fn().mockResolvedValue({
+			mockCacheImageResourceOperation.getCachedResource = vi.fn().mockResolvedValue({
 				data: Buffer.from('fake-image-data').toString('base64'),
 			})
 

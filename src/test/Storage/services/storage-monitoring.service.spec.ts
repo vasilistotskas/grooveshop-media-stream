@@ -1,22 +1,24 @@
+import type { MockedObject } from 'vitest'
 import { promises as fs } from 'node:fs'
 import { ConfigService } from '@microservice/Config/config.service'
 import { StorageMonitoringService } from '@microservice/Storage/services/storage-monitoring.service'
 import { Test, TestingModule } from '@nestjs/testing'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock fs module
-jest.mock('node:fs', () => ({
+vi.mock('node:fs', () => ({
 	promises: {
-		readdir: jest.fn(),
-		stat: jest.fn(),
-		mkdir: jest.fn(),
+		readdir: vi.fn(),
+		stat: vi.fn(),
+		mkdir: vi.fn(),
 	},
 }))
 
-const mockFs = fs as jest.Mocked<typeof fs>
+const mockFs = fs as MockedObject<typeof fs>
 
 describe('storageMonitoringService', () => {
 	let service: StorageMonitoringService
-	let configService: jest.Mocked<ConfigService>
+	let configService: MockedObject<ConfigService>
 
 	const mockStorageDirectory = '/test/storage'
 	const mockFiles = [
@@ -29,11 +31,11 @@ describe('storageMonitoringService', () => {
 
 	beforeEach(async () => {
 		const mockConfigService = {
-			get: jest.fn().mockImplementation((_key: string) => {
+			get: vi.fn().mockImplementation((_key: string) => {
 				return undefined
 			}),
-			getOptional: jest.fn().mockImplementation((key: string, defaultValue: any) => {
-				const defaults = {
+			getOptional: vi.fn().mockImplementation((key: string, defaultValue: any) => {
+				const defaults: Record<string, any> = {
 					'cache.file.directory': mockStorageDirectory,
 					'storage.warningSize': 800 * 1024 * 1024,
 					'storage.criticalSize': 1024 * 1024 * 1024,
@@ -64,7 +66,7 @@ describe('storageMonitoringService', () => {
 	})
 
 	afterEach(() => {
-		jest.clearAllMocks()
+		vi.clearAllMocks()
 	})
 
 	describe('getStorageStats', () => {
