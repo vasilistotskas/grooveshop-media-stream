@@ -1,3 +1,10 @@
+## [2.9.4](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.9.3...v2.9.4) (2025-10-16)
+
+
+### Bug Fixes
+
+* testing ([2b232db](https://github.com/vasilistotskas/grooveshop-media-stream/commit/2b232db84bf46a4c6d8f6f321218e32303908353))
+
 ## [2.9.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.9.2...v2.9.3) (2025-10-16)
 
 
