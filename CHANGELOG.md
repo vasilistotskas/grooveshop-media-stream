@@ -1,3 +1,10 @@
+## [2.9.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.9.1...v2.9.2) (2025-10-16)
+
+
+### Bug Fixes
+
+* tsconfig ([e275ea4](https://github.com/vasilistotskas/grooveshop-media-stream/commit/e275ea4a1d7370796bd39a2e5b3cd2e1872dcd40))
+
 ## [2.9.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.9.0...v2.9.1) (2025-10-16)
 
 
