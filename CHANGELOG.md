@@ -1,3 +1,10 @@
+# [2.9.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.8.3...v2.9.0) (2025-10-16)
+
+
+### Features
+
+* ES6 module, replace jest with vitest ([8facedf](https://github.com/vasilistotskas/grooveshop-media-stream/commit/8facedfc073f33fd13711cc5bb867a51e1a1a6f2))
+
 ## [2.8.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.8.2...v2.8.3) (2025-10-16)
 
 
