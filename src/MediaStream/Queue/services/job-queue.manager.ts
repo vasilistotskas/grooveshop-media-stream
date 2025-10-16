@@ -6,7 +6,7 @@ import type {
 	ImageProcessingJobData,
 	JobMetrics,
 } from '../types/job.types'
-import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
+import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { Injectable, Logger } from '@nestjs/common'
 import { CacheOperationsProcessor } from '../processors/cache-operations.processor'
 import { ImageProcessingProcessor } from '../processors/image-processing.processor'

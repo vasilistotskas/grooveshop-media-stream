@@ -1,10 +1,10 @@
 import type { MockedObject } from 'vitest'
-import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
-import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
+import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock the CorrelationService
-vi.mock('@microservice/Correlation/services/correlation.service')
+vi.mock('#microservice/Correlation/services/correlation.service')
 
 describe('correlatedLogger', () => {
 	let mockCorrelationService: MockedObject<CorrelationService>

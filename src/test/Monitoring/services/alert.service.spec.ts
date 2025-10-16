@@ -1,13 +1,13 @@
-import type { AlertRule } from '@microservice/Monitoring/interfaces/monitoring.interface'
+import type { AlertRule } from '#microservice/Monitoring/interfaces/monitoring.interface'
 import type { MockedObject } from 'vitest'
-import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
+import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import {
 	AlertCondition,
 
 	AlertSeverity,
-} from '@microservice/Monitoring/interfaces/monitoring.interface'
-import { AlertService } from '@microservice/Monitoring/services/alert.service'
-import { MonitoringService } from '@microservice/Monitoring/services/monitoring.service'
+} from '#microservice/Monitoring/interfaces/monitoring.interface'
+import { AlertService } from '#microservice/Monitoring/services/alert.service'
+import { MonitoringService } from '#microservice/Monitoring/services/monitoring.service'
 import { ConfigService } from '@nestjs/config'
 import { Test, TestingModule } from '@nestjs/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'

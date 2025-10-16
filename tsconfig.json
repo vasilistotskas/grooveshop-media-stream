@@ -2,8 +2,8 @@
   "compilerOptions": {
     "target": "ESNext",
     "outDir": "./build/dist",
-    "module": "nodenext",
-    "moduleResolution": "node",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "allowJs": true,
     "verbatimModuleSyntax": true,
     "noEmitOnError": true,
@@ -36,11 +36,11 @@
       "supertest"
     ],
     "paths": {
-      "@microservice/*": [
-        "src/MediaStream/*"
+      "#microservice/*": [
+        "./src/MediaStream/*.ts"
       ],
-      "@storage/*": [
-        "var/*"
+      "#storage/*": [
+        "./var/*"
       ]
     },
     "typeRoots": [

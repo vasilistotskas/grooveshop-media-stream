@@ -3,7 +3,7 @@ import {
 	ConnectionPoolConfigDto,
 	HttpConfigDto,
 	RetryConfigDto,
-} from '@microservice/Config/dto/http-config.dto'
+} from '#microservice/Config/dto/http-config.dto'
 import { plainToClass } from 'class-transformer'
 import { validate } from 'class-validator'
 import { describe, expect, it } from 'vitest'

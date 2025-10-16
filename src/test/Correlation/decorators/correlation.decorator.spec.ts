@@ -2,8 +2,8 @@ import type { ExecutionContext } from '@nestjs/common'
 import type { MockedClass, MockedObject } from 'vitest'
 
 // Import decorators after mocking
-import { CorrelationId, RequestContext } from '@microservice/Correlation/decorators/correlation.decorator'
-import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
+import { CorrelationId, RequestContext } from '#microservice/Correlation/decorators/correlation.decorator'
+import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock createParamDecorator to return the factory function directly
@@ -16,7 +16,7 @@ vi.mock('@nestjs/common', async () => {
 })
 
 // Mock the CorrelationService
-vi.mock('@microservice/Correlation/services/correlation.service')
+vi.mock('#microservice/Correlation/services/correlation.service')
 
 describe('correlation Decorators', () => {
 	let mockCorrelationService: MockedObject<CorrelationService>

@@ -1,4 +1,4 @@
-import { MemoryHealthIndicator } from '@microservice/Health/indicators/memory-health.indicator'
+import { MemoryHealthIndicator } from '#microservice/Health/indicators/memory-health.indicator'
 import { Test, TestingModule } from '@nestjs/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import 'reflect-metadata'

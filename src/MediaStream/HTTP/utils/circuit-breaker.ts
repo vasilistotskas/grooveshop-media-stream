@@ -1,4 +1,4 @@
-import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 
 export enum CircuitState {
 	CLOSED = 'closed',

@@ -1,8 +1,8 @@
 import type { AccessPattern } from './storage-monitoring.service'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
-import { ConfigService } from '@microservice/Config/config.service'
-import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
+import { ConfigService } from '#microservice/Config/config.service'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { Injectable } from '@nestjs/common'
 import { StorageMonitoringService } from './storage-monitoring.service'
 

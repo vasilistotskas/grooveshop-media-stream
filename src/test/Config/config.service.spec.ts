@@ -1,5 +1,5 @@
 import type { MockedObject } from 'vitest'
-import { ConfigService } from '@microservice/Config/config.service'
+import { ConfigService } from '#microservice/Config/config.service'
 import { ConfigService as NestConfigService } from '@nestjs/config'
 import { Test, TestingModule } from '@nestjs/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'

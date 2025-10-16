@@ -3,8 +3,8 @@ import CacheImageRequest, {
 	FitOptions,
 	PositionOptions,
 	SupportedResizeFormats,
-} from '@microservice/API/dto/cache-image-request.dto'
-import GenerateResourceIdentityFromRequestJob from '@microservice/Queue/jobs/generate-resource-identity-from-request.job'
+} from '#microservice/API/dto/cache-image-request.dto'
+import GenerateResourceIdentityFromRequestJob from '#microservice/Queue/jobs/generate-resource-identity-from-request.job'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 describe('generateResourceIdentityFromRequestJob', () => {

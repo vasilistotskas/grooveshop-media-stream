@@ -1,5 +1,5 @@
-import type CacheImageRequest from '@microservice/API/dto/cache-image-request.dto'
-import type { ResourceIdentifierKP } from '@microservice/common/constants/key-properties.constant'
+import type CacheImageRequest from '#microservice/API/dto/cache-image-request.dto'
+import type { ResourceIdentifierKP } from '#microservice/common/constants/key-properties.constant'
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import { Injectable, Scope } from '@nestjs/common'

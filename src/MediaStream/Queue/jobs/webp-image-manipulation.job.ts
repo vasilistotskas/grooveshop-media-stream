@@ -1,7 +1,7 @@
-import type { ResizeOptions } from '@microservice/API/dto/cache-image-request.dto'
+import type { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
 import { copyFile, readFile } from 'node:fs/promises'
 import { extname } from 'node:path'
-import ManipulationJobResult from '@microservice/Queue/dto/manipulation-job-result.dto'
+import ManipulationJobResult from '#microservice/Queue/dto/manipulation-job-result.dto'
 import { Injectable, Logger, Scope } from '@nestjs/common'
 import sharp from 'sharp'
 

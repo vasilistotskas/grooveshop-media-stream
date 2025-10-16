@@ -1,4 +1,4 @@
-import type { AppConfig } from '@microservice/Config/interfaces/app-config.interface'
+import type { AppConfig } from '#microservice/Config/interfaces/app-config.interface'
 import type { OnModuleInit } from '@nestjs/common'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService as NestConfigService } from '@nestjs/config'
@@ -65,7 +65,7 @@ export class ConfigService implements OnModuleInit {
 	async validate(): Promise<void> {
 		const { plainToClass } = await import('class-transformer')
 		const { validate } = await import('class-validator')
-		const { AppConfigDto } = await import('@microservice/Config/dto/app-config.dto')
+		const { AppConfigDto } = await import('#microservice/Config/dto/app-config.dto')
 
 		const rawConfig = this.createRawConfigForValidation()
 

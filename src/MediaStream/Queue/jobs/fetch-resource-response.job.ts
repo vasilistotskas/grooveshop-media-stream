@@ -1,4 +1,4 @@
-import type CacheImageRequest from '@microservice/API/dto/cache-image-request.dto'
+import type CacheImageRequest from '#microservice/API/dto/cache-image-request.dto'
 import type { AxiosResponse } from 'axios'
 import { HttpService } from '@nestjs/axios'
 import { Injectable, Logger, Scope } from '@nestjs/common'

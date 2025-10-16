@@ -1,7 +1,7 @@
 import type { MockedObject } from 'vitest'
-import { RedisHealthIndicator } from '@microservice/Cache/indicators/redis-health.indicator'
-import { RedisCacheService } from '@microservice/Cache/services/redis-cache.service'
-import { ConfigService } from '@microservice/Config/config.service'
+import { RedisHealthIndicator } from '#microservice/Cache/indicators/redis-health.indicator'
+import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
+import { ConfigService } from '#microservice/Config/config.service'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 

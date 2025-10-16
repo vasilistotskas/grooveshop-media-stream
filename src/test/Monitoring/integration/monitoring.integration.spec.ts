@@ -1,14 +1,14 @@
-import { CorrelationModule } from '@microservice/Correlation/correlation.module'
-import { MetricsModule } from '@microservice/Metrics/metrics.module'
-import { MonitoringController } from '@microservice/Monitoring/controllers/monitoring.controller'
+import { CorrelationModule } from '#microservice/Correlation/correlation.module'
+import { MetricsModule } from '#microservice/Metrics/metrics.module'
+import { MonitoringController } from '#microservice/Monitoring/controllers/monitoring.controller'
 import {
 	AlertCondition,
 	AlertSeverity,
-} from '@microservice/Monitoring/interfaces/monitoring.interface'
-import { MonitoringModule } from '@microservice/Monitoring/monitoring.module'
-import { AlertService } from '@microservice/Monitoring/services/alert.service'
-import { MonitoringService } from '@microservice/Monitoring/services/monitoring.service'
-import { PerformanceMonitoringService } from '@microservice/Monitoring/services/performance-monitoring.service'
+} from '#microservice/Monitoring/interfaces/monitoring.interface'
+import { MonitoringModule } from '#microservice/Monitoring/monitoring.module'
+import { AlertService } from '#microservice/Monitoring/services/alert.service'
+import { MonitoringService } from '#microservice/Monitoring/services/monitoring.service'
+import { PerformanceMonitoringService } from '#microservice/Monitoring/services/performance-monitoring.service'
 import { ConfigModule } from '@nestjs/config'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'

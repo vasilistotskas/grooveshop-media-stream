@@ -1,5 +1,5 @@
 import type { OnModuleInit } from '@nestjs/common'
-import { ConfigService } from '@microservice/Config/config.service'
+import { ConfigService } from '#microservice/Config/config.service'
 import { Injectable, Logger } from '@nestjs/common'
 import * as promClient from 'prom-client'
 

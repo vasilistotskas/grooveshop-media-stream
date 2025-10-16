@@ -1,5 +1,5 @@
-import type CacheImageRequest from '@microservice/API/dto/cache-image-request.dto'
-import ValidateCacheImageRequestResizeTargetRule from '@microservice/Validation/rules/validate-cache-image-request-resize-target.rule'
+import type CacheImageRequest from '#microservice/API/dto/cache-image-request.dto'
+import ValidateCacheImageRequestResizeTargetRule from '#microservice/Validation/rules/validate-cache-image-request-resize-target.rule'
 import { Injectable, Scope } from '@nestjs/common'
 
 @Injectable({ scope: Scope.REQUEST })

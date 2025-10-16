@@ -1,9 +1,9 @@
 import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import type { CacheStats, ICacheManager } from '../interfaces/cache-manager.interface'
 import { Buffer } from 'node:buffer'
-import { ConfigService } from '@microservice/Config/config.service'
-import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
-import { MetricsService } from '@microservice/Metrics/services/metrics.service'
+import { ConfigService } from '#microservice/Config/config.service'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
+import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Injectable } from '@nestjs/common'
 import Redis from 'ioredis'
 

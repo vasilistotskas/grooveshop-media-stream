@@ -1,5 +1,5 @@
-import CacheImageRequest, { ResizeOptions } from '@microservice/API/dto/cache-image-request.dto'
-import FetchResourceResponseJob from '@microservice/Queue/jobs/fetch-resource-response.job'
+import CacheImageRequest, { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
+import FetchResourceResponseJob from '#microservice/Queue/jobs/fetch-resource-response.job'
 import { HttpService } from '@nestjs/axios'
 import { Test, TestingModule } from '@nestjs/testing'
 import { AxiosError, AxiosHeaders } from 'axios'

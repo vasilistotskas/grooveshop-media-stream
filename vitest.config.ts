@@ -27,7 +27,7 @@ export default defineConfig({
 	},
 	resolve: {
 		alias: {
-			'@microservice': fileURLToPath(new URL('./src/MediaStream', import.meta.url)),
+			'#microservice': fileURLToPath(new URL('./src/MediaStream', import.meta.url)),
 			'@storage': fileURLToPath(new URL('./var', import.meta.url)),
 		},
 	},

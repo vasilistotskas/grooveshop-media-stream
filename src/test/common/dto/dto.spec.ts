@@ -1,10 +1,10 @@
-import CacheImageRequest, { BackgroundOptions, FitOptions, PositionOptions, ResizeOptions, SupportedResizeFormats } from '@microservice/API/dto/cache-image-request.dto'
+import CacheImageRequest, { BackgroundOptions, FitOptions, PositionOptions, ResizeOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
 import ResourceMetaData, {
 	defaultPrivateTTL,
 	defaultPublicTTL,
 	resourceMetaVersion,
-} from '@microservice/HTTP/dto/resource-meta-data.dto'
-import ManipulationJobResult from '@microservice/Queue/dto/manipulation-job-result.dto'
+} from '#microservice/HTTP/dto/resource-meta-data.dto'
+import ManipulationJobResult from '#microservice/Queue/dto/manipulation-job-result.dto'
 import { describe, expect, it } from 'vitest'
 
 describe('resizeOptions', () => {

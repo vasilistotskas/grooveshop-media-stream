@@ -1,7 +1,7 @@
-import type { SystemHealth } from '@microservice/Monitoring/interfaces/monitoring.interface'
+import type { SystemHealth } from '#microservice/Monitoring/interfaces/monitoring.interface'
 import type { MockedObject } from 'vitest'
-import { SystemHealthIndicator } from '@microservice/Monitoring/indicators/system-health.indicator'
-import { MonitoringService } from '@microservice/Monitoring/services/monitoring.service'
+import { SystemHealthIndicator } from '#microservice/Monitoring/indicators/system-health.indicator'
+import { MonitoringService } from '#microservice/Monitoring/services/monitoring.service'
 import { Test, TestingModule } from '@nestjs/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 

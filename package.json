@@ -16,6 +16,10 @@
   "files": [
     "build/dist/**/*"
   ],
+  "imports": {
+    "#microservice*": "./src/MediaStream/*.ts",
+    "#storage*": "./var/*"
+  },
   "scripts": {
     "prebuild": "rimraf build/dist && node scripts/inject-version.cjs",
     "build": "nest build",

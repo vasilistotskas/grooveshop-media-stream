@@ -1,8 +1,8 @@
 import type { OnModuleInit } from '@nestjs/common'
 import { promises as fs, Stats } from 'node:fs'
 import { extname, join } from 'node:path'
-import { ConfigService } from '@microservice/Config/config.service'
-import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
+import { ConfigService } from '#microservice/Config/config.service'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 

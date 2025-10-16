@@ -1,7 +1,7 @@
 import type { AxiosResponse } from 'axios'
-import { ConfigService } from '@microservice/Config/config.service'
-import { HttpHealthIndicator } from '@microservice/HTTP/indicators/http-health.indicator'
-import { HttpClientService } from '@microservice/HTTP/services/http-client.service'
+import { ConfigService } from '#microservice/Config/config.service'
+import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
+import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 import { Test, TestingModule } from '@nestjs/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 

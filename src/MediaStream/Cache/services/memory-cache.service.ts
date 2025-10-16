@@ -1,7 +1,7 @@
 import type { CacheStats, ICacheManager } from '../interfaces/cache-manager.interface'
-import { ConfigService } from '@microservice/Config/config.service'
-import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
-import { MetricsService } from '@microservice/Metrics/services/metrics.service'
+import { ConfigService } from '#microservice/Config/config.service'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
+import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Injectable } from '@nestjs/common'
 import NodeCache from 'node-cache'
 

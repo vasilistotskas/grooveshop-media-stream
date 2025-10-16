@@ -1,4 +1,4 @@
-import type ResourceMetaData from '@microservice/HTTP/dto/resource-meta-data.dto'
+import type ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
 import type { Response } from 'express'
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
@@ -10,20 +10,20 @@ import CacheImageRequest, {
 	PositionOptions,
 	ResizeOptions,
 	SupportedResizeFormats,
-} from '@microservice/API/dto/cache-image-request.dto'
-import CacheImageResourceOperation from '@microservice/Cache/operations/cache-image-resource.operation'
-import { IMAGE, VERSION } from '@microservice/common/constants/route-prefixes.constant'
+} from '#microservice/API/dto/cache-image-request.dto'
+import CacheImageResourceOperation from '#microservice/Cache/operations/cache-image-resource.operation'
+import { IMAGE, VERSION } from '#microservice/common/constants/route-prefixes.constant'
 import {
 	DefaultImageFallbackError,
 	InvalidRequestError,
 	ResourceStreamingError,
-} from '@microservice/common/errors/media-stream.errors'
-import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
-import { PerformanceTracker } from '@microservice/Correlation/utils/performance-tracker.util'
-import { MetricsService } from '@microservice/Metrics/services/metrics.service'
-import { AdaptiveRateLimitGuard } from '@microservice/RateLimit/guards/adaptive-rate-limit.guard'
-import { InputSanitizationService } from '@microservice/Validation/services/input-sanitization.service'
-import { SecurityCheckerService } from '@microservice/Validation/services/security-checker.service'
+} from '#microservice/common/errors/media-stream.errors'
+import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
+import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
+import { MetricsService } from '#microservice/Metrics/services/metrics.service'
+import { AdaptiveRateLimitGuard } from '#microservice/RateLimit/guards/adaptive-rate-limit.guard'
+import { InputSanitizationService } from '#microservice/Validation/services/input-sanitization.service'
+import { SecurityCheckerService } from '#microservice/Validation/services/security-checker.service'
 import { Controller, Get, Logger, Param, Res, Scope, UseGuards } from '@nestjs/common'
 
 @Controller({

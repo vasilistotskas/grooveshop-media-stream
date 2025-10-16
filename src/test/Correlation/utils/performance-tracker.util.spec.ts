@@ -1,10 +1,10 @@
 import type { Mock } from 'vitest'
-import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
-import { PerformanceTracker } from '@microservice/Correlation/utils/performance-tracker.util'
+import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
+import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock the CorrelatedLogger
-vi.mock('@microservice/Correlation/utils/logger.util', () => ({
+vi.mock('#microservice/Correlation/utils/logger.util', () => ({
 	CorrelatedLogger: {
 		debug: vi.fn(),
 		warn: vi.fn(),
@@ -22,14 +22,14 @@ const mockCorrelationService = {
 }
 
 // Mock the CorrelationService class
-vi.mock('@microservice/Correlation/services/correlation.service', () => {
+vi.mock('#microservice/Correlation/services/correlation.service', () => {
 	return {
 		CorrelationService: vi.fn().mockImplementation(() => mockCorrelationService),
 	}
 })
 
 // Ensure the mock is applied before importing PerformanceTracker
-vi.doMock('@microservice/Correlation/services/correlation.service', () => {
+vi.doMock('#microservice/Correlation/services/correlation.service', () => {
 	return {
 		CorrelationService: vi.fn().mockImplementation(() => mockCorrelationService),
 	}

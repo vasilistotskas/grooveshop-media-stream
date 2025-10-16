@@ -1,6 +1,6 @@
 import type { MockedObject } from 'vitest'
-import { ConfigService } from '@microservice/Config/config.service'
-import { InputSanitizationService } from '@microservice/Validation/services/input-sanitization.service'
+import { ConfigService } from '#microservice/Config/config.service'
+import { InputSanitizationService } from '#microservice/Validation/services/input-sanitization.service'
 import { Test, TestingModule } from '@nestjs/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 

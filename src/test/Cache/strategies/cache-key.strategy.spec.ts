@@ -1,4 +1,4 @@
-import { DefaultCacheKeyStrategy } from '@microservice/Cache/strategies/cache-key.strategy'
+import { DefaultCacheKeyStrategy } from '#microservice/Cache/strategies/cache-key.strategy'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 describe('defaultCacheKeyStrategy', () => {

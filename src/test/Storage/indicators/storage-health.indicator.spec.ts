@@ -1,8 +1,8 @@
 import type { MockedObject } from 'vitest'
-import { ConfigService } from '@microservice/Config/config.service'
-import { StorageHealthIndicator } from '@microservice/Storage/indicators/storage-health.indicator'
-import { StorageCleanupService } from '@microservice/Storage/services/storage-cleanup.service'
-import { StorageMonitoringService } from '@microservice/Storage/services/storage-monitoring.service'
+import { ConfigService } from '#microservice/Config/config.service'
+import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
+import { StorageCleanupService } from '#microservice/Storage/services/storage-cleanup.service'
+import { StorageMonitoringService } from '#microservice/Storage/services/storage-monitoring.service'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 

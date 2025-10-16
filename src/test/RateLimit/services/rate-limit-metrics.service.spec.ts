@@ -1,6 +1,6 @@
 import type { MockedObject } from 'vitest'
-import { ConfigService } from '@microservice/Config/config.service'
-import { RateLimitMetricsService } from '@microservice/RateLimit/services/rate-limit-metrics.service'
+import { ConfigService } from '#microservice/Config/config.service'
+import { RateLimitMetricsService } from '#microservice/RateLimit/services/rate-limit-metrics.service'
 import { Test, TestingModule } from '@nestjs/testing'
 import * as promClient from 'prom-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express'
-import { CORRELATION_ID_HEADER, CorrelationMiddleware } from '@microservice/Correlation/middleware/correlation.middleware'
-import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
+import { CORRELATION_ID_HEADER, CorrelationMiddleware } from '#microservice/Correlation/middleware/correlation.middleware'
+import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 

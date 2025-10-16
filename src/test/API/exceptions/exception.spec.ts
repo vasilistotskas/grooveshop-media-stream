@@ -4,11 +4,11 @@ import {
 	PositionOptions,
 	ResizeOptions,
 	SupportedResizeFormats,
-} from '@microservice/API/dto/cache-image-request.dto'
-import RequestedResizeTargetTooLargeException from '@microservice/API/exceptions/requested-resize-target-too-large.exception'
+} from '#microservice/API/dto/cache-image-request.dto'
+import RequestedResizeTargetTooLargeException from '#microservice/API/exceptions/requested-resize-target-too-large.exception'
 
-import UnableToFetchResourceException from '@microservice/API/exceptions/unable-to-fetch-resource.exception'
-import UnableToStoreFetchedResourceException from '@microservice/API/exceptions/unable-to-store-fetched-resource.exception'
+import UnableToFetchResourceException from '#microservice/API/exceptions/unable-to-fetch-resource.exception'
+import UnableToStoreFetchedResourceException from '#microservice/API/exceptions/unable-to-store-fetched-resource.exception'
 import { describe, expect, it } from 'vitest'
 
 describe('requestedResizeTargetTooLargeException', () => {

@@ -4,7 +4,7 @@ import type {
 	MonitoringConfig,
 } from '../interfaces/monitoring.interface'
 import * as process from 'node:process'
-import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
+import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { AlertCondition, AlertSeverity } from '../interfaces/monitoring.interface'

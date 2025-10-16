@@ -5,7 +5,7 @@ import {
 	ResourceNotFoundError,
 	ResourceProcessingError,
 	ResourceStreamingError,
-} from '@microservice/common/errors/media-stream.errors'
+} from '#microservice/common/errors/media-stream.errors'
 import { HttpStatus } from '@nestjs/common'
 import { describe, expect, it } from 'vitest'
 

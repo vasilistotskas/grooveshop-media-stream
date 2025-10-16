@@ -1,9 +1,9 @@
 import type { MockedObject } from 'vitest'
 import { Buffer } from 'node:buffer'
 import { promises as fs } from 'node:fs'
-import { ConfigService } from '@microservice/Config/config.service'
-import { StorageMonitoringService } from '@microservice/Storage/services/storage-monitoring.service'
-import { StorageOptimizationService } from '@microservice/Storage/services/storage-optimization.service'
+import { ConfigService } from '#microservice/Config/config.service'
+import { StorageMonitoringService } from '#microservice/Storage/services/storage-monitoring.service'
+import { StorageOptimizationService } from '#microservice/Storage/services/storage-optimization.service'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 

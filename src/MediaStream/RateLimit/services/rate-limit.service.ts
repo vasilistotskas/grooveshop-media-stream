@@ -1,6 +1,6 @@
 import * as process from 'node:process'
-import { ConfigService } from '@microservice/Config/config.service'
-import { MetricsService } from '@microservice/Metrics/services/metrics.service'
+import { ConfigService } from '#microservice/Config/config.service'
+import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Injectable, Logger } from '@nestjs/common'
 
 export interface RateLimitConfig {

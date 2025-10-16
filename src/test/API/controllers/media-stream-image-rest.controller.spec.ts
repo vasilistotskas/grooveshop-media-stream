@@ -2,28 +2,28 @@ import type { Response } from 'express'
 import type { MockedObject } from 'vitest'
 import { Buffer } from 'node:buffer'
 import { Readable } from 'node:stream'
-import MediaStreamImageRESTController from '@microservice/API/controllers/media-stream-image-rest.controller'
-import { BackgroundOptions, FitOptions, PositionOptions, SupportedResizeFormats } from '@microservice/API/dto/cache-image-request.dto'
-import CacheImageResourceOperation from '@microservice/Cache/operations/cache-image-resource.operation'
-import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
-import ResourceMetaData from '@microservice/HTTP/dto/resource-meta-data.dto'
-import { MetricsService } from '@microservice/Metrics/services/metrics.service'
-import GenerateResourceIdentityFromRequestJob from '@microservice/Queue/jobs/generate-resource-identity-from-request.job'
-import { InputSanitizationService } from '@microservice/Validation/services/input-sanitization.service'
-import { SecurityCheckerService } from '@microservice/Validation/services/security-checker.service'
+import MediaStreamImageRESTController from '#microservice/API/controllers/media-stream-image-rest.controller'
+import { BackgroundOptions, FitOptions, PositionOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
+import CacheImageResourceOperation from '#microservice/Cache/operations/cache-image-resource.operation'
+import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
+import ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
+import { MetricsService } from '#microservice/Metrics/services/metrics.service'
+import GenerateResourceIdentityFromRequestJob from '#microservice/Queue/jobs/generate-resource-identity-from-request.job'
+import { InputSanitizationService } from '#microservice/Validation/services/input-sanitization.service'
+import { SecurityCheckerService } from '#microservice/Validation/services/security-checker.service'
 import { HttpService } from '@nestjs/axios'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@nestjs/axios')
-vi.mock('@microservice/Queue/jobs/generate-resource-identity-from-request.job')
-vi.mock('@microservice/Cache/operations/cache-image-resource.operation')
-vi.mock('@microservice/Validation/services/input-sanitization.service')
-vi.mock('@microservice/Validation/services/security-checker.service')
-vi.mock('@microservice/Correlation/services/correlation.service')
-vi.mock('@microservice/Metrics/services/metrics.service')
-vi.mock('@microservice/RateLimit/guards/adaptive-rate-limit.guard')
-vi.mock('@microservice/Correlation/utils/performance-tracker.util', () => ({
+vi.mock('#microservice/Queue/jobs/generate-resource-identity-from-request.job')
+vi.mock('#microservice/Cache/operations/cache-image-resource.operation')
+vi.mock('#microservice/Validation/services/input-sanitization.service')
+vi.mock('#microservice/Validation/services/security-checker.service')
+vi.mock('#microservice/Correlation/services/correlation.service')
+vi.mock('#microservice/Metrics/services/metrics.service')
+vi.mock('#microservice/RateLimit/guards/adaptive-rate-limit.guard')
+vi.mock('#microservice/Correlation/utils/performance-tracker.util', () => ({
 	PerformanceTracker: {
 		startPhase: vi.fn(),
 		endPhase: vi.fn().mockReturnValue(100),

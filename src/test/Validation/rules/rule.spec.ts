@@ -1,7 +1,7 @@
-import CacheImageRequest, { ResizeOptions } from '@microservice/API/dto/cache-image-request.dto'
-import RequestedResizeTargetTooLargeException from '@microservice/API/exceptions/requested-resize-target-too-large.exception'
-import ValidateCacheImageRequestResizeTargetRule from '@microservice/Validation/rules/validate-cache-image-request-resize-target.rule'
-import ValidateCacheImageRequestRule from '@microservice/Validation/rules/validate-cache-image-request.rule'
+import CacheImageRequest, { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
+import RequestedResizeTargetTooLargeException from '#microservice/API/exceptions/requested-resize-target-too-large.exception'
+import ValidateCacheImageRequestResizeTargetRule from '#microservice/Validation/rules/validate-cache-image-request-resize-target.rule'
+import ValidateCacheImageRequestRule from '#microservice/Validation/rules/validate-cache-image-request.rule'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('validateCacheImageRequestResizeTargetRule', () => {

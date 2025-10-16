@@ -1,6 +1,6 @@
 import type { AxiosResponse } from 'axios'
 import { open } from 'node:fs/promises'
-import UnableToStoreFetchedResourceException from '@microservice/API/exceptions/unable-to-store-fetched-resource.exception'
+import UnableToStoreFetchedResourceException from '#microservice/API/exceptions/unable-to-store-fetched-resource.exception'
 import { Injectable, Logger, Scope } from '@nestjs/common'
 
 @Injectable({ scope: Scope.REQUEST })

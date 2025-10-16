@@ -1,8 +1,8 @@
 import type { CacheLayer, CacheLayerStats } from '../interfaces/cache-layer.interface'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
-import { ConfigService } from '@microservice/Config/config.service'
-import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
+import { ConfigService } from '#microservice/Config/config.service'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { Injectable } from '@nestjs/common'
 
 interface FileCacheEntry<T> {

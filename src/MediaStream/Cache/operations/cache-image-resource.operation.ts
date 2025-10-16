@@ -1,7 +1,7 @@
 import type {
 	ResizeOptions,
-} from '@microservice/API/dto/cache-image-request.dto'
-import type { ResourceIdentifierKP } from '@microservice/common/constants/key-properties.constant'
+} from '#microservice/API/dto/cache-image-request.dto'
+import type { ResourceIdentifierKP } from '#microservice/common/constants/key-properties.constant'
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import { access, readFile, unlink, writeFile } from 'node:fs/promises'
@@ -12,21 +12,21 @@ import CacheImageRequest, {
 	FitOptions,
 	PositionOptions,
 	SupportedResizeFormats,
-} from '@microservice/API/dto/cache-image-request.dto'
-import UnableToFetchResourceException from '@microservice/API/exceptions/unable-to-fetch-resource.exception'
-import { MultiLayerCacheManager } from '@microservice/Cache/services/multi-layer-cache.manager'
-import { CorrelatedLogger } from '@microservice/Correlation/utils/logger.util'
-import { PerformanceTracker } from '@microservice/Correlation/utils/performance-tracker.util'
-import ResourceMetaData from '@microservice/HTTP/dto/resource-meta-data.dto'
-import { MetricsService } from '@microservice/Metrics/services/metrics.service'
-import FetchResourceResponseJob from '@microservice/Queue/jobs/fetch-resource-response.job'
-import GenerateResourceIdentityFromRequestJob from '@microservice/Queue/jobs/generate-resource-identity-from-request.job'
-import StoreResourceResponseToFileJob from '@microservice/Queue/jobs/store-resource-response-to-file.job'
-import WebpImageManipulationJob from '@microservice/Queue/jobs/webp-image-manipulation.job'
-import { JobQueueManager } from '@microservice/Queue/services/job-queue.manager'
-import { JobPriority } from '@microservice/Queue/types/job.types'
-import ValidateCacheImageRequestRule from '@microservice/Validation/rules/validate-cache-image-request.rule'
-import { InputSanitizationService } from '@microservice/Validation/services/input-sanitization.service'
+} from '#microservice/API/dto/cache-image-request.dto'
+import UnableToFetchResourceException from '#microservice/API/exceptions/unable-to-fetch-resource.exception'
+import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
+import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
+import ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
+import { MetricsService } from '#microservice/Metrics/services/metrics.service'
+import FetchResourceResponseJob from '#microservice/Queue/jobs/fetch-resource-response.job'
+import GenerateResourceIdentityFromRequestJob from '#microservice/Queue/jobs/generate-resource-identity-from-request.job'
+import StoreResourceResponseToFileJob from '#microservice/Queue/jobs/store-resource-response-to-file.job'
+import WebpImageManipulationJob from '#microservice/Queue/jobs/webp-image-manipulation.job'
+import { JobQueueManager } from '#microservice/Queue/services/job-queue.manager'
+import { JobPriority } from '#microservice/Queue/types/job.types'
+import ValidateCacheImageRequestRule from '#microservice/Validation/rules/validate-cache-image-request.rule'
+import { InputSanitizationService } from '#microservice/Validation/services/input-sanitization.service'
 import { Injectable, InternalServerErrorException, Scope } from '@nestjs/common'
 
 @Injectable({ scope: Scope.REQUEST })

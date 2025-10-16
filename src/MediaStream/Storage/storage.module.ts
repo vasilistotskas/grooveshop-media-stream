@@ -1,5 +1,5 @@
-import { ConfigModule } from '@microservice/Config/config.module'
-import { CorrelationModule } from '@microservice/Correlation/correlation.module'
+import { ConfigModule } from '#microservice/Config/config.module'
+import { CorrelationModule } from '#microservice/Correlation/correlation.module'
 import { Module } from '@nestjs/common'
 import { ScheduleModule } from '@nestjs/schedule'
 

@@ -1,4 +1,4 @@
-import { CircuitBreaker, CircuitState } from '@microservice/HTTP/utils/circuit-breaker'
+import { CircuitBreaker, CircuitState } from '#microservice/HTTP/utils/circuit-breaker'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('circuitBreaker', () => {

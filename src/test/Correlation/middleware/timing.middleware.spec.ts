@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express'
-import { TimingMiddleware } from '@microservice/Correlation/middleware/timing.middleware'
-import { CorrelationService } from '@microservice/Correlation/services/correlation.service'
+import { TimingMiddleware } from '#microservice/Correlation/middleware/timing.middleware'
+import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 

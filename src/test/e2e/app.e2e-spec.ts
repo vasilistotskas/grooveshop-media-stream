@@ -1,6 +1,6 @@
 import type { INestApplication } from '@nestjs/common'
 import * as process from 'node:process'
-import MediaStreamModule from '@microservice/media-stream.module'
+import MediaStreamModule from '#microservice/media-stream.module'
 import { Test, TestingModule } from '@nestjs/testing'
 import request from 'supertest'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'

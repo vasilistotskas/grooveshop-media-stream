@@ -1,5 +1,5 @@
 import * as process from 'node:process'
-import MediaStreamModule from '@microservice/media-stream.module'
+import MediaStreamModule from '#microservice/media-stream.module'
 import { NestFactory } from '@nestjs/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { bootstrap } from '../main'
