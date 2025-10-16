@@ -133,8 +133,5 @@
       ]
     ]
   },
-  "_moduleAliases": {
-    "@microservice": "./build/dist"
-  },
   "packageManager": "pnpm@10.18.3"
 }

@@ -3,7 +3,7 @@
     "target": "ESNext",
     "outDir": "./build/dist",
     "module": "nodenext",
-    "moduleResolution": "nodenext",
+    "moduleResolution": "node",
     "allowJs": true,
     "verbatimModuleSyntax": true,
     "noEmitOnError": true,
