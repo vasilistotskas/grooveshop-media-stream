@@ -2,28 +2,6 @@
   "$schema": "https://swc.rs/schema.json",
   "module": {
     "type": "es6",
-    "strict": true,
-    "strictMode": true,
-    "lazy": false,
-    "noInterop": false,
     "resolveFully": true
-  },
-  "jsc": {
-    "parser": {
-      "syntax": "typescript",
-      "decorators": true,
-      "dynamicImport": true
-    },
-    "transform": {
-      "legacyDecorator": true,
-      "decoratorMetadata": true
-    },
-    "target": "es2024",
-    "keepClassNames": true,
-    "baseUrl": "./",
-    "paths": {
-      "@microservice/*": ["src/MediaStream/*"],
-      "@storage/*": ["var/*"]
-    }
   }
 }
