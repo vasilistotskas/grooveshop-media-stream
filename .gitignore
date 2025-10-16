@@ -1,5 +1,6 @@
 /node_modules
-!/build/dist
+dist
+build
 
 # ignore all env files except .env.example
 .env*
