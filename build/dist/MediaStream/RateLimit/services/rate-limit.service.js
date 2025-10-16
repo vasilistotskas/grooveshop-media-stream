@@ -12,6 +12,17 @@ import { ConfigService } from "../../Config/config.service.js";
 import { MetricsService } from "../../Metrics/services/metrics.service.js";
 import { Injectable, Logger } from "@nestjs/common";
 export class RateLimitService {
+    constructor(_configService, metricsService){
+        this._configService = _configService;
+        this.metricsService = metricsService;
+        this._logger = new Logger(RateLimitService.name);
+        this.requestCounts = new Map();
+        this.systemLoadThresholds = {
+            cpu: 80,
+            memory: 85,
+            connections: 1000
+        };
+    }
     /**
 	 * Generate rate limit key based on IP and request type
 	 */ generateKey(ip, requestType) {
@@ -260,17 +271,6 @@ export class RateLimitService {
         return {
             totalEntries: this.requestCounts.size,
             entries
-        };
-    }
-    constructor(_configService, metricsService){
-        this._configService = _configService;
-        this.metricsService = metricsService;
-        this._logger = new Logger(RateLimitService.name);
-        this.requestCounts = new Map();
-        this.systemLoadThresholds = {
-            cpu: 80,
-            memory: 85,
-            connections: 1000
         };
     }
 }

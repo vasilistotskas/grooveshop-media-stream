@@ -12,6 +12,17 @@ import * as process from "node:process";
 import { Injectable } from "@nestjs/common";
 import { BaseHealthIndicator } from "../base/base-health-indicator.js";
 export class MemoryHealthIndicator extends BaseHealthIndicator {
+    constructor(){
+        const options = {
+            timeout: 1000,
+            threshold: 0.95
+        };
+        super('memory', options);
+        this._warningThreshold = 0.85;
+        this._criticalThreshold = 0.95;
+        this.heapWarningThreshold = 0.90;
+        this.heapCriticalThreshold = 0.98;
+    }
     async performHealthCheck() {
         return this.executeWithTimeout(async ()=>{
             const memoryInfo = this.getMemoryInfo();
@@ -78,17 +89,6 @@ export class MemoryHealthIndicator extends BaseHealthIndicator {
             return true;
         }
         return false;
-    }
-    constructor(){
-        const options = {
-            timeout: 1000,
-            threshold: 0.95
-        };
-        super('memory', options);
-        this._warningThreshold = 0.85;
-        this._criticalThreshold = 0.95;
-        this.heapWarningThreshold = 0.90;
-        this.heapCriticalThreshold = 0.98;
     }
 }
 MemoryHealthIndicator = _ts_decorate([

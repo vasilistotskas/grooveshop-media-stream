@@ -1,5 +1,8 @@
 import { CorrelationService } from "../services/correlation.service.js";
 export class CorrelatedLogger {
+    static{
+        this._correlationService = null;
+    }
     static setCorrelationService(service) {
         this._correlationService = service;
     }
@@ -43,6 +46,5 @@ export class CorrelatedLogger {
         console.log(`${prefix}${contextStr} VERBOSE: ${message}`);
     }
 }
-CorrelatedLogger._correlationService = null;
 
 //# sourceMappingURL=logger.util.js.map

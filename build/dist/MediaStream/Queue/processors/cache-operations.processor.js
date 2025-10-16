@@ -16,6 +16,12 @@ import { CorrelationService } from "../../Correlation/services/correlation.servi
 import { HttpClientService } from "../../HTTP/services/http-client.service.js";
 import { Injectable, Logger } from "@nestjs/common";
 export class CacheOperationsProcessor {
+    constructor(_correlationService, cacheManager, httpClient){
+        this._correlationService = _correlationService;
+        this.cacheManager = cacheManager;
+        this.httpClient = httpClient;
+        this._logger = new Logger(CacheOperationsProcessor.name);
+    }
     async processCacheWarming(job) {
         const startTime = Date.now();
         const { imageUrls, batchSize = 5, correlationId } = job.data;
@@ -198,12 +204,6 @@ export class CacheOperationsProcessor {
         // Simple cache key generation - in real implementation this would be more sophisticated
         const hash = Buffer.from(imageUrl).toString('base64').replace(/[/+=]/g, '');
         return `image:${hash}`;
-    }
-    constructor(_correlationService, cacheManager, httpClient){
-        this._correlationService = _correlationService;
-        this.cacheManager = cacheManager;
-        this.httpClient = httpClient;
-        this._logger = new Logger(CacheOperationsProcessor.name);
     }
 }
 CacheOperationsProcessor = _ts_decorate([

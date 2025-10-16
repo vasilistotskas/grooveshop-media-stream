@@ -49,12 +49,11 @@ const rules = [
     ValidateCacheImageRequestRule,
     ValidateCacheImageRequestResizeTargetRule
 ];
-let MediaStreamModule = class MediaStreamModule {
+export default class MediaStreamModule {
     configure(consumer) {
         consumer.apply(CorrelationMiddleware, TimingMiddleware, MetricsMiddleware).forRoutes('*');
     }
-};
-export { MediaStreamModule as default };
+}
 MediaStreamModule = _ts_decorate([
     Module({
         imports: [

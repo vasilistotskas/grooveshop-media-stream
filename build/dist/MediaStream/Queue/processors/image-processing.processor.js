@@ -18,6 +18,23 @@ import { HttpClientService } from "../../HTTP/services/http-client.service.js";
 import { Injectable, Logger } from "@nestjs/common";
 import sharp from "sharp";
 export class ImageProcessingProcessor {
+    static{
+        this.MAX_SHARP_INSTANCES = 4;
+    }
+    constructor(_correlationService, httpClient, cacheManager){
+        this._correlationService = _correlationService;
+        this.httpClient = httpClient;
+        this.cacheManager = cacheManager;
+        this._logger = new Logger(ImageProcessingProcessor.name);
+        this.processedCount = 0;
+        sharp.cache({
+            memory: 50,
+            files: 10,
+            items: 100
+        });
+        sharp.concurrency(ImageProcessingProcessor.MAX_SHARP_INSTANCES);
+        sharp.simd(true);
+    }
     async process(job) {
         const startTime = Date.now();
         const { imageUrl, width, height, quality, format, cacheKey, correlationId, fit, position, background, trimThreshold } = job.data;
@@ -225,22 +242,7 @@ export class ImageProcessingProcessor {
             this._logger.warn(`Failed to update job progress: ${error.message}`);
         }
     }
-    constructor(_correlationService, httpClient, cacheManager){
-        this._correlationService = _correlationService;
-        this.httpClient = httpClient;
-        this.cacheManager = cacheManager;
-        this._logger = new Logger(ImageProcessingProcessor.name);
-        this.processedCount = 0;
-        sharp.cache({
-            memory: 50,
-            files: 10,
-            items: 100
-        });
-        sharp.concurrency(ImageProcessingProcessor.MAX_SHARP_INSTANCES);
-        sharp.simd(true);
-    }
 }
-ImageProcessingProcessor.MAX_SHARP_INSTANCES = 4;
 ImageProcessingProcessor = _ts_decorate([
     Injectable(),
     _ts_metadata("design:type", Function),

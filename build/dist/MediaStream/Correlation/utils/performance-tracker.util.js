@@ -2,6 +2,9 @@ import * as process from "node:process";
 import { CorrelationService } from "../services/correlation.service.js";
 import { CorrelatedLogger } from "./logger.util.js";
 export class PerformanceTracker {
+    static{
+        this.phases = new Map();
+    }
     static getCorrelationService() {
         return new CorrelationService();
     }
@@ -116,6 +119,5 @@ export class PerformanceTracker {
         this.clearPhases();
     }
 }
-PerformanceTracker.phases = new Map();
 
 //# sourceMappingURL=performance-tracker.util.js.map

@@ -96,13 +96,12 @@ export class ResizeOptions {
         });
     }
 }
-let CacheImageRequest = class CacheImageRequest {
+export default class CacheImageRequest {
     constructor(data){
         this.resourceTarget = '';
         this.resizeOptions = new ResizeOptions();
         Object.assign(this, data);
     }
-};
-export { CacheImageRequest as default };
+}
 
 //# sourceMappingURL=cache-image-request.dto.js.map

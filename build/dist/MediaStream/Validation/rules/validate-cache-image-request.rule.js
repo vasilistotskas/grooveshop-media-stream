@@ -9,7 +9,10 @@ function _ts_metadata(k, v) {
 }
 import ValidateCacheImageRequestResizeTargetRule from "./validate-cache-image-request-resize-target.rule.js";
 import { Injectable, Scope } from "@nestjs/common";
-let ValidateCacheImageRequestRule = class ValidateCacheImageRequestRule {
+export default class ValidateCacheImageRequestRule {
+    constructor(validateCacheImageRequestResizeTargetRule){
+        this.validateCacheImageRequestResizeTargetRule = validateCacheImageRequestResizeTargetRule;
+    }
     async setup(request) {
         this.request = request;
         await this.validateCacheImageRequestResizeTargetRule.setup(request);
@@ -17,11 +20,7 @@ let ValidateCacheImageRequestRule = class ValidateCacheImageRequestRule {
     async apply() {
         await this.validateCacheImageRequestResizeTargetRule.apply();
     }
-    constructor(validateCacheImageRequestResizeTargetRule){
-        this.validateCacheImageRequestResizeTargetRule = validateCacheImageRequestResizeTargetRule;
-    }
-};
-export { ValidateCacheImageRequestRule as default };
+}
 ValidateCacheImageRequestRule = _ts_decorate([
     Injectable({
         scope: Scope.REQUEST

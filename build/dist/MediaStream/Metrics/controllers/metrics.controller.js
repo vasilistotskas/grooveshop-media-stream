@@ -10,6 +10,9 @@ function _ts_metadata(k, v) {
 import { Controller, Get, Header, HttpCode, HttpStatus } from "@nestjs/common";
 import { MetricsService } from "../services/metrics.service.js";
 export class MetricsController {
+    constructor(metricsService){
+        this.metricsService = metricsService;
+    }
     /**
 	 * Prometheus metrics endpoint
 	 * Returns metrics in Prometheus format for scraping
@@ -27,9 +30,6 @@ export class MetricsController {
                 metricsCount: this.metricsService.getRegistry().getMetricsAsArray().length
             }
         };
-    }
-    constructor(metricsService){
-        this.metricsService = metricsService;
     }
 }
 _ts_decorate([

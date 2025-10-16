@@ -15,6 +15,27 @@ import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { StorageMonitoringService } from "./storage-monitoring.service.js";
 export class StorageOptimizationService {
+    constructor(_configService, storageMonitoring){
+        this._configService = _configService;
+        this.storageMonitoring = storageMonitoring;
+        this._logger = new Logger(StorageOptimizationService.name);
+        this.strategies = new Map();
+        this.optimizationHistory = new Map();
+        this.isOptimizationRunning = false;
+        this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage');
+        this.config = {
+            enabled: this._configService.getOptional('storage.optimization.enabled', true),
+            strategies: this._configService.getOptional('storage.optimization.strategies', [
+                'compression',
+                'deduplication'
+            ]),
+            popularFileThreshold: this._configService.getOptional('storage.optimization.popularThreshold', 10),
+            compressionLevel: this._configService.getOptional('storage.optimization.compressionLevel', 6),
+            createBackups: this._configService.getOptional('storage.optimization.createBackups', false),
+            maxOptimizationTime: this._configService.getOptional('storage.optimization.maxTime', 600000)
+        };
+        this.initializeStrategies();
+    }
     async onModuleInit() {
         if (this.config.enabled) {
             this._logger.log(`Storage optimization enabled with strategies: ${this.config.strategies.join(', ')}`);
@@ -295,27 +316,6 @@ export class StorageOptimizationService {
             unitIndex++;
         }
         return `${size.toFixed(1)} ${units[unitIndex]}`;
-    }
-    constructor(_configService, storageMonitoring){
-        this._configService = _configService;
-        this.storageMonitoring = storageMonitoring;
-        this._logger = new Logger(StorageOptimizationService.name);
-        this.strategies = new Map();
-        this.optimizationHistory = new Map();
-        this.isOptimizationRunning = false;
-        this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage');
-        this.config = {
-            enabled: this._configService.getOptional('storage.optimization.enabled', true),
-            strategies: this._configService.getOptional('storage.optimization.strategies', [
-                'compression',
-                'deduplication'
-            ]),
-            popularFileThreshold: this._configService.getOptional('storage.optimization.popularThreshold', 10),
-            compressionLevel: this._configService.getOptional('storage.optimization.compressionLevel', 6),
-            createBackups: this._configService.getOptional('storage.optimization.createBackups', false),
-            maxOptimizationTime: this._configService.getOptional('storage.optimization.maxTime', 600000)
-        };
-        this.initializeStrategies();
     }
 }
 _ts_decorate([

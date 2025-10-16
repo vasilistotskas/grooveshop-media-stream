@@ -13,6 +13,9 @@ import { BaseHealthIndicator } from "../../Health/base/base-health-indicator.js"
 import { Injectable } from "@nestjs/common";
 import { RedisCacheService } from "../services/redis-cache.service.js";
 export class RedisHealthIndicator extends BaseHealthIndicator {
+    constructor(redisCacheService, _configService){
+        super('redis'), this.redisCacheService = redisCacheService, this._configService = _configService;
+    }
     async performHealthCheck() {
         const startTime = Date.now();
         try {
@@ -167,9 +170,6 @@ export class RedisHealthIndicator extends BaseHealthIndicator {
     }
     getDescription() {
         return 'Redis cache health indicator that tests connection and basic operations';
-    }
-    constructor(redisCacheService, _configService){
-        super('redis'), this.redisCacheService = redisCacheService, this._configService = _configService;
     }
 }
 RedisHealthIndicator = _ts_decorate([

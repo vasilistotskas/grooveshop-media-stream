@@ -10,6 +10,11 @@ function _ts_metadata(k, v) {
 import { Injectable } from "@nestjs/common";
 import { MemoryCacheService } from "../services/memory-cache.service.js";
 export class MemoryCacheLayer {
+    constructor(memoryCacheService){
+        this.memoryCacheService = memoryCacheService;
+        this.layerName = 'memory';
+        this.priority = 1;
+    }
     async get(key) {
         return this.memoryCacheService.get(key);
     }
@@ -41,11 +46,6 @@ export class MemoryCacheLayer {
     }
     getPriority() {
         return this.priority;
-    }
-    constructor(memoryCacheService){
-        this.memoryCacheService = memoryCacheService;
-        this.layerName = 'memory';
-        this.priority = 1;
     }
 }
 MemoryCacheLayer = _ts_decorate([

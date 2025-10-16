@@ -12,6 +12,30 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { MonitoringService } from "./monitoring.service.js";
 export class PerformanceMonitoringService {
+    constructor(_configService, _correlationService, monitoringService){
+        this._configService = _configService;
+        this._correlationService = _correlationService;
+        this.monitoringService = monitoringService;
+        this._logger = new Logger(PerformanceMonitoringService.name);
+        this.performanceData = new Map();
+        this.activeOperations = new Map();
+        this.config = this._configService.get('monitoring', {
+            enabled: true,
+            metricsRetentionMs: 24 * 60 * 60 * 1000,
+            alertsRetentionMs: 7 * 24 * 60 * 60 * 1000,
+            performanceRetentionMs: 24 * 60 * 60 * 1000,
+            healthCheckIntervalMs: 30 * 1000,
+            alertCooldownMs: 5 * 60 * 1000,
+            externalIntegrations: {
+                enabled: false,
+                endpoints: []
+            }
+        });
+        if (this.config.enabled) {
+            this.startPerformanceCleanup();
+            this._logger.log('Performance monitoring service initialized');
+        }
+    }
     /**
 	 * Start tracking a performance operation
 	 */ startOperation(operationName, metadata) {
@@ -249,30 +273,6 @@ export class PerformanceMonitoringService {
         }
         if (removedCount > 0) {
             this._logger.debug(`Cleaned up ${removedCount} old performance metrics`);
-        }
-    }
-    constructor(_configService, _correlationService, monitoringService){
-        this._configService = _configService;
-        this._correlationService = _correlationService;
-        this.monitoringService = monitoringService;
-        this._logger = new Logger(PerformanceMonitoringService.name);
-        this.performanceData = new Map();
-        this.activeOperations = new Map();
-        this.config = this._configService.get('monitoring', {
-            enabled: true,
-            metricsRetentionMs: 24 * 60 * 60 * 1000,
-            alertsRetentionMs: 7 * 24 * 60 * 60 * 1000,
-            performanceRetentionMs: 24 * 60 * 60 * 1000,
-            healthCheckIntervalMs: 30 * 1000,
-            alertCooldownMs: 5 * 60 * 1000,
-            externalIntegrations: {
-                enabled: false,
-                endpoints: []
-            }
-        });
-        if (this.config.enabled) {
-            this.startPerformanceCleanup();
-            this._logger.log('Performance monitoring service initialized');
         }
     }
 }

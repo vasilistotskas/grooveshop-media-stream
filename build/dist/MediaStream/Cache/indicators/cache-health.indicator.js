@@ -14,6 +14,9 @@ import { Injectable } from "@nestjs/common";
 import { CacheWarmingService } from "../services/cache-warming.service.js";
 import { MemoryCacheService } from "../services/memory-cache.service.js";
 export class CacheHealthIndicator extends BaseHealthIndicator {
+    constructor(memoryCacheService, cacheWarmingService, _configService){
+        super('cache'), this.memoryCacheService = memoryCacheService, this.cacheWarmingService = cacheWarmingService, this._configService = _configService;
+    }
     async performHealthCheck() {
         const startTime = Date.now();
         try {
@@ -133,9 +136,6 @@ export class CacheHealthIndicator extends BaseHealthIndicator {
     }
     getDescription() {
         return 'Memory cache health indicator that tests cache operations and monitors memory usage';
-    }
-    constructor(memoryCacheService, cacheWarmingService, _configService){
-        super('cache'), this.memoryCacheService = memoryCacheService, this.cacheWarmingService = cacheWarmingService, this._configService = _configService;
     }
 }
 CacheHealthIndicator = _ts_decorate([

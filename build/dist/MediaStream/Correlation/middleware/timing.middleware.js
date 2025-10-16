@@ -13,6 +13,9 @@ import { CorrelationService } from "../services/correlation.service.js";
 import { CorrelatedLogger } from "../utils/logger.util.js";
 import { PerformanceTracker } from "../utils/performance-tracker.util.js";
 export class TimingMiddleware {
+    constructor(_correlationService){
+        this._correlationService = _correlationService;
+    }
     use(req, res, next) {
         const startTime = process.hrtime.bigint();
         const startTimestamp = Date.now();
@@ -64,9 +67,6 @@ export class TimingMiddleware {
             return 'warn';
         }
         return 'debug';
-    }
-    constructor(_correlationService){
-        this._correlationService = _correlationService;
     }
 }
 TimingMiddleware = _ts_decorate([

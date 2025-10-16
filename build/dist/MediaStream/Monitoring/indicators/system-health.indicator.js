@@ -11,6 +11,9 @@ import { BaseHealthIndicator } from "../../Health/base/base-health-indicator.js"
 import { Injectable } from "@nestjs/common";
 import { MonitoringService } from "../services/monitoring.service.js";
 export class SystemHealthIndicator extends BaseHealthIndicator {
+    constructor(monitoringService){
+        super('system'), this.monitoringService = monitoringService;
+    }
     async performHealthCheck() {
         try {
             const systemHealth = await this.monitoringService.getSystemHealth();
@@ -69,9 +72,6 @@ export class SystemHealthIndicator extends BaseHealthIndicator {
 	 * Get health indicator description
 	 */ getDescription() {
         return 'Monitors overall system health including memory, disk, network, and cache components';
-    }
-    constructor(monitoringService){
-        super('system'), this.monitoringService = monitoringService;
     }
 }
 SystemHealthIndicator = _ts_decorate([

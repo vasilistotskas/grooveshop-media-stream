@@ -6,7 +6,7 @@ function _ts_decorate(decorators, target, key, desc) {
 }
 import RequestedResizeTargetTooLargeException from "../../API/exceptions/requested-resize-target-too-large.exception.js";
 import { Injectable, Scope } from "@nestjs/common";
-let ValidateCacheImageRequestResizeTargetRule = class ValidateCacheImageRequestResizeTargetRule {
+export default class ValidateCacheImageRequestResizeTargetRule {
     async setup(request) {
         this.request = request;
     }
@@ -23,8 +23,7 @@ let ValidateCacheImageRequestResizeTargetRule = class ValidateCacheImageRequestR
     constructor(){
         this.allowedPixelCount = 7680 * 4320;
     }
-};
-export { ValidateCacheImageRequestResizeTargetRule as default };
+}
 ValidateCacheImageRequestResizeTargetRule = _ts_decorate([
     Injectable({
         scope: Scope.REQUEST

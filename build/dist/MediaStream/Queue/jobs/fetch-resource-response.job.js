@@ -10,7 +10,12 @@ function _ts_metadata(k, v) {
 import { HttpService } from "@nestjs/axios";
 import { Injectable, Logger, Scope } from "@nestjs/common";
 import { isAxiosError } from "axios";
-let FetchResourceResponseJob = class FetchResourceResponseJob {
+export default class FetchResourceResponseJob {
+    constructor(_httpService){
+        this._httpService = _httpService;
+        this._logger = new Logger(FetchResourceResponseJob.name);
+        this._logger.debug('HttpService has been injected successfully');
+    }
     async handle(request) {
         try {
             return await this._httpService.axiosRef({
@@ -34,13 +39,7 @@ let FetchResourceResponseJob = class FetchResourceResponseJob {
             }
         }
     }
-    constructor(_httpService){
-        this._httpService = _httpService;
-        this._logger = new Logger(FetchResourceResponseJob.name);
-        this._logger.debug('HttpService has been injected successfully');
-    }
-};
-export { FetchResourceResponseJob as default };
+}
 FetchResourceResponseJob = _ts_decorate([
     Injectable({
         scope: Scope.REQUEST

@@ -14,6 +14,20 @@ import { CorrelatedLogger } from "../../Correlation/utils/logger.util.js";
 import { Injectable } from "@nestjs/common";
 import { StorageMonitoringService } from "./storage-monitoring.service.js";
 export class IntelligentEvictionService {
+    constructor(_configService, storageMonitoring){
+        this._configService = _configService;
+        this.storageMonitoring = storageMonitoring;
+        this.strategies = new Map();
+        this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage');
+        this.config = {
+            strategy: this._configService.getOptional('storage.eviction.strategy', 'intelligent'),
+            aggressiveness: this._configService.getOptional('storage.eviction.aggressiveness', 'moderate'),
+            preservePopular: this._configService.getOptional('storage.eviction.preservePopular', true),
+            minAccessCount: this._configService.getOptional('storage.eviction.minAccessCount', 5),
+            maxFileAge: this._configService.getOptional('storage.eviction.maxFileAge', 7)
+        };
+        this.initializeStrategies();
+    }
     /**
 	 * Perform intelligent cache eviction based on access patterns
 	 */ async performEviction(targetSize) {
@@ -221,20 +235,6 @@ export class IntelligentEvictionService {
             unitIndex++;
         }
         return `${size.toFixed(1)} ${units[unitIndex]}`;
-    }
-    constructor(_configService, storageMonitoring){
-        this._configService = _configService;
-        this.storageMonitoring = storageMonitoring;
-        this.strategies = new Map();
-        this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage');
-        this.config = {
-            strategy: this._configService.getOptional('storage.eviction.strategy', 'intelligent'),
-            aggressiveness: this._configService.getOptional('storage.eviction.aggressiveness', 'moderate'),
-            preservePopular: this._configService.getOptional('storage.eviction.preservePopular', true),
-            minAccessCount: this._configService.getOptional('storage.eviction.minAccessCount', 5),
-            maxFileAge: this._configService.getOptional('storage.eviction.maxFileAge', 7)
-        };
-        this.initializeStrategies();
     }
 }
 IntelligentEvictionService = _ts_decorate([

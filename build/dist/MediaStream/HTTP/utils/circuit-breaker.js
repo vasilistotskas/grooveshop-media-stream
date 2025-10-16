@@ -6,6 +6,21 @@ export var CircuitState = /*#__PURE__*/ function(CircuitState) {
     return CircuitState;
 }({});
 export class CircuitBreaker {
+    constructor(options){
+        this.state = "closed";
+        this.failureCount = 0;
+        this.successCount = 0;
+        this.lastStateChange = Date.now();
+        this.nextAttempt = 0;
+        this.totalRequests = 0;
+        this.requestWindow = [];
+        this.options = {
+            failureThreshold: options.failureThreshold || 50,
+            resetTimeout: options.resetTimeout || 30000,
+            rollingWindow: options.rollingWindow || 60000,
+            minimumRequests: options.minimumRequests || 5
+        };
+    }
     /**
 	 * Execute a function with circuit breaker protection
 	 */ async execute(fn, fallback) {
@@ -144,21 +159,6 @@ export class CircuitBreaker {
         if (i > 0) {
             this.requestWindow.splice(0, i);
         }
-    }
-    constructor(options){
-        this.state = "closed";
-        this.failureCount = 0;
-        this.successCount = 0;
-        this.lastStateChange = Date.now();
-        this.nextAttempt = 0;
-        this.totalRequests = 0;
-        this.requestWindow = [];
-        this.options = {
-            failureThreshold: options.failureThreshold || 50,
-            resetTimeout: options.resetTimeout || 30000,
-            rollingWindow: options.rollingWindow || 60000,
-            minimumRequests: options.minimumRequests || 5
-        };
     }
 }
 

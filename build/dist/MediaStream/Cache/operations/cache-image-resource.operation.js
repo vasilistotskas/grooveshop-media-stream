@@ -28,7 +28,19 @@ import { JobPriority } from "../../Queue/types/job.types.js";
 import ValidateCacheImageRequestRule from "../../Validation/rules/validate-cache-image-request.rule.js";
 import { InputSanitizationService } from "../../Validation/services/input-sanitization.service.js";
 import { Injectable, InternalServerErrorException, Scope } from "@nestjs/common";
-let CacheImageResourceOperation = class CacheImageResourceOperation {
+export default class CacheImageResourceOperation {
+    constructor(validateCacheImageRequest, fetchResourceResponseJob, webpImageManipulationJob, storeResourceResponseToFileJob, generateResourceIdentityFromRequestJob, cacheManager, inputSanitizationService, jobQueueManager, metricsService){
+        this.validateCacheImageRequest = validateCacheImageRequest;
+        this.fetchResourceResponseJob = fetchResourceResponseJob;
+        this.webpImageManipulationJob = webpImageManipulationJob;
+        this.storeResourceResponseToFileJob = storeResourceResponseToFileJob;
+        this.generateResourceIdentityFromRequestJob = generateResourceIdentityFromRequestJob;
+        this.cacheManager = cacheManager;
+        this.inputSanitizationService = inputSanitizationService;
+        this.jobQueueManager = jobQueueManager;
+        this.metricsService = metricsService;
+        this.basePath = cwd();
+    }
     get getResourcePath() {
         return path.join(this.basePath, 'storage', `${this.id}.rsc`);
     }
@@ -447,20 +459,7 @@ let CacheImageResourceOperation = class CacheImageResourceOperation {
             return null;
         }
     }
-    constructor(validateCacheImageRequest, fetchResourceResponseJob, webpImageManipulationJob, storeResourceResponseToFileJob, generateResourceIdentityFromRequestJob, cacheManager, inputSanitizationService, jobQueueManager, metricsService){
-        this.validateCacheImageRequest = validateCacheImageRequest;
-        this.fetchResourceResponseJob = fetchResourceResponseJob;
-        this.webpImageManipulationJob = webpImageManipulationJob;
-        this.storeResourceResponseToFileJob = storeResourceResponseToFileJob;
-        this.generateResourceIdentityFromRequestJob = generateResourceIdentityFromRequestJob;
-        this.cacheManager = cacheManager;
-        this.inputSanitizationService = inputSanitizationService;
-        this.jobQueueManager = jobQueueManager;
-        this.metricsService = metricsService;
-        this.basePath = cwd();
-    }
-};
-export { CacheImageResourceOperation as default };
+}
 CacheImageResourceOperation = _ts_decorate([
     Injectable({
         scope: Scope.REQUEST

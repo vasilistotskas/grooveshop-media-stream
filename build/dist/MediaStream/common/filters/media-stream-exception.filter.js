@@ -13,6 +13,10 @@ import { CorrelatedLogger } from "../../Correlation/utils/logger.util.js";
 import { Catch, HttpException, HttpStatus } from "@nestjs/common";
 import { HttpAdapterHost } from "@nestjs/core";
 export class MediaStreamExceptionFilter {
+    constructor(httpAdapterHost, _correlationService){
+        this.httpAdapterHost = httpAdapterHost;
+        this._correlationService = _correlationService;
+    }
     catch(exception, host) {
         const { httpAdapter } = this.httpAdapterHost;
         const ctx = host.switchToHttp();
@@ -83,10 +87,6 @@ export class MediaStreamExceptionFilter {
             correlationId,
             context: error.context || {}
         };
-    }
-    constructor(httpAdapterHost, _correlationService){
-        this.httpAdapterHost = httpAdapterHost;
-        this._correlationService = _correlationService;
     }
 }
 MediaStreamExceptionFilter = _ts_decorate([

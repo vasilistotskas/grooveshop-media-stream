@@ -10,6 +10,17 @@ function _ts_metadata(k, v) {
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService as NestConfigService } from "@nestjs/config";
 export class ConfigService {
+    constructor(nestConfigService){
+        this.nestConfigService = nestConfigService;
+        this._logger = new Logger(ConfigService.name);
+        this.hotReloadableKeys = new Set([
+            'MONITORING_ENABLED',
+            'PROCESSING_MAX_CONCURRENT',
+            'CACHE_MEMORY_TTL',
+            'CACHE_FILE_CLEANUP_INTERVAL'
+        ]);
+        this.config = this.loadAndValidateConfig();
+    }
     async onModuleInit() {
         this._logger.log('Configuration loaded and validated successfully');
     }
@@ -336,17 +347,6 @@ export class ConfigService {
         if (this.isHotReloadable('CACHE_FILE_CLEANUP_INTERVAL')) {
             this.config.cache.file.cleanupInterval = newConfig.cache.file.cleanupInterval;
         }
-    }
-    constructor(nestConfigService){
-        this.nestConfigService = nestConfigService;
-        this._logger = new Logger(ConfigService.name);
-        this.hotReloadableKeys = new Set([
-            'MONITORING_ENABLED',
-            'PROCESSING_MAX_CONCURRENT',
-            'CACHE_MEMORY_TTL',
-            'CACHE_FILE_CLEANUP_INTERVAL'
-        ]);
-        this.config = this.loadAndValidateConfig();
     }
 }
 ConfigService = _ts_decorate([

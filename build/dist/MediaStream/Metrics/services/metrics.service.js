@@ -14,6 +14,334 @@ import { ConfigService } from "../../Config/config.service.js";
 import { Injectable, Logger } from "@nestjs/common";
 import * as promClient from "prom-client";
 export class MetricsService {
+    constructor(_configService){
+        this._configService = _configService;
+        this._logger = new Logger(MetricsService.name);
+        this.startTime = Date.now();
+        this.requestsInFlightCount = 0;
+        this.register = new promClient.Registry();
+        promClient.collectDefaultMetrics({
+            register: this.register,
+            prefix: 'mediastream_'
+        });
+        this.httpRequestsTotal = new promClient.Counter({
+            name: 'mediastream_http_requests_total',
+            help: 'Total number of HTTP requests',
+            labelNames: [
+                'method',
+                'route',
+                'status_code'
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.httpRequestDuration = new promClient.Histogram({
+            name: 'mediastream_http_request_duration_seconds',
+            help: 'Duration of HTTP requests in seconds',
+            labelNames: [
+                'method',
+                'route',
+                'status_code'
+            ],
+            buckets: [
+                0.001,
+                0.005,
+                0.01,
+                0.05,
+                0.1,
+                0.5,
+                1,
+                2,
+                5,
+                10
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.httpRequestSize = new promClient.Histogram({
+            name: 'mediastream_http_request_size_bytes',
+            help: 'Size of HTTP requests in bytes',
+            labelNames: [
+                'method',
+                'route'
+            ],
+            buckets: [
+                100,
+                1000,
+                10000,
+                100000,
+                1000000,
+                10000000
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.httpResponseSize = new promClient.Histogram({
+            name: 'mediastream_http_response_size_bytes',
+            help: 'Size of HTTP responses in bytes',
+            labelNames: [
+                'method',
+                'route',
+                'status_code'
+            ],
+            buckets: [
+                100,
+                1000,
+                10000,
+                100000,
+                1000000,
+                10000000
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.memoryUsage = new promClient.Gauge({
+            name: 'mediastream_memory_usage_bytes',
+            help: 'Memory usage in bytes',
+            labelNames: [
+                'type'
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.diskSpaceUsage = new promClient.Gauge({
+            name: 'mediastream_disk_space_usage_bytes',
+            help: 'Disk space usage in bytes',
+            labelNames: [
+                'type',
+                'path'
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.cpuUsage = new promClient.Gauge({
+            name: 'mediastream_cpu_usage_percent',
+            help: 'CPU usage percentage',
+            labelNames: [
+                'type'
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.loadAverage = new promClient.Gauge({
+            name: 'mediastream_load_average',
+            help: 'System load average',
+            labelNames: [
+                'period'
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.fileDescriptors = new promClient.Gauge({
+            name: 'mediastream_file_descriptors',
+            help: 'Number of open file descriptors',
+            labelNames: [
+                'type'
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.networkConnections = new promClient.Gauge({
+            name: 'mediastream_network_connections',
+            help: 'Number of network connections',
+            labelNames: [
+                'state'
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.activeConnections = new promClient.Gauge({
+            name: 'mediastream_active_connections',
+            help: 'Number of active connections',
+            labelNames: [
+                'type'
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.requestsInFlight = new promClient.Gauge({
+            name: 'mediastream_requests_in_flight',
+            help: 'Number of requests currently being processed',
+            registers: [
+                this.register
+            ]
+        });
+        this.uptime = new promClient.Gauge({
+            name: 'mediastream_uptime_seconds',
+            help: 'Application uptime in seconds',
+            registers: [
+                this.register
+            ]
+        });
+        this.imageProcessingQueueSize = new promClient.Gauge({
+            name: 'mediastream_image_processing_queue_size',
+            help: 'Number of items in image processing queue',
+            registers: [
+                this.register
+            ]
+        });
+        this.imageProcessingErrors = new promClient.Counter({
+            name: 'mediastream_image_processing_errors_total',
+            help: 'Total number of image processing errors',
+            labelNames: [
+                'operation',
+                'error_type'
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.gcDuration = new promClient.Histogram({
+            name: 'mediastream_gc_duration_seconds',
+            help: 'Garbage collection duration in seconds',
+            labelNames: [
+                'type'
+            ],
+            buckets: [
+                0.001,
+                0.01,
+                0.1,
+                1,
+                10
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.eventLoopLag = new promClient.Histogram({
+            name: 'mediastream_event_loop_lag_seconds',
+            help: 'Event loop lag in seconds',
+            buckets: [
+                0.001,
+                0.01,
+                0.1,
+                1,
+                10
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.cacheHitRatio = new promClient.Gauge({
+            name: 'mediastream_cache_hit_ratio',
+            help: 'Cache hit ratio (0-1)',
+            labelNames: [
+                'cache_type'
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.cacheSize = new promClient.Gauge({
+            name: 'mediastream_cache_size_bytes',
+            help: 'Cache size in bytes',
+            labelNames: [
+                'cache_type'
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.cacheEvictions = new promClient.Counter({
+            name: 'mediastream_cache_evictions_total',
+            help: 'Total number of cache evictions',
+            labelNames: [
+                'cache_type',
+                'reason'
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.cacheOperationDuration = new promClient.Histogram({
+            name: 'mediastream_cache_operation_duration_seconds',
+            help: 'Duration of cache operations in seconds',
+            labelNames: [
+                'operation',
+                'cache_type',
+                'status'
+            ],
+            buckets: [
+                0.001,
+                0.005,
+                0.01,
+                0.05,
+                0.1,
+                0.5,
+                1
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.imageProcessingDuration = new promClient.Histogram({
+            name: 'mediastream_image_processing_duration_seconds',
+            help: 'Duration of image processing operations in seconds',
+            labelNames: [
+                'operation',
+                'format',
+                'status'
+            ],
+            buckets: [
+                0.1,
+                0.5,
+                1,
+                2,
+                5,
+                10,
+                30
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.imageProcessingTotal = new promClient.Counter({
+            name: 'mediastream_image_processing_total',
+            help: 'Total number of image processing operations',
+            labelNames: [
+                'operation',
+                'format',
+                'status'
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.cacheOperationsTotal = new promClient.Counter({
+            name: 'mediastream_cache_operations_total',
+            help: 'Total number of cache operations',
+            labelNames: [
+                'operation',
+                'cache_type',
+                'status'
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.errorTotal = new promClient.Counter({
+            name: 'mediastream_errors_total',
+            help: 'Total number of errors',
+            labelNames: [
+                'type',
+                'operation'
+            ],
+            registers: [
+                this.register
+            ]
+        });
+    }
     async onModuleInit() {
         const isTestEnv = process.env.NODE_ENV === 'test';
         const monitoringEnabled = this._configService.get('monitoring.enabled');
@@ -370,334 +698,6 @@ export class MetricsService {
         } catch  {
             return 0;
         }
-    }
-    constructor(_configService){
-        this._configService = _configService;
-        this._logger = new Logger(MetricsService.name);
-        this.startTime = Date.now();
-        this.requestsInFlightCount = 0;
-        this.register = new promClient.Registry();
-        promClient.collectDefaultMetrics({
-            register: this.register,
-            prefix: 'mediastream_'
-        });
-        this.httpRequestsTotal = new promClient.Counter({
-            name: 'mediastream_http_requests_total',
-            help: 'Total number of HTTP requests',
-            labelNames: [
-                'method',
-                'route',
-                'status_code'
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.httpRequestDuration = new promClient.Histogram({
-            name: 'mediastream_http_request_duration_seconds',
-            help: 'Duration of HTTP requests in seconds',
-            labelNames: [
-                'method',
-                'route',
-                'status_code'
-            ],
-            buckets: [
-                0.001,
-                0.005,
-                0.01,
-                0.05,
-                0.1,
-                0.5,
-                1,
-                2,
-                5,
-                10
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.httpRequestSize = new promClient.Histogram({
-            name: 'mediastream_http_request_size_bytes',
-            help: 'Size of HTTP requests in bytes',
-            labelNames: [
-                'method',
-                'route'
-            ],
-            buckets: [
-                100,
-                1000,
-                10000,
-                100000,
-                1000000,
-                10000000
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.httpResponseSize = new promClient.Histogram({
-            name: 'mediastream_http_response_size_bytes',
-            help: 'Size of HTTP responses in bytes',
-            labelNames: [
-                'method',
-                'route',
-                'status_code'
-            ],
-            buckets: [
-                100,
-                1000,
-                10000,
-                100000,
-                1000000,
-                10000000
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.memoryUsage = new promClient.Gauge({
-            name: 'mediastream_memory_usage_bytes',
-            help: 'Memory usage in bytes',
-            labelNames: [
-                'type'
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.diskSpaceUsage = new promClient.Gauge({
-            name: 'mediastream_disk_space_usage_bytes',
-            help: 'Disk space usage in bytes',
-            labelNames: [
-                'type',
-                'path'
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.cpuUsage = new promClient.Gauge({
-            name: 'mediastream_cpu_usage_percent',
-            help: 'CPU usage percentage',
-            labelNames: [
-                'type'
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.loadAverage = new promClient.Gauge({
-            name: 'mediastream_load_average',
-            help: 'System load average',
-            labelNames: [
-                'period'
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.fileDescriptors = new promClient.Gauge({
-            name: 'mediastream_file_descriptors',
-            help: 'Number of open file descriptors',
-            labelNames: [
-                'type'
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.networkConnections = new promClient.Gauge({
-            name: 'mediastream_network_connections',
-            help: 'Number of network connections',
-            labelNames: [
-                'state'
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.activeConnections = new promClient.Gauge({
-            name: 'mediastream_active_connections',
-            help: 'Number of active connections',
-            labelNames: [
-                'type'
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.requestsInFlight = new promClient.Gauge({
-            name: 'mediastream_requests_in_flight',
-            help: 'Number of requests currently being processed',
-            registers: [
-                this.register
-            ]
-        });
-        this.uptime = new promClient.Gauge({
-            name: 'mediastream_uptime_seconds',
-            help: 'Application uptime in seconds',
-            registers: [
-                this.register
-            ]
-        });
-        this.imageProcessingQueueSize = new promClient.Gauge({
-            name: 'mediastream_image_processing_queue_size',
-            help: 'Number of items in image processing queue',
-            registers: [
-                this.register
-            ]
-        });
-        this.imageProcessingErrors = new promClient.Counter({
-            name: 'mediastream_image_processing_errors_total',
-            help: 'Total number of image processing errors',
-            labelNames: [
-                'operation',
-                'error_type'
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.gcDuration = new promClient.Histogram({
-            name: 'mediastream_gc_duration_seconds',
-            help: 'Garbage collection duration in seconds',
-            labelNames: [
-                'type'
-            ],
-            buckets: [
-                0.001,
-                0.01,
-                0.1,
-                1,
-                10
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.eventLoopLag = new promClient.Histogram({
-            name: 'mediastream_event_loop_lag_seconds',
-            help: 'Event loop lag in seconds',
-            buckets: [
-                0.001,
-                0.01,
-                0.1,
-                1,
-                10
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.cacheHitRatio = new promClient.Gauge({
-            name: 'mediastream_cache_hit_ratio',
-            help: 'Cache hit ratio (0-1)',
-            labelNames: [
-                'cache_type'
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.cacheSize = new promClient.Gauge({
-            name: 'mediastream_cache_size_bytes',
-            help: 'Cache size in bytes',
-            labelNames: [
-                'cache_type'
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.cacheEvictions = new promClient.Counter({
-            name: 'mediastream_cache_evictions_total',
-            help: 'Total number of cache evictions',
-            labelNames: [
-                'cache_type',
-                'reason'
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.cacheOperationDuration = new promClient.Histogram({
-            name: 'mediastream_cache_operation_duration_seconds',
-            help: 'Duration of cache operations in seconds',
-            labelNames: [
-                'operation',
-                'cache_type',
-                'status'
-            ],
-            buckets: [
-                0.001,
-                0.005,
-                0.01,
-                0.05,
-                0.1,
-                0.5,
-                1
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.imageProcessingDuration = new promClient.Histogram({
-            name: 'mediastream_image_processing_duration_seconds',
-            help: 'Duration of image processing operations in seconds',
-            labelNames: [
-                'operation',
-                'format',
-                'status'
-            ],
-            buckets: [
-                0.1,
-                0.5,
-                1,
-                2,
-                5,
-                10,
-                30
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.imageProcessingTotal = new promClient.Counter({
-            name: 'mediastream_image_processing_total',
-            help: 'Total number of image processing operations',
-            labelNames: [
-                'operation',
-                'format',
-                'status'
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.cacheOperationsTotal = new promClient.Counter({
-            name: 'mediastream_cache_operations_total',
-            help: 'Total number of cache operations',
-            labelNames: [
-                'operation',
-                'cache_type',
-                'status'
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.errorTotal = new promClient.Counter({
-            name: 'mediastream_errors_total',
-            help: 'Total number of errors',
-            labelNames: [
-                'type',
-                'operation'
-            ],
-            registers: [
-                this.register
-            ]
-        });
     }
 }
 MetricsService = _ts_decorate([

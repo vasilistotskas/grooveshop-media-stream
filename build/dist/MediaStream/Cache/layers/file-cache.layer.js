@@ -13,6 +13,18 @@ import { ConfigService } from "../../Config/config.service.js";
 import { CorrelatedLogger } from "../../Correlation/utils/logger.util.js";
 import { Injectable } from "@nestjs/common";
 export class FileCacheLayer {
+    constructor(_configService){
+        this._configService = _configService;
+        this.layerName = 'file';
+        this.priority = 3;
+        this.stats = {
+            hits: 0,
+            misses: 0,
+            errors: 0
+        };
+        this.cacheDirectory = this._configService.get('cache.file.directory');
+        this.ensureCacheDirectory();
+    }
     async get(key) {
         try {
             const filePath = this.getFilePath(key);
@@ -115,18 +127,6 @@ export class FileCacheLayer {
         } catch (error) {
             CorrelatedLogger.error(`Failed to create cache directory: ${error.message}`, error.stack, FileCacheLayer.name);
         }
-    }
-    constructor(_configService){
-        this._configService = _configService;
-        this.layerName = 'file';
-        this.priority = 3;
-        this.stats = {
-            hits: 0,
-            misses: 0,
-            errors: 0
-        };
-        this.cacheDirectory = this._configService.get('cache.file.directory');
-        this.ensureCacheDirectory();
     }
 }
 FileCacheLayer = _ts_decorate([

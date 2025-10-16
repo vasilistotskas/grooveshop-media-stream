@@ -27,7 +27,15 @@ import { AdaptiveRateLimitGuard } from "../../RateLimit/guards/adaptive-rate-lim
 import { InputSanitizationService } from "../../Validation/services/input-sanitization.service.js";
 import { SecurityCheckerService } from "../../Validation/services/security-checker.service.js";
 import { Controller, Get, Logger, Param, Res, Scope, UseGuards } from "@nestjs/common";
-let MediaStreamImageRESTController = class MediaStreamImageRESTController {
+export default class MediaStreamImageRESTController {
+    constructor(cacheImageResourceOperation, inputSanitizationService, securityCheckerService, _correlationService, metricsService){
+        this.cacheImageResourceOperation = cacheImageResourceOperation;
+        this.inputSanitizationService = inputSanitizationService;
+        this.securityCheckerService = securityCheckerService;
+        this._correlationService = _correlationService;
+        this.metricsService = metricsService;
+        this._logger = new Logger(MediaStreamImageRESTController.name);
+    }
     /**
 	 * Validates request parameters using the new validation infrastructure
 	 */ async validateRequestParameters(params) {
@@ -539,16 +547,7 @@ let MediaStreamImageRESTController = class MediaStreamImageRESTController {
             PerformanceTracker.endPhase('static_image_request');
         }
     }
-    constructor(cacheImageResourceOperation, inputSanitizationService, securityCheckerService, _correlationService, metricsService){
-        this.cacheImageResourceOperation = cacheImageResourceOperation;
-        this.inputSanitizationService = inputSanitizationService;
-        this.securityCheckerService = securityCheckerService;
-        this._correlationService = _correlationService;
-        this.metricsService = metricsService;
-        this._logger = new Logger(MediaStreamImageRESTController.name);
-    }
-};
-export { MediaStreamImageRESTController as default };
+}
 _ts_decorate([
     Get('media/uploads/:imageType/:image/:width/:height/:fit/:position/:background/:trimThreshold/:format/:quality'),
     _ts_param(0, Param('imageType')),

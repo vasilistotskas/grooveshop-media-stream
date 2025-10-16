@@ -11,6 +11,11 @@ import { Injectable, Logger } from "@nestjs/common";
 import { InputSanitizationService } from "./input-sanitization.service.js";
 import { SecurityCheckerService } from "./security-checker.service.js";
 export class SimpleValidationService {
+    constructor(sanitizationService, securityChecker){
+        this.sanitizationService = sanitizationService;
+        this.securityChecker = securityChecker;
+        this._logger = new Logger(SimpleValidationService.name);
+    }
     async validateCacheImageRequest(request) {
         const errors = [];
         try {
@@ -73,11 +78,6 @@ export class SimpleValidationService {
                 ]
             };
         }
-    }
-    constructor(sanitizationService, securityChecker){
-        this.sanitizationService = sanitizationService;
-        this.securityChecker = securityChecker;
-        this._logger = new Logger(SimpleValidationService.name);
     }
 }
 SimpleValidationService = _ts_decorate([

@@ -13,6 +13,13 @@ import { Injectable } from "@nestjs/common";
 import { StorageCleanupService } from "../services/storage-cleanup.service.js";
 import { StorageMonitoringService } from "../services/storage-monitoring.service.js";
 export class StorageHealthIndicator extends BaseHealthIndicator {
+    constructor(_configService, storageMonitoring, storageCleanup){
+        const options = {
+            timeout: 5000,
+            threshold: 0.9
+        };
+        super('storage', options), this._configService = _configService, this.storageMonitoring = storageMonitoring, this.storageCleanup = storageCleanup;
+    }
     async performHealthCheck() {
         return this.executeWithTimeout(async ()=>{
             const thresholdCheck = await this.storageMonitoring.checkThresholds();
@@ -138,13 +145,6 @@ export class StorageHealthIndicator extends BaseHealthIndicator {
             unitIndex++;
         }
         return `${size.toFixed(1)} ${units[unitIndex]}`;
-    }
-    constructor(_configService, storageMonitoring, storageCleanup){
-        const options = {
-            timeout: 5000,
-            threshold: 0.9
-        };
-        super('storage', options), this._configService = _configService, this.storageMonitoring = storageMonitoring, this.storageCleanup = storageCleanup;
     }
 }
 StorageHealthIndicator = _ts_decorate([

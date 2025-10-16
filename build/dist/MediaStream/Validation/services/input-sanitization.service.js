@@ -10,6 +10,11 @@ function _ts_metadata(k, v) {
 import { ConfigService } from "../../Config/config.service.js";
 import { Injectable, Logger } from "@nestjs/common";
 export class InputSanitizationService {
+    constructor(_configService){
+        this._configService = _configService;
+        this._logger = new Logger(InputSanitizationService.name);
+        this.allowedDomains = null;
+    }
     getAllowedDomains() {
         if (this.allowedDomains === null) {
             this.allowedDomains = this._configService.getOptional('validation.allowedDomains', [
@@ -321,11 +326,6 @@ export class InputSanitizationService {
             i++;
         }
         return i;
-    }
-    constructor(_configService){
-        this._configService = _configService;
-        this._logger = new Logger(InputSanitizationService.name);
-        this.allowedDomains = null;
     }
 }
 InputSanitizationService = _ts_decorate([

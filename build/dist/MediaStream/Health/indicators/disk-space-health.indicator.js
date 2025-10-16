@@ -12,6 +12,16 @@ import { ConfigService } from "../../Config/config.service.js";
 import { Injectable } from "@nestjs/common";
 import { BaseHealthIndicator } from "../base/base-health-indicator.js";
 export class DiskSpaceHealthIndicator extends BaseHealthIndicator {
+    constructor(_configService){
+        const options = {
+            timeout: 3000,
+            threshold: 0.9
+        };
+        super('disk_space', options), this._configService = _configService;
+        this.storagePath = this._configService.get('cache.file.directory');
+        this._warningThreshold = 0.8;
+        this._criticalThreshold = 0.9;
+    }
     async performHealthCheck() {
         return this.executeWithTimeout(async ()=>{
             const diskInfo = await this.getDiskSpaceInfo();
@@ -74,16 +84,6 @@ export class DiskSpaceHealthIndicator extends BaseHealthIndicator {
 	 * Get current disk space information without health check wrapper
 	 */ async getCurrentDiskInfo() {
         return this.getDiskSpaceInfo();
-    }
-    constructor(_configService){
-        const options = {
-            timeout: 3000,
-            threshold: 0.9
-        };
-        super('disk_space', options), this._configService = _configService;
-        this.storagePath = this._configService.get('cache.file.directory');
-        this._warningThreshold = 0.8;
-        this._criticalThreshold = 0.9;
     }
 }
 DiskSpaceHealthIndicator = _ts_decorate([

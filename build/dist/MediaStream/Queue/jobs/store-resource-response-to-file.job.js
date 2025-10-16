@@ -7,7 +7,7 @@ function _ts_decorate(decorators, target, key, desc) {
 import { open } from "node:fs/promises";
 import UnableToStoreFetchedResourceException from "../../API/exceptions/unable-to-store-fetched-resource.exception.js";
 import { Injectable, Logger, Scope } from "@nestjs/common";
-let StoreResourceResponseToFileJob = class StoreResourceResponseToFileJob {
+export default class StoreResourceResponseToFileJob {
     async handle(resourceName, path, response) {
         if (!response.data || typeof response.data.pipe !== 'function') {
             this._logger.error('No data found in response or data is not streamable');
@@ -28,8 +28,7 @@ let StoreResourceResponseToFileJob = class StoreResourceResponseToFileJob {
     constructor(){
         this._logger = new Logger(StoreResourceResponseToFileJob.name);
     }
-};
-export { StoreResourceResponseToFileJob as default };
+}
 StoreResourceResponseToFileJob = _ts_decorate([
     Injectable({
         scope: Scope.REQUEST

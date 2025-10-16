@@ -16,6 +16,16 @@ import { Cron } from "@nestjs/schedule";
 import { IntelligentEvictionService } from "./intelligent-eviction.service.js";
 import { StorageMonitoringService } from "./storage-monitoring.service.js";
 export class StorageCleanupService {
+    constructor(_configService, storageMonitoring, intelligentEviction){
+        this._configService = _configService;
+        this.storageMonitoring = storageMonitoring;
+        this.intelligentEviction = intelligentEviction;
+        this._logger = new Logger(StorageCleanupService.name);
+        this.lastCleanup = new Date();
+        this.isCleanupRunning = false;
+        this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage');
+        this.config = this.loadCleanupConfig();
+    }
     async onModuleInit() {
         if (this.config.enabled) {
             this._logger.log('Storage cleanup service initialized with policies:', this.config.policies.map((p)=>p.name));
@@ -255,16 +265,6 @@ export class StorageCleanupService {
             unitIndex++;
         }
         return `${size.toFixed(1)} ${units[unitIndex]}`;
-    }
-    constructor(_configService, storageMonitoring, intelligentEviction){
-        this._configService = _configService;
-        this.storageMonitoring = storageMonitoring;
-        this.intelligentEviction = intelligentEviction;
-        this._logger = new Logger(StorageCleanupService.name);
-        this.lastCleanup = new Date();
-        this.isCleanupRunning = false;
-        this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage');
-        this.config = this.loadCleanupConfig();
     }
 }
 _ts_decorate([

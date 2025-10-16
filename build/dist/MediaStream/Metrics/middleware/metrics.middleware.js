@@ -11,6 +11,10 @@ import { Buffer } from "node:buffer";
 import { Injectable, Logger } from "@nestjs/common";
 import { MetricsService } from "../services/metrics.service.js";
 export class MetricsMiddleware {
+    constructor(metricsService){
+        this.metricsService = metricsService;
+        this._logger = new Logger(MetricsMiddleware.name);
+    }
     use(req, res, next) {
         const startTime = Date.now();
         this.metricsService.incrementRequestsInFlight();
@@ -60,10 +64,6 @@ export class MetricsMiddleware {
         }
         const pathname = req.url.split('?')[0];
         return pathname.replace(/\/\d+/g, '/:id').replace(/\/[a-f0-9-]{36}/g, '/:uuid').replace(/\/[a-f0-9]{24}/g, '/:objectId');
-    }
-    constructor(metricsService){
-        this.metricsService = metricsService;
-        this._logger = new Logger(MetricsMiddleware.name);
     }
 }
 MetricsMiddleware = _ts_decorate([

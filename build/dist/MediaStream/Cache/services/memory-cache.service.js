@@ -13,6 +13,43 @@ import { MetricsService } from "../../Metrics/services/metrics.service.js";
 import { Injectable } from "@nestjs/common";
 import NodeCache from "node-cache";
 export class MemoryCacheService {
+    constructor(_configService, metricsService){
+        this._configService = _configService;
+        this.metricsService = metricsService;
+        const config = this._configService.get('cache.memory') || {};
+        this.cache = new NodeCache({
+            stdTTL: config.defaultTtl || 3600,
+            checkperiod: config.checkPeriod || 600,
+            useClones: false,
+            deleteOnExpire: true,
+            maxKeys: config.maxKeys || 1000
+        });
+        this.cache.on('set', (key, _value)=>{
+            this.metricsService.recordCacheOperation('set', 'memory', 'success');
+            CorrelatedLogger.debug(`Memory cache SET: ${key}`, MemoryCacheService.name);
+        });
+        this.cache.on('get', (key, value)=>{
+            if (value !== undefined) {
+                this.metricsService.recordCacheOperation('get', 'memory', 'hit');
+                CorrelatedLogger.debug(`Memory cache HIT: ${key}`, MemoryCacheService.name);
+            } else {
+                this.metricsService.recordCacheOperation('get', 'memory', 'miss');
+                CorrelatedLogger.debug(`Memory cache MISS: ${key}`, MemoryCacheService.name);
+            }
+        });
+        this.cache.on('del', (key, _value)=>{
+            this.metricsService.recordCacheOperation('delete', 'memory', 'success');
+            CorrelatedLogger.debug(`Memory cache DELETE: ${key}`, MemoryCacheService.name);
+        });
+        this.cache.on('expired', (key, _value)=>{
+            this.metricsService.recordCacheOperation('expire', 'memory', 'success');
+            CorrelatedLogger.debug(`Memory cache EXPIRED: ${key}`, MemoryCacheService.name);
+        });
+        this.cache.on('flush', ()=>{
+            this.metricsService.recordCacheOperation('flush', 'memory', 'success');
+            CorrelatedLogger.debug('Memory cache FLUSHED', MemoryCacheService.name);
+        });
+    }
     async get(key) {
         try {
             const value = this.cache.get(key);
@@ -119,43 +156,6 @@ export class MemoryCacheService {
             used: stats.vsize + stats.ksize,
             total: this._configService.get('cache.memory.maxSize') || 100 * 1024 * 1024
         };
-    }
-    constructor(_configService, metricsService){
-        this._configService = _configService;
-        this.metricsService = metricsService;
-        const config = this._configService.get('cache.memory') || {};
-        this.cache = new NodeCache({
-            stdTTL: config.defaultTtl || 3600,
-            checkperiod: config.checkPeriod || 600,
-            useClones: false,
-            deleteOnExpire: true,
-            maxKeys: config.maxKeys || 1000
-        });
-        this.cache.on('set', (key, _value)=>{
-            this.metricsService.recordCacheOperation('set', 'memory', 'success');
-            CorrelatedLogger.debug(`Memory cache SET: ${key}`, MemoryCacheService.name);
-        });
-        this.cache.on('get', (key, value)=>{
-            if (value !== undefined) {
-                this.metricsService.recordCacheOperation('get', 'memory', 'hit');
-                CorrelatedLogger.debug(`Memory cache HIT: ${key}`, MemoryCacheService.name);
-            } else {
-                this.metricsService.recordCacheOperation('get', 'memory', 'miss');
-                CorrelatedLogger.debug(`Memory cache MISS: ${key}`, MemoryCacheService.name);
-            }
-        });
-        this.cache.on('del', (key, _value)=>{
-            this.metricsService.recordCacheOperation('delete', 'memory', 'success');
-            CorrelatedLogger.debug(`Memory cache DELETE: ${key}`, MemoryCacheService.name);
-        });
-        this.cache.on('expired', (key, _value)=>{
-            this.metricsService.recordCacheOperation('expire', 'memory', 'success');
-            CorrelatedLogger.debug(`Memory cache EXPIRED: ${key}`, MemoryCacheService.name);
-        });
-        this.cache.on('flush', ()=>{
-            this.metricsService.recordCacheOperation('flush', 'memory', 'success');
-            CorrelatedLogger.debug('Memory cache FLUSHED', MemoryCacheService.name);
-        });
     }
 }
 MemoryCacheService = _ts_decorate([

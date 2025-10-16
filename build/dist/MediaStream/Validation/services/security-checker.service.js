@@ -10,6 +10,39 @@ function _ts_metadata(k, v) {
 import { ConfigService } from "../../Config/config.service.js";
 import { Injectable, Logger } from "@nestjs/common";
 export class SecurityCheckerService {
+    constructor(_configService){
+        this._configService = _configService;
+        this._logger = new Logger(SecurityCheckerService.name);
+        this.securityEvents = [];
+        this.suspiciousPatterns = [
+            /<script\b[^>]{0,100}>/i,
+            /javascript:/i,
+            /vbscript:/i,
+            /data:text\/html/i,
+            /\bon\w{1,20}\s*=/i,
+            /union\s{1,5}select/i,
+            /drop\s{1,5}table/i,
+            /insert\s{1,5}into/i,
+            /delete\s{1,5}from/i,
+            /\.\.\//,
+            /\.\.\\/,
+            /\.\.\\\\/,
+            /%2e%2e%2f/i,
+            /%2e%2e%5c/i,
+            /;\s{0,5}rm\s{1,5}-rf/i,
+            /;\s{0,5}cat\s{1,5}/i,
+            /;\s{0,5}ls\s{1,5}/i,
+            /\|\s{0,5}nc\s{1,5}/i,
+            /<!entity\b/i,
+            /<!doctype[^>]{0,100}\[/i,
+            /\(\|\(/,
+            /\)\(\|/,
+            /\$where\b/i,
+            /\$ne\b/i,
+            /\$gt\b/i,
+            /\$lt\b/i
+        ];
+    }
     async checkForMaliciousContent(input) {
         if (input === null || input === undefined) {
             return false;
@@ -151,39 +184,6 @@ export class SecurityCheckerService {
             eventsByType,
             recentEvents
         };
-    }
-    constructor(_configService){
-        this._configService = _configService;
-        this._logger = new Logger(SecurityCheckerService.name);
-        this.securityEvents = [];
-        this.suspiciousPatterns = [
-            /<script\b[^>]{0,100}>/i,
-            /javascript:/i,
-            /vbscript:/i,
-            /data:text\/html/i,
-            /\bon\w{1,20}\s*=/i,
-            /union\s{1,5}select/i,
-            /drop\s{1,5}table/i,
-            /insert\s{1,5}into/i,
-            /delete\s{1,5}from/i,
-            /\.\.\//,
-            /\.\.\\/,
-            /\.\.\\\\/,
-            /%2e%2e%2f/i,
-            /%2e%2e%5c/i,
-            /;\s{0,5}rm\s{1,5}-rf/i,
-            /;\s{0,5}cat\s{1,5}/i,
-            /;\s{0,5}ls\s{1,5}/i,
-            /\|\s{0,5}nc\s{1,5}/i,
-            /<!entity\b/i,
-            /<!doctype[^>]{0,100}\[/i,
-            /\(\|\(/,
-            /\)\(\|/,
-            /\$where\b/i,
-            /\$ne\b/i,
-            /\$gt\b/i,
-            /\$lt\b/i
-        ];
     }
 }
 SecurityCheckerService = _ts_decorate([

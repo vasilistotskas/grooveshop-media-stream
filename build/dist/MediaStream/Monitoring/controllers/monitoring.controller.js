@@ -17,6 +17,11 @@ import { AlertService } from "../services/alert.service.js";
 import { MonitoringService } from "../services/monitoring.service.js";
 import { PerformanceMonitoringService } from "../services/performance-monitoring.service.js";
 export class MonitoringController {
+    constructor(monitoringService, alertService, performanceService){
+        this.monitoringService = monitoringService;
+        this.alertService = alertService;
+        this.performanceService = performanceService;
+    }
     /**
 	 * Get system health overview
 	 */ async getSystemHealth() {
@@ -144,11 +149,6 @@ export class MonitoringController {
             monitoring: this.monitoringService.getStats(),
             alerts: this.alertService.getAlertStats()
         };
-    }
-    constructor(monitoringService, alertService, performanceService){
-        this.monitoringService = monitoringService;
-        this.alertService = alertService;
-        this.performanceService = performanceService;
     }
 }
 _ts_decorate([

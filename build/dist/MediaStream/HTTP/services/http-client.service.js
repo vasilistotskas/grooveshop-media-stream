@@ -18,6 +18,44 @@ import { lastValueFrom, throwError, timer } from "rxjs";
 import { retry, tap } from "rxjs/operators";
 import { CircuitBreaker } from "../utils/circuit-breaker.js";
 export class HttpClientService {
+    constructor(_httpService, _configService){
+        this._httpService = _httpService;
+        this._configService = _configService;
+        this.stats = {
+            totalRequests: 0,
+            successfulRequests: 0,
+            failedRequests: 0,
+            retriedRequests: 0,
+            averageResponseTime: 0,
+            circuitBreakerState: 'closed',
+            activeRequests: 0,
+            queueSize: 0
+        };
+        this.totalResponseTime = 0;
+        this.maxRetries = this._configService.getOptional('http.retry.retries', 3);
+        this.retryDelay = this._configService.getOptional('http.retry.retryDelay', 1000);
+        this.maxRetryDelay = this._configService.getOptional('http.retry.maxRetryDelay', 10000);
+        this.timeout = this._configService.getOptional('http.connectionPool.timeout', 30000);
+        this.circuitBreaker = new CircuitBreaker({
+            failureThreshold: this._configService.getOptional('http.circuitBreaker.failureThreshold', 50),
+            resetTimeout: this._configService.getOptional('http.circuitBreaker.resetTimeout', 30000),
+            rollingWindow: this._configService.getOptional('http.circuitBreaker.monitoringPeriod', 60000),
+            minimumRequests: this._configService.getOptional('http.circuitBreaker.minimumRequests', 10)
+        });
+        const maxSockets = this._configService.getOptional('http.connectionPool.maxSockets', 50);
+        const keepAliveMsecs = this._configService.getOptional('http.connectionPool.keepAliveMsecs', 1000);
+        this.httpAgent = new http.Agent({
+            keepAlive: true,
+            keepAliveMsecs,
+            maxSockets
+        });
+        this.httpsAgent = new https.Agent({
+            keepAlive: true,
+            keepAliveMsecs,
+            maxSockets
+        });
+        this.configureAxios();
+    }
     async onModuleInit() {
         CorrelatedLogger.log('HTTP client service initialized', HttpClientService.name);
     }
@@ -192,44 +230,6 @@ export class HttpClientService {
             CorrelatedLogger.warn(`Failed to encode URL: ${url} - ${error.message}`, HttpClientService.name);
             return url;
         }
-    }
-    constructor(_httpService, _configService){
-        this._httpService = _httpService;
-        this._configService = _configService;
-        this.stats = {
-            totalRequests: 0,
-            successfulRequests: 0,
-            failedRequests: 0,
-            retriedRequests: 0,
-            averageResponseTime: 0,
-            circuitBreakerState: 'closed',
-            activeRequests: 0,
-            queueSize: 0
-        };
-        this.totalResponseTime = 0;
-        this.maxRetries = this._configService.getOptional('http.retry.retries', 3);
-        this.retryDelay = this._configService.getOptional('http.retry.retryDelay', 1000);
-        this.maxRetryDelay = this._configService.getOptional('http.retry.maxRetryDelay', 10000);
-        this.timeout = this._configService.getOptional('http.connectionPool.timeout', 30000);
-        this.circuitBreaker = new CircuitBreaker({
-            failureThreshold: this._configService.getOptional('http.circuitBreaker.failureThreshold', 50),
-            resetTimeout: this._configService.getOptional('http.circuitBreaker.resetTimeout', 30000),
-            rollingWindow: this._configService.getOptional('http.circuitBreaker.monitoringPeriod', 60000),
-            minimumRequests: this._configService.getOptional('http.circuitBreaker.minimumRequests', 10)
-        });
-        const maxSockets = this._configService.getOptional('http.connectionPool.maxSockets', 50);
-        const keepAliveMsecs = this._configService.getOptional('http.connectionPool.keepAliveMsecs', 1000);
-        this.httpAgent = new http.Agent({
-            keepAlive: true,
-            keepAliveMsecs,
-            maxSockets
-        });
-        this.httpsAgent = new https.Agent({
-            keepAlive: true,
-            keepAliveMsecs,
-            maxSockets
-        });
-        this.configureAxios();
     }
 }
 HttpClientService = _ts_decorate([

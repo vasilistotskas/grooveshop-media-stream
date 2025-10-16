@@ -22,6 +22,20 @@ import { StorageHealthIndicator } from "../../Storage/indicators/storage-health.
 import { Controller, Get, Post } from "@nestjs/common";
 import { HealthCheck, HealthCheckService } from "@nestjs/terminus";
 export class HealthController {
+    constructor(health, diskSpaceIndicator, memoryIndicator, httpHealthIndicator, cacheHealthIndicator, redisHealthIndicator, alertingHealthIndicator, systemHealthIndicator, jobQueueHealthIndicator, storageHealthIndicator, _configService, httpClientService){
+        this.health = health;
+        this.diskSpaceIndicator = diskSpaceIndicator;
+        this.memoryIndicator = memoryIndicator;
+        this.httpHealthIndicator = httpHealthIndicator;
+        this.cacheHealthIndicator = cacheHealthIndicator;
+        this.redisHealthIndicator = redisHealthIndicator;
+        this.alertingHealthIndicator = alertingHealthIndicator;
+        this.systemHealthIndicator = systemHealthIndicator;
+        this.jobQueueHealthIndicator = jobQueueHealthIndicator;
+        this.storageHealthIndicator = storageHealthIndicator;
+        this._configService = _configService;
+        this.httpClientService = httpClientService;
+    }
     async check() {
         return this.health.check([
             ()=>this.diskSpaceIndicator.isHealthy(),
@@ -137,20 +151,6 @@ export class HealthController {
             message: 'Circuit breaker has been reset successfully',
             previousState: previousStats
         };
-    }
-    constructor(health, diskSpaceIndicator, memoryIndicator, httpHealthIndicator, cacheHealthIndicator, redisHealthIndicator, alertingHealthIndicator, systemHealthIndicator, jobQueueHealthIndicator, storageHealthIndicator, _configService, httpClientService){
-        this.health = health;
-        this.diskSpaceIndicator = diskSpaceIndicator;
-        this.memoryIndicator = memoryIndicator;
-        this.httpHealthIndicator = httpHealthIndicator;
-        this.cacheHealthIndicator = cacheHealthIndicator;
-        this.redisHealthIndicator = redisHealthIndicator;
-        this.alertingHealthIndicator = alertingHealthIndicator;
-        this.systemHealthIndicator = systemHealthIndicator;
-        this.jobQueueHealthIndicator = jobQueueHealthIndicator;
-        this.storageHealthIndicator = storageHealthIndicator;
-        this._configService = _configService;
-        this.httpClientService = httpClientService;
     }
 }
 _ts_decorate([

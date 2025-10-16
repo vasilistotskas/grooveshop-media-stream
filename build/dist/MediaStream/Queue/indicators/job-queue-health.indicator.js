@@ -11,6 +11,9 @@ import { BaseHealthIndicator } from "../../Health/base/base-health-indicator.js"
 import { Injectable } from "@nestjs/common";
 import { JobQueueManager } from "../services/job-queue.manager.js";
 export class JobQueueHealthIndicator extends BaseHealthIndicator {
+    constructor(jobQueueManager){
+        super('job-queue'), this.jobQueueManager = jobQueueManager;
+    }
     async performHealthCheck() {
         try {
             const stats = await this.jobQueueManager.getQueueStats();
@@ -39,9 +42,6 @@ export class JobQueueHealthIndicator extends BaseHealthIndicator {
     }
     getDescription() {
         return 'Monitors job queue health including queue length, failure rates, and processing times';
-    }
-    constructor(jobQueueManager){
-        super('job-queue'), this.jobQueueManager = jobQueueManager;
     }
 }
 JobQueueHealthIndicator = _ts_decorate([

@@ -10,6 +10,11 @@ function _ts_metadata(k, v) {
 import { Injectable } from "@nestjs/common";
 import { RedisCacheService } from "../services/redis-cache.service.js";
 export class RedisCacheLayer {
+    constructor(redisCacheService){
+        this.redisCacheService = redisCacheService;
+        this.layerName = 'redis';
+        this.priority = 2;
+    }
     async get(key) {
         try {
             return await this.redisCacheService.get(key);
@@ -71,11 +76,6 @@ export class RedisCacheLayer {
     }
     getPriority() {
         return this.priority;
-    }
-    constructor(redisCacheService){
-        this.redisCacheService = redisCacheService;
-        this.layerName = 'redis';
-        this.priority = 2;
     }
 }
 RedisCacheLayer = _ts_decorate([

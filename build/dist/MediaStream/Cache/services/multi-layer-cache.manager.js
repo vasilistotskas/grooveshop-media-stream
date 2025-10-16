@@ -16,6 +16,17 @@ import { MemoryCacheLayer } from "../layers/memory-cache.layer.js";
 import { RedisCacheLayer } from "../layers/redis-cache.layer.js";
 import { DefaultCacheKeyStrategy } from "../strategies/cache-key.strategy.js";
 export class MultiLayerCacheManager {
+    constructor(_configService, metricsService, memoryCacheLayer, redisCacheLayer, fileCacheLayer){
+        this._configService = _configService;
+        this.metricsService = metricsService;
+        this.memoryCacheLayer = memoryCacheLayer;
+        this.redisCacheLayer = redisCacheLayer;
+        this.fileCacheLayer = fileCacheLayer;
+        this.layers = [];
+        this.popularKeys = new Map();
+        this.keyStrategy = new DefaultCacheKeyStrategy();
+        this.preloadingEnabled = this._configService.getOptional('cache.preloading.enabled', false);
+    }
     async onModuleInit() {
         this.layers = [
             this.memoryCacheLayer,
@@ -219,17 +230,6 @@ export class MultiLayerCacheManager {
             }
         }, interval);
         CorrelatedLogger.debug(`Cache preloading started with ${interval}ms interval`, MultiLayerCacheManager.name);
-    }
-    constructor(_configService, metricsService, memoryCacheLayer, redisCacheLayer, fileCacheLayer){
-        this._configService = _configService;
-        this.metricsService = metricsService;
-        this.memoryCacheLayer = memoryCacheLayer;
-        this.redisCacheLayer = redisCacheLayer;
-        this.fileCacheLayer = fileCacheLayer;
-        this.layers = [];
-        this.popularKeys = new Map();
-        this.keyStrategy = new DefaultCacheKeyStrategy();
-        this.preloadingEnabled = this._configService.getOptional('cache.preloading.enabled', false);
     }
 }
 MultiLayerCacheManager = _ts_decorate([

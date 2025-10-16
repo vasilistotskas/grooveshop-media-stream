@@ -9,7 +9,7 @@ import { extname } from "node:path";
 import ManipulationJobResult from "../dto/manipulation-job-result.dto.js";
 import { Injectable, Logger, Scope } from "@nestjs/common";
 import sharp from "sharp";
-let WebpImageManipulationJob = class WebpImageManipulationJob {
+export default class WebpImageManipulationJob {
     async handle(filePathFrom, filePathTo, options) {
         this.logger.debug(`WebpImageManipulationJob.handle called with all options:`, {
             filePathFrom,
@@ -170,8 +170,7 @@ let WebpImageManipulationJob = class WebpImageManipulationJob {
     constructor(){
         this.logger = new Logger(WebpImageManipulationJob.name);
     }
-};
-export { WebpImageManipulationJob as default };
+}
 WebpImageManipulationJob = _ts_decorate([
     Injectable({
         scope: Scope.REQUEST

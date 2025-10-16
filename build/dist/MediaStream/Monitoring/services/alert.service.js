@@ -14,6 +14,36 @@ import { ConfigService } from "@nestjs/config";
 import { AlertCondition, AlertSeverity } from "../interfaces/monitoring.interface.js";
 import { MonitoringService } from "./monitoring.service.js";
 export class AlertService {
+    constructor(_configService, _correlationService, monitoringService){
+        this._configService = _configService;
+        this._correlationService = _correlationService;
+        this.monitoringService = monitoringService;
+        this._logger = new Logger(AlertService.name);
+        this.alertRules = new Map();
+        this.activeAlerts = new Map();
+        this.alertHistory = [];
+        this.alertCooldowns = new Map();
+        this.config = this._configService.get('monitoring', {
+            enabled: true,
+            metricsRetentionMs: 24 * 60 * 60 * 1000,
+            alertsRetentionMs: 7 * 24 * 60 * 60 * 1000,
+            performanceRetentionMs: 24 * 60 * 60 * 1000,
+            healthCheckIntervalMs: 30 * 1000,
+            alertCooldownMs: 5 * 60 * 1000,
+            externalIntegrations: {
+                enabled: false,
+                endpoints: []
+            }
+        });
+        if (this.config.enabled) {
+            this.initializeDefaultRules();
+            if (process.env.NODE_ENV !== 'test') {
+                this.startAlertEvaluation();
+            }
+            this.startAlertCleanup();
+            this._logger.log('Alert service initialized');
+        }
+    }
     /**
 	 * Add or update an alert rule
 	 */ addAlertRule(rule) {
@@ -255,36 +285,6 @@ export class AlertService {
         const removedCount = originalLength - this.alertHistory.length;
         if (removedCount > 0) {
             this._logger.debug(`Cleaned up ${removedCount} old alerts`);
-        }
-    }
-    constructor(_configService, _correlationService, monitoringService){
-        this._configService = _configService;
-        this._correlationService = _correlationService;
-        this.monitoringService = monitoringService;
-        this._logger = new Logger(AlertService.name);
-        this.alertRules = new Map();
-        this.activeAlerts = new Map();
-        this.alertHistory = [];
-        this.alertCooldowns = new Map();
-        this.config = this._configService.get('monitoring', {
-            enabled: true,
-            metricsRetentionMs: 24 * 60 * 60 * 1000,
-            alertsRetentionMs: 7 * 24 * 60 * 60 * 1000,
-            performanceRetentionMs: 24 * 60 * 60 * 1000,
-            healthCheckIntervalMs: 30 * 1000,
-            alertCooldownMs: 5 * 60 * 1000,
-            externalIntegrations: {
-                enabled: false,
-                endpoints: []
-            }
-        });
-        if (this.config.enabled) {
-            this.initializeDefaultRules();
-            if (process.env.NODE_ENV !== 'test') {
-                this.startAlertEvaluation();
-            }
-            this.startAlertCleanup();
-            this._logger.log('Alert service initialized');
         }
     }
 }

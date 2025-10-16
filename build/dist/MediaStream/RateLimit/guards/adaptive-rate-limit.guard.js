@@ -13,6 +13,11 @@ import { ThrottlerException } from "@nestjs/throttler";
 import { RateLimitMetricsService } from "../services/rate-limit-metrics.service.js";
 import { RateLimitService } from "../services/rate-limit.service.js";
 export class AdaptiveRateLimitGuard {
+    constructor(rateLimitService, rateLimitMetricsService){
+        this.rateLimitService = rateLimitService;
+        this.rateLimitMetricsService = rateLimitMetricsService;
+        this._logger = new Logger(AdaptiveRateLimitGuard.name);
+    }
     async canActivate(context) {
         if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'dev') {
             this._logger.debug('Skipping rate limiting in development mode');
@@ -192,11 +197,6 @@ export class AdaptiveRateLimitGuard {
         response.setHeader('X-RateLimit-Remaining', info.remaining.toString());
         response.setHeader('X-RateLimit-Reset', Math.ceil(info.resetTime.getTime() / 1000).toString());
         response.setHeader('X-RateLimit-Used', info.current.toString());
-    }
-    constructor(rateLimitService, rateLimitMetricsService){
-        this.rateLimitService = rateLimitService;
-        this.rateLimitMetricsService = rateLimitMetricsService;
-        this._logger = new Logger(AdaptiveRateLimitGuard.name);
     }
 }
 AdaptiveRateLimitGuard = _ts_decorate([

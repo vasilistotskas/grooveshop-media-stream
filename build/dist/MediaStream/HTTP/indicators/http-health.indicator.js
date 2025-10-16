@@ -13,6 +13,11 @@ import { BaseHealthIndicator } from "../../Health/base/base-health-indicator.js"
 import { Injectable } from "@nestjs/common";
 import { HttpClientService } from "../services/http-client.service.js";
 export class HttpHealthIndicator extends BaseHealthIndicator {
+    constructor(httpClient, _configService){
+        super('http'), this.httpClient = httpClient, this._configService = _configService;
+        this.healthCheckUrls = this._configService.getOptional('http.healthCheck.urls', []);
+        this.timeout = this._configService.getOptional('http.healthCheck.timeout', 5000);
+    }
     async performHealthCheck() {
         const stats = this.httpClient.getStats();
         const circuitBreakerOpen = this.httpClient.isCircuitOpen();
@@ -97,11 +102,6 @@ export class HttpHealthIndicator extends BaseHealthIndicator {
     }
     getDescription() {
         return 'Monitors HTTP connection health including circuit breaker status and external endpoint connectivity';
-    }
-    constructor(httpClient, _configService){
-        super('http'), this.httpClient = httpClient, this._configService = _configService;
-        this.healthCheckUrls = this._configService.getOptional('http.healthCheck.urls', []);
-        this.timeout = this._configService.getOptional('http.healthCheck.timeout', 5000);
     }
 }
 HttpHealthIndicator = _ts_decorate([

@@ -12,6 +12,9 @@ import { Injectable } from "@nestjs/common";
 import { CorrelationService } from "../services/correlation.service.js";
 export const CORRELATION_ID_HEADER = 'x-correlation-id';
 export class CorrelationMiddleware {
+    constructor(_correlationService){
+        this._correlationService = _correlationService;
+    }
     use(req, res, next) {
         const correlationId = req.headers[CORRELATION_ID_HEADER] || this._correlationService.generateCorrelationId();
         const context = {
@@ -30,9 +33,6 @@ export class CorrelationMiddleware {
     }
     getClientIp(req) {
         return req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.headers['x-real-ip'] || req.connection.remoteAddress || req.socket.remoteAddress || 'unknown';
-    }
-    constructor(_correlationService){
-        this._correlationService = _correlationService;
     }
 }
 CorrelationMiddleware = _ts_decorate([

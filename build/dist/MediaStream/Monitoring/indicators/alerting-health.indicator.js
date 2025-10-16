@@ -12,6 +12,10 @@ import { HealthIndicatorService } from "@nestjs/terminus";
 import { AlertSeverity } from "../interfaces/monitoring.interface.js";
 import { AlertService } from "../services/alert.service.js";
 export class AlertingHealthIndicator {
+    constructor(alertService, healthIndicatorService){
+        this.alertService = alertService;
+        this.healthIndicatorService = healthIndicatorService;
+    }
     get key() {
         return 'alerting';
     }
@@ -99,10 +103,6 @@ export class AlertingHealthIndicator {
 	 * Get health indicator description
 	 */ getDescription() {
         return 'Monitors alerting system health including active alerts, alert rules, and system responsiveness';
-    }
-    constructor(alertService, healthIndicatorService){
-        this.alertService = alertService;
-        this.healthIndicatorService = healthIndicatorService;
     }
 }
 AlertingHealthIndicator = _ts_decorate([

@@ -11,6 +11,67 @@ import { ConfigService } from "../../Config/config.service.js";
 import { Injectable, Logger } from "@nestjs/common";
 import * as promClient from "prom-client";
 export class RateLimitMetricsService {
+    constructor(_configService){
+        this._configService = _configService;
+        this._logger = new Logger(RateLimitMetricsService.name);
+        this.register = new promClient.Registry();
+        this.rateLimitAttemptsTotal = new promClient.Counter({
+            name: 'mediastream_rate_limit_attempts_total',
+            help: 'Total number of rate limit attempts',
+            labelNames: [
+                'request_type',
+                'client_ip',
+                'status'
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.rateLimitBlockedTotal = new promClient.Counter({
+            name: 'mediastream_rate_limit_blocked_total',
+            help: 'Total number of blocked requests due to rate limiting',
+            labelNames: [
+                'request_type',
+                'client_ip',
+                'reason'
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.rateLimitCurrentRequests = new promClient.Gauge({
+            name: 'mediastream_rate_limit_current_requests',
+            help: 'Current number of requests in rate limit window',
+            labelNames: [
+                'request_type',
+                'client_ip'
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.rateLimitAdaptiveAdjustments = new promClient.Counter({
+            name: 'mediastream_rate_limit_adaptive_adjustments_total',
+            help: 'Total number of adaptive rate limit adjustments',
+            labelNames: [
+                'adjustment_type',
+                'reason'
+            ],
+            registers: [
+                this.register
+            ]
+        });
+        this.rateLimitSystemLoad = new promClient.Gauge({
+            name: 'mediastream_rate_limit_system_load',
+            help: 'System load metrics used for adaptive rate limiting',
+            labelNames: [
+                'metric_type'
+            ],
+            registers: [
+                this.register
+            ]
+        });
+    }
     async onModuleInit() {
         if (this._configService.get('monitoring.enabled')) {
             this._logger.log('Rate limit metrics service initialized');
@@ -109,67 +170,6 @@ export class RateLimitMetricsService {
         this.rateLimitCurrentRequests.reset();
         this.rateLimitAdaptiveAdjustments.reset();
         this.rateLimitSystemLoad.reset();
-    }
-    constructor(_configService){
-        this._configService = _configService;
-        this._logger = new Logger(RateLimitMetricsService.name);
-        this.register = new promClient.Registry();
-        this.rateLimitAttemptsTotal = new promClient.Counter({
-            name: 'mediastream_rate_limit_attempts_total',
-            help: 'Total number of rate limit attempts',
-            labelNames: [
-                'request_type',
-                'client_ip',
-                'status'
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.rateLimitBlockedTotal = new promClient.Counter({
-            name: 'mediastream_rate_limit_blocked_total',
-            help: 'Total number of blocked requests due to rate limiting',
-            labelNames: [
-                'request_type',
-                'client_ip',
-                'reason'
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.rateLimitCurrentRequests = new promClient.Gauge({
-            name: 'mediastream_rate_limit_current_requests',
-            help: 'Current number of requests in rate limit window',
-            labelNames: [
-                'request_type',
-                'client_ip'
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.rateLimitAdaptiveAdjustments = new promClient.Counter({
-            name: 'mediastream_rate_limit_adaptive_adjustments_total',
-            help: 'Total number of adaptive rate limit adjustments',
-            labelNames: [
-                'adjustment_type',
-                'reason'
-            ],
-            registers: [
-                this.register
-            ]
-        });
-        this.rateLimitSystemLoad = new promClient.Gauge({
-            name: 'mediastream_rate_limit_system_load',
-            help: 'System load metrics used for adaptive rate limiting',
-            labelNames: [
-                'metric_type'
-            ],
-            registers: [
-                this.register
-            ]
-        });
     }
 }
 RateLimitMetricsService = _ts_decorate([

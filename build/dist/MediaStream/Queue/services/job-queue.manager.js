@@ -14,6 +14,19 @@ import { ImageProcessingProcessor } from "../processors/image-processing.process
 import { JobPriority, JobType } from "../types/job.types.js";
 import { BullQueueService } from "./bull-queue.service.js";
 export class JobQueueManager {
+    constructor(queueService, imageProcessor, cacheProcessor, _correlationService){
+        this.queueService = queueService;
+        this.imageProcessor = imageProcessor;
+        this.cacheProcessor = cacheProcessor;
+        this._correlationService = _correlationService;
+        this._logger = new Logger(JobQueueManager.name);
+        this.metrics = {
+            totalJobs: 0,
+            completedJobs: 0,
+            failedJobs: 0,
+            processingTimes: []
+        };
+    }
     async onModuleInit() {
         this.setupJobProcessors();
         this._logger.log('Job queue manager initialized');
@@ -163,19 +176,6 @@ export class JobQueueManager {
         if (this.metrics.processingTimes.length > 1000) {
             this.metrics.processingTimes = this.metrics.processingTimes.slice(-1000);
         }
-    }
-    constructor(queueService, imageProcessor, cacheProcessor, _correlationService){
-        this.queueService = queueService;
-        this.imageProcessor = imageProcessor;
-        this.cacheProcessor = cacheProcessor;
-        this._correlationService = _correlationService;
-        this._logger = new Logger(JobQueueManager.name);
-        this.metrics = {
-            totalJobs: 0,
-            completedJobs: 0,
-            failedJobs: 0,
-            processingTimes: []
-        };
     }
 }
 JobQueueManager = _ts_decorate([

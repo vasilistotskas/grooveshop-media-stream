@@ -13,6 +13,9 @@ import { cwd } from "node:process";
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 export class CleanupService {
+    constructor(logger){
+        this.logger = logger;
+    }
     async handleCleanup() {
         const projectRoot = cwd();
         const directoryPath = path.join(projectRoot, 'storage');
@@ -29,9 +32,6 @@ export class CleanupService {
         } catch (err) {
             this.logger.error(`Error during cleanup: ${err}`);
         }
-    }
-    constructor(logger){
-        this.logger = logger;
     }
 }
 _ts_decorate([

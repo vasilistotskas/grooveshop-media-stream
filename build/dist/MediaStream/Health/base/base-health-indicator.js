@@ -9,6 +9,16 @@ function _ts_metadata(k, v) {
 }
 import { Injectable, Logger } from "@nestjs/common";
 export class BaseHealthIndicator {
+    constructor(key, options = {}){
+        this.key = key;
+        this.logger = new Logger(`${this.constructor.name}`);
+        this.options = {
+            timeout: 5000,
+            retries: 3,
+            threshold: 0.8,
+            ...options
+        };
+    }
     /**
 	 * Public method to check health with error handling and metrics
 	 */ async isHealthy() {
@@ -85,16 +95,6 @@ export class BaseHealthIndicator {
             }, timeoutMs);
             operation().then(resolve).catch(reject).finally(()=>clearTimeout(timer));
         });
-    }
-    constructor(key, options = {}){
-        this.key = key;
-        this.logger = new Logger(`${this.constructor.name}`);
-        this.options = {
-            timeout: 5000,
-            retries: 3,
-            threshold: 0.8,
-            ...options
-        };
     }
 }
 BaseHealthIndicator = _ts_decorate([

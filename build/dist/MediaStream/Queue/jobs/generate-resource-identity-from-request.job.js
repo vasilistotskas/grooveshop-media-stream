@@ -19,14 +19,13 @@ function generateUUIDv5(name, namespace = NAMESPACE_URL) {
     const hex = hash.subarray(0, 16).toString('hex');
     return `${hex.substring(0, 8)}-` + `${hex.substring(8, 12)}-` + `${hex.substring(12, 16)}-` + `${hex.substring(16, 20)}-` + `${hex.substring(20)}`;
 }
-let GenerateResourceIdentityFromRequestJob = class GenerateResourceIdentityFromRequestJob {
+export default class GenerateResourceIdentityFromRequestJob {
     async handle(cacheImageRequest) {
         const request = JSON.parse(JSON.stringify(cacheImageRequest));
         const requestStr = JSON.stringify(request);
         return generateUUIDv5(requestStr);
     }
-};
-export { GenerateResourceIdentityFromRequestJob as default };
+}
 GenerateResourceIdentityFromRequestJob = _ts_decorate([
     Injectable({
         scope: Scope.REQUEST

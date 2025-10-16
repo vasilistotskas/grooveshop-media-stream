@@ -14,6 +14,17 @@ import { MetricsService } from "../../Metrics/services/metrics.service.js";
 import { Injectable } from "@nestjs/common";
 import Redis from "ioredis";
 export class RedisCacheService {
+    constructor(_configService, metricsService){
+        this._configService = _configService;
+        this.metricsService = metricsService;
+        this.isConnected = false;
+        this.stats = {
+            hits: 0,
+            misses: 0,
+            operations: 0,
+            errors: 0
+        };
+    }
     async onModuleInit() {
         await this.initializeRedis();
     }
@@ -328,17 +339,6 @@ export class RedisCacheService {
             }
             return val;
         });
-    }
-    constructor(_configService, metricsService){
-        this._configService = _configService;
-        this.metricsService = metricsService;
-        this.isConnected = false;
-        this.stats = {
-            hits: 0,
-            misses: 0,
-            operations: 0,
-            errors: 0
-        };
     }
 }
 RedisCacheService = _ts_decorate([

@@ -3,6 +3,14 @@ import { HttpStatus } from "@nestjs/common";
  * Base error class for all MediaStream errors
  * Provides additional context for error handling and logging
  */ export class MediaStreamError extends Error {
+    constructor(message, status = HttpStatus.INTERNAL_SERVER_ERROR, code = 'MEDIA_STREAM_ERROR', context = {}){
+        super(message);
+        this.name = this.constructor.name;
+        this.status = status;
+        this.code = code;
+        this.context = context;
+        Error.captureStackTrace(this, this.constructor);
+    }
     /**
 	 * Converts the error to a JSON object for logging and response formatting
 	 */ toJSON() {
@@ -14,14 +22,6 @@ import { HttpStatus } from "@nestjs/common";
             context: this.context,
             stack: this.stack
         };
-    }
-    constructor(message, status = HttpStatus.INTERNAL_SERVER_ERROR, code = 'MEDIA_STREAM_ERROR', context = {}){
-        super(message);
-        this.name = this.constructor.name;
-        this.status = status;
-        this.code = code;
-        this.context = context;
-        Error.captureStackTrace(this, this.constructor);
     }
 }
 /**

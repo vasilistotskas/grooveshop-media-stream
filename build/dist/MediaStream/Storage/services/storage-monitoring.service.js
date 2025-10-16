@@ -14,6 +14,20 @@ import { CorrelatedLogger } from "../../Correlation/utils/logger.util.js";
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 export class StorageMonitoringService {
+    constructor(_configService){
+        this._configService = _configService;
+        this._logger = new Logger(StorageMonitoringService.name);
+        this.accessPatterns = new Map();
+        this.lastScanTime = new Date();
+        this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage');
+        this.thresholds = {
+            warningSize: this._configService.getOptional('storage.warningSize', 800 * 1024 * 1024),
+            criticalSize: this._configService.getOptional('storage.criticalSize', 1024 * 1024 * 1024),
+            warningFileCount: this._configService.getOptional('storage.warningFileCount', 5000),
+            criticalFileCount: this._configService.getOptional('storage.criticalFileCount', 10000),
+            maxFileAge: this._configService.getOptional('storage.maxFileAge', 30)
+        };
+    }
     async onModuleInit() {
         await this.ensureStorageDirectory();
         await this.scanStorageDirectory();
@@ -200,20 +214,6 @@ export class StorageMonitoringService {
             CorrelatedLogger.error(`Failed to create storage directory: ${error.message}`, error.stack, StorageMonitoringService.name);
             throw error;
         }
-    }
-    constructor(_configService){
-        this._configService = _configService;
-        this._logger = new Logger(StorageMonitoringService.name);
-        this.accessPatterns = new Map();
-        this.lastScanTime = new Date();
-        this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage');
-        this.thresholds = {
-            warningSize: this._configService.getOptional('storage.warningSize', 800 * 1024 * 1024),
-            criticalSize: this._configService.getOptional('storage.criticalSize', 1024 * 1024 * 1024),
-            warningFileCount: this._configService.getOptional('storage.warningFileCount', 5000),
-            criticalFileCount: this._configService.getOptional('storage.criticalFileCount', 10000),
-            maxFileAge: this._configService.getOptional('storage.maxFileAge', 30)
-        };
     }
 }
 _ts_decorate([

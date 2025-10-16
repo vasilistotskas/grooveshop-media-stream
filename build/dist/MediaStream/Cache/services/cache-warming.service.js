@@ -17,6 +17,19 @@ import { MetricsService } from "../../Metrics/services/metrics.service.js";
 import { Injectable } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 export class CacheWarmingService {
+    constructor(memoryCacheService, _configService, metricsService){
+        this.memoryCacheService = memoryCacheService;
+        this._configService = _configService;
+        this.metricsService = metricsService;
+        this.config = this._configService.get('cache.warming') || {
+            enabled: true,
+            warmupOnStart: true,
+            maxFilesToWarm: 50,
+            warmupCron: '0 */6 * * *',
+            popularImageThreshold: 5
+        };
+        this.storagePath = join(cwd(), 'storage');
+    }
     async onModuleInit() {
         if (this.config.enabled && this.config.warmupOnStart) {
             CorrelatedLogger.log('Starting cache warming on module initialization', CacheWarmingService.name);
@@ -139,19 +152,6 @@ export class CacheWarmingService {
             filesWarmed: stats.keys,
             cacheSize: stats.vsize + stats.ksize
         };
-    }
-    constructor(memoryCacheService, _configService, metricsService){
-        this.memoryCacheService = memoryCacheService;
-        this._configService = _configService;
-        this.metricsService = metricsService;
-        this.config = this._configService.get('cache.warming') || {
-            enabled: true,
-            warmupOnStart: true,
-            maxFilesToWarm: 50,
-            warmupCron: '0 */6 * * *',
-            popularImageThreshold: 5
-        };
-        this.storagePath = join(cwd(), 'storage');
     }
 }
 _ts_decorate([

@@ -16,6 +16,12 @@ import { InjectQueue } from "@nestjs/bull";
 import { Injectable, Logger } from "@nestjs/common";
 import { JobType } from "../types/job.types.js";
 export class BullQueueService {
+    constructor(imageQueue, cacheQueue){
+        this.imageQueue = imageQueue;
+        this.cacheQueue = cacheQueue;
+        this._logger = new Logger(BullQueueService.name);
+        this.processors = new Map();
+    }
     async add(name, data, options = {}) {
         try {
             const queue = this.getQueueForJobType(name);
@@ -198,12 +204,6 @@ export class BullQueueService {
             finishedOn: bullJob.finishedOn,
             processedOn: bullJob.processedOn
         };
-    }
-    constructor(imageQueue, cacheQueue){
-        this.imageQueue = imageQueue;
-        this.cacheQueue = cacheQueue;
-        this._logger = new Logger(BullQueueService.name);
-        this.processors = new Map();
     }
 }
 BullQueueService = _ts_decorate([

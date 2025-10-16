@@ -13,7 +13,20 @@ COPY . .
 
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
-RUN pnpm run build
+ENV DEBUG=nest:*
+
+# Add this before RUN pnpm run build
+RUN echo "=== Checking environment ===" && \
+    node --version && \
+    pnpm --version && \
+    ls -la && \
+    echo "=== TypeScript config ===" && \
+    cat tsconfig.json && \
+    echo "=== NestJS CLI config ===" && \
+    cat nest-cli.json && \
+    echo "=== Starting build ==="
+
+RUN pnpm run build || (echo "=== Build failed! Checking directory structure ===" && find build -type f 2>/dev/null && exit 1)
 
 # debug: ENTRYPOINT ["tail", "-f", "/dev/null"]
 
