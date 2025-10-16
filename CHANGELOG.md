@@ -1,3 +1,10 @@
+## [2.9.7](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.9.6...v2.9.7) (2025-10-16)
+
+
+### Bug Fixes
+
+* path aliases ([01aaa60](https://github.com/vasilistotskas/grooveshop-media-stream/commit/01aaa6078ea70b968e39ff956550b7285fabe5b4))
+
 ## [2.9.6](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.9.5...v2.9.6) (2025-10-16)
 
 
