@@ -1,3 +1,10 @@
+## [2.9.5](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.9.4...v2.9.5) (2025-10-16)
+
+
+### Bug Fixes
+
+* moduleResolution ([f0c4372](https://github.com/vasilistotskas/grooveshop-media-stream/commit/f0c437248f17a78591817d2961d795052ded11cb))
+
 ## [2.9.4](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.9.3...v2.9.4) (2025-10-16)
 
 
