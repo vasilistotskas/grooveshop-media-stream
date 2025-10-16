@@ -1,3 +1,11 @@
+## [2.8.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.8.2...v2.8.3) (2025-10-16)
+
+
+### Bug Fixes
+
+* shouldUseBackgroundProcessing ([bd184bb](https://github.com/vasilistotskas/grooveshop-media-stream/commit/bd184bbabf6856d037a2e2d78a30310b9ef7fe7e))
+* shouldUseBackgroundProcessing ([5674cac](https://github.com/vasilistotskas/grooveshop-media-stream/commit/5674cac633efa04796c9fea0d3d3fe3a2e516139))
+
 ## [2.8.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.8.1...v2.8.2) (2025-10-16)
 
 
