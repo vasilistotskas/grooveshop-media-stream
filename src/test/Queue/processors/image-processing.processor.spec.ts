@@ -135,6 +135,7 @@ describe('imageProcessingProcessor', () => {
 				webp: jest.fn().mockReturnThis(),
 				withMetadata: jest.fn().mockReturnThis(),
 				toBuffer: jest.fn().mockResolvedValue(processedImageData),
+				destroy: jest.fn(),
 			}
 			mockSharp.mockReturnValue(mockSharpInstance as any)
 
@@ -200,6 +201,7 @@ describe('imageProcessingProcessor', () => {
 				jpeg: jest.fn().mockReturnThis(),
 				withMetadata: jest.fn().mockReturnThis(),
 				toBuffer: jest.fn().mockResolvedValue(processedImageData),
+				destroy: jest.fn(),
 			}
 			mockSharp.mockReturnValue(mockSharpInstance as any)
 
@@ -235,6 +237,7 @@ describe('imageProcessingProcessor', () => {
 				png: jest.fn().mockReturnThis(),
 				withMetadata: jest.fn().mockReturnThis(),
 				toBuffer: jest.fn().mockResolvedValue(processedImageData),
+				destroy: jest.fn(),
 			}
 			mockSharp.mockReturnValue(mockSharpInstance as any)
 
@@ -268,6 +271,7 @@ describe('imageProcessingProcessor', () => {
 				webp: jest.fn().mockReturnThis(),
 				withMetadata: jest.fn().mockReturnThis(),
 				toBuffer: jest.fn().mockResolvedValue(processedImageData),
+				destroy: jest.fn(),
 			}
 			mockSharp.mockReturnValue(mockSharpInstance as any)
 
@@ -302,6 +306,7 @@ describe('imageProcessingProcessor', () => {
 				webp: jest.fn().mockReturnThis(),
 				withMetadata: jest.fn().mockReturnThis(),
 				toBuffer: jest.fn().mockResolvedValue(processedImageData),
+				destroy: jest.fn(),
 			}
 			mockSharp.mockReturnValue(mockSharpInstance as any)
 
@@ -350,6 +355,7 @@ describe('imageProcessingProcessor', () => {
 				webp: jest.fn().mockReturnThis(),
 				withMetadata: jest.fn().mockReturnThis(),
 				toBuffer: jest.fn().mockRejectedValue(new Error('Invalid image format')),
+				destroy: jest.fn(),
 			}
 			mockSharp.mockReturnValue(mockSharpInstance as any)
 
@@ -393,6 +399,7 @@ describe('imageProcessingProcessor', () => {
 				webp: jest.fn().mockReturnThis(),
 				withMetadata: jest.fn().mockReturnThis(),
 				toBuffer: jest.fn().mockResolvedValue(processedImageData),
+				destroy: jest.fn(),
 			}
 			mockSharp.mockReturnValue(mockSharpInstance as any)
 

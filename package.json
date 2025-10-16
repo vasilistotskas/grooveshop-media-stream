@@ -1,6 +1,6 @@
 {
   "name": "@vasilistotskas/grooveshop-media-stream",
-  "version": "2.8.1",
+  "version": "2.8.2",
   "private": false,
   "type": "module",
   "module": "src/main.ts",
@@ -31,7 +31,7 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:e2e": "jest --config ./src/test/jest-e2e.json",
     "cache:clear": "node scripts/clear-cache.js",
     "semantic-release": "semantic-release"
   },

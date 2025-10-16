@@ -327,6 +327,9 @@ describe('cacheImageResourceOperation', () => {
 			mockRequest.resizeOptions.height = 1500 // 3MP total
 			await operation.setup(mockRequest)
 
+			// Mock shouldUseBackgroundProcessing to return true for this test
+			jest.spyOn(operation, 'shouldUseBackgroundProcessing').mockReturnValue(true)
+
 			// Ensure cache returns null so resource doesn't exist
 			jest.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
 

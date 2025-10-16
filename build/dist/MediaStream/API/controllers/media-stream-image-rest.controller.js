@@ -186,8 +186,8 @@ let MediaStreamImageRESTController = MediaStreamImageRESTController_1 = class Me
                 const shouldUseQueue = this.cacheImageResourceOperation.shouldUseBackgroundProcessing
                     && this.cacheImageResourceOperation.shouldUseBackgroundProcessing();
                 await this.cacheImageResourceOperation.execute();
-                const maxWaitTime = shouldUseQueue ? 3000 : 10000;
-                const pollInterval = 100;
+                const maxWaitTime = shouldUseQueue ? 15000 : 10000;
+                const pollInterval = 150;
                 let waitTime = 0;
                 while (waitTime < maxWaitTime) {
                     if (await this.cacheImageResourceOperation.resourceExists) {

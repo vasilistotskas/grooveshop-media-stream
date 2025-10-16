@@ -94,7 +94,7 @@ let MemoryHealthIndicator = class MemoryHealthIndicator extends base_health_indi
         const usedMemory = totalMemory - freeMemory;
         const memoryUsagePercentage = usedMemory / totalMemory;
         const processMemory = process.memoryUsage();
-        const heapUsagePercentage = processMemory.heapUsed / processMemory.heapTotal;
+        const heapUsagePercentage = processMemory.heapUsed / processMemory.rss;
         return {
             totalMemory: this.formatBytes(totalMemory),
             freeMemory: this.formatBytes(freeMemory),
