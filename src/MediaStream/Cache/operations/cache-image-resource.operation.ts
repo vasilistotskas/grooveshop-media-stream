@@ -255,6 +255,8 @@ export default class CacheImageResourceOperation {
 			CorrelatedLogger.warn(`Image is too large to be processed synchronously: ${totalPixels} pixels`, CacheImageResourceOperation.name)
 			return true
 		}
+
+		return false
 	}
 
 	private async queueImageProcessing(): Promise<void> {
