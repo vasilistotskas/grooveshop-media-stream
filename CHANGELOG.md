@@ -1,3 +1,10 @@
+## [2.9.6](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.9.5...v2.9.6) (2025-10-16)
+
+
+### Bug Fixes
+
+* remove sharp deps from ci ([67bdb77](https://github.com/vasilistotskas/grooveshop-media-stream/commit/67bdb77d5a5a2750bceaa54d099ca76ef8806bf6))
+
 ## [2.9.5](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.9.4...v2.9.5) (2025-10-16)
 
 
