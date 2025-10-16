@@ -1,3 +1,12 @@
+## [2.8.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.8.1...v2.8.2) (2025-10-16)
+
+
+### Bug Fixes
+
+* e2e tests ([028e5dd](https://github.com/vasilistotskas/grooveshop-media-stream/commit/028e5ddc16224e409991b6afceaa9291ab905a75))
+* previous commit ([32cbee2](https://github.com/vasilistotskas/grooveshop-media-stream/commit/32cbee22d9cd39d7e76702eea0ef04adf0207de3))
+* shouldUseBackgroundProcessing return false, remove useless tests ([89a2a26](https://github.com/vasilistotskas/grooveshop-media-stream/commit/89a2a26665bc192133d697e9f087e0756073e708))
+
 ## [2.8.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.8.0...v2.8.1) (2025-10-15)
 
 
