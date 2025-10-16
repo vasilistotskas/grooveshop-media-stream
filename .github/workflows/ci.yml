@@ -124,11 +124,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
 
-      - name: Install Sharp dependencies (for image processing)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libvips-dev
-
       - name: Configure system for Redis
         run: |
           # Enable memory overcommit for Redis
@@ -227,11 +222,6 @@ jobs:
         run: |
           # Enable memory overcommit for Redis
           sudo sysctl -w vm.overcommit_memory=1
-
-      - name: Install Sharp dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libvips-dev
 
       - name: Build application
         run: pnpm run build
