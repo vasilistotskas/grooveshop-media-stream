@@ -240,7 +240,19 @@ let CacheImageResourceOperation = CacheImageResourceOperation_1 = class CacheIma
         }
     }
     shouldUseBackgroundProcessing() {
-        return false;
+        const resizeOptions = this.request.resizeOptions;
+        if (!resizeOptions)
+            return false;
+        const width = resizeOptions.width || 0;
+        const height = resizeOptions.height || 0;
+        const totalPixels = width * height;
+        if (resizeOptions.format === 'svg') {
+            return false;
+        }
+        if (totalPixels > 8000000) {
+            logger_util_1.CorrelatedLogger.warn(`Image is too large to be processed synchronously: ${totalPixels} pixels`, CacheImageResourceOperation_1.name);
+            return true;
+        }
     }
     async queueImageProcessing() {
         const priority = this.request.resizeOptions?.width && this.request.resizeOptions.width > 1920

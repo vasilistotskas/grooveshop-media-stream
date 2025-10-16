@@ -239,8 +239,22 @@ export default class CacheImageResourceOperation {
 	}
 
 	public shouldUseBackgroundProcessing(): boolean {
-		// @TODO / this slows the app too much
-		return false
+		const resizeOptions = this.request.resizeOptions
+		if (!resizeOptions)
+			return false
+
+		const width = resizeOptions.width || 0
+		const height = resizeOptions.height || 0
+		const totalPixels = width * height
+
+		if (resizeOptions.format === 'svg') {
+			return false
+		}
+
+		if (totalPixels > 8000000) {
+			CorrelatedLogger.warn(`Image is too large to be processed synchronously: ${totalPixels} pixels`, CacheImageResourceOperation.name)
+			return true
+		}
 	}
 
 	private async queueImageProcessing(): Promise<void> {
