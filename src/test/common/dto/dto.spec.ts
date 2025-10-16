@@ -18,7 +18,7 @@ describe('resizeOptions', () => {
 		expect(resizeOptions.format).toBe(SupportedResizeFormats.webp)
 		expect(resizeOptions.background).toBe(BackgroundOptions.white)
 		expect(resizeOptions.trimThreshold).toBeNull()
-		expect(resizeOptions.quality).toBe(100)
+		expect(resizeOptions.quality).toBe(80)
 	})
 
 	it('should accept custom values', () => {
@@ -61,7 +61,7 @@ describe('resizeOptions', () => {
 	it('should handle default values for quality and trimThreshold', () => {
 		const resizeOptions = new ResizeOptions({ quality: undefined, trimThreshold: null })
 
-		expect(resizeOptions.quality).toBe(100)
+		expect(resizeOptions.quality).toBe(80)
 		expect(resizeOptions.trimThreshold).toBeNull()
 	})
 })

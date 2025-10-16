@@ -400,7 +400,7 @@ let MediaStreamImageRESTController = class MediaStreamImageRESTController {
             return resourceTarget;
         }
     }
-    async uploadedImage(imageType, image, width = null, height = null, fit = FitOptions.contain, position = PositionOptions.entropy, background = BackgroundOptions.transparent, trimThreshold = 5, format = SupportedResizeFormats.webp, quality = 100, res) {
+    async uploadedImage(imageType, image, width = null, height = null, fit = FitOptions.contain, position = PositionOptions.entropy, background = BackgroundOptions.transparent, trimThreshold = 5, format = SupportedResizeFormats.webp, quality = 80, res) {
         const correlationId = this._correlationService.getCorrelationId();
         PerformanceTracker.startPhase('uploaded_image_request');
         try {
@@ -474,7 +474,7 @@ let MediaStreamImageRESTController = class MediaStreamImageRESTController {
             PerformanceTracker.endPhase('uploaded_image_request');
         }
     }
-    async staticImage(image, width = null, height = null, fit = FitOptions.contain, position = PositionOptions.entropy, background = BackgroundOptions.transparent, trimThreshold = 5, format = SupportedResizeFormats.webp, quality = 100, res) {
+    async staticImage(image, width = null, height = null, fit = FitOptions.contain, position = PositionOptions.entropy, background = BackgroundOptions.transparent, trimThreshold = 5, format = SupportedResizeFormats.webp, quality = 80, res) {
         const correlationId = this._correlationService.getCorrelationId();
         PerformanceTracker.startPhase('static_image_request');
         try {

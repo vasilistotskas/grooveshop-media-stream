@@ -160,10 +160,9 @@ export class ImageProcessingProcessor {
             switch(options.format){
                 case 'webp':
                     pipeline = pipeline.webp({
-                        quality: Math.min(qual, 85),
-                        effort: 4,
+                        quality: qual,
                         smartSubsample: true,
-                        nearLossless: false
+                        nearLossless: true
                     });
                     break;
                 case 'jpeg':

@@ -522,7 +522,7 @@ export default class MediaStreamImageRESTController {
 		@Param('background') background = BackgroundOptions.transparent,
 		@Param('trimThreshold') trimThreshold = 5,
 		@Param('format') format: SupportedResizeFormats = SupportedResizeFormats.webp,
-		@Param('quality') quality = 100,
+		@Param('quality') quality = 80,
 
 		@Res() res: Response,
 	): Promise<void> {
@@ -622,7 +622,7 @@ export default class MediaStreamImageRESTController {
 		@Param('background') background = BackgroundOptions.transparent,
 		@Param('trimThreshold') trimThreshold = 5,
 		@Param('format') format: SupportedResizeFormats = SupportedResizeFormats.webp,
-		@Param('quality') quality = 100,
+		@Param('quality') quality = 80,
 
 		@Res() res: Response,
 	): Promise<void> {

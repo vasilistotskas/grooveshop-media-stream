@@ -2,10 +2,9 @@
   "compilerOptions": {
     "target": "ESNext",
     "outDir": "./build/dist",
-    "module": "ESNext",
-    "moduleDetection": "force",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "allowJs": true,
-    "moduleResolution": "bundler",
     "verbatimModuleSyntax": true,
     "noEmitOnError": true,
     "strict": true,
@@ -30,9 +29,6 @@
     "sourceMap": true,
     "esModuleInterop": true,
     "baseUrl": "./",
-    "lib": [
-      "ES2021"
-    ],
     "types": [
       "node",
       "express",

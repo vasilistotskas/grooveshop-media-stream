@@ -141,7 +141,8 @@ describe('imageProcessingProcessor', ()=>{
             }));
             expect(mockSharpInstance.webp).toHaveBeenCalledWith(expect.objectContaining({
                 quality: 80,
-                effort: 4
+                nearLossless: true,
+                smartSubsample: true
             }));
             expect(mockCacheManager.set).toHaveBeenCalledWith('image', 'test-cache-key', expect.objectContaining({
                 data: processedImageData,
@@ -236,7 +237,8 @@ describe('imageProcessingProcessor', ()=>{
             expect(result.success).toBe(true);
             expect(mockSharpInstance.webp).toHaveBeenCalledWith(expect.objectContaining({
                 quality: 80,
-                effort: 4
+                nearLossless: true,
+                smartSubsample: true
             }));
         // resize should not be called when no dimensions provided
         // (mock doesn't have resize method when dimensions aren't needed)

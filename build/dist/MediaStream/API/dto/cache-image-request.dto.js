@@ -75,7 +75,7 @@ export class ResizeOptions {
         this.format = "webp";
         this.background = "#FFFFFF";
         this.trimThreshold = null;
-        this.quality = 100;
+        this.quality = 80;
         const { width, height, trimThreshold, background, fit, position, format, quality, ...rest } = data || {};
         this.width = width ?? null;
         this.height = height ?? null;
@@ -84,7 +84,7 @@ export class ResizeOptions {
         this.fit = fit ?? "contain";
         this.position = position ?? "entropy";
         this.format = format ?? "webp";
-        this.quality = quality !== undefined ? Number(quality) : 100;
+        this.quality = quality !== undefined ? Number(quality) : 80;
         Object.assign(this, rest);
         [
             'width',

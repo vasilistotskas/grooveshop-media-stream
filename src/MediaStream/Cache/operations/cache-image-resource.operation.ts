@@ -461,7 +461,7 @@ export default class CacheImageResourceOperation {
 			format: resizeOptions.format || SupportedResizeFormats.webp,
 			background: resizeOptions.background || BackgroundOptions.white,
 			trimThreshold: resizeOptions.trimThreshold || 5,
-			quality: resizeOptions.quality || 100,
+			quality: resizeOptions.quality || 80,
 		}
 
 		const optionsString = this.createOptionsString(resizeOptionsWithDefaults)
