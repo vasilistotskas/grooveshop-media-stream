@@ -184,12 +184,7 @@ export class ImageProcessingProcessor {
 	): Promise<Buffer> {
 		let pipeline: sharp.Sharp | null = null
 		try {
-			pipeline = sharp(buffer, {
-				failOn: 'none',
-				limitInputPixels: 268402689,
-				sequentialRead: true,
-				density: 72,
-			})
+			pipeline = sharp(buffer)
 
 			if (options.trimThreshold !== undefined && options.trimThreshold > 0) {
 				pipeline = pipeline.trim({
@@ -199,10 +194,7 @@ export class ImageProcessingProcessor {
 			}
 
 			if (options.width || options.height) {
-				const resizeOptions: any = {
-					fastShrinkOnLoad: true,
-					kernel: 'lanczos3',
-				}
+				const resizeOptions: any = {}
 
 				if (options.width)
 					resizeOptions.width = options.width
@@ -226,7 +218,6 @@ export class ImageProcessingProcessor {
 					pipeline = pipeline.webp({
 						quality: qual,
 						smartSubsample: true,
-						nearLossless: true,
 					})
 					break
 				case 'jpeg':
@@ -234,7 +225,6 @@ export class ImageProcessingProcessor {
 					pipeline = pipeline.jpeg({
 						quality: qual,
 						progressive: true,
-						optimizeCoding: true,
 						mozjpeg: true,
 						trellisQuantisation: true,
 						overshootDeringing: true,
@@ -243,7 +233,6 @@ export class ImageProcessingProcessor {
 				case 'png':
 					pipeline = pipeline.png({
 						quality: qual,
-						compressionLevel: 6,
 						adaptiveFiltering: true,
 						palette: qual < 95,
 					})
@@ -251,14 +240,11 @@ export class ImageProcessingProcessor {
 				case 'avif':
 					pipeline = pipeline.avif({
 						quality: Math.min(qual, 75),
-						effort: 4,
 						chromaSubsampling: '4:2:0',
 					})
 					break
 				default:
 					pipeline = pipeline.webp({
-						quality: 80,
-						effort: 4,
 						smartSubsample: true,
 					})
 					break
