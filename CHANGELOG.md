@@ -1,3 +1,10 @@
+## [2.10.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.10.0...v2.10.1) (2025-10-17)
+
+
+### Bug Fixes
+
+* Dockerfile ([52e2166](https://github.com/vasilistotskas/grooveshop-media-stream/commit/52e21660f51cc011680a946d7dbeb58a9d7ccd0b))
+
 # [2.10.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.9.7...v2.10.0) (2025-10-17)
 
 
