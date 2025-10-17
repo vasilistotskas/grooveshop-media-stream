@@ -1,3 +1,10 @@
+# [2.11.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.10.1...v2.11.0) (2025-10-17)
+
+
+### Features
+
+* dockerfile node alpine ([0bd617f](https://github.com/vasilistotskas/grooveshop-media-stream/commit/0bd617f5913ef5e679ce98ace3b69366fa85e808))
+
 ## [2.10.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.10.0...v2.10.1) (2025-10-17)
 
 
