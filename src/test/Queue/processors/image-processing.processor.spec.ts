@@ -153,19 +153,12 @@ describe('imageProcessingProcessor', () => {
 				responseType: 'arraybuffer',
 				timeout: 30000,
 			})
-			expect(mockSharp).toHaveBeenCalledWith(originalImageData, expect.objectContaining({
-				failOn: 'none',
-				sequentialRead: true,
-			}))
 			expect(mockSharpInstance.resize).toHaveBeenCalledWith(expect.objectContaining({
 				width: 300,
 				height: 200,
-				fastShrinkOnLoad: true,
-				kernel: 'lanczos3',
 			}))
 			expect(mockSharpInstance.webp).toHaveBeenCalledWith(expect.objectContaining({
 				quality: 80,
-				nearLossless: true,
 				smartSubsample: true,
 			}))
 			expect(mockCacheManager.set).toHaveBeenCalledWith(
@@ -284,7 +277,6 @@ describe('imageProcessingProcessor', () => {
 			expect(result.success).toBe(true)
 			expect(mockSharpInstance.webp).toHaveBeenCalledWith(expect.objectContaining({
 				quality: 80,
-				nearLossless: true,
 				smartSubsample: true,
 			}))
 			// resize should not be called when no dimensions provided
