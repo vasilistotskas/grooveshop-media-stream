@@ -5,13 +5,13 @@ FROM node:${NODE_VERSION}-slim AS build
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 
-RUN corepack enable pnpm
+RUN npm install -g pnpm@latest
 
 WORKDIR /usr/src/app
 
 COPY . .
 
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile --prefer-offline
 
 RUN pnpm run build
 
