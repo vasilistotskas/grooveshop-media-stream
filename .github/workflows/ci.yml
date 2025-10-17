@@ -87,7 +87,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-          --sysctl net.core.somaxconn=1024
         ports:
           - 6379:6379
 
@@ -123,17 +122,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
-
-      - name: Configure system for Redis
-        run: |
-          # Enable memory overcommit for Redis
-          sudo sysctl -w vm.overcommit_memory=1
-          # Install Redis tools
-          sudo apt-get install -y redis-tools
-
-      - name: Verify Redis connection
-        run: |
-          redis-cli -h localhost -p 6379 ping
 
       - name: Run unit tests with coverage
         if: matrix.coverage
@@ -197,7 +185,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-          --sysctl net.core.somaxconn=1024
         ports:
           - 6379:6379
 
@@ -213,15 +200,26 @@ jobs:
           scope: '@vasilistotskas'
 
       - name: Enable corepack for pnpm
-        run: corepack enable pnpm
+        run: |
+          corepack enable pnpm
+          pnpm config set store-dir ~/.pnpm-store
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
-
-      - name: Configure system for Redis
-        run: |
-          # Enable memory overcommit for Redis
-          sudo sysctl -w vm.overcommit_memory=1
 
       - name: Build application
         run: pnpm run build
@@ -259,7 +257,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-          --sysctl net.core.somaxconn=1024
         ports:
           - 6379:6379
 
@@ -275,22 +272,26 @@ jobs:
           scope: '@vasilistotskas'
 
       - name: Enable corepack for pnpm
-        run: corepack enable pnpm
+        run: |
+          corepack enable pnpm
+          pnpm config set store-dir ~/.pnpm-store
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
-
-      - name: Configure system for Redis
-        run: |
-          # Enable memory overcommit for Redis
-          sudo sysctl -w vm.overcommit_memory=1
-          # Install Redis tools
-          sudo apt-get update
-          sudo apt-get install -y redis-tools
-
-      - name: Verify Redis connection
-        run: |
-          redis-cli -h localhost -p 6379 ping
 
       - name: Clean previous build
         run: pnpm run prebuild
@@ -355,7 +356,23 @@ jobs:
           scope: '@vasilistotskas'
 
       - name: Enable corepack for pnpm
-        run: corepack enable pnpm
+        run: |
+          corepack enable pnpm
+          pnpm config set store-dir ~/.pnpm-store
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
@@ -389,4 +406,3 @@ jobs:
         run: |
           echo "New version: ${{ steps.release.outputs.new_release_version }}"
           echo "IMAGE_TAG=${{ steps.release.outputs.new_release_version }}" >> $GITHUB_ENV
-
