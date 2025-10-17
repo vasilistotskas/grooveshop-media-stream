@@ -1,3 +1,18 @@
+# [2.10.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.9.7...v2.10.0) (2025-10-17)
+
+
+### Bug Fixes
+
+* ci redis, Added pnpm cache setup ([143a840](https://github.com/vasilistotskas/grooveshop-media-stream/commit/143a8403accb7426606b3e2694a08efcb150210f))
+* remove default configs from sharp settings and skip ci on release ([bb9bd51](https://github.com/vasilistotskas/grooveshop-media-stream/commit/bb9bd51eff6ac41477c60f2aba8e2d2e290fe534))
+* tests ([01ac123](https://github.com/vasilistotskas/grooveshop-media-stream/commit/01ac123f88674ae3d89126c181705db21fc9a0d3))
+
+
+### Features
+
+* Bump node to 25, internal imports `.js` added, remove useless file and `d.ts` types added for tsc typing ([900d226](https://github.com/vasilistotskas/grooveshop-media-stream/commit/900d2269c1969b7dff6f7378007c0891341eedf6))
+* ci use action pnpm ([6dc5e41](https://github.com/vasilistotskas/grooveshop-media-stream/commit/6dc5e4162961f6c75eb05560da87955f6bfe57ab))
+
 ## [2.9.7](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.9.6...v2.9.7) (2025-10-16)
 
 
