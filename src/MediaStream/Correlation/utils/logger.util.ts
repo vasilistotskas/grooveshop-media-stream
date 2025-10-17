@@ -1,4 +1,4 @@
-import { CorrelationService } from '../services/correlation.service'
+import { CorrelationService } from '../services/correlation.service.js'
 
 export class CorrelatedLogger {
 	private static _correlationService: CorrelationService | null = null

@@ -1,6 +1,6 @@
-import type { CacheLayer, CacheLayerStats } from '../interfaces/cache-layer.interface'
+import type { CacheLayer, CacheLayerStats } from '../interfaces/cache-layer.interface.js'
 import { Injectable } from '@nestjs/common'
-import { RedisCacheService } from '../services/redis-cache.service'
+import { RedisCacheService } from '../services/redis-cache.service.js'
 
 @Injectable()
 export class RedisCacheLayer implements CacheLayer {

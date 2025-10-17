@@ -1,9 +1,9 @@
 import type { NestMiddleware } from '@nestjs/common'
 import type { NextFunction, Request, Response } from 'express'
-import type { RequestContext } from '../interfaces/correlation.interface'
+import type { RequestContext } from '../interfaces/correlation.interface.js'
 import * as process from 'node:process'
 import { Injectable } from '@nestjs/common'
-import { CorrelationService } from '../services/correlation.service'
+import { CorrelationService } from '../services/correlation.service.js'
 
 export const CORRELATION_ID_HEADER = 'x-correlation-id'
 

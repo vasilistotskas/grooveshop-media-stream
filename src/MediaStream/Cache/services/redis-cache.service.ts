@@ -1,11 +1,11 @@
 import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
-import type { CacheStats, ICacheManager } from '../interfaces/cache-manager.interface'
+import type { CacheStats, ICacheManager } from '../interfaces/cache-manager.interface.js'
 import { Buffer } from 'node:buffer'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Injectable } from '@nestjs/common'
-import Redis from 'ioredis'
+import { Redis } from 'ioredis'
 
 @Injectable()
 export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleDestroy {
@@ -367,7 +367,7 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 	 * Serialize value for Redis storage, handling Buffers properly
 	 */
 	private serializeValue<T>(value: T): string {
-		return JSON.stringify(value, (key, val) => {
+		return JSON.stringify(value, (_key, val) => {
 			if (Buffer.isBuffer(val)) {
 				return {
 					type: 'Buffer',
@@ -382,7 +382,7 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 	 * Deserialize value from Redis storage, reconstructing Buffers properly
 	 */
 	private deserializeValue<T>(value: string): T {
-		return JSON.parse(value, (key, val) => {
+		return JSON.parse(value, (_key, val) => {
 			if (val && typeof val === 'object' && val.type === 'Buffer' && typeof val.data === 'string') {
 				return Buffer.from(val.data, 'base64')
 			}

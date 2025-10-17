@@ -1,4 +1,4 @@
-import type { CacheKeyStrategy } from '../interfaces/cache-layer.interface'
+import type { CacheKeyStrategy } from '../interfaces/cache-layer.interface.js'
 import { createHash } from 'node:crypto'
 import { Injectable } from '@nestjs/common'
 

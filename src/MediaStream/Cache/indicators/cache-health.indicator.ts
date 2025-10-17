@@ -3,8 +3,8 @@ import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { BaseHealthIndicator } from '#microservice/Health/base/base-health-indicator'
 import { Injectable } from '@nestjs/common'
-import { CacheWarmingService } from '../services/cache-warming.service'
-import { MemoryCacheService } from '../services/memory-cache.service'
+import { CacheWarmingService } from '../services/cache-warming.service.js'
+import { MemoryCacheService } from '../services/memory-cache.service.js'
 
 @Injectable()
 export class CacheHealthIndicator extends BaseHealthIndicator {

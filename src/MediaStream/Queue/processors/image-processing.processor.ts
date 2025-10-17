@@ -1,5 +1,5 @@
-import type { Job } from '../interfaces/job-queue.interface'
-import type { ImageProcessingJobData, JobResult } from '../types/job.types'
+import type { Job } from '../interfaces/job-queue.interface.js'
+import type { ImageProcessingJobData, JobResult } from '../types/job.types.js'
 import { Buffer } from 'node:buffer'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'

@@ -1,6 +1,6 @@
 import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import type { AxiosRequestConfig, AxiosResponse } from 'axios'
-import type { HttpClientStats, IHttpClient } from '../interfaces/http-client.interface'
+import type { HttpClientStats, IHttpClient } from '../interfaces/http-client.interface.js'
 import * as http from 'node:http'
 import { Agent as HttpAgent } from 'node:http'
 import * as https from 'node:https'
@@ -12,7 +12,7 @@ import { HttpService } from '@nestjs/axios'
 import { Injectable } from '@nestjs/common'
 import { lastValueFrom, throwError, timer } from 'rxjs'
 import { retry, tap } from 'rxjs/operators'
-import { CircuitBreaker } from '../utils/circuit-breaker'
+import { CircuitBreaker } from '../utils/circuit-breaker.js'
 
 @Injectable()
 export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDestroy {

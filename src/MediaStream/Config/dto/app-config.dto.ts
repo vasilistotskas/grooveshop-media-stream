@@ -6,7 +6,7 @@ import { RateLimitConfigDto } from '#microservice/Config/dto/rate-limit-config.d
 import { ServerConfigDto } from '#microservice/Config/dto/server-config.dto'
 import { Type } from 'class-transformer'
 import { ValidateNested } from 'class-validator'
-import { ExternalServicesConfigDto } from './external-services-config.dto'
+import { ExternalServicesConfigDto } from './external-services-config.dto.js'
 
 export class AppConfigDto {
 	@ValidateNested()

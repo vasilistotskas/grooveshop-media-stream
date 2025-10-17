@@ -1,13 +1,13 @@
 import type { OnModuleInit } from '@nestjs/common'
-import type { CacheKeyStrategy, CacheLayer, CacheLayerStats } from '../interfaces/cache-layer.interface'
+import type { CacheKeyStrategy, CacheLayer, CacheLayerStats } from '../interfaces/cache-layer.interface.js'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Injectable } from '@nestjs/common'
-import { FileCacheLayer } from '../layers/file-cache.layer'
-import { MemoryCacheLayer } from '../layers/memory-cache.layer'
-import { RedisCacheLayer } from '../layers/redis-cache.layer'
-import { DefaultCacheKeyStrategy } from '../strategies/cache-key.strategy'
+import { FileCacheLayer } from '../layers/file-cache.layer.js'
+import { MemoryCacheLayer } from '../layers/memory-cache.layer.js'
+import { RedisCacheLayer } from '../layers/redis-cache.layer.js'
+import { DefaultCacheKeyStrategy } from '../strategies/cache-key.strategy.js'
 
 export interface MultiLayerCacheStats {
 	layers: Record<string, CacheLayerStats>

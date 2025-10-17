@@ -1,9 +1,9 @@
-import type { Alert, AlertRule, SystemHealth } from '../interfaces/monitoring.interface'
+import type { Alert, AlertRule, SystemHealth } from '../interfaces/monitoring.interface.js'
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common'
-import { AlertSeverity } from '../interfaces/monitoring.interface'
-import { AlertService } from '../services/alert.service'
-import { MonitoringService } from '../services/monitoring.service'
-import { PerformanceMonitoringService } from '../services/performance-monitoring.service'
+import { AlertSeverity } from '../interfaces/monitoring.interface.js'
+import { AlertService } from '../services/alert.service.js'
+import { MonitoringService } from '../services/monitoring.service.js'
+import { PerformanceMonitoringService } from '../services/performance-monitoring.service.js'
 
 @Controller('monitoring')
 export class MonitoringController {

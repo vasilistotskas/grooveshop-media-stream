@@ -1,5 +1,5 @@
 import type { HealthIndicatorResult } from '@nestjs/terminus'
-import type { HealthCheckOptions, HealthMetrics, IHealthIndicator } from '../interfaces/health-indicator.interface'
+import type { HealthCheckOptions, HealthMetrics, IHealthIndicator } from '../interfaces/health-indicator.interface.js'
 import { Injectable, Logger } from '@nestjs/common'
 
 @Injectable()

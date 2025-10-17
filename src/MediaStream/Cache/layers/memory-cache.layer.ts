@@ -1,6 +1,6 @@
-import type { CacheLayer, CacheLayerStats } from '../interfaces/cache-layer.interface'
+import type { CacheLayer, CacheLayerStats } from '../interfaces/cache-layer.interface.js'
 import { Injectable } from '@nestjs/common'
-import { MemoryCacheService } from '../services/memory-cache.service'
+import { MemoryCacheService } from '../services/memory-cache.service.js'
 
 @Injectable()
 export class MemoryCacheLayer implements CacheLayer {

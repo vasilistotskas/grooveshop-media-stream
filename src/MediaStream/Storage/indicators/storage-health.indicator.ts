@@ -1,11 +1,11 @@
 import type { HealthCheckOptions } from '#microservice/Health/interfaces/health-indicator.interface'
 import type { HealthIndicatorResult } from '@nestjs/terminus'
-import type { AccessPattern, StorageStats } from '../services/storage-monitoring.service'
+import type { AccessPattern, StorageStats } from '../services/storage-monitoring.service.js'
 import { ConfigService } from '#microservice/Config/config.service'
 import { BaseHealthIndicator } from '#microservice/Health/base/base-health-indicator'
 import { Injectable } from '@nestjs/common'
-import { StorageCleanupService } from '../services/storage-cleanup.service'
-import { StorageMonitoringService } from '../services/storage-monitoring.service'
+import { StorageCleanupService } from '../services/storage-cleanup.service.js'
+import { StorageMonitoringService } from '../services/storage-monitoring.service.js'
 
 export interface StorageHealthDetails {
 	totalFiles: number

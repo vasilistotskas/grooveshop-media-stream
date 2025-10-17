@@ -1,6 +1,6 @@
 import type { ExecutionContext } from '@nestjs/common'
 import { createParamDecorator } from '@nestjs/common'
-import { CorrelationService } from '../services/correlation.service'
+import { CorrelationService } from '../services/correlation.service.js'
 
 /**
  * Decorator to inject correlation ID into controller methods

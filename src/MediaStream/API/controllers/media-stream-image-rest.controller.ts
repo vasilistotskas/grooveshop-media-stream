@@ -1,7 +1,6 @@
 import type ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
 import type { Response } from 'express'
 import { Buffer } from 'node:buffer'
-import { createHash } from 'node:crypto'
 import { open } from 'node:fs/promises'
 import * as process from 'node:process'
 import CacheImageRequest, {
@@ -107,15 +106,6 @@ export default class MediaStreamImageRESTController {
 				})
 			}
 		}
-	}
-
-	/**
-	 * Generates an ETag for cache validation
-	 */
-	private generateETag(input: Buffer | string): string {
-		const hash = createHash('md5')
-		hash.update(Buffer.isBuffer(input) ? input : Buffer.from(input))
-		return `"${hash.digest('hex')}"`
 	}
 
 	/**
@@ -399,62 +389,6 @@ export default class MediaStreamImageRESTController {
 		}
 		finally {
 			await this.cacheImageResourceOperation.execute()
-		}
-	}
-
-	/**
-	 * Fetches the resource, processes it, and streams it.
-	 *
-	 * @param request
-	 * @param res
-	 * @protected
-	 */
-	private async fetchAndStreamResource(request: CacheImageRequest, res: Response): Promise<void> {
-		const correlationId = this._correlationService.getCorrelationId()
-
-		try {
-			await this.cacheImageResourceOperation.execute()
-
-			if (this.cacheImageResourceOperation.shouldUseBackgroundProcessing && this.cacheImageResourceOperation.shouldUseBackgroundProcessing()) {
-				await new Promise(resolve => setTimeout(resolve, 100))
-			}
-
-			const headers = await this.cacheImageResourceOperation.getHeaders
-
-			if (!headers) {
-				this._logger.warn('Failed to fetch resource or generate headers.', {
-					request,
-					correlationId,
-				})
-				await this.defaultImageFallback(request, res)
-				return
-			}
-
-			const cachedResource = await this.cacheImageResourceOperation.getCachedResource()
-			if (cachedResource && cachedResource.data) {
-				res = this.addHeadersToRequest(res, headers)
-				const imageData = typeof cachedResource.data === 'string'
-					? Buffer.from(cachedResource.data, 'base64')
-					: cachedResource.data
-				res.end(imageData)
-				return
-			}
-
-			await this.streamFileToResponse(
-				this.cacheImageResourceOperation.getResourcePath,
-				headers,
-				res,
-			)
-		}
-		catch (error: unknown) {
-			const context = {
-				request,
-				resourcePath: this.cacheImageResourceOperation.getResourcePath,
-				error: (error as Error).message || error,
-				correlationId,
-			}
-			this._logger.error(`Error during resource fetch and stream: ${(error as Error).message || error}`, error, context)
-			await this.defaultImageFallback(request, res)
 		}
 	}
 

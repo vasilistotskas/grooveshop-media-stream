@@ -1,4 +1,4 @@
-import type { ISecurityChecker, SecurityEvent } from '../interfaces/validator.interface'
+import type { ISecurityChecker, SecurityEvent } from '../interfaces/validator.interface.js'
 import { ConfigService } from '#microservice/Config/config.service'
 import { Injectable, Logger } from '@nestjs/common'
 

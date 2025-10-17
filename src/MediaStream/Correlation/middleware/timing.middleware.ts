@@ -2,9 +2,9 @@ import type { NestMiddleware } from '@nestjs/common'
 import type { NextFunction, Request, Response } from 'express'
 import * as process from 'node:process'
 import { Injectable } from '@nestjs/common'
-import { CorrelationService } from '../services/correlation.service'
-import { CorrelatedLogger } from '../utils/logger.util'
-import { PerformanceTracker } from '../utils/performance-tracker.util'
+import { CorrelationService } from '../services/correlation.service.js'
+import { CorrelatedLogger } from '../utils/logger.util.js'
+import { PerformanceTracker } from '../utils/performance-tracker.util.js'
 
 @Injectable()
 export class TimingMiddleware implements NestMiddleware {

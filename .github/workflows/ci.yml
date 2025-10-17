@@ -144,7 +144,7 @@ jobs:
           BULL_REDIS_PORT: 6379
           NODE_ENV: test
           CI: true
-        run: pnpm run test:cov
+        run: pnpm run test:coverage
         timeout-minutes: 10
 
       - name: Run unit tests without coverage

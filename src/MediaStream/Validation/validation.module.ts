@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common'
-import { ConfigModule } from '../Config/config.module'
-import { CorrelationModule } from '../Correlation/correlation.module'
-import { InputSanitizationService } from './services/input-sanitization.service'
-import { SecurityCheckerService } from './services/security-checker.service'
-import { SimpleValidationService } from './services/simple-validation.service'
+import { ConfigModule } from '../Config/config.module.js'
+import { CorrelationModule } from '../Correlation/correlation.module.js'
+import { InputSanitizationService } from './services/input-sanitization.service.js'
+import { SecurityCheckerService } from './services/security-checker.service.js'
+import { SimpleValidationService } from './services/simple-validation.service.js'
 
 @Module({
 	imports: [

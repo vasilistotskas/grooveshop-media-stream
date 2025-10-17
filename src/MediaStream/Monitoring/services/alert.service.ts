@@ -2,13 +2,13 @@ import type {
 	Alert,
 	AlertRule,
 	MonitoringConfig,
-} from '../interfaces/monitoring.interface'
+} from '../interfaces/monitoring.interface.js'
 import * as process from 'node:process'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { AlertCondition, AlertSeverity } from '../interfaces/monitoring.interface'
-import { MonitoringService } from './monitoring.service'
+import { AlertCondition, AlertSeverity } from '../interfaces/monitoring.interface.js'
+import { MonitoringService } from './monitoring.service.js'
 
 @Injectable()
 export class AlertService {

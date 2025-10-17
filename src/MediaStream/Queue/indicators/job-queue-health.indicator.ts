@@ -1,7 +1,7 @@
 import type { HealthIndicatorResult } from '@nestjs/terminus'
 import { BaseHealthIndicator } from '#microservice/Health/base/base-health-indicator'
 import { Injectable } from '@nestjs/common'
-import { JobQueueManager } from '../services/job-queue.manager'
+import { JobQueueManager } from '../services/job-queue.manager.js'
 
 @Injectable()
 export class JobQueueHealthIndicator extends BaseHealthIndicator {

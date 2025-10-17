@@ -1,8 +1,8 @@
 import type { HealthIndicatorResult } from '@nestjs/terminus'
 import { Injectable } from '@nestjs/common'
 import { HealthIndicatorService } from '@nestjs/terminus'
-import { AlertSeverity } from '../interfaces/monitoring.interface'
-import { AlertService } from '../services/alert.service'
+import { AlertSeverity } from '../interfaces/monitoring.interface.js'
+import { AlertService } from '../services/alert.service.js'
 
 @Injectable()
 export class AlertingHealthIndicator {

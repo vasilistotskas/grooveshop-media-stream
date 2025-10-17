@@ -1,4 +1,4 @@
-import type { CacheLayer, CacheLayerStats } from '../interfaces/cache-layer.interface'
+import type { CacheLayer, CacheLayerStats } from '../interfaces/cache-layer.interface.js'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { ConfigService } from '#microservice/Config/config.service'

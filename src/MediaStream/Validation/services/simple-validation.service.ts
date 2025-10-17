@@ -1,8 +1,8 @@
 import CacheImageRequest from '#microservice/API/dto/cache-image-request.dto'
 
 import { Injectable, Logger } from '@nestjs/common'
-import { InputSanitizationService } from './input-sanitization.service'
-import { SecurityCheckerService } from './security-checker.service'
+import { InputSanitizationService } from './input-sanitization.service.js'
+import { SecurityCheckerService } from './security-checker.service.js'
 
 export interface SimpleValidationResult {
 	isValid: boolean

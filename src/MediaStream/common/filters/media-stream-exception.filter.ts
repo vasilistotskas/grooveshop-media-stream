@@ -7,6 +7,17 @@ import { Catch, HttpException, HttpStatus } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
 
 /**
+ * Type for generic error objects
+ */
+interface GenericErrorObject {
+	name: string
+	message: string
+	status: HttpStatus
+	code: string
+	context?: Record<string, any>
+}
+
+/**
  * Global exception filter for handling MediaStream errors
  * Converts errors to appropriate HTTP responses with structured error information
  */
@@ -34,8 +45,8 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 		else if (exception instanceof HttpException) {
 			status = exception.getStatus()
 			const exceptionResponse = exception.getResponse()
-			const message = typeof exceptionResponse === 'object' && 'message' in exceptionResponse
-				? exceptionResponse.message
+			const message = typeof exceptionResponse === 'object' && exceptionResponse !== null && 'message' in exceptionResponse
+				? String(exceptionResponse.message)
 				: exception.message
 
 			errorResponse = this.formatErrorResponse({
@@ -74,7 +85,7 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 	 * Formats the error response with consistent structure
 	 */
 	private formatErrorResponse(
-		error: MediaStreamError | Record<string, any>,
+		error: MediaStreamError | GenericErrorObject,
 		request: Request,
 	): Record<string, any> {
 		const timestamp = new Date().toISOString()
@@ -95,8 +106,8 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 
 		return {
 			name: error.name,
-			message: (error as Error).message,
-			code: (error as any).code,
+			message: error.message,
+			code: error.code,
 			status: error.status,
 			timestamp,
 			path,

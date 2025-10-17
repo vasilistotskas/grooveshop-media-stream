@@ -5,8 +5,8 @@ import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron } from '@nestjs/schedule'
-import { IntelligentEvictionService } from './intelligent-eviction.service'
-import { StorageMonitoringService } from './storage-monitoring.service'
+import { IntelligentEvictionService } from './intelligent-eviction.service.js'
+import { StorageMonitoringService } from './storage-monitoring.service.js'
 
 export interface RetentionPolicy {
 	name: string

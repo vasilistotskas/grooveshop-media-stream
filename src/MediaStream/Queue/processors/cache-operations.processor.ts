@@ -1,5 +1,5 @@
-import type { Job } from '../interfaces/job-queue.interface'
-import type { CacheCleanupJobData, CacheWarmingJobData, JobResult } from '../types/job.types'
+import type { Job } from '../interfaces/job-queue.interface.js'
+import type { CacheCleanupJobData, CacheWarmingJobData, JobResult } from '../types/job.types.js'
 import { Buffer } from 'node:buffer'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'

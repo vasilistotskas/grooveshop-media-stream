@@ -57,7 +57,8 @@ export default class WebpImageManipulationJob {
 					const manipulation = sharp(filePathFrom)
 					manipulation.png({ quality: options.quality })
 
-					const resizeScales: Record<string, number> = {}
+					const resizeScales: { width?: number, height?: number } = {}
+
 					if (options.width !== null && !Number.isNaN(options.width)) {
 						resizeScales.width = Number(options.width)
 					}
@@ -87,7 +88,7 @@ export default class WebpImageManipulationJob {
 				const manipulation = sharp(filePathFrom)
 				manipulation.png({ quality: options.quality })
 
-				const resizeScales: Record<string, number> = {}
+				const resizeScales: { width?: number, height?: number } = {}
 				if (options.width !== null && !Number.isNaN(options.width)) {
 					resizeScales.width = Number(options.width)
 				}
@@ -145,9 +146,9 @@ export default class WebpImageManipulationJob {
 				manipulation.webp({ quality: options.quality })
 		}
 
-		const resizeScales: Record<string, number> = {};
+		const resizeScales: { width?: number, height?: number } = {};
 
-		(['width', 'height'] as const).forEach((scale) => {
+		(['width', 'height'] as const).forEach((scale: 'width' | 'height') => {
 			const value = options[scale]
 			if (value !== null && !Number.isNaN(value)) {
 				resizeScales[scale] = Number(value)

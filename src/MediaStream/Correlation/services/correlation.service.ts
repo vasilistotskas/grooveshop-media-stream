@@ -1,4 +1,4 @@
-import type { CorrelationService as ICorrelationService, RequestContext } from '../interfaces/correlation.interface'
+import type { CorrelationService as ICorrelationService, RequestContext } from '../interfaces/correlation.interface.js'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { randomUUID } from 'node:crypto'
 import { Injectable } from '@nestjs/common'

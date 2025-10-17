@@ -1,17 +1,17 @@
 import type { OnModuleInit } from '@nestjs/common'
-import type { Job, JobOptions } from '../interfaces/job-queue.interface'
+import type { Job, JobOptions } from '../interfaces/job-queue.interface.js'
 import type {
 	CacheCleanupJobData,
 	CacheWarmingJobData,
 	ImageProcessingJobData,
 	JobMetrics,
-} from '../types/job.types'
+} from '../types/job.types.js'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { Injectable, Logger } from '@nestjs/common'
-import { CacheOperationsProcessor } from '../processors/cache-operations.processor'
-import { ImageProcessingProcessor } from '../processors/image-processing.processor'
-import { JobPriority, JobType } from '../types/job.types'
-import { BullQueueService } from './bull-queue.service'
+import { CacheOperationsProcessor } from '../processors/cache-operations.processor.js'
+import { ImageProcessingProcessor } from '../processors/image-processing.processor.js'
+import { JobPriority, JobType } from '../types/job.types.js'
+import { BullQueueService } from './bull-queue.service.js'
 
 @Injectable()
 export class JobQueueManager implements OnModuleInit {

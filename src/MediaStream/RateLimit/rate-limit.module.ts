@@ -3,9 +3,9 @@ import { ConfigService } from '#microservice/Config/config.service'
 import { MetricsModule } from '#microservice/Metrics/metrics.module'
 import { Module } from '@nestjs/common'
 import { ThrottlerModule } from '@nestjs/throttler'
-import { AdaptiveRateLimitGuard } from './guards/adaptive-rate-limit.guard'
-import { RateLimitMetricsService } from './services/rate-limit-metrics.service'
-import { RateLimitService } from './services/rate-limit.service'
+import { AdaptiveRateLimitGuard } from './guards/adaptive-rate-limit.guard.js'
+import { RateLimitMetricsService } from './services/rate-limit-metrics.service.js'
+import { RateLimitService } from './services/rate-limit.service.js'
 
 @Module({
 	imports: [

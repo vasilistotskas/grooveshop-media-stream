@@ -1,9 +1,9 @@
 import type { HealthIndicatorResult } from '@nestjs/terminus'
-import type { HealthCheckOptions } from '../interfaces/health-indicator.interface'
+import type { HealthCheckOptions } from '../interfaces/health-indicator.interface.js'
 import * as os from 'node:os'
 import * as process from 'node:process'
 import { Injectable } from '@nestjs/common'
-import { BaseHealthIndicator } from '../base/base-health-indicator'
+import { BaseHealthIndicator } from '../base/base-health-indicator.js'
 
 export interface MemoryInfo {
 	totalMemory: number

@@ -1,4 +1,4 @@
-import type { CacheStats, ICacheManager } from '../interfaces/cache-manager.interface'
+import type { CacheStats, ICacheManager } from '../interfaces/cache-manager.interface.js'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'

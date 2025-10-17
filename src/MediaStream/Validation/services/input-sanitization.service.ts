@@ -1,4 +1,4 @@
-import type { ISanitizer } from '../interfaces/validator.interface'
+import type { ISanitizer } from '../interfaces/validator.interface.js'
 import { ConfigService } from '#microservice/Config/config.service'
 import { Injectable, Logger } from '@nestjs/common'
 
