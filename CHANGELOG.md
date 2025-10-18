@@ -1,3 +1,10 @@
+## [2.12.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.12.0...v2.12.1) (2025-10-18)
+
+
+### Bug Fixes
+
+* Remove unused interfaces and decorators ([c2f317c](https://github.com/vasilistotskas/grooveshop-media-stream/commit/c2f317ce659d19210edc4a3e969bb5c27a8ab1b6))
+
 # [2.12.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.11.0...v2.12.0) (2025-10-18)
 
 
