@@ -1,3 +1,4 @@
+import type { FileTypeMap } from '#microservice/common/types/common.types'
 import type { OnModuleInit } from '@nestjs/common'
 import { promises as fs, Stats } from 'node:fs'
 import { extname, join } from 'node:path'
@@ -12,7 +13,7 @@ export interface StorageStats {
 	averageFileSize: number
 	oldestFile: Date | null
 	newestFile: Date | null
-	fileTypes: Record<string, number>
+	fileTypes: FileTypeMap
 	accessPatterns: AccessPattern[]
 }
 
@@ -67,7 +68,7 @@ export class StorageMonitoringService implements OnModuleInit {
 			let processedFileCount = 0
 			let oldestFile: Date | null = null as any
 			let newestFile: Date | null = null as any
-			const fileTypes: Record<string, number> = {}
+			const fileTypes: FileTypeMap = {}
 
 			for (const file of files) {
 				if (file === '.gitkeep')

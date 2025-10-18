@@ -1,3 +1,4 @@
+import type { Metadata } from '#microservice/common/types/common.types'
 import type { Alert, AlertRule, SystemHealth } from '../interfaces/monitoring.interface.js'
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common'
 import { AlertSeverity } from '../interfaces/monitoring.interface.js'
@@ -128,7 +129,7 @@ export class MonitoringController {
 		ruleName: string
 		message: string
 		severity: AlertSeverity
-		metadata?: Record<string, any>
+		metadata?: Metadata
 	}): { success: boolean, message: string } {
 		this.alertService.triggerAlert(
 			alertData.ruleName,

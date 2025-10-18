@@ -1,3 +1,4 @@
+import type { StringRecord } from '#microservice/common/types/common.types'
 import type { AxiosRequestConfig, AxiosResponse } from 'axios'
 
 export interface HttpClientOptions {
@@ -54,7 +55,7 @@ export interface HttpClientOptions {
 	/**
 	 * Headers to include in every request
 	 */
-	headers?: Record<string, string>
+	headers?: StringRecord
 
 	/**
 	 * Whether to follow redirects

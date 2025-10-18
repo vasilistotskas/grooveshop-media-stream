@@ -1,3 +1,4 @@
+import type { DetailsMap } from '#microservice/common/types/common.types'
 import type { HealthIndicatorResult } from '@nestjs/terminus'
 
 export interface IHealthIndicator {
@@ -16,7 +17,7 @@ export interface IHealthIndicator {
 	 * Get additional details about this health indicator
 	 * @returns Object containing metadata about the health check
 	 */
-	getDetails: () => Record<string, any>
+	getDetails: () => DetailsMap
 }
 
 export interface HealthCheckOptions {
@@ -29,5 +30,5 @@ export interface HealthMetrics {
 	timestamp: number
 	status: 'healthy' | 'unhealthy' | 'degraded'
 	responseTime: number
-	details: Record<string, any>
+	details: DetailsMap
 }

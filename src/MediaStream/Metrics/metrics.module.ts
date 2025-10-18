@@ -1,9 +1,9 @@
 import type { MiddlewareConsumer, NestModule } from '@nestjs/common'
 import { ConfigModule } from '#microservice/Config/config.module'
-import { MetricsController } from '#microservice/Metrics/controllers/metrics.controller'
-import { MetricsMiddleware } from '#microservice/Metrics/middleware/metrics.middleware'
-import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Module } from '@nestjs/common'
+import { MetricsController } from './controllers/metrics.controller.js'
+import { MetricsMiddleware } from './middleware/metrics.middleware.js'
+import { MetricsService } from './services/metrics.service.js'
 
 @Module({
 	imports: [ConfigModule],

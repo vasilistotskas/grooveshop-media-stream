@@ -1,3 +1,4 @@
+import type { MetricsMap, Tags } from '#microservice/common/types/common.types'
 import type {
 	ComponentHealth,
 	CustomMetric,
@@ -43,7 +44,7 @@ export class MonitoringService {
 	/**
 	 * Record a custom metric
 	 */
-	recordMetric(name: string, value: number, type: MetricType, tags?: Record<string, string>): void {
+	recordMetric(name: string, value: number, type: MetricType, tags?: Tags): void {
 		if (!this.config.enabled)
 			return
 
@@ -75,28 +76,28 @@ export class MonitoringService {
 	/**
 	 * Record a counter metric (incremental value)
 	 */
-	incrementCounter(name: string, value: number = 1, tags?: Record<string, string>): void {
+	incrementCounter(name: string, value: number = 1, tags?: Tags): void {
 		this.recordMetric(name, value, MetricType.COUNTER, tags)
 	}
 
 	/**
 	 * Record a gauge metric (current value)
 	 */
-	recordGauge(name: string, value: number, tags?: Record<string, string>): void {
+	recordGauge(name: string, value: number, tags?: Tags): void {
 		this.recordMetric(name, value, MetricType.GAUGE, tags)
 	}
 
 	/**
 	 * Record a histogram metric (distribution of values)
 	 */
-	recordHistogram(name: string, value: number, tags?: Record<string, string>): void {
+	recordHistogram(name: string, value: number, tags?: Tags): void {
 		this.recordMetric(name, value, MetricType.HISTOGRAM, tags)
 	}
 
 	/**
 	 * Record a timer metric (duration)
 	 */
-	recordTimer(name: string, durationMs: number, tags?: Record<string, string>): void {
+	recordTimer(name: string, durationMs: number, tags?: Tags): void {
 		this.recordMetric(name, durationMs, MetricType.TIMER, tags)
 	}
 
@@ -194,7 +195,7 @@ export class MonitoringService {
 	 */
 	getStats(): {
 		totalMetrics: number
-		metricTypes: Record<string, number>
+		metricTypes: MetricsMap
 		oldestMetric: number
 		newestMetric: number
 		memoryUsage: number
@@ -202,7 +203,7 @@ export class MonitoringService {
 		let totalMetrics = 0
 		let oldestTimestamp = Date.now()
 		let newestTimestamp = 0
-		const metricTypes: Record<string, number> = {}
+		const metricTypes: MetricsMap = {}
 
 		for (const [_name, metrics] of this.metrics.entries()) {
 			totalMetrics += metrics.length

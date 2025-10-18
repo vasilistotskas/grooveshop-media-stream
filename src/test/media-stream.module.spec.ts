@@ -1,4 +1,4 @@
-import MediaStreamImageRESTController from '#microservice/API/controllers/media-stream-image-rest.controller'
+import MediaStreamImageController from '#microservice/API/controllers/media-stream-image.controller'
 import CacheImageResourceOperation from '#microservice/Cache/operations/cache-image-resource.operation'
 import MediaStreamModule from '#microservice/media-stream.module'
 import FetchResourceResponseJob from '#microservice/Queue/jobs/fetch-resource-response.job'
@@ -28,8 +28,8 @@ describe('mediaStreamModule', () => {
 		expect(mediaStreamModule).toBeDefined()
 	})
 
-	it('should have MediaStreamImageRESTController defined', async () => {
-		const controller = await module.resolve<MediaStreamImageRESTController>(MediaStreamImageRESTController)
+	it('should have MediaStreamImageController defined', async () => {
+		const controller = await module.resolve<MediaStreamImageController>(MediaStreamImageController)
 		expect(controller).toBeDefined()
 	})
 

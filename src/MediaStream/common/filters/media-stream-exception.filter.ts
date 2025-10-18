@@ -1,10 +1,12 @@
 import type { ArgumentsHost, ExceptionFilter } from '@nestjs/common'
 import type { Request, Response } from 'express'
-import { MediaStreamError } from '#microservice/common/errors/media-stream.errors'
+import type { Metadata, StringMap } from '../types/common.types.js'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { Catch, HttpException, HttpStatus } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
+
+import { MediaStreamError } from '../errors/media-stream.errors.js'
 
 /**
  * Type for generic error objects
@@ -14,7 +16,7 @@ interface GenericErrorObject {
 	message: string
 	status: HttpStatus
 	code: string
-	context?: Record<string, any>
+	context?: Metadata
 }
 
 /**
@@ -35,7 +37,7 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 		const request = ctx.getRequest<Request>()
 
 		let status: HttpStatus
-		let errorResponse: Record<string, any>
+		let errorResponse: StringMap
 
 		if (exception instanceof MediaStreamError) {
 			status = exception.status
@@ -87,7 +89,7 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 	private formatErrorResponse(
 		error: MediaStreamError | GenericErrorObject,
 		request: Request,
-	): Record<string, any> {
+	): StringMap {
 		const timestamp = new Date().toISOString()
 		const path = request.url
 		const method = request.method

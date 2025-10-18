@@ -14,7 +14,6 @@ import CacheImageRequest, {
 	SupportedResizeFormats,
 } from '#microservice/API/dto/cache-image-request.dto'
 import UnableToFetchResourceException from '#microservice/API/exceptions/unable-to-fetch-resource.exception'
-import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
 import ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
@@ -28,6 +27,7 @@ import { JobPriority } from '#microservice/Queue/types/job.types'
 import ValidateCacheImageRequestRule from '#microservice/Validation/rules/validate-cache-image-request.rule'
 import { InputSanitizationService } from '#microservice/Validation/services/input-sanitization.service'
 import { Injectable, InternalServerErrorException, Scope } from '@nestjs/common'
+import { MultiLayerCacheManager } from '../services/multi-layer-cache.manager.js'
 
 @Injectable({ scope: Scope.REQUEST })
 export default class CacheImageResourceOperation {

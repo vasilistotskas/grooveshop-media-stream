@@ -1,3 +1,4 @@
+import type { Metadata } from '../types/common.types.js'
 import { HttpStatus } from '@nestjs/common'
 
 /**
@@ -7,13 +8,13 @@ import { HttpStatus } from '@nestjs/common'
 export class MediaStreamError extends Error {
 	public readonly status: HttpStatus
 	public readonly code: string
-	public readonly context: Record<string, any>
+	public readonly context: Metadata
 
 	constructor(
 		message: string,
 		status: HttpStatus = HttpStatus.INTERNAL_SERVER_ERROR,
 		code: string = 'MEDIA_STREAM_ERROR',
-		context: Record<string, any> = {},
+		context: Metadata = {},
 	) {
 		super(message)
 		this.name = this.constructor.name
@@ -26,7 +27,7 @@ export class MediaStreamError extends Error {
 	/**
 	 * Converts the error to a JSON object for logging and response formatting
 	 */
-	public toJSON(): Record<string, any> {
+	public toJSON(): Metadata {
 		return {
 			name: this.name,
 			message: this.message,
@@ -44,7 +45,7 @@ export class MediaStreamError extends Error {
 export class ResourceNotFoundError extends MediaStreamError {
 	constructor(
 		message: string = 'Resource not found',
-		context: Record<string, any> = {},
+		context: Metadata = {},
 	) {
 		super(message, HttpStatus.NOT_FOUND, 'RESOURCE_NOT_FOUND', context)
 	}
@@ -56,7 +57,7 @@ export class ResourceNotFoundError extends MediaStreamError {
 export class ResourceProcessingError extends MediaStreamError {
 	constructor(
 		message: string = 'Failed to process resource',
-		context: Record<string, any> = {},
+		context: Metadata = {},
 	) {
 		super(message, HttpStatus.INTERNAL_SERVER_ERROR, 'RESOURCE_PROCESSING_ERROR', context)
 	}
@@ -68,7 +69,7 @@ export class ResourceProcessingError extends MediaStreamError {
 export class ResourceStreamingError extends MediaStreamError {
 	constructor(
 		message: string = 'Failed to stream resource',
-		context: Record<string, any> = {},
+		context: Metadata = {},
 	) {
 		super(message, HttpStatus.INTERNAL_SERVER_ERROR, 'RESOURCE_STREAMING_ERROR', context)
 	}
@@ -80,7 +81,7 @@ export class ResourceStreamingError extends MediaStreamError {
 export class DefaultImageFallbackError extends MediaStreamError {
 	constructor(
 		message: string = 'Failed to serve default image',
-		context: Record<string, any> = {},
+		context: Metadata = {},
 	) {
 		super(message, HttpStatus.INTERNAL_SERVER_ERROR, 'DEFAULT_IMAGE_FALLBACK_ERROR', context)
 	}
@@ -92,7 +93,7 @@ export class DefaultImageFallbackError extends MediaStreamError {
 export class InvalidRequestError extends MediaStreamError {
 	constructor(
 		message: string = 'Invalid request parameters',
-		context: Record<string, any> = {},
+		context: Metadata = {},
 	) {
 		super(message, HttpStatus.BAD_REQUEST, 'INVALID_REQUEST', context)
 	}

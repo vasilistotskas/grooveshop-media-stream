@@ -1,16 +1,14 @@
-import type { DiskSpaceInfo } from '#microservice/Health/indicators/disk-space-health.indicator'
-import type { MemoryInfo } from '#microservice/Health/indicators/memory-health.indicator'
 import type {
 	HealthCheckResult,
 	HealthCheckStatus,
 	HealthIndicatorResult,
 } from '@nestjs/terminus'
+import type { DiskSpaceInfo } from '../indicators/disk-space-health.indicator.js'
+import type { MemoryInfo } from '../indicators/memory-health.indicator.js'
 import * as process from 'node:process'
 import { CacheHealthIndicator } from '#microservice/Cache/indicators/cache-health.indicator'
 import { RedisHealthIndicator } from '#microservice/Cache/indicators/redis-health.indicator'
 import { ConfigService } from '#microservice/Config/config.service'
-import { DiskSpaceHealthIndicator } from '#microservice/Health/indicators/disk-space-health.indicator'
-import { MemoryHealthIndicator } from '#microservice/Health/indicators/memory-health.indicator'
 import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 import { AlertingHealthIndicator } from '#microservice/Monitoring/indicators/alerting-health.indicator'
@@ -19,6 +17,8 @@ import { JobQueueHealthIndicator } from '#microservice/Queue/indicators/job-queu
 import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
 import { Controller, Get, Post } from '@nestjs/common'
 import { HealthCheck, HealthCheckService } from '@nestjs/terminus'
+import { DiskSpaceHealthIndicator } from '../indicators/disk-space-health.indicator.js'
+import { MemoryHealthIndicator } from '../indicators/memory-health.indicator.js'
 
 @Controller('health')
 export class HealthController {

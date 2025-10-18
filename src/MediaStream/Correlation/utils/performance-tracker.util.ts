@@ -1,13 +1,15 @@
+import type { Metadata } from '#microservice/common/types/common.types'
 import * as process from 'node:process'
-import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
-import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
+import { CorrelationService } from '../services/correlation.service.js'
+
+import { CorrelatedLogger } from './logger.util.js'
 
 export interface PerformancePhase {
 	name: string
 	startTime: bigint
 	endTime?: bigint
 	duration?: number
-	metadata?: Record<string, any>
+	metadata?: Metadata
 }
 
 export class PerformanceTracker {
@@ -20,7 +22,7 @@ export class PerformanceTracker {
 	/**
 	 * Start tracking a performance phase
 	 */
-	static startPhase(phaseName: string, metadata?: Record<string, any>): void {
+	static startPhase(phaseName: string, metadata?: Metadata): void {
 		const correlationId = this.getCorrelationService().getCorrelationId()
 		if (!correlationId)
 			return
@@ -46,7 +48,7 @@ export class PerformanceTracker {
 	/**
 	 * End tracking a performance phase
 	 */
-	static endPhase(phaseName: string, metadata?: Record<string, any>): number | null {
+	static endPhase(phaseName: string, metadata?: Metadata): number | null {
 		const correlationId = this.getCorrelationService().getCorrelationId()
 		if (!correlationId)
 			return null
@@ -140,7 +142,7 @@ export class PerformanceTracker {
 	static async measure<T>(
 		phaseName: string,
 		fn: () => Promise<T> | T,
-		metadata?: Record<string, any>,
+		metadata?: Metadata,
 	): Promise<T> {
 		this.startPhase(phaseName, metadata)
 		try {
@@ -160,7 +162,7 @@ export class PerformanceTracker {
 	/**
 	 * Create a decorator for measuring method execution time
 	 */
-	static measureMethod(phaseName?: string, metadata?: Record<string, any>) {
+	static measureMethod(phaseName?: string, metadata?: Metadata) {
 		return function (target: any, propertyName: string, descriptor: PropertyDescriptor) {
 			const method = descriptor.value
 			const actualPhaseName = phaseName || `${target.constructor.name}.${propertyName}`

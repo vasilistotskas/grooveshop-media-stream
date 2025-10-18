@@ -1,3 +1,4 @@
+import type { StringMap } from '#microservice/common/types/common.types'
 import type { CacheKeyStrategy } from '../interfaces/cache-layer.interface.js'
 import { createHash } from 'node:crypto'
 import { Injectable } from '@nestjs/common'
@@ -7,7 +8,7 @@ export class DefaultCacheKeyStrategy implements CacheKeyStrategy {
 	private readonly separator = ':'
 	private readonly hashAlgorithm = 'sha256'
 
-	generateKey(namespace: string, identifier: string, params?: Record<string, any>): string {
+	generateKey(namespace: string, identifier: string, params?: StringMap): string {
 		const parts = [namespace, identifier]
 
 		if (params && Object.keys(params).length > 0) {
@@ -21,7 +22,7 @@ export class DefaultCacheKeyStrategy implements CacheKeyStrategy {
 		return parts.join(this.separator)
 	}
 
-	parseKey(key: string): { namespace: string, identifier: string, params?: Record<string, any> } {
+	parseKey(key: string): { namespace: string, identifier: string, params?: StringMap } {
 		const parts = key.split(this.separator)
 
 		if (parts.length < 2) {

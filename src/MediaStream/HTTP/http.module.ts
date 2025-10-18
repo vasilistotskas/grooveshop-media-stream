@@ -1,8 +1,8 @@
 import { ConfigModule } from '#microservice/Config/config.module'
-import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
-import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 import { HttpModule as NestHttpModule } from '@nestjs/axios'
 import { Module } from '@nestjs/common'
+import { HttpHealthIndicator } from './indicators/http-health.indicator.js'
+import { HttpClientService } from './services/http-client.service.js'
 
 @Module({
 	imports: [

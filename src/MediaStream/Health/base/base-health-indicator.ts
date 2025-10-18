@@ -1,3 +1,4 @@
+import type { DetailsMap } from '#microservice/common/types/common.types'
 import type { HealthIndicatorResult } from '@nestjs/terminus'
 import type { HealthCheckOptions, HealthMetrics, IHealthIndicator } from '../interfaces/health-indicator.interface.js'
 import { Injectable, Logger } from '@nestjs/common'
@@ -67,7 +68,7 @@ export abstract class BaseHealthIndicator implements IHealthIndicator {
 	/**
 	 * Get details about this health indicator including last check results
 	 */
-	getDetails(): Record<string, any> {
+	getDetails(): DetailsMap {
 		return {
 			key: this.key,
 			options: this.options,
@@ -96,7 +97,7 @@ export abstract class BaseHealthIndicator implements IHealthIndicator {
 	/**
 	 * Helper method to create a healthy result
 	 */
-	protected createHealthyResult(details: Record<string, any> = {}): HealthIndicatorResult {
+	protected createHealthyResult(details: DetailsMap = {}): HealthIndicatorResult {
 		return {
 			[this.key]: {
 				status: 'up',
@@ -109,7 +110,7 @@ export abstract class BaseHealthIndicator implements IHealthIndicator {
 	/**
 	 * Helper method to create an unhealthy result
 	 */
-	protected createUnhealthyResult(message: string, _details: Record<string, any> = {}): HealthIndicatorResult {
+	protected createUnhealthyResult(message: string, _details: DetailsMap = {}): HealthIndicatorResult {
 		throw new Error(`${this.key} health check failed: ${message}`)
 	}
 

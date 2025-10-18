@@ -1,3 +1,4 @@
+import type { Metadata } from '#microservice/common/types/common.types'
 import type {
 	Alert,
 	AlertRule,
@@ -100,7 +101,7 @@ export class AlertService {
 		ruleName: string,
 		message: string,
 		severity: AlertSeverity,
-		metadata?: Record<string, any>,
+		metadata?: Metadata,
 	): void {
 		const alert: Alert = {
 			id: `manual-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,

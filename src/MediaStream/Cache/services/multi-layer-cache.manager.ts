@@ -1,4 +1,6 @@
+import type { LayerDistribution, StringMap } from '#microservice/common/types/common.types'
 import type { OnModuleInit } from '@nestjs/common'
+
 import type { CacheKeyStrategy, CacheLayer, CacheLayerStats } from '../interfaces/cache-layer.interface.js'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
@@ -7,6 +9,7 @@ import { Injectable } from '@nestjs/common'
 import { FileCacheLayer } from '../layers/file-cache.layer.js'
 import { MemoryCacheLayer } from '../layers/memory-cache.layer.js'
 import { RedisCacheLayer } from '../layers/redis-cache.layer.js'
+
 import { DefaultCacheKeyStrategy } from '../strategies/cache-key.strategy.js'
 
 export interface MultiLayerCacheStats {
@@ -14,7 +17,7 @@ export interface MultiLayerCacheStats {
 	totalHits: number
 	totalMisses: number
 	overallHitRate: number
-	layerHitDistribution: Record<string, number>
+	layerHitDistribution: LayerDistribution
 }
 
 @Injectable()
@@ -55,7 +58,7 @@ export class MultiLayerCacheManager implements OnModuleInit {
 	/**
 	 * Get a value from cache using cache-aside pattern with automatic fallback
 	 */
-	async get<T>(namespace: string, identifier: string, params?: Record<string, any>): Promise<T | null> {
+	async get<T>(namespace: string, identifier: string, params?: StringMap): Promise<T | null> {
 		const key = this.keyStrategy.generateKey(namespace, identifier, params)
 		this.trackKeyAccess(key)
 
@@ -97,7 +100,7 @@ export class MultiLayerCacheManager implements OnModuleInit {
 		identifier: string,
 		value: T,
 		ttl?: number,
-		params?: Record<string, any>,
+		params?: StringMap,
 	): Promise<void> {
 		const key = this.keyStrategy.generateKey(namespace, identifier, params)
 
@@ -124,7 +127,7 @@ export class MultiLayerCacheManager implements OnModuleInit {
 	/**
 	 * Delete a key from all cache layers
 	 */
-	async delete(namespace: string, identifier: string, params?: Record<string, any>): Promise<void> {
+	async delete(namespace: string, identifier: string, params?: StringMap): Promise<void> {
 		const key = this.keyStrategy.generateKey(namespace, identifier, params)
 
 		const deletePromises = this.layers.map(async (layer) => {
@@ -151,7 +154,7 @@ export class MultiLayerCacheManager implements OnModuleInit {
 	/**
 	 * Check if a key exists in any cache layer
 	 */
-	async exists(namespace: string, identifier: string, params?: Record<string, any>): Promise<boolean> {
+	async exists(namespace: string, identifier: string, params?: StringMap): Promise<boolean> {
 		const key = this.keyStrategy.generateKey(namespace, identifier, params)
 
 		for (const layer of this.layers) {
@@ -216,7 +219,7 @@ export class MultiLayerCacheManager implements OnModuleInit {
 		const layerStats: Record<string, CacheLayerStats> = {}
 		let totalHits = 0
 		let totalMisses = 0
-		const layerHitDistribution: Record<string, number> = {}
+		const layerHitDistribution: LayerDistribution = {}
 
 		for (const layer of this.layers) {
 			try {

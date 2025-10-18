@@ -1,3 +1,5 @@
+import type { StringMap } from '#microservice/common/types/common.types'
+
 export interface CacheLayer {
 	name: string
 	priority: number
@@ -19,7 +21,7 @@ export interface CacheStats {
 }
 
 export interface CacheKeyStrategy {
-	generateKey: (operation: string, params: Record<string, any>) => string
+	generateKey: (operation: string, params: StringMap) => string
 	parseKey: (key: string) => { operation: string, hash: string }
 }
 

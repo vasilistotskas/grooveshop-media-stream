@@ -1,7 +1,8 @@
 import type { MiddlewareConsumer, NestModule } from '@nestjs/common'
-import MediaStreamImageRESTController from '#microservice/API/controllers/media-stream-image-rest.controller'
+import { ApiModule } from '#microservice/API/api.module'
+import MediaStreamImageController from '#microservice/API/controllers/media-stream-image.controller'
+import { CacheOperationsModule } from '#microservice/Cache/cache-operations.module'
 import { CacheModule } from '#microservice/Cache/cache.module'
-import CacheImageResourceOperation from '#microservice/Cache/operations/cache-image-resource.operation'
 import { MediaStreamExceptionFilter } from '#microservice/common/filters/media-stream-exception.filter'
 import { ConfigModule } from '#microservice/Config/config.module'
 import { CorrelationModule } from '#microservice/Correlation/correlation.module'
@@ -13,34 +14,17 @@ import { HttpModule } from '#microservice/HTTP/http.module'
 import { MetricsModule } from '#microservice/Metrics/metrics.module'
 import { MetricsMiddleware } from '#microservice/Metrics/middleware/metrics.middleware'
 import { MonitoringModule } from '#microservice/Monitoring/monitoring.module'
-import FetchResourceResponseJob from '#microservice/Queue/jobs/fetch-resource-response.job'
-import GenerateResourceIdentityFromRequestJob from '#microservice/Queue/jobs/generate-resource-identity-from-request.job'
-import StoreResourceResponseToFileJob from '#microservice/Queue/jobs/store-resource-response-to-file.job'
-import WebpImageManipulationJob from '#microservice/Queue/jobs/webp-image-manipulation.job'
 import { QueueModule } from '#microservice/Queue/queue.module'
 import { AdaptiveRateLimitGuard } from '#microservice/RateLimit/guards/adaptive-rate-limit.guard'
 import { RateLimitModule } from '#microservice/RateLimit/rate-limit.module'
 import { StorageModule } from '#microservice/Storage/storage.module'
 import { TasksModule } from '#microservice/Tasks/tasks.module'
-import ValidateCacheImageRequestResizeTargetRule from '#microservice/Validation/rules/validate-cache-image-request-resize-target.rule'
-import ValidateCacheImageRequestRule from '#microservice/Validation/rules/validate-cache-image-request.rule'
 import { ValidationModule } from '#microservice/Validation/validation.module'
 import { Module } from '@nestjs/common'
 import { APP_FILTER, APP_GUARD, HttpAdapterHost } from '@nestjs/core'
 import { ScheduleModule } from '@nestjs/schedule'
 
-const controllers = [MediaStreamImageRESTController]
-
-const operations = [CacheImageResourceOperation]
-
-const jobs = [
-	GenerateResourceIdentityFromRequestJob,
-	FetchResourceResponseJob,
-	StoreResourceResponseToFileJob,
-	WebpImageManipulationJob,
-]
-
-const rules = [ValidateCacheImageRequestRule, ValidateCacheImageRequestResizeTargetRule]
+const controllers = [MediaStreamImageController]
 
 /**
  * The Main module for the MediaStream application
@@ -48,8 +32,10 @@ const rules = [ValidateCacheImageRequestRule, ValidateCacheImageRequestResizeTar
  */
 @Module({
 	imports: [
+		ApiModule,
 		ConfigModule,
 		CacheModule,
+		CacheOperationsModule,
 		CorrelationModule,
 		HealthModule,
 		HttpModule,
@@ -64,9 +50,6 @@ const rules = [ValidateCacheImageRequestRule, ValidateCacheImageRequestResizeTar
 	],
 	controllers,
 	providers: [
-		...jobs,
-		...rules,
-		...operations,
 		{
 			provide: APP_FILTER,
 			useFactory: (httpAdapterHost: HttpAdapterHost, _correlationService: CorrelationService) => {

@@ -1,5 +1,6 @@
-import type { AppConfig } from '#microservice/Config/interfaces/app-config.interface'
+import type { StringMap } from '#microservice/common/types/common.types'
 import type { OnModuleInit } from '@nestjs/common'
+import type { AppConfig } from './interfaces/app-config.interface.js'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService as NestConfigService } from '@nestjs/config'
 
@@ -91,7 +92,7 @@ export class ConfigService implements OnModuleInit {
 	/**
 	 * Create raw configuration object for validation
 	 */
-	private createRawConfigForValidation(): Record<string, any> {
+	private createRawConfigForValidation(): StringMap {
 		return {
 			server: {
 				port: this.nestConfigService.get('PORT'),

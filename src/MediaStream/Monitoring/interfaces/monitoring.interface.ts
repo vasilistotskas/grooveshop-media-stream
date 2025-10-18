@@ -1,8 +1,10 @@
+import type { ConfigMap, Metadata, MetricsMap, Tags } from '#microservice/common/types/common.types'
+
 export interface CustomMetric {
 	name: string
 	value: number
 	timestamp: number
-	tags?: Record<string, string>
+	tags?: Tags
 	type: MetricType
 }
 
@@ -23,7 +25,7 @@ export interface AlertRule {
 	severity: AlertSeverity
 	enabled: boolean
 	cooldownMs: number
-	tags?: Record<string, string>
+	tags?: Tags
 }
 
 export enum AlertCondition {
@@ -51,7 +53,7 @@ export interface Alert {
 	timestamp: number
 	resolved: boolean
 	resolvedAt?: number
-	metadata?: Record<string, any>
+	metadata?: Metadata
 }
 
 export interface PerformanceMetrics {
@@ -60,7 +62,7 @@ export interface PerformanceMetrics {
 	timestamp: number
 	success: boolean
 	errorMessage?: string
-	metadata?: Record<string, any>
+	metadata?: Metadata
 }
 
 export interface SystemHealth {
@@ -74,7 +76,7 @@ export interface ComponentHealth {
 	name: string
 	status: 'healthy' | 'degraded' | 'unhealthy'
 	score: number
-	metrics: Record<string, number>
+	metrics: MetricsMap
 	lastCheck: number
 }
 
@@ -88,6 +90,6 @@ export interface MonitoringConfig {
 	externalIntegrations: {
 		enabled: boolean
 		endpoints: string[]
-		apiKeys?: Record<string, string>
+		apiKeys?: ConfigMap
 	}
 }
