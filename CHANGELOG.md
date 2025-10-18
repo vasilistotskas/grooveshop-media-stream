@@ -1,3 +1,10 @@
+# [2.13.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.12.1...v2.13.0) (2025-10-18)
+
+
+### Features
+
+* Update image route patterns to use quality.format ([a192044](https://github.com/vasilistotskas/grooveshop-media-stream/commit/a1920444cd47b911bf3e969492e03b4b81db3291))
+
 ## [2.12.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.12.0...v2.12.1) (2025-10-18)
 
 
