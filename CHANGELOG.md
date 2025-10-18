@@ -1,3 +1,10 @@
+## [2.13.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.13.0...v2.13.1) (2025-10-18)
+
+
+### Bug Fixes
+
+* dockerfile revert to slim node ([9f1563a](https://github.com/vasilistotskas/grooveshop-media-stream/commit/9f1563a0926ac702cccff75b7b8fed50489eb9d4))
+
 # [2.13.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.12.1...v2.13.0) (2025-10-18)
 
 
