@@ -1,3 +1,10 @@
+## [2.13.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.13.1...v2.13.2) (2025-10-18)
+
+
+### Bug Fixes
+
+* Decode URL-encoded paths in image controller ([c2a0054](https://github.com/vasilistotskas/grooveshop-media-stream/commit/c2a0054623a788467ada9ba1a991d0497ac51022))
+
 ## [2.13.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.13.0...v2.13.1) (2025-10-18)
 
 
