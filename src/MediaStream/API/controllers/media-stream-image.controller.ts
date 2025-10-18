@@ -61,9 +61,18 @@ export default class MediaStreamImageController {
 		// req.path is like: /media_stream-image/media/uploads/...
 		// We need to remove the base path (/{IMAGE}/) to get just the route pattern
 		const basePath = `/${IMAGE}/`
-		const fullPath = req.path.startsWith(basePath)
+		let fullPath = req.path.startsWith(basePath)
 			? req.path.substring(basePath.length)
 			: req.path
+
+		if (fullPath && fullPath.includes('%')) {
+			try {
+				fullPath = decodeURIComponent(fullPath)
+			}
+			catch (error) {
+				this._logger.warn('Failed to decode URL path', { fullPath, error, correlationId })
+			}
+		}
 
 		this._logger.debug('Processing image request', { fullPath, originalPath: req.path, correlationId })
 

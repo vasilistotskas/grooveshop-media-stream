@@ -61,14 +61,33 @@ export class UrlBuilderService {
 	 * Ensure proper URL encoding while handling already-encoded parts
 	 */
 	private ensureProperEncoding(url: string): string {
-		if (url.includes('%')) {
+		return UrlBuilderService.decodeUrlSafely(url)
+	}
+
+	/**
+	 * Safely decode a URL-encoded string, handling already-decoded or malformed URLs
+	 *
+	 * @param encodedString - The potentially encoded string
+	 * @returns The decoded string, or the original if decoding fails
+	 *
+	 * @example
+	 * decodeUrlSafely('hello%20world') // 'hello world'
+	 * decodeUrlSafely('hello world')   // 'hello world'
+	 * decodeUrlSafely('%CF%80%CF%89%CF%83') // 'πωσ' (Greek)
+	 */
+	static decodeUrlSafely(encodedString: string | undefined | null): string {
+		if (!encodedString) {
+			return ''
+		}
+
+		if (encodedString.includes('%')) {
 			try {
-				return decodeURIComponent(url)
+				return decodeURIComponent(encodedString)
 			}
 			catch {
-				return url
+				return encodedString
 			}
 		}
-		return url
+		return encodedString
 	}
 }

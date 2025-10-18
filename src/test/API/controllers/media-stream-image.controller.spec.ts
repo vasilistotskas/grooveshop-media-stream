@@ -157,6 +157,26 @@ describe('mediaStreamImageController', () => {
 			)
 		})
 
+		it('should decode URL-encoded Unicode characters (Greek)', async () => {
+			// Test with Greek characters as sent by Facebook/Twitter crawlers
+			// URL: /media/uploads/blog/πωσ_cover.png/1200/630/cover/entropy/transparent/5/80.png
+			// Encoded: /media/uploads/blog/%CF%80%CF%89%CF%83_cover.png/1200/630/cover/entropy/transparent/5/80.png
+			const mockRequest = {
+				path: '/media_stream-image/media/uploads/blog/%CF%80%CF%89%CF%83_cover.png/1200/630/cover/entropy/transparent/5/80.png',
+			} as any
+
+			await controller.handleImageRequest(mockRequest, mockResponse)
+
+			expect(mockRequestValidatorService.validateRequest).toHaveBeenCalledWith(
+				expect.objectContaining({
+					params: expect.objectContaining({
+						imageType: 'blog',
+						image: 'πωσ_cover.png', // Should be decoded to Greek characters
+					}),
+				}),
+			)
+		})
+
 		it('should handle validation errors', async () => {
 			mockRequestValidatorService.validateRequest.mockRejectedValue(
 				new Error('Invalid parameters'),
