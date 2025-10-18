@@ -100,9 +100,12 @@ export default class MediaStreamImageController {
 		pattern: string,
 		paramNames: string[],
 	): ImageProcessingParams | null {
+		// Replace :param with capture groups, handling dots specially
+		// :quality.:format becomes ([^/.]+)\.([^/]+) to match "90.webp"
 		const regexPattern = pattern
-			.replace(/:[^/]+/g, '([^/]+)')
-			.replace(/\//g, '\\/')
+			.replace(/:([^/.]+)\.([^/.]+)/g, '([^/.]+)\\.([^/]+)') // Handle :param1.:param2
+			.replace(/:([^/]+)/g, '([^/]+)') // Handle remaining :param
+			.replace(/\//g, '\\/') // Escape slashes
 
 		const regex = new RegExp(`^${regexPattern}$`)
 		const match = path.match(regex)

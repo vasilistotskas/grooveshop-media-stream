@@ -105,7 +105,7 @@ describe('mediaStreamImageController', () => {
 	describe('handleImageRequest', () => {
 		it('should handle uploaded media image request', async () => {
 			const mockRequest = {
-				path: '/media_stream-image/media/uploads/test/image.webp/100/100/contain/entropy/transparent/5/webp/80',
+				path: '/media_stream-image/media/uploads/test/image.webp/100/100/contain/entropy/transparent/5/80.webp',
 			} as any
 
 			await controller.handleImageRequest(mockRequest, mockResponse)
@@ -120,7 +120,7 @@ describe('mediaStreamImageController', () => {
 		it('should handle static image request', async () => {
 			mockUrlBuilderService.buildResourceUrl.mockReturnValue('http://localhost:8000/static/images/image.webp')
 			const mockRequest = {
-				path: '/media_stream-image/static/images/image.webp/100/100/contain/entropy/transparent/5/webp/80',
+				path: '/media_stream-image/static/images/image.webp/100/100/contain/entropy/transparent/5/80.webp',
 			} as any
 
 			await controller.handleImageRequest(mockRequest, mockResponse)
@@ -142,7 +142,7 @@ describe('mediaStreamImageController', () => {
 
 		it('should decode URL-encoded parameters', async () => {
 			const mockRequest = {
-				path: '/media_stream-image/media/uploads/test%20type/image%20name.webp/100/100/contain/entropy/transparent/5/webp/80',
+				path: '/media_stream-image/media/uploads/test%20type/image%20name.webp/100/100/contain/entropy/transparent/5/80.webp',
 			} as any
 
 			await controller.handleImageRequest(mockRequest, mockResponse)
@@ -162,7 +162,7 @@ describe('mediaStreamImageController', () => {
 				new Error('Invalid parameters'),
 			)
 			const mockRequest = {
-				path: '/media_stream-image/media/uploads/test/image.webp/100/100/contain/entropy/transparent/5/webp/80',
+				path: '/media_stream-image/media/uploads/test/image.webp/100/100/contain/entropy/transparent/5/80.webp',
 			} as any
 
 			await expect(controller.handleImageRequest(mockRequest, mockResponse))
@@ -177,7 +177,7 @@ describe('mediaStreamImageController', () => {
 				throw new Error('URL building failed')
 			})
 			const mockRequest = {
-				path: '/media_stream-image/media/uploads/test/image.webp/100/100/contain/entropy/transparent/5/webp/80',
+				path: '/media_stream-image/media/uploads/test/image.webp/100/100/contain/entropy/transparent/5/80.webp',
 			} as any
 
 			await expect(controller.handleImageRequest(mockRequest, mockResponse))
@@ -189,7 +189,7 @@ describe('mediaStreamImageController', () => {
 
 		it('should set response locals correctly', async () => {
 			const mockRequest = {
-				path: '/media_stream-image/static/images/logo.png/200/200/contain/center/white/5/png/90',
+				path: '/media_stream-image/static/images/logo.png/200/200/contain/center/white/5/90.png',
 			} as any
 
 			await controller.handleImageRequest(mockRequest, mockResponse)
@@ -200,7 +200,7 @@ describe('mediaStreamImageController', () => {
 
 		it('should handle null width and height', async () => {
 			const mockRequest = {
-				path: '/media_stream-image/media/uploads/test/image.webp/null/null/contain/entropy/transparent/5/webp/80',
+				path: '/media_stream-image/media/uploads/test/image.webp/null/null/contain/entropy/transparent/5/80.webp',
 			} as any
 
 			await controller.handleImageRequest(mockRequest, mockResponse)
