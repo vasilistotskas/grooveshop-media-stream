@@ -65,20 +65,3 @@ export interface CacheKeyStrategy {
 	 */
 	generateHash: (input: string) => string
 }
-
-export interface CacheInvalidationStrategy {
-	/**
-	 * Invalidate keys by pattern
-	 */
-	invalidateByPattern: (pattern: string) => Promise<string[]>
-
-	/**
-	 * Invalidate keys by namespace
-	 */
-	invalidateByNamespace: (namespace: string) => Promise<string[]>
-
-	/**
-	 * Invalidate keys by tags
-	 */
-	invalidateByTags: (tags: string[]) => Promise<string[]>
-}

@@ -19,32 +19,3 @@ export interface CacheStats {
 	hitRate: number
 	missRate: number
 }
-
-export interface CacheEntry<T = any> {
-	key: string
-	value: T
-	ttl: number
-	createdAt: number
-	lastAccessed: number
-	accessCount: number
-	size: number
-}
-
-export interface CacheConfig {
-	maxSize: number
-	ttl: number
-	checkPeriod: number
-	useClones: boolean
-	deleteOnExpire: boolean
-}
-
-export interface CacheMetrics {
-	totalHits: number
-	totalMisses: number
-	totalKeys: number
-	memoryUsage: number
-	hitRate: number
-	missRate: number
-	evictions: number
-	lastEvictionTime?: number
-}

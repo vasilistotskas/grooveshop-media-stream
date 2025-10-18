@@ -20,10 +20,3 @@ export interface CorrelationService {
 	getCorrelationId: () => string | null
 	clearContext: () => void
 }
-
-export interface TimingInfo {
-	startTime: number
-	endTime?: number
-	duration?: number
-	phase: string
-}

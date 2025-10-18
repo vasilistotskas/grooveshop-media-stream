@@ -11,10 +11,6 @@ export interface ValidationResult {
 	sanitized?: any
 }
 
-export interface IValidator<T> {
-	validate: (input: T) => Promise<ValidationResult>
-}
-
 export interface ISanitizer<T> {
 	sanitize: (input: T) => Promise<T>
 }

@@ -16,12 +16,6 @@ export type StringMap = Record<string, any>
 export type StringRecord = Record<string, string>
 
 /**
- * String-to-number mapping
- * Use for metrics, counters, statistics, or numeric aggregations
- */
-export type NumericRecord = Record<string, number>
-
-/**
  * Metadata object for additional contextual information
  * Use for error context, logging metadata, or extensible data structures
  */

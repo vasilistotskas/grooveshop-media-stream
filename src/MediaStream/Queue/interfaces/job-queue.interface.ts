@@ -96,10 +96,3 @@ export interface QueueStats {
 export type JobStatus = 'completed' | 'waiting' | 'active' | 'delayed' | 'failed' | 'paused'
 
 export type JobProcessor<T = any> = (job: Job<T>) => Promise<any>
-
-export interface JobEvent {
-	jobId: string
-	event: 'completed' | 'failed' | 'progress' | 'stalled'
-	data?: any
-	error?: Error
-}
