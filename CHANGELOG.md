@@ -1,3 +1,10 @@
+# [2.12.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.11.0...v2.12.0) (2025-10-18)
+
+
+### Features
+
+* new API controller implementation ([2a3ca48](https://github.com/vasilistotskas/grooveshop-media-stream/commit/2a3ca483a85af9f5100d4ab967371c4a0145d80f))
+
 # [2.11.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.10.1...v2.11.0) (2025-10-17)
 
 
