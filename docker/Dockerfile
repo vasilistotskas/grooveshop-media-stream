@@ -1,6 +1,6 @@
 ARG NODE_VERSION=25.0.0
 
-FROM node:${NODE_VERSION}-alpine AS build
+FROM node:${NODE_VERSION}-slim AS build
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
@@ -15,7 +15,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 RUN pnpm run build
 
-FROM node:${NODE_VERSION}-alpine AS production
+FROM node:${NODE_VERSION}-slim AS production
 
 WORKDIR /usr/src/app
 
