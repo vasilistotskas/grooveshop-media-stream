@@ -1,3 +1,10 @@
+# [2.14.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.13.2...v2.14.0) (2025-10-24)
+
+
+### Features
+
+* Update backend URL env var and dependencies ([be74df9](https://github.com/vasilistotskas/grooveshop-media-stream/commit/be74df93a818f356106886c09464cbbefc5e0dd7))
+
 ## [2.13.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.13.1...v2.13.2) (2025-10-18)
 
 
