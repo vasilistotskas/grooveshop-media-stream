@@ -19,11 +19,19 @@ export default defineConfig({
 			clean: true,
 			cleanOnRerun: true,
 		},
+		exclude: [
+			'**/build/**/*',
+			'**/dist/**/*',
+			'**/node_modules/**/*',
+			'**/.cache/**/*',
+		],
 		globals: true,
 		environment: 'node',
 		setupFiles: ['./src/test/setup.ts'],
 		root: './',
 		testTimeout: 30_000,
+		isolate: true,
+		fileParallelism: false,
 	},
 	resolve: {
 		alias: {

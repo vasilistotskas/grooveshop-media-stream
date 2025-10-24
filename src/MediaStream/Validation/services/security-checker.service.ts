@@ -129,6 +129,13 @@ export class SecurityCheckerService implements ISecurityChecker {
 		if (str.length < 20 || str.length > maxLengthForEntropy)
 			return false
 
+		// Skip entropy check for filenames with common image extensions
+		// file upload system could adds random suffixes like __ytXSDgf which have high entropy
+		const imageExtensionPattern = /\.(?:jpe?g|png|gif|webp|svg|bmp|tiff?|ico|avif)$/i
+		if (imageExtensionPattern.test(str)) {
+			return false
+		}
+
 		const sampleStr = str.length > 500 ? str.substring(0, 500) : str
 
 		const charCount: { [key: string]: number } = {}

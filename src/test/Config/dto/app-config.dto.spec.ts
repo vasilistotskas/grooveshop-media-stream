@@ -103,10 +103,8 @@ describe('appConfigDto', () => {
 		it('should fail validation with invalid external service URLs', async () => {
 			const invalidConfig = {
 				externalServices: {
-					djangoUrl: 'invalid://url with spaces',
-					nuxtUrl: 'not a url at all',
-					requestTimeout: 30000,
-					maxRetries: 3,
+					requestTimeout: -1000, // Invalid: below minimum
+					maxRetries: 20, // Invalid: above maximum
 				},
 			}
 

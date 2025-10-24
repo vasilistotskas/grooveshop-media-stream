@@ -1,4 +1,4 @@
-import type { MockedClass, MockedObject } from 'vitest'
+import type { MockedObject } from 'vitest'
 import { Buffer } from 'node:buffer'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { ConfigService } from '#microservice/Config/config.service'
@@ -8,7 +8,36 @@ import Redis from 'ioredis'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock ioredis
-vi.mock('ioredis')
+vi.mock('ioredis', () => {
+	const mockConstructor = vi.fn(function (this: any) {
+		// Create a new instance for each call
+		const instance = {
+			connect: vi.fn().mockResolvedValue(undefined),
+			quit: vi.fn().mockResolvedValue('OK'),
+			get: vi.fn(),
+			set: vi.fn().mockResolvedValue('OK'),
+			setex: vi.fn().mockResolvedValue('OK'),
+			del: vi.fn().mockResolvedValue(1),
+			flushdb: vi.fn().mockResolvedValue('OK'),
+			flushall: vi.fn().mockResolvedValue('OK'),
+			exists: vi.fn(),
+			keys: vi.fn().mockResolvedValue(['key1', 'key2']),
+			ping: vi.fn().mockResolvedValue('PONG'),
+			ttl: vi.fn().mockResolvedValue(3600),
+			expire: vi.fn().mockResolvedValue(1),
+			info: vi.fn(),
+			on: vi.fn(),
+		}
+		// Store the instance on 'this' for constructor calls
+		Object.assign(this, instance)
+		return instance
+	})
+
+	return {
+		default: mockConstructor,
+		Redis: mockConstructor,
+	}
+})
 
 describe('redisCacheService', () => {
 	let service: RedisCacheService
@@ -26,27 +55,8 @@ describe('redisCacheService', () => {
 	}
 
 	beforeEach(async () => {
-		// Create mock Redis instance
-		mockRedis = {
-			connect: vi.fn().mockResolvedValue(undefined),
-			quit: vi.fn().mockResolvedValue('OK'),
-			get: vi.fn(),
-			set: vi.fn().mockResolvedValue('OK'),
-			setex: vi.fn().mockResolvedValue('OK'),
-			del: vi.fn().mockResolvedValue(1),
-			flushdb: vi.fn().mockResolvedValue('OK'),
-			flushall: vi.fn().mockResolvedValue('OK'),
-			exists: vi.fn(),
-			keys: vi.fn().mockResolvedValue(['key1', 'key2']),
-			ping: vi.fn().mockResolvedValue('PONG'),
-			ttl: vi.fn().mockResolvedValue(3600),
-			expire: vi.fn().mockResolvedValue(1),
-			info: vi.fn(),
-			on: vi.fn(),
-		} as any
-
-		// Mock Redis constructor
-		;(Redis as MockedClass<typeof Redis>).mockImplementation(() => mockRedis)
+		// Reset all mock function calls
+		vi.clearAllMocks()
 
 		const mockConfigService = {
 			get: vi.fn().mockImplementation((key: string) => {
@@ -74,6 +84,13 @@ describe('redisCacheService', () => {
 
 		service = module.get<RedisCacheService>(RedisCacheService)
 		metricsService = module.get(MetricsService)
+
+		// Get the mock Redis instance from the mocked Redis constructor
+		// Redis is the mocked constructor, we can get its instances
+		const RedisMock = Redis as any
+		if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
+			mockRedis = RedisMock.mock.instances[RedisMock.mock.instances.length - 1]
+		}
 	})
 
 	afterEach(() => {
@@ -87,6 +104,12 @@ describe('redisCacheService', () => {
 
 		it('should initialize Redis connection on module init', async () => {
 			await service.onModuleInit()
+
+			// Update mockRedis to the latest instance
+			const RedisMock = Redis as any
+			if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
+				mockRedis = RedisMock.mock.instances[RedisMock.mock.instances.length - 1]
+			}
 
 			expect(Redis).toHaveBeenCalledWith({
 				host: mockConfig.host,
@@ -106,6 +129,12 @@ describe('redisCacheService', () => {
 		it('should set up event listeners', async () => {
 			await service.onModuleInit()
 
+			// Update mockRedis to the latest instance
+			const RedisMock = Redis as any
+			if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
+				mockRedis = RedisMock.mock.instances[RedisMock.mock.instances.length - 1]
+			}
+
 			expect(mockRedis.on).toHaveBeenCalledWith('connect', expect.any(Function))
 			expect(mockRedis.on).toHaveBeenCalledWith('ready', expect.any(Function))
 			expect(mockRedis.on).toHaveBeenCalledWith('error', expect.any(Function))
@@ -115,6 +144,13 @@ describe('redisCacheService', () => {
 
 		it('should close Redis connection on module destroy', async () => {
 			await service.onModuleInit()
+
+			// Update mockRedis to the latest instance
+			const RedisMock = Redis as any
+			if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
+				mockRedis = RedisMock.mock.instances[RedisMock.mock.instances.length - 1]
+			}
+
 			await service.onModuleDestroy()
 
 			expect(mockRedis.quit).toHaveBeenCalled()
@@ -124,6 +160,13 @@ describe('redisCacheService', () => {
 	describe('cache operations', () => {
 		beforeEach(async () => {
 			await service.onModuleInit()
+
+			// Update mockRedis to the latest instance after onModuleInit
+			const RedisMock = Redis as any
+			if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
+				mockRedis = RedisMock.mock.instances[RedisMock.mock.instances.length - 1]
+			}
+
 			// Simulate ready event
 			const readyCallback = mockRedis.on.mock.calls.find(call => call[0] === 'ready')?.[1]
 			if (readyCallback)
@@ -376,6 +419,13 @@ describe('redisCacheService', () => {
 	describe('redis-specific methods', () => {
 		beforeEach(async () => {
 			await service.onModuleInit()
+
+			// Update mockRedis to the latest instance after onModuleInit
+			const RedisMock = Redis as any
+			if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
+				mockRedis = RedisMock.mock.instances[RedisMock.mock.instances.length - 1]
+			}
+
 			// Simulate ready event
 			const readyCallback = mockRedis.on.mock.calls.find(call => call[0] === 'ready')?.[1]
 			if (readyCallback)

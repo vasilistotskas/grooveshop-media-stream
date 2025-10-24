@@ -147,8 +147,6 @@ export class ConfigService implements OnModuleInit {
 				metricsPath: this.nestConfigService.get('MONITORING_METRICS_PATH'),
 			},
 			externalServices: {
-				djangoUrl: this.nestConfigService.get('NEST_PUBLIC_DJANGO_URL'),
-				nuxtUrl: this.nestConfigService.get('NEST_PUBLIC_NUXT_URL'),
 				requestTimeout: this.nestConfigService.get('EXTERNAL_REQUEST_TIMEOUT'),
 				maxRetries: this.nestConfigService.get('EXTERNAL_MAX_RETRIES'),
 			},
@@ -271,8 +269,6 @@ export class ConfigService implements OnModuleInit {
 		const monitoringHealthPath = this.nestConfigService.get('MONITORING_HEALTH_PATH') || '/health'
 		const monitoringMetricsPath = this.nestConfigService.get('MONITORING_METRICS_PATH') || '/metrics'
 
-		const djangoUrl = this.nestConfigService.get('NEST_PUBLIC_DJANGO_URL') || 'http://localhost:8000'
-		const nuxtUrl = this.nestConfigService.get('NEST_PUBLIC_NUXT_URL') || 'http://localhost:3000'
 		const externalRequestTimeout = Number.parseInt(this.nestConfigService.get('EXTERNAL_REQUEST_TIMEOUT') || '30000')
 		const externalMaxRetries = Number.parseInt(this.nestConfigService.get('EXTERNAL_MAX_RETRIES') || '3')
 
@@ -359,8 +355,6 @@ export class ConfigService implements OnModuleInit {
 				metricsPath: monitoringMetricsPath,
 			},
 			externalServices: {
-				djangoUrl,
-				nuxtUrl,
 				requestTimeout: externalRequestTimeout,
 				maxRetries: externalMaxRetries,
 			},

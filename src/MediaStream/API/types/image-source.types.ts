@@ -10,7 +10,15 @@ export interface ImageSourceConfig {
 	name: string
 
 	/**
-	 * Base URL pattern for the source
+	 * Base URL for this source (REQUIRED)
+	 * Can be:
+	 * - Environment variable key (e.g., 'BACKEND_URL', 'CDN_URL')
+	 * - Direct URL (e.g., 'https://api.example.com')
+	 */
+	baseUrl: string
+
+	/**
+	 * URL pattern for the source
 	 * Supports placeholders: {baseUrl}, {path}, {param1}, {param2}, etc.
 	 */
 	urlPattern: string

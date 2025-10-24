@@ -37,8 +37,7 @@ This service provides image processing capabilities for the Grooveshop platform,
 ### Environment Variables
 - `COMPOSE_PROJECT_NAME`: Docker Compose project name
 - `LAUNCH_AS`: Launch mode (HYBRID)
-- `NEST_PUBLIC_DJANGO_URL`: URL for the Django backend
-- `NEST_PUBLIC_NUXT_URL`: URL for the Nuxt frontend
+- `BACKEND_URL`: URL for the backend
 - `PORT`: Port for the NestJS application to listen on (default: 3003)
 - `COVERALLS_REPO_TOKEN`: Token for Coveralls code coverage reporting (CI only)
 

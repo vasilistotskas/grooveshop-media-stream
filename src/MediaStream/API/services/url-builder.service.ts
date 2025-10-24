@@ -1,5 +1,5 @@
 import type { ImageProcessingContext, ImageSourceConfig } from '../types/image-source.types.js'
-import { ConfigService } from '#microservice/Config/config.service'
+import * as process from 'node:process'
 import { Injectable, Logger } from '@nestjs/common'
 
 /**
@@ -8,8 +8,6 @@ import { Injectable, Logger } from '@nestjs/common'
 @Injectable()
 export class UrlBuilderService {
 	private readonly _logger = new Logger(UrlBuilderService.name)
-
-	constructor(private readonly configService: ConfigService) {}
 
 	/**
 	 * Build a resource URL from source configuration and parameters
@@ -51,10 +49,27 @@ export class UrlBuilderService {
 
 	/**
 	 * Get the appropriate base URL for a source
+	 * Supports:
+	 * 1. Direct URL in source.baseUrl (e.g., 'https://api.example.com')
+	 * 2. Environment variable key in source.baseUrl (e.g., 'BACKEND_URL')
 	 */
-	private getBaseUrlForSource(_source: ImageSourceConfig): string {
-		// This can be extended to support different base URLs per source
-		return this.configService.get<string>('externalServices.djangoUrl')
+	private getBaseUrlForSource(source: ImageSourceConfig): string {
+		if (!source.baseUrl) {
+			throw new Error(`Image source '${source.name}' must specify a baseUrl`)
+		}
+
+		if (source.baseUrl.startsWith('http://') || source.baseUrl.startsWith('https://')) {
+			return source.baseUrl
+		}
+
+		const envValue = process.env[source.baseUrl]
+		if (!envValue) {
+			throw new Error(
+				`Environment variable '${source.baseUrl}' not found for image source '${source.name}'`,
+			)
+		}
+
+		return envValue
 	}
 
 	/**

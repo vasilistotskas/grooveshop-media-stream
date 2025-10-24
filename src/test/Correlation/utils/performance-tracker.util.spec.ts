@@ -1,5 +1,3 @@
-import type { Mock } from 'vitest'
-import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -12,32 +10,25 @@ vi.mock('#microservice/Correlation/utils/logger.util', () => ({
 	},
 }))
 
-// Mock the CorrelationService to return a consistent correlation ID
+// Create mock correlation service instance
 const mockCorrelationService = {
 	setContext: vi.fn(),
 	getContext: vi.fn(),
-	getCorrelationId: vi.fn().mockReturnValue('test-correlation-id'),
+	getCorrelationId: vi.fn(),
 	updateContext: vi.fn(),
 	clearContext: vi.fn(),
 }
 
-// Mock the CorrelationService class
-vi.mock('#microservice/Correlation/services/correlation.service', () => {
-	return {
-		CorrelationService: vi.fn().mockImplementation(() => mockCorrelationService),
-	}
-})
-
-// Ensure the mock is applied before importing PerformanceTracker
-vi.doMock('#microservice/Correlation/services/correlation.service', () => {
-	return {
-		CorrelationService: vi.fn().mockImplementation(() => mockCorrelationService),
-	}
-})
+// Mock the CorrelationService class to return our mock instance
+vi.mock('#microservice/Correlation/services/correlation.service', () => ({
+	CorrelationService: vi.fn(function (this: any) {
+		// Assign mock methods to 'this' for constructor call
+		Object.assign(this, mockCorrelationService)
+		return this
+	}),
+}))
 
 describe('performanceTracker', () => {
-	let correlationService: CorrelationService
-
 	beforeEach(() => {
 		// Reset all mocks
 		vi.clearAllMocks()
@@ -47,12 +38,6 @@ describe('performanceTracker', () => {
 
 		// Clear any existing phases by directly accessing the private phases map
 		;(PerformanceTracker as any).phases = new Map()
-
-		// Create correlation service instance
-		correlationService = new CorrelationService()
-
-		// Verify the mock is working
-		expect(correlationService.getCorrelationId()).toBe('test-correlation-id')
 	})
 
 	afterEach(() => {
@@ -238,12 +223,8 @@ describe('performanceTracker', () => {
 
 	describe('edge Cases', () => {
 		it('should handle missing correlation context gracefully', () => {
-			// Clear correlation context and mock to return null
-			correlationService.clearContext()
-			;(correlationService.getCorrelationId as unknown as Mock).mockReturnValue(null)
-			if (mockCorrelationService) {
-				;(mockCorrelationService.getCorrelationId as unknown as Mock).mockReturnValue(null)
-			}
+			// Mock to return null correlation ID
+			mockCorrelationService.getCorrelationId.mockReturnValue(null)
 
 			PerformanceTracker.startPhase('no-context-phase')
 			const duration = PerformanceTracker.endPhase('no-context-phase')

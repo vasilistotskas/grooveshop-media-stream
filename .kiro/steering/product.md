@@ -21,7 +21,6 @@ The service follows a microservice architecture pattern, designed to be:
 ## Integration
 
 Part of the larger Grooveshop ecosystem, integrating with:
-- Django backend (`NEST_PUBLIC_DJANGO_URL`)
-- Nuxt.js frontend (`NEST_PUBLIC_NUXT_URL`)
+- Django backend (`BACKEND_URL`)
 - Redis for caching and job queues
 - External image sources via HTTP

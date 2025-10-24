@@ -1,13 +1,10 @@
-import type { MockedObject } from 'vitest'
-import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-// Mock the CorrelationService
-vi.mock('#microservice/Correlation/services/correlation.service')
-
 describe('correlatedLogger', () => {
-	let mockCorrelationService: MockedObject<CorrelationService>
+	let mockCorrelationService: {
+		getCorrelationId: ReturnType<typeof vi.fn>
+	}
 	let consoleSpy: {
 		log: ReturnType<typeof vi.spyOn>
 		error: ReturnType<typeof vi.spyOn>
@@ -24,9 +21,13 @@ describe('correlatedLogger', () => {
 			debug: vi.spyOn(console, 'debug').mockImplementation(() => {}),
 		}
 
+		// Create mock correlation service with vi.fn()
+		mockCorrelationService = {
+			getCorrelationId: vi.fn(),
+		}
+
 		// Mock the static correlation service instance
-		mockCorrelationService = new CorrelationService() as MockedObject<CorrelationService>
-		CorrelatedLogger.setCorrelationService(mockCorrelationService)
+		CorrelatedLogger.setCorrelationService(mockCorrelationService as any)
 	})
 
 	afterEach(() => {

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grooveshop Media Stream - Terminal</title>
+    <title>GrooveShop Media Stream API</title>
     <style>
         * {
             margin: 0;
@@ -12,28 +12,23 @@
         }
 
         body {
-            font-family: 'Fira Code', 'Courier New', Consolas, Monaco, monospace;
-            background: #0a0e27;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
             min-height: 100vh;
-            padding: 20px;
-            color: #00ff41;
-            overflow-x: hidden;
+            padding: 40px 20px;
+            color: #e4e4e7;
         }
 
-        .terminal-container {
-            max-width: 1200px;
+        .container {
+            max-width: 1000px;
             margin: 0 auto;
-            background: #0d1117;
-            border: 2px solid #1f2937;
-            border-radius: 8px;
-            box-shadow: 0 0 40px rgba(0, 255, 65, 0.1);
-            animation: fadeIn 0.4s ease-in;
+            animation: fadeIn 0.6s ease-out;
         }
 
         @keyframes fadeIn {
             from {
                 opacity: 0;
-                transform: translateY(10px);
+                transform: translateY(20px);
             }
             to {
                 opacity: 1;
@@ -41,252 +36,139 @@
             }
         }
 
-        .terminal-header {
-            background: #161b22;
-            padding: 12px 20px;
-            border-bottom: 1px solid #1f2937;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
         }
 
-        .terminal-button {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
+        .logo {
+            font-size: 2.5em;
+            font-weight: 700;
+            background: linear-gradient(135deg, #00ff88 0%, #00d4ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+            letter-spacing: -1px;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            font-size: 1.1em;
+            font-weight: 400;
+        }
+
+        .version {
             display: inline-block;
+            background: rgba(0, 255, 136, 0.1);
+            color: #00ff88;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+            margin-top: 10px;
+            border: 1px solid rgba(0, 255, 136, 0.2);
         }
 
-        .terminal-button.close { background: #ff5f56; }
-        .terminal-button.minimize { background: #ffbd2e; }
-        .terminal-button.maximize { background: #27c93f; }
-
-        .terminal-title {
-            margin-left: 12px;
-            color: #8b949e;
-            font-size: 0.9em;
-        }
-
-        .terminal-body {
+        .card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
             padding: 30px;
+            margin-bottom: 24px;
+            transition: all 0.3s ease;
         }
 
-        .prompt {
-            color: #00ff41;
-            margin-bottom: 5px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+        .card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(0, 255, 136, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(0, 255, 136, 0.1);
         }
 
-        .prompt::before {
-            content: '>';
-            color: #58a6ff;
-            font-weight: bold;
-        }
-
-        .cursor {
-            display: inline-block;
-            width: 8px;
-            height: 16px;
-            background: #00ff41;
-            animation: blink 1s infinite;
-            margin-left: 4px;
-        }
-
-        @keyframes blink {
-            0%, 50% { opacity: 1; }
-            51%, 100% { opacity: 0; }
-        }
-
-        .section {
-            margin: 30px 0;
-            border-left: 2px solid #1f2937;
-            padding-left: 20px;
-        }
-
-        .section-title {
-            color: #58a6ff;
+        .card-title {
             font-size: 1.3em;
-            margin-bottom: 15px;
-            text-transform: uppercase;
-            letter-spacing: 2px;
+            font-weight: 600;
+            margin-bottom: 20px;
             display: flex;
             align-items: center;
             gap: 10px;
+            color: #f1f5f9;
         }
 
-        .section-title::before {
-            content: '//';
-            color: #6e7681;
-        }
-
-        .output-line {
-            color: #c9d1d9;
-            margin: 8px 0;
-            line-height: 1.6;
-            padding-left: 15px;
-        }
-
-        .key {
-            color: #79c0ff;
-            font-weight: bold;
-        }
-
-        .value {
-            color: #a5d6ff;
-        }
-
-        .comment {
-            color: #6e7681;
-            font-style: italic;
+        .card-title::before {
+            content: '';
+            width: 4px;
+            height: 24px;
+            background: linear-gradient(135deg, #00ff88 0%, #00d4ff 100%);
+            border-radius: 2px;
         }
 
         .status-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-            margin: 20px 0;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
         }
 
-        .status-box {
-            background: #161b22;
-            border: 1px solid #1f2937;
-            padding: 15px;
-            border-radius: 6px;
-            position: relative;
-            overflow: hidden;
+        .stat-box {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.2s ease;
         }
 
-        .status-box::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, #00ff41, transparent);
-            animation: scan 3s linear infinite;
+        .stat-box:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(0, 255, 136, 0.2);
         }
 
-        @keyframes scan {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-        }
-
-        .status-label {
-            color: #6e7681;
+        .stat-label {
+            color: #94a3b8;
             font-size: 0.85em;
+            font-weight: 500;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
             margin-bottom: 8px;
         }
 
-        .status-value {
-            color: #00ff41;
-            font-size: 1.3em;
-            font-weight: bold;
+        .stat-value {
+            color: #00ff88;
+            font-size: 1.5em;
+            font-weight: 700;
         }
 
-        .status-value.loading {
-            color: #ffa657;
+        .stat-value.loading::after {
+            content: '...';
+            animation: dots 1.5s steps(3, end) infinite;
         }
 
-        .status-value.error {
-            color: #ff7b72;
-        }
-
-        .endpoint-item {
-            background: #161b22;
-            border: 1px solid #1f2937;
-            padding: 12px 15px;
-            margin: 10px 0;
-            border-radius: 4px;
-            transition: all 0.2s ease;
-            cursor: pointer;
-            position: relative;
-        }
-
-        .endpoint-item:hover {
-            border-color: #58a6ff;
-            background: #1c2128;
-            transform: translateX(5px);
-            box-shadow: 0 0 20px rgba(88, 166, 255, 0.1);
-        }
-
-        .endpoint-item::before {
-            content: '→';
-            position: absolute;
-            left: -20px;
-            color: #58a6ff;
-            opacity: 0;
-            transition: all 0.2s ease;
-        }
-
-        .endpoint-item:hover::before {
-            opacity: 1;
-            left: -10px;
-        }
-
-        .method {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 3px;
-            font-size: 0.75em;
-            font-weight: bold;
-            margin-right: 10px;
-            letter-spacing: 1px;
-        }
-
-        .method.get {
-            background: #1f6feb;
-            color: #ffffff;
-        }
-
-        .method.post {
-            background: #238636;
-            color: #ffffff;
-        }
-
-        .endpoint-path {
-            color: #c9d1d9;
-            font-size: 0.9em;
-        }
-
-        .endpoint-path .param {
-            color: #ffa657;
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
         }
 
         .status-indicator {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            padding: 6px 12px;
-            background: #161b22;
-            border: 1px solid #1f2937;
-            border-radius: 4px;
+            padding: 8px 16px;
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            border-radius: 8px;
+            font-size: 0.9em;
+            font-weight: 500;
         }
 
         .status-dot {
-            width: 8px;
-            height: 8px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
+            background: #00ff88;
+            box-shadow: 0 0 10px #00ff88;
             animation: pulse 2s infinite;
-        }
-
-        .status-dot.loading {
-            background: #ffa657;
-            box-shadow: 0 0 10px #ffa657;
-        }
-
-        .status-dot.healthy {
-            background: #00ff41;
-            box-shadow: 0 0 10px #00ff41;
-        }
-
-        .status-dot.unhealthy {
-            background: #ff7b72;
-            box-shadow: 0 0 10px #ff7b72;
         }
 
         @keyframes pulse {
@@ -300,304 +182,167 @@
             }
         }
 
+        .endpoint-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .endpoint {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 18px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.95em;
+        }
+
+        .endpoint:hover {
+            background: rgba(0, 255, 136, 0.05);
+            border-color: rgba(0, 255, 136, 0.3);
+            transform: translateX(4px);
+        }
+
+        .method {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75em;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .method.get {
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .endpoint-path {
+            color: #cbd5e1;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+            flex: 1;
+        }
+
         .footer {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #1f2937;
             text-align: center;
-            color: #6e7681;
-            font-size: 0.85em;
+            padding: 40px 20px 20px;
+            color: #64748b;
+            font-size: 0.9em;
         }
 
         .footer a {
-            color: #58a6ff;
+            color: #00ff88;
             text-decoration: none;
+            transition: all 0.2s ease;
         }
 
         .footer a:hover {
-            text-decoration: underline;
+            color: #00d4ff;
         }
 
-        .ascii-art {
-            color: #58a6ff;
-            font-size: 0.7em;
-            line-height: 1.2;
-            margin: 20px 0;
-            white-space: pre;
-            text-align: center;
+        .tech-stack {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 16px;
         }
 
-        @keyframes glitch {
-            0% {
-                text-shadow: 2px 2px #ff00ff, -2px -2px #00ffff;
-            }
-            25% {
-                text-shadow: -2px -2px #ff00ff, 2px 2px #00ffff;
-            }
-            50% {
-                text-shadow: 2px -2px #ff00ff, -2px 2px #00ffff;
-            }
-            75% {
-                text-shadow: -2px 2px #ff00ff, 2px -2px #00ffff;
-            }
-            100% {
-                text-shadow: 2px 2px #ff00ff, -2px -2px #00ffff;
-            }
+        .tech-badge {
+            padding: 6px 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 500;
         }
 
-        .glitch {
-            animation: glitch 3s infinite;
-        }
-
-        .loading-dots::after {
-            content: '...';
-            animation: dots 1.5s steps(4, end) infinite;
-        }
-
-        @keyframes dots {
-            0%, 20% { content: '.'; }
-            40% { content: '..'; }
-            60%, 100% { content: '...'; }
-        }
-
-        /* Mobile responsiveness */
         @media (max-width: 768px) {
             body {
-                padding: 10px;
+                padding: 20px 10px;
             }
 
-            .terminal-body {
-                padding: 15px;
+            .logo {
+                font-size: 2em;
             }
 
-            .ascii-art {
-                font-size: 0.5em;
+            .card {
+                padding: 20px;
             }
 
-            .section {
-                padding-left: 10px;
-            }
-
-            .section-title {
-                font-size: 1.1em;
-            }
-
-            .status-grid {
-                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            .tech-stack {
                 gap: 10px;
-            }
-
-            .status-box {
-                padding: 10px;
-            }
-
-            .status-label {
-                font-size: 0.75em;
-            }
-
-            .status-value {
-                font-size: 1em;
-            }
-
-            .endpoint-item {
-                padding: 10px;
-                display: flex;
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 8px;
-            }
-
-            .endpoint-path {
-                font-size: 0.75em;
-                word-break: break-all;
-                line-height: 1.4;
-            }
-
-            .method {
-                font-size: 0.7em;
-                padding: 2px 6px;
-            }
-
-            .output-line {
-                font-size: 0.85em;
-                padding-left: 10px;
-            }
-
-            .prompt {
-                font-size: 0.9em;
-            }
-
-            .status-indicator {
-                font-size: 0.85em;
-            }
-        }
-
-        @media (max-width: 480px) {
-            body {
-                padding: 5px;
-            }
-
-            .terminal-body {
-                padding: 10px;
-            }
-
-            .terminal-header {
-                padding: 10px 15px;
-            }
-
-            .terminal-title {
-                font-size: 0.75em;
-            }
-
-            .ascii-art {
-                font-size: 0.4em;
-            }
-
-            .section-title {
-                font-size: 1em;
-            }
-
-            .status-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .endpoint-path {
-                font-size: 0.7em;
             }
         }
     </style>
 </head>
 <body>
-    <div class="terminal-container">
-        <div class="terminal-header">
-            <span class="terminal-button close"></span>
-            <span class="terminal-button minimize"></span>
-            <span class="terminal-button maximize"></span>
-                <span class="terminal-title">grooveshop-media-stream@v2.12.0</span>
+    <div class="container">
+        <div class="header">
+            <div class="logo">GrooveShop Media Stream</div>
+            <div class="subtitle">High-Performance Image Processing API</div>
+            <span class="version">v2.13.2</span>
         </div>
 
-        <div class="terminal-body">
-            <div class="ascii-art">
- _____ _____ _____ _____ _____ _____ _____ _____ _____ 
-|   __|  _  |     |     | __  |   __|  |  |     |  _  |
-|  |  |     |  |  |  |  |    -|__   |     |  |  |   __|
-|_____|__|__|_____|_____|__|__|_____|__|__|_____|__|   
-    MEDIA STREAM API v2.12.0
-            </div>
-
-            <div class="prompt">
-                <span>$ system-status --verbose</span>
-                <span class="cursor"></span>
-            </div>
-
-            <div class="section">
-                <div class="section-title">System Information</div>
-                
-                <div class="status-grid">
-                    <div class="status-box">
-                        <div class="status-label">Status</div>
-                        <div class="status-value loading" id="healthStatus">
-                            <span class="loading-dots">Loading</span>
-                        </div>
-                    </div>
-                    <div class="status-box">
-                        <div class="status-label">Uptime</div>
-                        <div class="status-value" id="uptime">
-                            <span class="loading-dots">Loading</span>
-                        </div>
-                    </div>
-                    <div class="status-box">
-                        <div class="status-label">Environment</div>
-                        <div class="status-value" id="environment">
-                            <span class="loading-dots">Loading</span>
-                        </div>
-                    </div>
-                    <div class="status-box">
-                        <div class="status-label">Node.js</div>
-                        <div class="status-value" id="nodeVersion">
-                            <span class="loading-dots">Loading</span>
-                        </div>
-                    </div>
+        <div class="card">
+            <div class="card-title">System Status</div>
+            <div class="status-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Status</div>
+                    <div class="stat-value loading" id="healthStatus">Loading</div>
                 </div>
-
-                <div style="margin-top: 20px;">
-                    <div class="status-indicator">
-                        <div class="status-dot loading" id="statusDot"></div>
-                        <span style="color: #8b949e; font-size: 0.9em;" id="statusText">Initializing system checks...</span>
-                    </div>
+                <div class="stat-box">
+                    <div class="stat-label">Uptime</div>
+                    <div class="stat-value" id="uptime">--</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Environment</div>
+                    <div class="stat-value" id="environment">--</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Node.js</div>
+                    <div class="stat-value" id="nodeVersion">--</div>
                 </div>
             </div>
+            <div style="margin-top: 20px;">
+                <div class="status-indicator">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span id="statusText">Checking system health...</span>
+                </div>
+            </div>
+        </div>
 
-            <div class="section">
-                <div class="section-title">Health Endpoints</div>
-                <div class="output-line comment">// System health monitoring and diagnostics</div>
-                
-                <div class="endpoint-item" onclick="openEndpoint('/health')">
+        <div class="card">
+            <div class="card-title">Quick Links</div>
+            <div class="endpoint-list">
+                <div class="endpoint" onclick="openEndpoint('/health')">
                     <span class="method get">GET</span>
                     <span class="endpoint-path">/health</span>
                 </div>
-                <div class="endpoint-item" onclick="openEndpoint('/health/detailed')">
+                <div class="endpoint" onclick="openEndpoint('/config/image-sources')">
                     <span class="method get">GET</span>
-                    <span class="endpoint-path">/health/detailed</span>
+                    <span class="endpoint-path">/config/image-sources</span>
                 </div>
-                <div class="endpoint-item" onclick="openEndpoint('/health/ready')">
-                    <span class="method get">GET</span>
-                    <span class="endpoint-path">/health/ready</span>
-                </div>
-                <div class="endpoint-item" onclick="openEndpoint('/health/live')">
-                    <span class="method get">GET</span>
-                    <span class="endpoint-path">/health/live</span>
-                </div>
-                <div class="endpoint-item" onclick="openEndpoint('/health/circuit-breaker')">
-                    <span class="method get">GET</span>
-                    <span class="endpoint-path">/health/circuit-breaker</span>
-                </div>
-            </div>
-
-            <div class="section">
-                <div class="section-title">Image Processing API</div>
-                <div class="output-line comment">// On-the-fly image transformation and optimization</div>
-                
-                <div class="endpoint-item">
-                    <span class="method get">GET</span>
-                    <span class="endpoint-path">/v1/image/media/uploads/<span class="param">:imageType</span>/<span class="param">:image</span>/<span class="param">:width</span>/<span class="param">:height</span>/<span class="param">:fit</span>/<span class="param">:position</span>/<span class="param">:background</span>/<span class="param">:trimThreshold</span>/<span class="param">:format</span>/<span class="param">:quality</span></span>
-                </div>
-                <div class="output-line" style="margin-left: 30px; font-size: 0.85em; color: #6e7681;">
-                    <span class="key">fit:</span> <span class="value">contain | cover | fill | inside | outside</span>
-                </div>
-                <div class="output-line" style="margin-left: 30px; font-size: 0.85em; color: #6e7681;">
-                    <span class="key">format:</span> <span class="value">webp | jpeg | png | avif</span>
-                </div>
-                <div class="output-line" style="margin-left: 30px; font-size: 0.85em; color: #6e7681; margin-bottom: 15px;">
-                    <span class="key">quality:</span> <span class="value">1-100</span>
-                </div>
-
-                <div class="endpoint-item">
-                    <span class="method get">GET</span>
-                    <span class="endpoint-path">/v1/image/static/images/<span class="param">:image</span>/<span class="param">:width</span>/<span class="param">:height</span>/<span class="param">:fit</span>/<span class="param">:position</span>/<span class="param">:background</span>/<span class="param">:trimThreshold</span>/<span class="param">:format</span>/<span class="param">:quality</span></span>
-                </div>
-            </div>
-
-            <div class="section">
-                <div class="section-title">Monitoring & Metrics</div>
-                <div class="output-line comment">// Prometheus-compatible metrics endpoint</div>
-                
-                <div class="endpoint-item" onclick="openEndpoint('/metrics')">
+                <div class="endpoint" onclick="openEndpoint('/metrics')">
                     <span class="method get">GET</span>
                     <span class="endpoint-path">/metrics</span>
                 </div>
             </div>
+        </div>
 
-            <div class="footer">
-                <div class="output-line comment" style="padding-left: 0;">
-                    // Repository: <a href="https://github.com/vasilistotskas/grooveshop-media-stream" target="_blank">github.com/vasilistotskas/grooveshop-media-stream</a>
-                </div>
-                <div class="output-line comment" style="padding-left: 0;">
-                    // License: MIT | © 2025 Grooveshop
-                </div>
-                <div class="output-line comment" style="padding-left: 0; margin-top: 15px;">
-                    // Built with NestJS + Sharp + Redis
-                </div>
+        <div class="footer">
+            <div>Built with ❤️ for <a href="https://github.com/vasilistotskas/grooveshop-media-stream" target="_blank">GrooveShop</a></div>
+            <div class="tech-stack">
+                <span class="tech-badge">NestJS 11</span>
+                <span class="tech-badge">Sharp 0.34</span>
+                <span class="tech-badge">Redis 7</span>
+                <span class="tech-badge">Bull 4</span>
             </div>
         </div>
     </div>
@@ -611,146 +356,46 @@
             const days = Math.floor(seconds / 86400);
             const hours = Math.floor((seconds % 86400) / 3600);
             const minutes = Math.floor((seconds % 3600) / 60);
-            
-            if (days > 0) {
-                return `${days}d ${hours}h ${minutes}m`;
-            } else if (hours > 0) {
-                return `${hours}h ${minutes}m`;
-            } else if (minutes > 0) {
-                return `${minutes}m`;
-            } else {
-                return `${Math.floor(seconds)}s`;
-            }
+
+            if (days > 0) return `${days}d ${hours}h`;
+            if (hours > 0) return `${hours}h ${minutes}m`;
+            if (minutes > 0) return `${minutes}m`;
+            return `${Math.floor(seconds)}s`;
         }
 
         async function loadHealthStatus() {
-            // Try /health/detailed first, fallback to /health/live
             try {
                 const response = await fetch('/health/detailed');
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    
-                    // Update status indicator
-                    const statusDot = document.getElementById('statusDot');
-                    const statusText = document.getElementById('statusText');
-                    
-                    if (data.status === 'ok') {
-                        statusDot.className = 'status-dot healthy';
-                        statusText.textContent = '✓ All systems operational';
-                        statusText.style.color = '#00ff41';
-                    } else {
-                        statusDot.className = 'status-dot unhealthy';
-                        statusText.textContent = '⚠ System degraded';
-                        statusText.style.color = '#ff7b72';
-                    }
-                    
-                    // Update status cards
-                    const healthStatus = document.getElementById('healthStatus');
-                    healthStatus.textContent = data.status.toUpperCase();
-                    healthStatus.className = 'status-value';
-                    
-                    const uptime = document.getElementById('uptime');
-                    uptime.textContent = formatUptime(data.uptime);
-                    uptime.className = 'status-value';
-                    
-                    const environment = document.getElementById('environment');
-                    environment.textContent = data.environment.toUpperCase();
-                    environment.className = 'status-value';
-                    
-                    const nodeVersion = document.getElementById('nodeVersion');
-                    nodeVersion.textContent = data.systemInfo.nodeVersion;
-                    nodeVersion.className = 'status-value';
-                    
-                    return; // Success!
-                }
-                
-                // If detailed health failed, try the simpler /health/live endpoint
-                const liveResponse = await fetch('/health/live');
-                if (!liveResponse.ok) {
-                    throw new Error('Health checks failed');
-                }
-                
-                const liveData = await liveResponse.json();
-                
-                // Update with limited info from /health/live
-                const statusDot = document.getElementById('statusDot');
-                const statusText = document.getElementById('statusText');
-                
-                statusDot.className = 'status-dot loading';
-                statusText.textContent = '⚠ Limited health info (configuration issue)';
-                statusText.style.color = '#ffa657';
-                
-                const healthStatus = document.getElementById('healthStatus');
-                healthStatus.textContent = 'DEGRADED';
-                healthStatus.className = 'status-value loading';
-                
-                const uptime = document.getElementById('uptime');
-                uptime.textContent = formatUptime(liveData.uptime);
-                uptime.className = 'status-value';
-                
-                const environment = document.getElementById('environment');
-                environment.textContent = 'UNKNOWN';
-                environment.className = 'status-value loading';
-                
-                const nodeVersion = document.getElementById('nodeVersion');
-                nodeVersion.textContent = 'N/A';
-                nodeVersion.className = 'status-value loading';
-                
+                if (!response.ok) throw new Error('Health check failed');
+
+                const data = await response.json();
+
+                document.getElementById('healthStatus').textContent = data.status.toUpperCase();
+                document.getElementById('healthStatus').className = 'stat-value';
+
+                document.getElementById('uptime').textContent = formatUptime(data.uptime);
+                document.getElementById('environment').textContent = data.environment.toUpperCase();
+                document.getElementById('nodeVersion').textContent = data.systemInfo.nodeVersion;
+
+                document.getElementById('statusText').textContent = 'All systems operational';
+                document.getElementById('statusDot').style.background = '#00ff88';
+                document.getElementById('statusDot').style.boxShadow = '0 0 10px #00ff88';
             } catch (error) {
-                console.error('Failed to load health status:', error);
-                
-                const statusDot = document.getElementById('statusDot');
-                const statusText = document.getElementById('statusText');
-                
-                statusDot.className = 'status-dot unhealthy';
-                statusText.textContent = '✗ Service unavailable';
-                statusText.style.color = '#ff7b72';
-                
-                const healthStatus = document.getElementById('healthStatus');
-                healthStatus.textContent = 'ERROR';
-                healthStatus.className = 'status-value error';
-                
-                const uptime = document.getElementById('uptime');
-                uptime.textContent = 'N/A';
-                uptime.className = 'status-value error';
-                
-                const environment = document.getElementById('environment');
-                environment.textContent = 'N/A';
-                environment.className = 'status-value error';
-                
-                const nodeVersion = document.getElementById('nodeVersion');
-                nodeVersion.textContent = 'N/A';
-                nodeVersion.className = 'status-value error';
+                document.getElementById('healthStatus').textContent = 'ERROR';
+                document.getElementById('uptime').textContent = 'N/A';
+                document.getElementById('environment').textContent = 'N/A';
+                document.getElementById('nodeVersion').textContent = 'N/A';
+
+                document.getElementById('statusText').textContent = 'Service unavailable';
+                document.getElementById('statusDot').style.background = '#ef4444';
+                document.getElementById('statusDot').style.boxShadow = '0 0 10px #ef4444';
             }
         }
 
-        // Add typing effect to prompt
-        function typePrompt() {
-            const prompt = document.querySelector('.prompt span:first-child');
-            const text = '$ system-status --verbose';
-            prompt.textContent = '';
-            let i = 0;
-            
-            const interval = setInterval(() => {
-                if (i < text.length) {
-                    prompt.textContent += text.charAt(i);
-                    i++;
-                } else {
-                    clearInterval(interval);
-                }
-            }, 50);
-        }
-
-        // Initialize
         window.addEventListener('DOMContentLoaded', () => {
-            typePrompt();
-            setTimeout(loadHealthStatus, 500);
+            loadHealthStatus();
+            setInterval(loadHealthStatus, 30000);
         });
-
-        // Refresh health status every 30 seconds
-        setInterval(loadHealthStatus, 30000);
     </script>
 </body>
 </html>
-

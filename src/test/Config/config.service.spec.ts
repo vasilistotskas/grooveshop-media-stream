@@ -36,8 +36,7 @@ describe('configService', () => {
 		MONITORING_METRICS_PORT: '9090',
 		MONITORING_HEALTH_PATH: '/health',
 		MONITORING_METRICS_PATH: '/metrics',
-		NEST_PUBLIC_DJANGO_URL: 'http://localhost:8000',
-		NEST_PUBLIC_NUXT_URL: 'http://localhost:3000',
+		BACKEND_URL: 'http://localhost:8000',
 		EXTERNAL_REQUEST_TIMEOUT: '30000',
 		EXTERNAL_MAX_RETRIES: '3',
 		RATE_LIMIT_ENABLED: 'true',
@@ -142,16 +141,8 @@ describe('configService', () => {
 			await expect(invalidService.validate()).rejects.toThrow('Configuration validation failed')
 		})
 
-		it('should validate external services URLs', async () => {
-			nestConfigService.get.mockImplementation((key: string) => {
-				if (key === 'NEST_PUBLIC_DJANGO_URL')
-					return 'invalid://url with spaces'
-				return mockEnvVars[key as keyof typeof mockEnvVars]
-			})
-
-			const invalidService = new ConfigService(nestConfigService)
-			await expect(invalidService.validate()).rejects.toThrow('Configuration validation failed')
-		})
+		// External services URLs are now validated per-source, not globally
+		// This test is no longer applicable
 	})
 
 	describe('hot Reload Functionality', () => {

@@ -65,8 +65,6 @@ export interface MonitoringConfig {
 }
 
 export interface ExternalServicesConfig {
-	djangoUrl: string
-	nuxtUrl: string
 	requestTimeout: number
 	maxRetries: number
 }
