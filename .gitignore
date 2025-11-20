@@ -42,3 +42,9 @@ coverage
 !.vscode/extensions.json
 /notes.md
 
+# AI
+.claude
+.cursor
+.cursorrules
+.windsurfrules
+.kiro
