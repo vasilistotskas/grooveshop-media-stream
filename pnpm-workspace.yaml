@@ -1,0 +1,6 @@
+onlyBuiltDependencies:
+  - '@nestjs/core'
+  - '@swc/core'
+  - esbuild
+  - msgpackr-extract
+  - sharp
