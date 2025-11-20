@@ -1,3 +1,10 @@
+# [2.17.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.16.0...v2.17.0) (2025-11-20)
+
+
+### Features
+
+* pnpm-workspace.yaml ([d58b447](https://github.com/vasilistotskas/grooveshop-media-stream/commit/d58b447b4e9c86656f51fa1e56a2b032a9b69fe1))
+
 # [2.16.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.15.0...v2.16.0) (2025-11-20)
 
 
