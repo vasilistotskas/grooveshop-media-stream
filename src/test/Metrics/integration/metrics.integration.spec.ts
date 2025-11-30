@@ -257,11 +257,13 @@ describe('metrics Integration', () => {
 			expect(metricLines.length).toBeGreaterThan(0)
 
 			// Validate metric line format (basic check)
-			metricLines.forEach((line) => {
-				if (line.trim() && !line.includes('Nan') && !line.includes('Infinity')) {
-					// Allow scientific notation (e.g., 5.11e-7) and regular numbers
-					expect(line).toMatch(/^[a-z_:][\w:]*(\{[^}]*\})?\s+[0-9.-]+(e[+-]?\d+)?(\s+\d+)?$/i)
-				}
+			const validMetricLines = metricLines.filter(
+				line => line.trim() && !line.includes('Nan') && !line.includes('Infinity'),
+			)
+
+			validMetricLines.forEach((line) => {
+				// Allow scientific notation (e.g., 5.11e-7) and regular numbers
+				expect(line).toMatch(/^[a-z_:][\w:]*(\{[^}]*\})?\s+[0-9.-]+(e[+-]?\d+)?(\s+\d+)?$/i)
 			})
 		})
 	})

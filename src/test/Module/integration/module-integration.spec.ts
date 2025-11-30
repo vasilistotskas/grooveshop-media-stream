@@ -1,5 +1,7 @@
 import type { INestApplication } from '@nestjs/common'
+import { CacheWarmingService } from '#microservice/Cache/services/cache-warming.service'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
+import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { HealthController } from '#microservice/Health/controllers/health.controller'
@@ -12,7 +14,7 @@ import { JobQueueManager } from '#microservice/Queue/services/job-queue.manager'
 import { AdaptiveRateLimitGuard } from '#microservice/RateLimit/guards/adaptive-rate-limit.guard'
 import { SimpleValidationService } from '#microservice/Validation/services/simple-validation.service'
 import { Test, TestingModule } from '@nestjs/testing'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 describe('module Integration', () => {
 	let app: INestApplication
@@ -21,14 +23,50 @@ describe('module Integration', () => {
 	beforeAll(async () => {
 		module = await Test.createTestingModule({
 			imports: [MediaStreamModule],
-		}).compile()
+		})
+			.overrideProvider(RedisCacheService)
+			.useValue({
+				get: vi.fn().mockResolvedValue(null),
+				set: vi.fn().mockResolvedValue(undefined),
+				del: vi.fn().mockResolvedValue(undefined),
+				clear: vi.fn().mockResolvedValue(undefined),
+				has: vi.fn().mockResolvedValue(false),
+				keys: vi.fn().mockResolvedValue([]),
+				getStats: vi.fn().mockReturnValue({ hits: 0, misses: 0, size: 0 }),
+				disconnect: vi.fn().mockResolvedValue(undefined),
+			})
+			.overrideProvider(CacheWarmingService)
+			.useValue({
+				warmCache: vi.fn().mockResolvedValue(undefined),
+				onModuleInit: vi.fn(),
+			})
+			.compile()
 
 		app = module.createNestApplication()
 		await app.init()
 	})
 
 	afterAll(async () => {
-		await app.close()
+		try {
+			// Stop metrics collection to prevent open handles
+			const metricsService = module.get<MetricsService>(MetricsService)
+			if (metricsService && typeof metricsService.stopMetricsCollection === 'function') {
+				metricsService.stopMetricsCollection()
+			}
+
+			// Add delay to allow pending operations to complete
+			await new Promise(resolve => setTimeout(resolve, 500))
+
+			if (app) {
+				await app.close()
+			}
+		}
+		catch (error) {
+			console.warn('Error during test cleanup:', error)
+		}
+
+		// Additional delay to ensure cleanup is complete
+		await new Promise(resolve => setTimeout(resolve, 100))
 	})
 
 	describe('core Module Loading', () => {

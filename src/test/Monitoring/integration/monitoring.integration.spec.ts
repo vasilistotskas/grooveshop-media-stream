@@ -109,14 +109,11 @@ describe('monitoring Integration', () => {
 			expect(result1).toBe('processed-image.jpg')
 
 			// 2. Track a failed operation
-			try {
-				await performanceService.trackAsyncOperation('image-processing', async () => {
+			await expect(
+				performanceService.trackAsyncOperation('image-processing', async () => {
 					throw new Error('Processing failed')
-				})
-			}
-			catch (error: unknown) {
-				expect((error as Error).message).toBe('Processing failed')
-			}
+				}),
+			).rejects.toThrow('Processing failed')
 
 			// 3. Get performance statistics
 			const stats = performanceService.getPerformanceStats('image-processing')

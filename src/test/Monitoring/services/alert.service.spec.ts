@@ -260,12 +260,7 @@ describe('alertService', () => {
 				service.evaluateAlertsNow()
 
 				const activeAlerts = service.getActiveAlerts()
-				if (shouldAlert) {
-					expect(activeAlerts.length).toBeGreaterThan(0)
-				}
-				else {
-					expect(activeAlerts).toHaveLength(0)
-				}
+				expect(activeAlerts.length > 0).toBe(shouldAlert)
 			})
 		})
 	})

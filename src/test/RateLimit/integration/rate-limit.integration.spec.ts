@@ -860,29 +860,18 @@ describe('rate Limiting Integration', () => {
 
 				expect(successCount + rateLimitedCount + otherCount).toBe(responses.length)
 
+				// Ensure the service is responding and not completely broken
+				expect(successCount + rateLimitedCount).toBeGreaterThan(0)
+
 				// With a limit of 3, we should see some rate limiting if we have enough requests
+				// Allow some tolerance for race conditions and CI environment differences
+				const hasEnoughResponses = responses.length >= 4
+				expect(hasEnoughResponses ? successCount : 0).toBeLessThanOrEqual(4)
+				expect(hasEnoughResponses ? successCount > 0 : true).toBe(true)
 
-				if (responses.length >= 4) {
-					expect(successCount).toBeLessThanOrEqual(4) // Allow some tolerance for race conditions
-
-					expect(successCount).toBeGreaterThan(0) // At least some should succeed
-				}
-
-				// In CI, be more lenient due to timing variations and connection issues
-
-				if (process.env.CI) {
-					// Just ensure the service is responding and not completely broken
-
-					expect(successCount + rateLimitedCount).toBeGreaterThan(0)
-				}
-
-				else {
-					// In local environment, expect proper rate limiting
-
-					if (responses.length >= 4) {
-						expect(rateLimitedCount).toBeGreaterThan(0)
-					}
-				}
+				// In local environment with enough responses, expect proper rate limiting
+				const shouldHaveRateLimit = !process.env.CI && responses.length >= 4
+				expect(shouldHaveRateLimit ? rateLimitedCount > 0 : true).toBe(true)
 			}
 
 			catch (error) {

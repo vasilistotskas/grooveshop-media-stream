@@ -359,10 +359,8 @@ describe('storageOptimizationService', () => {
 
 			// Check if any file has optimization history
 			const stats = service.getOptimizationStats()
-			if (stats.totalOptimizations > 0) {
-				// This test would need to be more specific based on actual implementation
-				expect(stats.totalOptimizations).toBeGreaterThan(0)
-			}
+			// This test would need to be more specific based on actual implementation
+			expect(stats.totalOptimizations).toBeGreaterThanOrEqual(0)
 		})
 	})
 

@@ -1,6 +1,8 @@
 import type { INestApplication } from '@nestjs/common'
 import { CacheHealthIndicator } from '#microservice/Cache/indicators/cache-health.indicator'
 import { RedisHealthIndicator } from '#microservice/Cache/indicators/redis-health.indicator'
+import { CacheWarmingService } from '#microservice/Cache/services/cache-warming.service'
+import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { DiskSpaceHealthIndicator } from '#microservice/Health/indicators/disk-space-health.indicator'
 import { MemoryHealthIndicator } from '#microservice/Health/indicators/memory-health.indicator'
@@ -67,6 +69,22 @@ describe('middleware Configuration', () => {
 		module = await Test.createTestingModule({
 			imports: [MediaStreamModule],
 		})
+			.overrideProvider(RedisCacheService)
+			.useValue({
+				get: vi.fn().mockResolvedValue(null),
+				set: vi.fn().mockResolvedValue(undefined),
+				del: vi.fn().mockResolvedValue(undefined),
+				clear: vi.fn().mockResolvedValue(undefined),
+				has: vi.fn().mockResolvedValue(false),
+				keys: vi.fn().mockResolvedValue([]),
+				getStats: vi.fn().mockReturnValue({ hits: 0, misses: 0, size: 0 }),
+				disconnect: vi.fn().mockResolvedValue(undefined),
+			})
+			.overrideProvider(CacheWarmingService)
+			.useValue({
+				warmCache: vi.fn().mockResolvedValue(undefined),
+				onModuleInit: vi.fn(),
+			})
 			.overrideProvider(CacheHealthIndicator)
 			.useValue({
 				isHealthy: vi.fn().mockResolvedValue({ cache: { status: 'up' } }),

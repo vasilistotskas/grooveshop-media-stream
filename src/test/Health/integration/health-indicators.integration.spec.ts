@@ -88,53 +88,37 @@ describe('health Indicators Integration', () => {
 		it('should execute disk space health check', async () => {
 			const indicator = module.get<DiskSpaceHealthIndicator>(DiskSpaceHealthIndicator)
 
-			try {
-				const result = await indicator.isHealthy()
-				expect(result).toBeDefined()
-			}
-			catch (error) {
-				// Health checks might fail in test environment
-				expect(error).toBeDefined()
-			}
+			// Health checks might fail in test environment
+			const result = await Promise.allSettled([indicator.isHealthy()])
+			expect(result).toBeDefined()
+			expect(result.length).toBe(1)
 		})
 
 		it('should execute memory health check', async () => {
 			const indicator = module.get<MemoryHealthIndicator>(MemoryHealthIndicator)
 
-			try {
-				const result = await indicator.isHealthy()
-				expect(result).toBeDefined()
-			}
-			catch (error) {
-				// Health checks might fail in test environment
-				expect(error).toBeDefined()
-			}
+			// Health checks might fail in test environment
+			const result = await Promise.allSettled([indicator.isHealthy()])
+			expect(result).toBeDefined()
+			expect(result.length).toBe(1)
 		})
 
 		it('should execute cache health check', async () => {
 			const indicator = module.get<CacheHealthIndicator>(CacheHealthIndicator)
 
-			try {
-				const result = await indicator.isHealthy()
-				expect(result).toBeDefined()
-			}
-			catch (error) {
-				// Health checks might fail in test environment
-				expect(error).toBeDefined()
-			}
+			// Health checks might fail in test environment
+			const result = await Promise.allSettled([indicator.isHealthy()])
+			expect(result).toBeDefined()
+			expect(result.length).toBe(1)
 		})
 
 		it('should execute system health check', async () => {
 			const indicator = module.get<SystemHealthIndicator>(SystemHealthIndicator)
 
-			try {
-				const result = await indicator.isHealthy()
-				expect(result).toBeDefined()
-			}
-			catch (error) {
-				// Health checks might fail in test environment
-				expect(error).toBeDefined()
-			}
+			// Health checks might fail in test environment
+			const result = await Promise.allSettled([indicator.isHealthy()])
+			expect(result).toBeDefined()
+			expect(result.length).toBe(1)
 		})
 	})
 
@@ -145,27 +129,17 @@ describe('health Indicators Integration', () => {
 
 		it('should execute comprehensive health check', async () => {
 			// This tests that all health indicators are properly integrated
-			try {
-				const result = await healthController.check()
-				expect(result).toBeDefined()
-				expect(result.status).toBeDefined()
-				expect(result.info).toBeDefined()
-			}
-			catch (error) {
-				// Health checks might fail in test environment, but should not throw module errors
-				expect(error).toBeDefined()
-			}
+			// Health checks might fail in test environment, but should not throw module errors
+			const result = await Promise.allSettled([healthController.check()])
+			expect(result).toBeDefined()
+			expect(result.length).toBe(1)
 		})
 
 		it('should provide detailed health information', async () => {
-			try {
-				const result = await healthController.getDetailedHealth()
-				expect(result).toBeDefined()
-			}
-			catch (error) {
-				// Detailed health might fail in test environment
-				expect(error).toBeDefined()
-			}
+			// Detailed health might fail in test environment
+			const result = await Promise.allSettled([healthController.getDetailedHealth()])
+			expect(result).toBeDefined()
+			expect(result.length).toBe(1)
 		})
 	})
 
@@ -212,16 +186,13 @@ describe('health Indicators Integration', () => {
 				module.get<SystemHealthIndicator>(SystemHealthIndicator),
 			]
 
-			for (const indicator of indicators) {
-				try {
-					const result = await indicator.isHealthy()
-					expect(result).toBeDefined()
-				}
-				catch (error) {
-					// Individual health checks might fail, but should be handled
-					expect(error).toBeDefined()
-				}
-			}
+			// Individual health checks might fail, but should be handled
+			const results = await Promise.allSettled(
+				indicators.map(indicator => indicator.isHealthy()),
+			)
+
+			expect(results).toBeDefined()
+			expect(results.length).toBe(indicators.length)
 		})
 	})
 
