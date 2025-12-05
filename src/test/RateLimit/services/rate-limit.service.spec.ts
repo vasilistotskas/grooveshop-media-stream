@@ -1,4 +1,5 @@
 import type { MockedObject } from 'vitest'
+import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { ConfigService } from '#microservice/Config/config.service'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { RateLimitService } from '#microservice/RateLimit/services/rate-limit.service'
@@ -9,6 +10,7 @@ describe('rateLimitService', () => {
 	let service: RateLimitService
 	let configService: MockedObject<ConfigService>
 	let metricsService: MockedObject<MetricsService>
+	let _redisCacheService: MockedObject<RedisCacheService>
 
 	beforeEach(async () => {
 		const mockConfigService = {
@@ -22,17 +24,26 @@ describe('rateLimitService', () => {
 			getRegistry: vi.fn().mockReturnValue({}),
 		}
 
+		const mockRedisCacheService = {
+			get: vi.fn().mockResolvedValue(null),
+			set: vi.fn().mockResolvedValue(undefined),
+			delete: vi.fn().mockResolvedValue(undefined),
+			getConnectionStatus: vi.fn().mockReturnValue({ connected: false, stats: {} }),
+		}
+
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [
 				RateLimitService,
 				{ provide: ConfigService, useValue: mockConfigService },
 				{ provide: MetricsService, useValue: mockMetricsService },
+				{ provide: RedisCacheService, useValue: mockRedisCacheService },
 			],
 		}).compile()
 
 		service = module.get<RateLimitService>(RateLimitService)
 		configService = module.get(ConfigService)
 		metricsService = module.get(MetricsService)
+		_redisCacheService = module.get(RedisCacheService)
 	})
 
 	afterEach(() => {
@@ -294,8 +305,8 @@ describe('rateLimitService', () => {
 			// Make request to reach limit
 			await service.checkRateLimit('test-key', mockConfig)
 
-			// Reset the key
-			service.resetRateLimit('test-key')
+			// Reset the key (now async)
+			await service.resetRateLimit('test-key')
 
 			// Next request should be allowed
 			const result = await service.checkRateLimit('test-key', mockConfig)

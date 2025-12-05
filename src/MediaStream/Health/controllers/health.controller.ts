@@ -19,6 +19,7 @@ import { Controller, Get, Post } from '@nestjs/common'
 import { HealthCheck, HealthCheckService } from '@nestjs/terminus'
 import { DiskSpaceHealthIndicator } from '../indicators/disk-space-health.indicator.js'
 import { MemoryHealthIndicator } from '../indicators/memory-health.indicator.js'
+import { SharpHealthIndicator } from '../indicators/sharp-health.indicator.js'
 
 @Controller('health')
 export class HealthController {
@@ -33,6 +34,7 @@ export class HealthController {
 		private readonly systemHealthIndicator: SystemHealthIndicator,
 		private readonly jobQueueHealthIndicator: JobQueueHealthIndicator,
 		private readonly storageHealthIndicator: StorageHealthIndicator,
+		private readonly sharpHealthIndicator: SharpHealthIndicator,
 		private readonly _configService: ConfigService,
 		private readonly httpClientService: HttpClientService,
 	) {}
@@ -50,6 +52,7 @@ export class HealthController {
 			() => this.systemHealthIndicator.isHealthy(),
 			() => this.jobQueueHealthIndicator.isHealthy(),
 			() => this.storageHealthIndicator.isHealthy(),
+			() => this.sharpHealthIndicator.isHealthy(),
 		])
 	}
 
@@ -94,6 +97,7 @@ export class HealthController {
 			() => this.systemHealthIndicator.isHealthy(),
 			() => this.jobQueueHealthIndicator.isHealthy(),
 			() => this.storageHealthIndicator.isHealthy(),
+			() => this.sharpHealthIndicator.isHealthy(),
 		])
 
 		const diskInfo = await this.diskSpaceIndicator.getCurrentDiskInfo()
@@ -144,6 +148,7 @@ export class HealthController {
 				() => this.systemHealthIndicator.isHealthy(),
 				() => this.jobQueueHealthIndicator.isHealthy(),
 				() => this.storageHealthIndicator.isHealthy(),
+				() => this.sharpHealthIndicator.isHealthy(),
 			])
 
 			return {

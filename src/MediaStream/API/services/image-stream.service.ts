@@ -34,10 +34,10 @@ export class ImageStreamService {
 		PerformanceTracker.startPhase('image_request_processing')
 
 		try {
-			this.metricsService.recordError('image_requests', 'total')
+			this.metricsService.incrementCounter('image_requests_total')
 			await this.cacheImageResourceOperation.setup(request)
 
-			if (await this.cacheImageResourceOperation.resourceExists) {
+			if (await this.cacheImageResourceOperation.checkResourceExists()) {
 				await this.streamResource(request, res, correlationId)
 			}
 			else {
@@ -62,7 +62,7 @@ export class ImageStreamService {
 	): Promise<void> {
 		this._logger.debug('Resource does not exist, fetching', { correlationId })
 
-		const shouldUseQueue = this.cacheImageResourceOperation.shouldUseBackgroundProcessing?.()
+		const shouldUseQueue = this.cacheImageResourceOperation.shouldUseBackgroundProcessing()
 		await this.cacheImageResourceOperation.execute()
 
 		const maxWaitTime = shouldUseQueue ? 15000 : 10000
@@ -70,7 +70,7 @@ export class ImageStreamService {
 		let waitTime = 0
 
 		while (waitTime < maxWaitTime) {
-			if (await this.cacheImageResourceOperation.resourceExists) {
+			if (await this.cacheImageResourceOperation.checkResourceExists()) {
 				this._logger.debug('Resource available after waiting', { waitTime, correlationId })
 				await this.streamResource(request, res, correlationId)
 				return
@@ -91,7 +91,7 @@ export class ImageStreamService {
 		res: Response,
 		correlationId: string,
 	): Promise<void> {
-		const headers = await this.cacheImageResourceOperation.getHeaders
+		const headers = await this.cacheImageResourceOperation.fetchHeaders()
 
 		if (!headers) {
 			this._logger.warn('Resource metadata missing', { correlationId })
@@ -264,7 +264,10 @@ export class ImageStreamService {
 			.header('Cache-Control', `max-age=${publicTTL / 1000}, public, immutable`)
 			.header('Expires', new Date(expiresAt).toUTCString())
 			.header('X-Correlation-ID', correlationId)
-			.header('Vary', 'Accept-Encoding')
+			// Vary on Accept for proper CDN caching with content negotiation (WebP/AVIF support)
+			.header('Vary', 'Accept, Accept-Encoding')
+			// Prevent MIME type sniffing for security
+			.header('X-Content-Type-Options', 'nosniff')
 			.header('Content-Type', format === 'svg' ? 'image/svg+xml' : `image/${format}`)
 	}
 }

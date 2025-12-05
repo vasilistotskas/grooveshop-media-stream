@@ -1,5 +1,6 @@
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import * as process from 'node:process'
+import * as zlib from 'node:zlib'
 import { ConfigService } from '#microservice/Config/config.service'
 import MediaStreamModule from '#microservice/media-stream.module'
 import { NestFactory } from '@nestjs/core'
@@ -20,12 +21,24 @@ export async function bootstrap(exitProcess = true): Promise<void> {
 		app.use(helmet({
 			contentSecurityPolicy: false, // Allow images from any source
 			crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow cross-origin resource sharing
+			// Prevent MIME type sniffing
+			noSniff: true,
 		}))
 
-		// HTTP Compression (but not for images - they're already compressed)
+		// HTTP Compression with Brotli and Gzip support
+		// Brotli provides ~20% better compression than gzip for text content
 		app.use(compression({
 			level: 6, // Balance between speed (1) and compression (9)
 			threshold: 1024, // Only compress responses > 1KB
+			// Enable Brotli compression (preferred) with gzip fallback
+			brotli: {
+				enabled: true,
+				zlib: {
+					params: {
+						[zlib.constants.BROTLI_PARAM_QUALITY]: 4, // Balance speed vs compression (0-11)
+					},
+				},
+			},
 			filter: (req, res) => {
 				const contentType = res.getHeader('Content-Type')
 				// Don't compress images (already compressed formats)

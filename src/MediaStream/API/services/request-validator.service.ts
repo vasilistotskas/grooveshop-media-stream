@@ -1,4 +1,13 @@
 import type { ImageProcessingContext } from '../types/image-source.types.js'
+import {
+	MAX_IMAGE_HEIGHT,
+	MAX_IMAGE_WIDTH,
+	MAX_QUALITY,
+	MAX_TRIM_THRESHOLD,
+	MIN_IMAGE_DIMENSION,
+	MIN_QUALITY,
+	MIN_TRIM_THRESHOLD,
+} from '#microservice/common/constants/image-limits.constant'
 import { InvalidRequestError } from '#microservice/common/errors/media-stream.errors'
 import { InputSanitizationService } from '#microservice/Validation/services/input-sanitization.service'
 import { SecurityCheckerService } from '#microservice/Validation/services/security-checker.service'
@@ -15,10 +24,10 @@ interface ValidationRule {
 }
 
 const VALIDATION_RULES: Record<string, ValidationRule> = {
-	width: { min: 1, max: 5000 },
-	height: { min: 1, max: 5000 },
-	quality: { min: 1, max: 100 },
-	trimThreshold: { min: 0, max: 100 },
+	width: { min: MIN_IMAGE_DIMENSION, max: MAX_IMAGE_WIDTH },
+	height: { min: MIN_IMAGE_DIMENSION, max: MAX_IMAGE_HEIGHT },
+	quality: { min: MIN_QUALITY, max: MAX_QUALITY },
+	trimThreshold: { min: MIN_TRIM_THRESHOLD, max: MAX_TRIM_THRESHOLD },
 }
 
 /**

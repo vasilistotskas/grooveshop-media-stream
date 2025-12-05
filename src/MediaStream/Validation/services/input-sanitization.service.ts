@@ -1,4 +1,11 @@
 import type { ISanitizer } from '../interfaces/validator.interface.js'
+import {
+	MAX_FILE_SIZES,
+	MAX_IMAGE_HEIGHT,
+	MAX_IMAGE_WIDTH,
+	MAX_STRING_LENGTH,
+	MAX_TOTAL_PIXELS,
+} from '#microservice/common/constants/image-limits.constant'
 import { ConfigService } from '#microservice/Config/config.service'
 import { Injectable, Logger } from '@nestjs/common'
 
@@ -88,10 +95,9 @@ export class InputSanitizationService implements ISanitizer<any> {
 
 		sanitized = sanitized.trim()
 
-		const maxLength = 2048
-		if (sanitized.length > maxLength) {
-			sanitized = sanitized.substring(0, maxLength)
-			this._logger.warn(`String truncated to ${maxLength} characters for security`)
+		if (sanitized.length > MAX_STRING_LENGTH) {
+			sanitized = sanitized.substring(0, MAX_STRING_LENGTH)
+			this._logger.warn(`String truncated to ${MAX_STRING_LENGTH} characters for security`)
 		}
 
 		return sanitized
@@ -162,30 +168,18 @@ export class InputSanitizationService implements ISanitizer<any> {
 	}
 
 	validateFileSize(sizeBytes: number, format?: string): boolean {
-		const maxSizes = this._configService.getOptional('validation.maxFileSizes', {
-			default: 10 * 1024 * 1024,
-			jpeg: 5 * 1024 * 1024,
-			jpg: 5 * 1024 * 1024,
-			png: 8 * 1024 * 1024,
-			webp: 3 * 1024 * 1024,
-			gif: 2 * 1024 * 1024,
-			svg: 1024 * 1024,
-		})
+		const maxSizes = this._configService.getOptional('validation.maxFileSizes', MAX_FILE_SIZES)
 
 		const maxSize = format ? (maxSizes as any)[format.toLowerCase()] || maxSizes.default : maxSizes.default
 		return sizeBytes > 0 && sizeBytes <= maxSize
 	}
 
 	validateImageDimensions(width: number, height: number): boolean {
-		const maxWidth = 8192
-		const maxHeight = 8192
-		const maxPixels = 7680 * 4320
-
 		if (width <= 0 || height <= 0)
 			return false
-		if (width > maxWidth || height > maxHeight)
+		if (width > MAX_IMAGE_WIDTH || height > MAX_IMAGE_HEIGHT)
 			return false
-		if ((width * height) > maxPixels)
+		if ((width * height) > MAX_TOTAL_PIXELS)
 			return false
 
 		return true

@@ -6,7 +6,7 @@ import { CorrelationService } from '#microservice/Correlation/services/correlati
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { AdaptiveRateLimitGuard } from '#microservice/RateLimit/guards/adaptive-rate-limit.guard'
-import { Controller, Get, Logger, NotFoundException, Req, Res, Scope, UseGuards } from '@nestjs/common'
+import { Controller, Get, Logger, NotFoundException, Req, Res, UseGuards } from '@nestjs/common'
 import { IMAGE_SOURCES } from '../config/image-sources.config.js'
 import CacheImageRequest, {
 	BackgroundOptions,
@@ -24,11 +24,9 @@ import { UrlBuilderService } from '../services/url-builder.service.js'
  *
  * This controller uses a catch-all route that matches patterns
  * against IMAGE_SOURCES configuration.
+ * Note: Controllers are stateless by design, no need for REQUEST scope.
  */
-@Controller({
-	path: IMAGE,
-	scope: Scope.REQUEST,
-})
+@Controller(IMAGE)
 @UseGuards(AdaptiveRateLimitGuard)
 export default class MediaStreamImageController {
 	private readonly _logger = new Logger(MediaStreamImageController.name)

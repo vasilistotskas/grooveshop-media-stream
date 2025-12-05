@@ -1,3 +1,4 @@
+import { CacheModule } from '#microservice/Cache/cache.module'
 import { ConfigModule } from '#microservice/Config/config.module'
 import { ConfigService } from '#microservice/Config/config.service'
 import { MetricsModule } from '#microservice/Metrics/metrics.module'
@@ -11,6 +12,7 @@ import { RateLimitService } from './services/rate-limit.service.js'
 	imports: [
 		ConfigModule,
 		MetricsModule,
+		CacheModule,
 		ThrottlerModule.forRootAsync({
 			imports: [ConfigModule],
 			inject: [ConfigService],

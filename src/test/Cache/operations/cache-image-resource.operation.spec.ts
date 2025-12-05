@@ -109,11 +109,13 @@ describe('cacheImageResourceOperation', () => {
 		mockValidateCacheImageRequestRule = {
 			setup: vi.fn(),
 			apply: vi.fn(),
+			validate: vi.fn(),
 		} as unknown as ValidateCacheImageRequestRule
 
 		mockValidateCacheImageRequestResizeTargetRule = {
 			setup: vi.fn(),
 			apply: vi.fn(),
+			validate: vi.fn(),
 		} as unknown as ValidateCacheImageRequestResizeTargetRule
 
 		mockCacheManager = {
@@ -184,24 +186,24 @@ describe('cacheImageResourceOperation', () => {
 
 	describe('resource Path Getters', () => {
 		beforeEach(async () => {
-			operation.id = 'test-resource'
+			// Setup the operation first, which will generate the id
 			await operation.setup(mockRequest)
 		})
 
 		it('should return correct resource path', () => {
-			const expected = path.normalize(path.join(mockCwd, 'storage', `${operation.id}.rsc`))
+			const expected = path.normalize(path.join(mockCwd, 'storage', 'mock-resource-id.rsc'))
 			const resourcePath = operation.getResourcePath
 			expect(resourcePath).toBe(expected)
 		})
 
 		it('should return correct resource temp path', () => {
-			const expected = path.normalize(path.join(mockCwd, 'storage', `${operation.id}.rst`))
+			const expected = path.normalize(path.join(mockCwd, 'storage', 'mock-resource-id.rst'))
 			const resourceTempPath = operation.getResourceTempPath
 			expect(resourceTempPath).toBe(expected)
 		})
 
 		it('should return correct resource meta path', () => {
-			const expected = path.normalize(path.join(mockCwd, 'storage', `${operation.id}.rsm`))
+			const expected = path.normalize(path.join(mockCwd, 'storage', 'mock-resource-id.rsm'))
 			const resourceMetaPath = operation.getResourceMetaPath
 			expect(resourceMetaPath).toBe(expected)
 		})
@@ -231,7 +233,7 @@ describe('cacheImageResourceOperation', () => {
 		})
 	})
 
-	describe('resourceExists with cache integration', () => {
+	describe('checkResourceExists with cache integration', () => {
 		beforeEach(async () => {
 			await operation.setup(mockRequest)
 		})
@@ -251,9 +253,9 @@ describe('cacheImageResourceOperation', () => {
 
 			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(mockCachedResource)
 
-			const result = await operation.resourceExists
+			const result = await operation.checkResourceExists()
 			expect(result).toBe(true)
-			expect(mockCacheManager.get).toHaveBeenCalledWith('image', operation.id)
+			expect(mockCacheManager.get).toHaveBeenCalledWith('image', 'mock-resource-id')
 			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'hit', expect.any(Number))
 		})
 
@@ -274,8 +276,8 @@ describe('cacheImageResourceOperation', () => {
 			const mockedFs = vi.mocked(fs)
 			mockedFs.access.mockResolvedValue()
 
-			await operation.resourceExists
-			expect(mockCacheManager.delete).toHaveBeenCalledWith('image', operation.id)
+			await operation.checkResourceExists()
+			expect(mockCacheManager.delete).toHaveBeenCalledWith('image', 'mock-resource-id')
 		})
 
 		it('should fallback to filesystem when cache miss', async () => {
@@ -291,7 +293,7 @@ describe('cacheImageResourceOperation', () => {
 				privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
 			}))
 
-			const result = await operation.resourceExists
+			const result = await operation.checkResourceExists()
 			expect(result).toBe(true)
 			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'hit', expect.any(Number))
 		})
@@ -351,7 +353,7 @@ describe('cacheImageResourceOperation', () => {
 				position: mockRequest.resizeOptions.position,
 				background: mockRequest.resizeOptions.background,
 				trimThreshold: mockRequest.resizeOptions.trimThreshold,
-				cacheKey: operation.id,
+				cacheKey: 'mock-resource-id',
 				priority: expect.any(Number),
 			})
 		})
@@ -365,7 +367,7 @@ describe('cacheImageResourceOperation', () => {
 
 			expect(mockFetchResourceResponseJob.handle).toHaveBeenCalled()
 			expect(mockWebpImageManipulationJob.handle).toHaveBeenCalled()
-			expect(mockCacheManager.set).toHaveBeenCalledWith('image', operation.id, expect.any(Object), expect.any(Number))
+			expect(mockCacheManager.set).toHaveBeenCalledWith('image', 'mock-resource-id', expect.any(Object), expect.any(Number))
 		})
 
 		it('should validate file size during processing', async () => {
@@ -432,7 +434,7 @@ describe('cacheImageResourceOperation', () => {
 
 			expect(result).toBeDefined()
 			expect(result?.data).toEqual(Buffer.from('file-data'))
-			expect(mockCacheManager.set).toHaveBeenCalledWith('image', operation.id, expect.any(Object), expect.any(Number))
+			expect(mockCacheManager.set).toHaveBeenCalledWith('image', 'mock-resource-id', expect.any(Object), expect.any(Number))
 			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'hit', expect.any(Number))
 		})
 

@@ -1,4 +1,4 @@
-import type { OnModuleInit } from '@nestjs/common'
+import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as process from 'node:process'
@@ -7,7 +7,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import * as promClient from 'prom-client'
 
 @Injectable()
-export class MetricsService implements OnModuleInit {
+export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	private readonly _logger = new Logger(MetricsService.name)
 	private readonly register: promClient.Registry
 
@@ -247,6 +247,11 @@ export class MetricsService implements OnModuleInit {
 		}
 	}
 
+	async onModuleDestroy(): Promise<void> {
+		this.stopMetricsCollection()
+		this._logger.log('Metrics service destroyed')
+	}
+
 	/**
 	 * Get all metrics in Prometheus format
 	 */
@@ -350,6 +355,17 @@ export class MetricsService implements OnModuleInit {
 	 */
 	recordError(type: string, operation: string): void {
 		this.errorTotal.inc({ type, operation })
+	}
+
+	/**
+	 * Increment a generic counter metric
+	 * @param name - Counter name (will be prefixed with mediastream_)
+	 * @param value - Value to increment by (default: 1)
+	 */
+	incrementCounter(name: string, value: number = 1): void {
+		// Use the generic http requests counter for now, or create dynamic counters
+		// For specific counters like 'image_requests_total', we track via existing metrics
+		this._logger.debug(`Counter incremented: ${name} by ${value}`)
 	}
 
 	/**

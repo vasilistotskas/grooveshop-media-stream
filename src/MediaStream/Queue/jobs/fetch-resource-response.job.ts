@@ -1,10 +1,14 @@
 import type CacheImageRequest from '#microservice/API/dto/cache-image-request.dto'
 import type { AxiosResponse } from 'axios'
 import { HttpService } from '@nestjs/axios'
-import { Injectable, Logger, Scope } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { isAxiosError } from 'axios'
 
-@Injectable({ scope: Scope.REQUEST })
+/**
+ * Fetches resources from remote URLs.
+ * Stateless service - all request data is passed via method parameters.
+ */
+@Injectable()
 export default class FetchResourceResponseJob {
 	private readonly _logger = new Logger(FetchResourceResponseJob.name)
 	constructor(private readonly _httpService: HttpService) {

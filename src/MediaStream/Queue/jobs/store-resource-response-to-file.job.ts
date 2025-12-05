@@ -1,9 +1,13 @@
 import type { AxiosResponse } from 'axios'
 import { open } from 'node:fs/promises'
 import UnableToStoreFetchedResourceException from '#microservice/API/exceptions/unable-to-store-fetched-resource.exception'
-import { Injectable, Logger, Scope } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 
-@Injectable({ scope: Scope.REQUEST })
+/**
+ * Stores fetched resource responses to the filesystem.
+ * Stateless service - all request data is passed via method parameters.
+ */
+@Injectable()
 export default class StoreResourceResponseToFileJob {
 	private readonly _logger = new Logger(StoreResourceResponseToFileJob.name)
 

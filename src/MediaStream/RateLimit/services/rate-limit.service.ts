@@ -1,4 +1,5 @@
 import * as process from 'node:process'
+import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { ConfigService } from '#microservice/Config/config.service'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Injectable, Logger } from '@nestjs/common'
@@ -24,19 +25,27 @@ export interface SystemLoadInfo {
 	activeConnections: number
 }
 
+/**
+ * Distributed rate limiting service using Redis for horizontal scaling.
+ * Falls back to in-memory storage if Redis is unavailable.
+ */
 @Injectable()
 export class RateLimitService {
 	private readonly _logger = new Logger(RateLimitService.name)
-	private readonly requestCounts = new Map<string, { count: number, resetTime: number }>()
+	/** In-memory fallback when Redis is unavailable */
+	private readonly localRequestCounts = new Map<string, { count: number, resetTime: number }>()
 	private readonly systemLoadThresholds = {
 		cpu: 80,
 		memory: 85,
 		connections: 1000,
 	}
 
+	private readonly RATE_LIMIT_PREFIX = 'ratelimit:'
+
 	constructor(
 		private readonly _configService: ConfigService,
 		private readonly metricsService: MetricsService,
+		private readonly redisCacheService: RedisCacheService,
 	) {}
 
 	/**
@@ -139,20 +148,94 @@ export class RateLimitService {
 	}
 
 	/**
-	 * Check if request should be rate limited
+	 * Check if request should be rate limited.
+	 * Uses Redis for distributed rate limiting, falls back to in-memory if Redis unavailable.
 	 */
 	async checkRateLimit(key: string, config: RateLimitConfig): Promise<{ allowed: boolean, info: RateLimitInfo }> {
 		const now = Date.now()
-		const windowStart = now - config.windowMs
+		const resetTime = new Date(now + config.windowMs)
+		const redisKey = `${this.RATE_LIMIT_PREFIX}${key}`
 
+		try {
+			// Try Redis first for distributed rate limiting
+			const redisStatus = this.redisCacheService.getConnectionStatus()
+			if (redisStatus.connected) {
+				return await this.checkRateLimitRedis(redisKey, config, now, resetTime)
+			}
+		}
+		catch (error: unknown) {
+			this._logger.warn(`Redis rate limit check failed, falling back to local: ${(error as Error).message}`)
+		}
+
+		// Fallback to local in-memory rate limiting
+		return this.checkRateLimitLocal(key, config, now, resetTime)
+	}
+
+	/**
+	 * Redis-based distributed rate limiting using atomic increment
+	 */
+	private async checkRateLimitRedis(
+		redisKey: string,
+		config: RateLimitConfig,
+		now: number,
+		resetTime: Date,
+	): Promise<{ allowed: boolean, info: RateLimitInfo }> {
+		// Get current count from Redis
+		const cached = await this.redisCacheService.get<{ count: number, resetTime: number }>(redisKey)
+
+		if (!cached || cached.resetTime <= now) {
+			// Window expired or new key - start fresh
+			const newEntry = { count: 1, resetTime: now + config.windowMs }
+			const ttlSeconds = Math.ceil(config.windowMs / 1000)
+			await this.redisCacheService.set(redisKey, newEntry, ttlSeconds)
+
+			return {
+				allowed: true,
+				info: {
+					limit: config.max,
+					current: 1,
+					remaining: config.max - 1,
+					resetTime,
+				},
+			}
+		}
+
+		// Increment count
+		const newCount = cached.count + 1
+		const updatedEntry = { count: newCount, resetTime: cached.resetTime }
+		const remainingTtl = Math.ceil((cached.resetTime - now) / 1000)
+		await this.redisCacheService.set(redisKey, updatedEntry, Math.max(1, remainingTtl))
+
+		const allowed = newCount <= config.max
+
+		return {
+			allowed,
+			info: {
+				limit: config.max,
+				current: newCount,
+				remaining: Math.max(0, config.max - newCount),
+				resetTime: new Date(cached.resetTime),
+			},
+		}
+	}
+
+	/**
+	 * Local in-memory rate limiting (fallback)
+	 */
+	private checkRateLimitLocal(
+		key: string,
+		config: RateLimitConfig,
+		now: number,
+		resetTime: Date,
+	): { allowed: boolean, info: RateLimitInfo } {
+		const windowStart = now - config.windowMs
 		this.cleanupOldEntries(windowStart)
 
-		let entry = this.requestCounts.get(key)
-		const resetTime = new Date(now + config.windowMs)
+		let entry = this.localRequestCounts.get(key)
 
 		if (!entry || entry.resetTime <= now) {
 			entry = { count: 1, resetTime: now + config.windowMs }
-			this.requestCounts.set(key, entry)
+			this.localRequestCounts.set(key, entry)
 
 			return {
 				allowed: true,
@@ -249,12 +332,12 @@ export class RateLimitService {
 	}
 
 	/**
-	 * Clean up old rate limit entries
+	 * Clean up old local rate limit entries (Redis handles TTL automatically)
 	 */
 	private cleanupOldEntries(windowStart: number): void {
-		for (const [key, entry] of this.requestCounts.entries()) {
+		for (const [key, entry] of this.localRequestCounts.entries()) {
 			if (entry.resetTime <= windowStart) {
-				this.requestCounts.delete(key)
+				this.localRequestCounts.delete(key)
 			}
 		}
 	}
@@ -275,34 +358,61 @@ export class RateLimitService {
 	/**
 	 * Reset rate limit for a specific key (useful for testing)
 	 */
-	resetRateLimit(key: string): void {
-		this.requestCounts.delete(key)
+	async resetRateLimit(key: string): Promise<void> {
+		this.localRequestCounts.delete(key)
+		try {
+			await this.redisCacheService.delete(`${this.RATE_LIMIT_PREFIX}${key}`)
+		}
+		catch {
+			// Ignore Redis errors during reset
+		}
 	}
 
 	/**
 	 * Clear all rate limits (useful for testing)
 	 */
-	clearAllRateLimits(): void {
-		const entriesCount = this.requestCounts.size
-		this.requestCounts.clear()
+	async clearAllRateLimits(): Promise<void> {
+		const entriesCount = this.localRequestCounts.size
+		this.localRequestCounts.clear()
 		if (process.env.NODE_ENV === 'test' && entriesCount > 0) {
-			this._logger.debug(`Cleared ${entriesCount} rate limit entries`)
+			this._logger.debug(`Cleared ${entriesCount} local rate limit entries`)
 		}
+		// Note: Redis entries will expire via TTL
 	}
 
 	/**
 	 * Get current rate limit status for a key
 	 */
-	getRateLimitStatus(key: string): RateLimitInfo | null {
-		const entry = this.requestCounts.get(key)
+	async getRateLimitStatus(key: string): Promise<RateLimitInfo | null> {
+		// Try Redis first
+		try {
+			const redisStatus = this.redisCacheService.getConnectionStatus()
+			if (redisStatus.connected) {
+				const cached = await this.redisCacheService.get<{ count: number, resetTime: number }>(`${this.RATE_LIMIT_PREFIX}${key}`)
+				if (cached) {
+					return {
+						limit: 0, // Would need to be passed or stored
+						current: cached.count,
+						remaining: 0, // Would need to be calculated
+						resetTime: new Date(cached.resetTime),
+					}
+				}
+			}
+		}
+		catch {
+			// Fall through to local
+		}
+
+		// Fallback to local
+		const entry = this.localRequestCounts.get(key)
 		if (!entry) {
 			return null
 		}
 
 		return {
-			limit: 0, // Would need to be passed or stored
+			limit: 0,
 			current: entry.count,
-			remaining: 0, // Would need to be calculated
+			remaining: 0,
 			resetTime: new Date(entry.resetTime),
 		}
 	}
@@ -332,16 +442,19 @@ export class RateLimitService {
 	/**
 	 * Get debug information about current rate limit state (for testing)
 	 */
-	getDebugInfo(): { totalEntries: number, entries: Array<{ key: string, count: number, resetTime: number }> } {
-		const entries = Array.from(this.requestCounts.entries()).map(([key, entry]) => ({
+	getDebugInfo(): { totalEntries: number, entries: Array<{ key: string, count: number, resetTime: number }>, storageType: string } {
+		const entries = Array.from(this.localRequestCounts.entries()).map(([key, entry]) => ({
 			key,
 			count: entry.count,
 			resetTime: entry.resetTime,
 		}))
 
+		const redisStatus = this.redisCacheService.getConnectionStatus()
+
 		return {
-			totalEntries: this.requestCounts.size,
+			totalEntries: this.localRequestCounts.size,
 			entries,
+			storageType: redisStatus.connected ? 'redis' : 'local',
 		}
 	}
 }

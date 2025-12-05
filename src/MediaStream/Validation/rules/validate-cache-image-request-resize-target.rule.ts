@@ -1,19 +1,23 @@
 import type CacheImageRequest from '#microservice/API/dto/cache-image-request.dto'
 import RequestedResizeTargetTooLargeException from '#microservice/API/exceptions/requested-resize-target-too-large.exception'
-import { Injectable, Scope } from '@nestjs/common'
+import { MAX_TOTAL_PIXELS } from '#microservice/common/constants/image-limits.constant'
+import { Injectable } from '@nestjs/common'
 
-@Injectable({ scope: Scope.REQUEST })
+/**
+ * Validates that requested resize dimensions don't exceed maximum allowed pixels.
+ * Stateless service - request data is passed via method parameters.
+ */
+@Injectable()
 export default class ValidateCacheImageRequestResizeTargetRule {
-	allowedPixelCount = 7680 * 4320
+	private readonly allowedPixelCount = MAX_TOTAL_PIXELS
 
-	request!: CacheImageRequest
-
-	public async setup(request: CacheImageRequest): Promise<void> {
-		this.request = request
-	}
-
-	public async apply(): Promise<void> {
-		const { width, height } = this.request.resizeOptions
+	/**
+	 * Validates the resize target dimensions
+	 * @param request - The cache image request to validate
+	 * @throws RequestedResizeTargetTooLargeException if dimensions exceed limit
+	 */
+	public async validate(request: CacheImageRequest): Promise<void> {
+		const { width, height } = request.resizeOptions
 
 		if (width === null || height === null) {
 			return
@@ -22,7 +26,7 @@ export default class ValidateCacheImageRequestResizeTargetRule {
 		const pixelCount = width * height
 
 		if (pixelCount > this.allowedPixelCount) {
-			throw new RequestedResizeTargetTooLargeException(this.request.resizeOptions, this.allowedPixelCount)
+			throw new RequestedResizeTargetTooLargeException(request.resizeOptions, this.allowedPixelCount)
 		}
 	}
 }

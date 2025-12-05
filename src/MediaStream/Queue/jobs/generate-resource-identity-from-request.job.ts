@@ -2,7 +2,7 @@ import type CacheImageRequest from '#microservice/API/dto/cache-image-request.dt
 import type { ResourceIdentifierKP } from '#microservice/common/constants/key-properties.constant'
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
-import { Injectable, Scope } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 
 const NAMESPACE_URL = '6ba7b811-9dad-11d1-80b4-00c04fd430c8'
 
@@ -23,7 +23,11 @@ function generateUUIDv5(name: string, namespace: string = NAMESPACE_URL): string
 	)
 }
 
-@Injectable({ scope: Scope.REQUEST })
+/**
+ * Generates unique resource identifiers from cache image requests.
+ * Stateless service - all request data is passed via method parameters.
+ */
+@Injectable()
 export default class GenerateResourceIdentityFromRequestJob {
 	async handle(cacheImageRequest: CacheImageRequest): Promise<ResourceIdentifierKP> {
 		const request = JSON.parse(JSON.stringify(cacheImageRequest))

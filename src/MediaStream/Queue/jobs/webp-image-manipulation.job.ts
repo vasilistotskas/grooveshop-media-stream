@@ -1,11 +1,15 @@
 import type { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
 import { copyFile, readFile } from 'node:fs/promises'
 import { extname } from 'node:path'
-import { Injectable, Logger, Scope } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import sharp from 'sharp'
 import ManipulationJobResult from '../dto/manipulation-job-result.dto.js'
 
-@Injectable({ scope: Scope.REQUEST })
+/**
+ * Handles image manipulation and format conversion using Sharp.
+ * Stateless service - all request data is passed via method parameters.
+ */
+@Injectable()
 export default class WebpImageManipulationJob {
 	private readonly logger = new Logger(WebpImageManipulationJob.name)
 	async handle(
@@ -137,6 +141,11 @@ export default class WebpImageManipulationJob {
 				manipulation.webp({ quality: options.quality })
 				break
 			case 'avif':
+				// AVIF quality is capped at 75 because:
+				// 1. Diminishing returns: quality above 75 provides minimal visual improvement
+				// 2. Encoding speed: higher quality significantly increases encoding time (exponential)
+				// 3. File size: quality 75 provides excellent compression with near-lossless appearance
+				// 4. Browser compatibility: some decoders struggle with very high quality AVIF
 				manipulation.avif({ quality: Math.min(options.quality, 75), chromaSubsampling: '4:2:0' })
 				break
 			case 'gif':

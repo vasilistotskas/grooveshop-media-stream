@@ -16,6 +16,7 @@ import { TerminusModule } from '@nestjs/terminus'
 import { HealthController } from './controllers/health.controller.js'
 import { DiskSpaceHealthIndicator } from './indicators/disk-space-health.indicator.js'
 import { MemoryHealthIndicator } from './indicators/memory-health.indicator.js'
+import { SharpHealthIndicator } from './indicators/sharp-health.indicator.js'
 
 @Module({
 	imports: [
@@ -38,6 +39,7 @@ import { MemoryHealthIndicator } from './indicators/memory-health.indicator.js'
 		SystemHealthIndicator,
 		JobQueueHealthIndicator,
 		StorageHealthIndicator,
+		SharpHealthIndicator,
 	],
 	exports: [
 		DiskSpaceHealthIndicator,
@@ -49,6 +51,7 @@ import { MemoryHealthIndicator } from './indicators/memory-health.indicator.js'
 		SystemHealthIndicator,
 		JobQueueHealthIndicator,
 		StorageHealthIndicator,
+		SharpHealthIndicator,
 	],
 })
 export class HealthModule {}

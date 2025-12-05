@@ -23,8 +23,8 @@ describe('validateCacheImageRequestResizeTargetRule', () => {
 			}),
 		})
 
-		await rule.setup(mockRequest)
-		await expect(rule.apply()).resolves.not.toThrow()
+		// Use the new validate() method
+		await expect(rule.validate(mockRequest)).resolves.not.toThrow()
 	})
 
 	it('should throw an exception when the requested pixel count exceeds the allowed limit', async () => {
@@ -35,8 +35,8 @@ describe('validateCacheImageRequestResizeTargetRule', () => {
 			}),
 		})
 
-		await rule.setup(mockRequest)
-		await expect(rule.apply()).rejects.toThrow(RequestedResizeTargetTooLargeException)
+		// Use the new validate() method
+		await expect(rule.validate(mockRequest)).rejects.toThrow(RequestedResizeTargetTooLargeException)
 	})
 })
 
@@ -53,7 +53,7 @@ describe('validateCacheImageRequestRule', () => {
 		expect(rule).toBeDefined()
 	})
 
-	it('should setup the request and call the resize target rule setup', async () => {
+	it('should validate the request and call the resize target rule validate', async () => {
 		const mockRequest: CacheImageRequest = new CacheImageRequest({
 			resizeOptions: new ResizeOptions({
 				width: 1920,
@@ -61,14 +61,14 @@ describe('validateCacheImageRequestRule', () => {
 			}),
 		})
 
-		const setupSpy = vi.spyOn(validateCacheImageRequestResizeTargetRule, 'setup')
+		const validateSpy = vi.spyOn(validateCacheImageRequestResizeTargetRule, 'validate')
 
-		await rule.setup(mockRequest)
+		await rule.validate(mockRequest)
 
-		expect(setupSpy).toHaveBeenCalledWith(mockRequest)
+		expect(validateSpy).toHaveBeenCalledWith(mockRequest)
 	})
 
-	it('should apply the resize target rule without errors', async () => {
+	it('should validate without errors for valid requests', async () => {
 		const mockRequest: CacheImageRequest = new CacheImageRequest({
 			resizeOptions: new ResizeOptions({
 				width: 1920,
@@ -76,11 +76,7 @@ describe('validateCacheImageRequestRule', () => {
 			}),
 		})
 
-		const applySpy = vi.spyOn(validateCacheImageRequestResizeTargetRule, 'apply').mockResolvedValue(undefined)
-
-		await rule.setup(mockRequest)
-		await expect(rule.apply()).resolves.not.toThrow()
-		expect(applySpy).toHaveBeenCalled()
+		await expect(rule.validate(mockRequest)).resolves.not.toThrow()
 	})
 
 	it('should throw an error if the resize target rule throws', async () => {
@@ -91,9 +87,8 @@ describe('validateCacheImageRequestRule', () => {
 			}),
 		})
 
-		vi.spyOn(validateCacheImageRequestResizeTargetRule, 'apply').mockRejectedValue(new Error('Resize error'))
+		vi.spyOn(validateCacheImageRequestResizeTargetRule, 'validate').mockRejectedValue(new Error('Resize error'))
 
-		await rule.setup(mockRequest)
-		await expect(rule.apply()).rejects.toThrow('Resize error')
+		await expect(rule.validate(mockRequest)).rejects.toThrow('Resize error')
 	})
 })

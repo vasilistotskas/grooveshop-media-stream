@@ -1,5 +1,5 @@
 import type { LayerDistribution, StringMap } from '#microservice/common/types/common.types'
-import type { OnModuleInit } from '@nestjs/common'
+import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 
 import type { CacheKeyStrategy, CacheLayer, CacheLayerStats } from '../interfaces/cache-layer.interface.js'
 import { ConfigService } from '#microservice/Config/config.service'
@@ -21,11 +21,12 @@ export interface MultiLayerCacheStats {
 }
 
 @Injectable()
-export class MultiLayerCacheManager implements OnModuleInit {
+export class MultiLayerCacheManager implements OnModuleInit, OnModuleDestroy {
 	private layers: CacheLayer[] = []
 	private keyStrategy: CacheKeyStrategy
 	private preloadingEnabled: boolean
 	private popularKeys: Map<string, number> = new Map()
+	private preloadingInterval?: NodeJS.Timeout
 
 	constructor(
 		private readonly _configService: ConfigService,
@@ -53,6 +54,11 @@ export class MultiLayerCacheManager implements OnModuleInit {
 		if (this.preloadingEnabled) {
 			this.startPreloading()
 		}
+	}
+
+	async onModuleDestroy(): Promise<void> {
+		this.stopPreloading()
+		CorrelatedLogger.debug('Multi-layer cache manager destroyed', MultiLayerCacheManager.name)
 	}
 
 	/**
@@ -350,7 +356,7 @@ export class MultiLayerCacheManager implements OnModuleInit {
 	private startPreloading(): void {
 		const interval = this._configService.getOptional('cache.preloading.interval', 300000)
 
-		setInterval(async () => {
+		this.preloadingInterval = setInterval(async () => {
 			try {
 				await this.preloadPopularKeys()
 			}
@@ -367,5 +373,16 @@ export class MultiLayerCacheManager implements OnModuleInit {
 			`Cache preloading started with ${interval}ms interval`,
 			MultiLayerCacheManager.name,
 		)
+	}
+
+	/**
+	 * Stop periodic preloading
+	 */
+	private stopPreloading(): void {
+		if (this.preloadingInterval) {
+			clearInterval(this.preloadingInterval)
+			this.preloadingInterval = undefined
+			CorrelatedLogger.debug('Cache preloading stopped', MultiLayerCacheManager.name)
+		}
 	}
 }

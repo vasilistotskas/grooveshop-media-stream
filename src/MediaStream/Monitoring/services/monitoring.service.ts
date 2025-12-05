@@ -1,4 +1,5 @@
 import type { MetricsMap, Tags } from '#microservice/common/types/common.types'
+import type { OnModuleDestroy } from '@nestjs/common'
 import type {
 	ComponentHealth,
 	CustomMetric,
@@ -12,11 +13,12 @@ import { ConfigService } from '@nestjs/config'
 import { MetricType } from '../interfaces/monitoring.interface.js'
 
 @Injectable()
-export class MonitoringService {
+export class MonitoringService implements OnModuleDestroy {
 	private readonly _logger = new Logger(MonitoringService.name)
 	private readonly metrics = new Map<string, CustomMetric[]>()
 	private readonly config: MonitoringConfig
 	private readonly maxMetricsPerType = 10000
+	private cleanupInterval?: NodeJS.Timeout
 
 	constructor(
 		private readonly _configService: ConfigService,
@@ -39,6 +41,11 @@ export class MonitoringService {
 			this.startMetricsCleanup()
 			this._logger.log('Monitoring service initialized')
 		}
+	}
+
+	async onModuleDestroy(): Promise<void> {
+		this.stopMetricsCleanup()
+		this._logger.log('Monitoring service destroyed')
 	}
 
 	/**
@@ -230,10 +237,21 @@ export class MonitoringService {
 	 * Clear old metrics based on retention policy
 	 */
 	private startMetricsCleanup(): void {
-		const cleanupInterval = Math.min(this.config.metricsRetentionMs / 10, 60 * 60 * 1000)
-		setInterval(() => {
+		const intervalMs = Math.min(this.config.metricsRetentionMs / 10, 60 * 60 * 1000)
+		this.cleanupInterval = setInterval(() => {
 			this.cleanupOldMetrics()
-		}, cleanupInterval)
+		}, intervalMs)
+	}
+
+	/**
+	 * Stop the metrics cleanup interval
+	 */
+	private stopMetricsCleanup(): void {
+		if (this.cleanupInterval) {
+			clearInterval(this.cleanupInterval)
+			this.cleanupInterval = undefined
+			this._logger.debug('Metrics cleanup interval stopped')
+		}
 	}
 
 	private cleanupOldMetrics(): void {
