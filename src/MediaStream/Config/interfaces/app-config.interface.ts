@@ -42,11 +42,17 @@ export interface CacheWarmingConfig {
 	popularImageThreshold: number
 }
 
+export interface ImageCacheConfig {
+	publicTtl: number
+	privateTtl: number
+}
+
 export interface CacheConfig {
 	memory: MemoryCacheConfig
 	redis: RedisConfig
 	file: FileCacheConfig
 	warming: CacheWarmingConfig
+	image: ImageCacheConfig
 }
 
 export interface ProcessingConfig {
@@ -90,6 +96,11 @@ export interface RateLimitConfig {
 	bypass: RateLimitBypassConfig
 }
 
+export interface ShutdownConfig {
+	timeout: number
+	forceTimeout: number
+}
+
 export interface AppConfig {
 	server: ServerConfig
 	cache: CacheConfig
@@ -97,4 +108,5 @@ export interface AppConfig {
 	monitoring: MonitoringConfig
 	externalServices: ExternalServicesConfig
 	rateLimit: RateLimitConfig
+	shutdown: ShutdownConfig
 }

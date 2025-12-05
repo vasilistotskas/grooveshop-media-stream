@@ -11,6 +11,17 @@ export interface CircuitBreakerOptions {
 	resetTimeout: number
 	rollingWindow: number
 	minimumRequests: number
+	name?: string
+	persistState?: (state: CircuitBreakerPersistedState) => Promise<void>
+	loadState?: () => Promise<CircuitBreakerPersistedState | null>
+}
+
+export interface CircuitBreakerPersistedState {
+	state: CircuitState
+	failureCount: number
+	successCount: number
+	lastStateChange: number
+	nextAttempt: number
 }
 
 export class CircuitBreaker {
@@ -22,6 +33,7 @@ export class CircuitBreaker {
 	private totalRequests = 0
 	private readonly options: CircuitBreakerOptions
 	private readonly requestWindow: Array<{ timestamp: number, success: boolean }> = []
+	private persistenceTimer?: NodeJS.Timeout
 
 	constructor(options: CircuitBreakerOptions) {
 		this.options = {
@@ -29,6 +41,87 @@ export class CircuitBreaker {
 			resetTimeout: options.resetTimeout || 30000,
 			rollingWindow: options.rollingWindow || 60000,
 			minimumRequests: options.minimumRequests || 5,
+			name: options.name || 'default',
+			persistState: options.persistState,
+			loadState: options.loadState,
+		}
+
+		// Load persisted state on initialization
+		this.loadPersistedState()
+
+		// Setup periodic state persistence
+		if (this.options.persistState) {
+			this.persistenceTimer = setInterval(() => this.persistCurrentState(), 10000)
+		}
+	}
+
+	/**
+	 * Load persisted state from storage
+	 */
+	private async loadPersistedState(): Promise<void> {
+		if (!this.options.loadState) {
+			return
+		}
+
+		try {
+			const persisted = await this.options.loadState()
+			if (persisted) {
+				// Only restore if the state is still relevant (not too old)
+				const stateAge = Date.now() - persisted.lastStateChange
+				if (stateAge < this.options.resetTimeout * 2) {
+					this.state = persisted.state
+					this.failureCount = persisted.failureCount
+					this.successCount = persisted.successCount
+					this.lastStateChange = persisted.lastStateChange
+					this.nextAttempt = persisted.nextAttempt
+
+					CorrelatedLogger.log(
+						`Circuit breaker state restored: ${this.state} (age: ${stateAge}ms)`,
+						'CircuitBreaker',
+					)
+				}
+			}
+		}
+		catch (error: unknown) {
+			CorrelatedLogger.warn(
+				`Failed to load circuit breaker state: ${(error as Error).message}`,
+				'CircuitBreaker',
+			)
+		}
+	}
+
+	/**
+	 * Persist current state to storage
+	 */
+	private async persistCurrentState(): Promise<void> {
+		if (!this.options.persistState) {
+			return
+		}
+
+		try {
+			await this.options.persistState({
+				state: this.state,
+				failureCount: this.failureCount,
+				successCount: this.successCount,
+				lastStateChange: this.lastStateChange,
+				nextAttempt: this.nextAttempt,
+			})
+		}
+		catch (error: unknown) {
+			CorrelatedLogger.warn(
+				`Failed to persist circuit breaker state: ${(error as Error).message}`,
+				'CircuitBreaker',
+			)
+		}
+	}
+
+	/**
+	 * Cleanup resources
+	 */
+	destroy(): void {
+		if (this.persistenceTimer) {
+			clearInterval(this.persistenceTimer)
+			this.persistenceTimer = undefined
 		}
 	}
 

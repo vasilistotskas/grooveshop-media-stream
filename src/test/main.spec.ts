@@ -41,6 +41,9 @@ describe('bootstrap', () => {
 					}
 					return undefined
 				}),
+				getOptional: vi.fn().mockImplementation((key: any, defaultValue: any) => {
+					return defaultValue
+				}),
 			}),
 		}
 
@@ -58,7 +61,7 @@ describe('bootstrap', () => {
 	it('should bootstrap the application successfully', async () => {
 		process.env.PORT = '4000'
 
-		await bootstrap(false)
+		await bootstrap({ exitProcess: false, enableGracefulShutdown: false })
 
 		expect(NestFactory.create).toHaveBeenCalledWith(
 			MediaStreamModule,
@@ -76,7 +79,7 @@ describe('bootstrap', () => {
 	it('should use default port if PORT environment variable is not set', async () => {
 		delete process.env.PORT
 
-		await bootstrap(false)
+		await bootstrap({ exitProcess: false, enableGracefulShutdown: false })
 
 		expect(mockApp.listen).toHaveBeenCalledWith(3003, '0.0.0.0')
 	})
@@ -85,7 +88,7 @@ describe('bootstrap', () => {
 		const error = new Error('Test error')
 		vi.mocked(NestFactory.create).mockRejectedValue(error)
 
-		await expect(bootstrap(false)).rejects.toThrow('Test error')
+		await expect(bootstrap({ exitProcess: false, enableGracefulShutdown: false })).rejects.toThrow('Test error')
 	})
 
 	// eslint-disable-next-line test/expect-expect
@@ -96,7 +99,7 @@ describe('bootstrap', () => {
 
 		vi.mocked(NestFactory.create).mockRejectedValue(error)
 
-		const bootstrapPromise = bootstrap(false)
+		const bootstrapPromise = bootstrap({ exitProcess: false, enableGracefulShutdown: false })
 
 		await new Promise(process.nextTick)
 

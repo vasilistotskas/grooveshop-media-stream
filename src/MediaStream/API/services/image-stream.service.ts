@@ -1,10 +1,13 @@
 import type ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
-import type { Response } from 'express'
+import type { Request, Response } from 'express'
 import type { ImageProcessingContext } from '../types/image-source.types.js'
 import { Buffer } from 'node:buffer'
 import { open } from 'node:fs/promises'
 import CacheImageResourceOperation from '#microservice/Cache/operations/cache-image-resource.operation'
 import { DefaultImageFallbackError, InvalidRequestError, ResourceStreamingError } from '#microservice/common/errors/media-stream.errors'
+import { getMimeType, getVaryHeader, negotiateImageFormat } from '#microservice/common/utils/content-negotiation.util'
+import { checkETagMatch, checkIfModifiedSince, formatLastModified, generateWeakETag } from '#microservice/common/utils/etag.util'
+import { imageProcessingDeduplicator } from '#microservice/common/utils/request-deduplication.util'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Injectable, Logger } from '@nestjs/common'
@@ -16,6 +19,7 @@ import CacheImageRequest from '../dto/cache-image-request.dto.js'
 @Injectable()
 export class ImageStreamService {
 	private readonly _logger = new Logger(ImageStreamService.name)
+	private readonly REQUEST_TIMEOUT = 30000 // 30 seconds
 
 	constructor(
 		private readonly cacheImageResourceOperation: CacheImageResourceOperation,
@@ -24,25 +28,47 @@ export class ImageStreamService {
 
 	/**
 	 * Main entry point for processing and streaming images
+	 * Supports content negotiation, ETag caching, and request deduplication
 	 */
 	async processAndStream(
 		context: ImageProcessingContext,
 		request: CacheImageRequest,
 		res: Response,
+		req?: Request,
 	): Promise<void> {
 		const { correlationId } = context
 		PerformanceTracker.startPhase('image_request_processing')
+
+		// Apply content negotiation if request is available
+		if (req && request.resizeOptions) {
+			const negotiated = negotiateImageFormat(req, request.resizeOptions.format, request.resizeOptions.quality)
+			request.resizeOptions.format = negotiated.format
+			request.resizeOptions.quality = negotiated.quality
+		}
 
 		try {
 			this.metricsService.incrementCounter('image_requests_total')
 			await this.cacheImageResourceOperation.setup(request)
 
-			if (await this.cacheImageResourceOperation.checkResourceExists()) {
-				await this.streamResource(request, res, correlationId)
-			}
-			else {
-				await this.fetchAndWaitForResource(request, res, correlationId)
-			}
+			// Use request deduplication to prevent duplicate processing
+			const resourceId = this.cacheImageResourceOperation.getResourcePath
+			await imageProcessingDeduplicator.execute(resourceId, async () => {
+				if (await this.cacheImageResourceOperation.checkResourceExists()) {
+					// Check for conditional request (ETag/If-Modified-Since)
+					const headers = await this.cacheImageResourceOperation.fetchHeaders()
+					if (headers && req) {
+						const notModified = this.checkConditionalRequest(req, headers)
+						if (notModified) {
+							this.send304Response(res, headers, correlationId)
+							return
+						}
+					}
+					await this.streamResource(request, res, correlationId)
+				}
+				else {
+					await this.fetchAndWaitForResource(request, res, correlationId)
+				}
+			})
 		}
 		catch (error: unknown) {
 			await this.handleStreamError(error, request, res, correlationId)
@@ -53,7 +79,44 @@ export class ImageStreamService {
 	}
 
 	/**
+	 * Check if resource has been modified (for conditional requests)
+	 */
+	private checkConditionalRequest(req: Request, headers: ResourceMetaData): boolean {
+		const ifNoneMatch = req.headers['if-none-match'] as string | undefined
+		const ifModifiedSince = req.headers['if-modified-since'] as string | undefined
+
+		if (ifNoneMatch) {
+			const etag = generateWeakETag(headers.size || 0, headers.dateCreated, headers.format)
+			return checkETagMatch(ifNoneMatch, etag)
+		}
+
+		if (ifModifiedSince && headers.dateCreated) {
+			return !checkIfModifiedSince(ifModifiedSince, headers.dateCreated)
+		}
+
+		return false
+	}
+
+	/**
+	 * Send 304 Not Modified response
+	 */
+	private send304Response(res: Response, headers: ResourceMetaData, correlationId: string): void {
+		const etag = generateWeakETag(headers.size || 0, headers.dateCreated, headers.format)
+
+		res
+			.status(304)
+			.header('ETag', etag)
+			.header('Cache-Control', `max-age=${(headers.publicTTL || 0) / 1000}, public, immutable`)
+			.header('X-Correlation-ID', correlationId)
+			.header('Vary', getVaryHeader())
+			.end()
+
+		this._logger.debug('Sent 304 Not Modified response', { correlationId })
+	}
+
+	/**
 	 * Fetch resource and wait for it to be processed
+	 * Uses AbortController for proper timeout handling
 	 */
 	private async fetchAndWaitForResource(
 		request: CacheImageRequest,
@@ -63,24 +126,47 @@ export class ImageStreamService {
 		this._logger.debug('Resource does not exist, fetching', { correlationId })
 
 		const shouldUseQueue = this.cacheImageResourceOperation.shouldUseBackgroundProcessing()
-		await this.cacheImageResourceOperation.execute()
-
 		const maxWaitTime = shouldUseQueue ? 15000 : 10000
-		const pollInterval = 150
-		let waitTime = 0
 
-		while (waitTime < maxWaitTime) {
-			if (await this.cacheImageResourceOperation.checkResourceExists()) {
-				this._logger.debug('Resource available after waiting', { waitTime, correlationId })
-				await this.streamResource(request, res, correlationId)
-				return
+		// Create AbortController for timeout
+		const controller = new AbortController()
+		const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT)
+
+		try {
+			await this.cacheImageResourceOperation.execute()
+
+			const pollInterval = 150
+			let waitTime = 0
+
+			while (waitTime < maxWaitTime && !controller.signal.aborted) {
+				if (await this.cacheImageResourceOperation.checkResourceExists()) {
+					this._logger.debug('Resource available after waiting', { waitTime, correlationId })
+					await this.streamResource(request, res, correlationId)
+					return
+				}
+				await new Promise((resolve, reject) => {
+					const timer = setTimeout(resolve, pollInterval)
+					controller.signal.addEventListener('abort', () => {
+						clearTimeout(timer)
+						reject(new Error('Request timeout'))
+					}, { once: true })
+				})
+				waitTime += pollInterval
 			}
-			await new Promise(resolve => setTimeout(resolve, pollInterval))
-			waitTime += pollInterval
-		}
 
-		this._logger.warn('Timeout waiting for resource', { waitTime, correlationId })
-		await this.serveFallbackImage(request, res, correlationId)
+			this._logger.warn('Timeout waiting for resource', { waitTime, correlationId })
+			await this.serveFallbackImage(request, res, correlationId)
+		}
+		catch (error: unknown) {
+			if ((error as Error).message === 'Request timeout') {
+				this._logger.warn('Request aborted due to timeout', { correlationId })
+				this.metricsService.recordError('image_request', 'timeout')
+			}
+			throw error
+		}
+		finally {
+			clearTimeout(timeoutId)
+		}
 	}
 
 	/**
@@ -243,7 +329,7 @@ export class ImageStreamService {
 	}
 
 	/**
-	 * Add required headers to response
+	 * Add required headers to response including ETag for caching
 	 */
 	private addHeadersToResponse(
 		res: Response,
@@ -259,15 +345,22 @@ export class ImageStreamService {
 		const publicTTL = headers.publicTTL || 0
 		const expiresAt = Date.now() + publicTTL
 
+		// Generate ETag for conditional requests
+		const etag = generateWeakETag(size, headers.dateCreated, format)
+
 		res
 			.header('Content-Length', size)
 			.header('Cache-Control', `max-age=${publicTTL / 1000}, public, immutable`)
 			.header('Expires', new Date(expiresAt).toUTCString())
 			.header('X-Correlation-ID', correlationId)
+			// ETag for conditional requests (304 Not Modified)
+			.header('ETag', etag)
+			// Last-Modified for conditional requests
+			.header('Last-Modified', formatLastModified(headers.dateCreated))
 			// Vary on Accept for proper CDN caching with content negotiation (WebP/AVIF support)
-			.header('Vary', 'Accept, Accept-Encoding')
+			.header('Vary', getVaryHeader())
 			// Prevent MIME type sniffing for security
 			.header('X-Content-Type-Options', 'nosniff')
-			.header('Content-Type', format === 'svg' ? 'image/svg+xml' : `image/${format}`)
+			.header('Content-Type', getMimeType(format))
 	}
 }

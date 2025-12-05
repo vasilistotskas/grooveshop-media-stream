@@ -1,6 +1,7 @@
 import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import type { AxiosRequestConfig, AxiosResponse } from 'axios'
 import type { HttpClientStats, IHttpClient } from '../interfaces/http-client.interface.js'
+import type { CircuitBreakerPersistedState } from '../utils/circuit-breaker.js'
 import * as http from 'node:http'
 import { Agent as HttpAgent } from 'node:http'
 import * as https from 'node:https'
@@ -10,6 +11,7 @@ import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { HttpService } from '@nestjs/axios'
 import { Injectable } from '@nestjs/common'
+import { Redis } from 'ioredis'
 import { lastValueFrom, throwError, timer } from 'rxjs'
 import { retry, tap } from 'rxjs/operators'
 import { CircuitBreaker } from '../utils/circuit-breaker.js'
@@ -19,6 +21,8 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	private readonly circuitBreaker: CircuitBreaker
 	private readonly httpAgent: HttpAgent
 	private readonly httpsAgent: HttpsAgent
+	private redis: Redis | null = null
+	private readonly CIRCUIT_BREAKER_KEY = 'circuit_breaker:http_client'
 	private readonly stats: HttpClientStats = {
 		totalRequests: 0,
 		successfulRequests: 0,
@@ -45,11 +49,21 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 		this.maxRetryDelay = this._configService.getOptional('http.retry.maxRetryDelay', 10000)
 		this.timeout = this._configService.getOptional('http.connectionPool.timeout', 30000)
 
+		// Initialize Redis for circuit breaker state persistence
+		this.initializeRedis()
+
 		this.circuitBreaker = new CircuitBreaker({
 			failureThreshold: this._configService.getOptional('http.circuitBreaker.failureThreshold', 50),
 			resetTimeout: this._configService.getOptional('http.circuitBreaker.resetTimeout', 30000),
 			rollingWindow: this._configService.getOptional('http.circuitBreaker.monitoringPeriod', 60000),
 			minimumRequests: this._configService.getOptional('http.circuitBreaker.minimumRequests', 10),
+			name: 'http_client',
+			persistState: async (state: CircuitBreakerPersistedState) => {
+				await this.persistCircuitBreakerState(state)
+			},
+			loadState: async () => {
+				return await this.loadCircuitBreakerState()
+			},
 		})
 
 		const maxSockets = this._configService.getOptional('http.connectionPool.maxSockets', 50)
@@ -70,6 +84,85 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 		this.configureAxios()
 	}
 
+	/**
+	 * Initialize Redis connection for circuit breaker state persistence
+	 */
+	private initializeRedis(): void {
+		try {
+			const redisConfig = this._configService.get('cache.redis')
+			this.redis = new Redis({
+				host: redisConfig.host,
+				port: redisConfig.port,
+				password: redisConfig.password,
+				db: redisConfig.db,
+				lazyConnect: true,
+				maxRetriesPerRequest: 1,
+				connectTimeout: 5000,
+			})
+
+			this.redis.on('error', (error: unknown) => {
+				CorrelatedLogger.warn(
+					`Redis connection error for circuit breaker: ${(error as Error).message}`,
+					HttpClientService.name,
+				)
+			})
+		}
+		catch (error: unknown) {
+			CorrelatedLogger.warn(
+				`Failed to initialize Redis for circuit breaker: ${(error as Error).message}`,
+				HttpClientService.name,
+			)
+			this.redis = null
+		}
+	}
+
+	/**
+	 * Persist circuit breaker state to Redis
+	 */
+	private async persistCircuitBreakerState(state: CircuitBreakerPersistedState): Promise<void> {
+		if (!this.redis) {
+			return
+		}
+
+		try {
+			await this.redis.setex(
+				this.CIRCUIT_BREAKER_KEY,
+				300, // 5 minutes TTL
+				JSON.stringify(state),
+			)
+		}
+		catch (error: unknown) {
+			CorrelatedLogger.warn(
+				`Failed to persist circuit breaker state: ${(error as Error).message}`,
+				HttpClientService.name,
+			)
+		}
+	}
+
+	/**
+	 * Load circuit breaker state from Redis
+	 */
+	private async loadCircuitBreakerState(): Promise<CircuitBreakerPersistedState | null> {
+		if (!this.redis) {
+			return null
+		}
+
+		try {
+			const data = await this.redis.get(this.CIRCUIT_BREAKER_KEY)
+			if (data) {
+				return JSON.parse(data) as CircuitBreakerPersistedState
+			}
+		}
+		catch (error: unknown) {
+			CorrelatedLogger.warn(
+				`Failed to load circuit breaker state: ${(error as Error).message}`,
+				HttpClientService.name,
+			)
+		}
+
+		return null
+	}
+
 	async onModuleInit(): Promise<void> {
 		CorrelatedLogger.log('HTTP client service initialized', HttpClientService.name)
 	}
@@ -77,6 +170,12 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	async onModuleDestroy(): Promise<void> {
 		this.httpAgent.destroy()
 		this.httpsAgent.destroy()
+		this.circuitBreaker.destroy()
+
+		if (this.redis) {
+			await this.redis.quit()
+		}
+
 		CorrelatedLogger.log('HTTP client service destroyed', HttpClientService.name)
 	}
 

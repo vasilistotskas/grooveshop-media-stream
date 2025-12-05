@@ -1,6 +1,7 @@
 import type { StringMap } from '#microservice/common/types/common.types'
 import type { OnModuleInit } from '@nestjs/common'
 import type { AppConfig } from './interfaces/app-config.interface.js'
+import { APP_CONFIG_SCHEMA, buildConfigFromSchema } from '#microservice/common/utils/config-schema.util'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService as NestConfigService } from '@nestjs/config'
 
@@ -214,171 +215,111 @@ export class ConfigService implements OnModuleInit {
 		return this.loadConfig()
 	}
 
+	/**
+	 * Load configuration using schema-based approach
+	 * This reduces repetitive parsing logic significantly
+	 */
 	private loadConfig(): AppConfig {
-		const serverPort = Number.parseInt(this.nestConfigService.get('PORT') || '3003')
-		const serverHost = this.nestConfigService.get('HOST') || '0.0.0.0'
-		const corsOrigin = this.nestConfigService.get('CORS_ORIGIN') || '*'
-		const corsMethods = this.nestConfigService.get('CORS_METHODS') || 'GET'
-		const corsMaxAge = Number.parseInt(this.nestConfigService.get('CORS_MAX_AGE') || '86400')
+		// Use schema-based config loading for cleaner code
+		const config = buildConfigFromSchema<AppConfig>(
+			(key: string) => this.nestConfigService.get(key),
+			APP_CONFIG_SCHEMA,
+		)
 
-		const memoryMaxSize = Number.parseInt(this.nestConfigService.get('CACHE_MEMORY_MAX_SIZE') || '104857600')
-		const memoryDefaultTtl = Number.parseInt(this.nestConfigService.get('CACHE_MEMORY_DEFAULT_TTL') || '3600')
-		const memoryCheckPeriod = Number.parseInt(this.nestConfigService.get('CACHE_MEMORY_CHECK_PERIOD') || '600')
-		const memoryMaxKeys = Number.parseInt(this.nestConfigService.get('CACHE_MEMORY_MAX_KEYS') || '1000')
-		const memoryWarningThreshold = Number.parseInt(this.nestConfigService.get('CACHE_MEMORY_WARNING_THRESHOLD') || '80')
+		// Ensure nested objects exist (schema might not create all levels)
+		return this.ensureConfigStructure(config)
+	}
 
-		const redisHost = this.nestConfigService.get('REDIS_HOST') || 'localhost'
-		const redisPort = Number.parseInt(this.nestConfigService.get('REDIS_PORT') || '6379')
-		const redisPassword = this.nestConfigService.get('REDIS_PASSWORD')
-		const redisDb = Number.parseInt(this.nestConfigService.get('REDIS_DB') || '0')
-		const redisTtl = Number.parseInt(this.nestConfigService.get('REDIS_TTL') || '7200')
-		const redisMaxRetries = Number.parseInt(this.nestConfigService.get('REDIS_MAX_RETRIES') || '3')
-		const redisRetryDelay = Number.parseInt(this.nestConfigService.get('REDIS_RETRY_DELAY') || '100')
-
-		const fileDirectory = this.nestConfigService.get('CACHE_FILE_DIRECTORY') || './storage'
-		const fileMaxSize = Number.parseInt(this.nestConfigService.get('CACHE_FILE_MAX_SIZE') || '1073741824')
-		const fileCleanupInterval = Number.parseInt(this.nestConfigService.get('CACHE_FILE_CLEANUP_INTERVAL') || '3600')
-
-		const warmingEnabledStr = this.nestConfigService.get('CACHE_WARMING_ENABLED') || 'true'
-		const warmingEnabled = typeof warmingEnabledStr === 'string'
-			? warmingEnabledStr.toLowerCase() === 'true'
-			: warmingEnabledStr
-		const warmingOnStartStr = this.nestConfigService.get('CACHE_WARMING_ON_START') || 'true'
-		const warmingOnStart = typeof warmingOnStartStr === 'string'
-			? warmingOnStartStr.toLowerCase() === 'true'
-			: warmingOnStartStr
-		const warmingMaxFiles = Number.parseInt(this.nestConfigService.get('CACHE_WARMING_MAX_FILES') || '50')
-		const warmingCron = this.nestConfigService.get('CACHE_WARMING_CRON') || '0 */6 * * *'
-		const warmingThreshold = Number.parseInt(this.nestConfigService.get('CACHE_WARMING_THRESHOLD') || '5')
-
-		const processingMaxConcurrent = Number.parseInt(this.nestConfigService.get('PROCESSING_MAX_CONCURRENT') || '10')
-		const processingTimeout = Number.parseInt(this.nestConfigService.get('PROCESSING_TIMEOUT') || '30000')
-		const processingRetries = Number.parseInt(this.nestConfigService.get('PROCESSING_RETRIES') || '3')
-		const processingMaxFileSize = Number.parseInt(this.nestConfigService.get('PROCESSING_MAX_FILE_SIZE') || '10485760')
-
-		const allowedFormatsStr = this.nestConfigService.get('PROCESSING_ALLOWED_FORMATS') || 'jpg,jpeg,png,webp,gif,svg'
-		const allowedFormats = typeof allowedFormatsStr === 'string'
-			? allowedFormatsStr.split(',').map(format => format.trim().toLowerCase())
-			: allowedFormatsStr
-
-		const monitoringEnabledStr = this.nestConfigService.get('MONITORING_ENABLED') || 'true'
-		const monitoringEnabled = typeof monitoringEnabledStr === 'string'
-			? monitoringEnabledStr.toLowerCase() === 'true'
-			: monitoringEnabledStr
-		const monitoringMetricsPort = Number.parseInt(this.nestConfigService.get('MONITORING_METRICS_PORT') || '9090')
-		const monitoringHealthPath = this.nestConfigService.get('MONITORING_HEALTH_PATH') || '/health'
-		const monitoringMetricsPath = this.nestConfigService.get('MONITORING_METRICS_PATH') || '/metrics'
-
-		const externalRequestTimeout = Number.parseInt(this.nestConfigService.get('EXTERNAL_REQUEST_TIMEOUT') || '30000')
-		const externalMaxRetries = Number.parseInt(this.nestConfigService.get('EXTERNAL_MAX_RETRIES') || '3')
-
-		const rateLimitEnabledStr = this.nestConfigService.get('RATE_LIMIT_ENABLED') || 'true'
-		const rateLimitEnabled = typeof rateLimitEnabledStr === 'string'
-			? rateLimitEnabledStr.toLowerCase() === 'true'
-			: rateLimitEnabledStr
-		const rateLimitDefaultWindowMs = Number.parseInt(this.nestConfigService.get('RATE_LIMIT_DEFAULT_WINDOW_MS') || '60000')
-		const rateLimitDefaultMax = Number.parseInt(this.nestConfigService.get('RATE_LIMIT_DEFAULT_MAX') || '100')
-		const rateLimitImageProcessingWindowMs = Number.parseInt(this.nestConfigService.get('RATE_LIMIT_IMAGE_PROCESSING_WINDOW_MS') || '60000')
-		const rateLimitImageProcessingMax = Number.parseInt(this.nestConfigService.get('RATE_LIMIT_IMAGE_PROCESSING_MAX') || '50')
-		const rateLimitHealthCheckWindowMs = Number.parseInt(this.nestConfigService.get('RATE_LIMIT_HEALTH_CHECK_WINDOW_MS') || '10000')
-		const rateLimitHealthCheckMax = Number.parseInt(this.nestConfigService.get('RATE_LIMIT_HEALTH_CHECK_MAX') || '1000')
-
-		const rateLimitBypassHealthChecksStr = this.nestConfigService.get('RATE_LIMIT_BYPASS_HEALTH_CHECKS') || 'true'
-		const rateLimitBypassHealthChecks = typeof rateLimitBypassHealthChecksStr === 'string'
-			? rateLimitBypassHealthChecksStr.toLowerCase() === 'true'
-			: rateLimitBypassHealthChecksStr
-		const rateLimitBypassMetricsEndpointStr = this.nestConfigService.get('RATE_LIMIT_BYPASS_METRICS_ENDPOINT') || 'true'
-		const rateLimitBypassMetricsEndpoint = typeof rateLimitBypassMetricsEndpointStr === 'string'
-			? rateLimitBypassMetricsEndpointStr.toLowerCase() === 'true'
-			: rateLimitBypassMetricsEndpointStr
-		const rateLimitBypassStaticAssetsStr = this.nestConfigService.get('RATE_LIMIT_BYPASS_STATIC_ASSETS') || 'true'
-		const rateLimitBypassStaticAssets = typeof rateLimitBypassStaticAssetsStr === 'string'
-			? rateLimitBypassStaticAssetsStr.toLowerCase() === 'true'
-			: rateLimitBypassStaticAssetsStr
-		const rateLimitBypassWhitelistedDomains = this.nestConfigService.get('RATE_LIMIT_BYPASS_WHITELISTED_DOMAINS') || ''
-		const rateLimitBypassBotsStr = this.nestConfigService.get('RATE_LIMIT_BYPASS_BOTS') || 'true'
-		const rateLimitBypassBots = typeof rateLimitBypassBotsStr === 'string'
-			? rateLimitBypassBotsStr.toLowerCase() === 'true'
-			: rateLimitBypassBotsStr
-
+	/**
+	 * Ensure all required nested config structures exist
+	 */
+	private ensureConfigStructure(config: any): AppConfig {
 		return {
 			server: {
-				port: serverPort,
-				host: serverHost,
+				port: config.server?.port ?? 3003,
+				host: config.server?.host ?? '0.0.0.0',
 				cors: {
-					origin: corsOrigin,
-					methods: corsMethods,
-					maxAge: corsMaxAge,
+					origin: config.server?.cors?.origin ?? '*',
+					methods: config.server?.cors?.methods ?? 'GET',
+					maxAge: config.server?.cors?.maxAge ?? 86400,
 				},
 			},
 			cache: {
 				memory: {
-					maxSize: memoryMaxSize,
-					defaultTtl: memoryDefaultTtl,
-					checkPeriod: memoryCheckPeriod,
-					maxKeys: memoryMaxKeys,
-					warningThreshold: memoryWarningThreshold,
+					maxSize: config.cache?.memory?.maxSize ?? 104857600,
+					defaultTtl: config.cache?.memory?.defaultTtl ?? 3600,
+					checkPeriod: config.cache?.memory?.checkPeriod ?? 600,
+					maxKeys: config.cache?.memory?.maxKeys ?? 1000,
+					warningThreshold: config.cache?.memory?.warningThreshold ?? 80,
 				},
 				redis: {
-					host: redisHost,
-					port: redisPort,
-					password: redisPassword,
-					db: redisDb,
-					ttl: redisTtl,
-					maxRetries: redisMaxRetries,
-					retryDelayOnFailover: redisRetryDelay,
+					host: config.cache?.redis?.host ?? 'localhost',
+					port: config.cache?.redis?.port ?? 6379,
+					password: config.cache?.redis?.password,
+					db: config.cache?.redis?.db ?? 0,
+					ttl: config.cache?.redis?.ttl ?? 7200,
+					maxRetries: config.cache?.redis?.maxRetries ?? 3,
+					retryDelayOnFailover: config.cache?.redis?.retryDelayOnFailover ?? 100,
 				},
 				file: {
-					directory: fileDirectory,
-					maxSize: fileMaxSize,
-					cleanupInterval: fileCleanupInterval,
+					directory: config.cache?.file?.directory ?? './storage',
+					maxSize: config.cache?.file?.maxSize ?? 1073741824,
+					cleanupInterval: config.cache?.file?.cleanupInterval ?? 3600,
 				},
 				warming: {
-					enabled: warmingEnabled,
-					warmupOnStart: warmingOnStart,
-					maxFilesToWarm: warmingMaxFiles,
-					warmupCron: warmingCron,
-					popularImageThreshold: warmingThreshold,
+					enabled: config.cache?.warming?.enabled ?? true,
+					warmupOnStart: config.cache?.warming?.warmupOnStart ?? true,
+					maxFilesToWarm: config.cache?.warming?.maxFilesToWarm ?? 50,
+					warmupCron: config.cache?.warming?.warmupCron ?? '0 */6 * * *',
+					popularImageThreshold: config.cache?.warming?.popularImageThreshold ?? 5,
+				},
+				image: {
+					publicTtl: config.cache?.image?.publicTtl ?? 12 * 30 * 24 * 60 * 60 * 1000,
+					privateTtl: config.cache?.image?.privateTtl ?? 6 * 30 * 24 * 60 * 60 * 1000,
 				},
 			},
 			processing: {
-				maxConcurrent: processingMaxConcurrent,
-				timeout: processingTimeout,
-				retries: processingRetries,
-				maxFileSize: processingMaxFileSize,
-				allowedFormats,
+				maxConcurrent: config.processing?.maxConcurrent ?? 10,
+				timeout: config.processing?.timeout ?? 30000,
+				retries: config.processing?.retries ?? 3,
+				maxFileSize: config.processing?.maxFileSize ?? 10485760,
+				allowedFormats: config.processing?.allowedFormats ?? ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'],
 			},
 			monitoring: {
-				enabled: monitoringEnabled,
-				metricsPort: monitoringMetricsPort,
-				healthPath: monitoringHealthPath,
-				metricsPath: monitoringMetricsPath,
+				enabled: config.monitoring?.enabled ?? true,
+				metricsPort: config.monitoring?.metricsPort ?? 9090,
+				healthPath: config.monitoring?.healthPath ?? '/health',
+				metricsPath: config.monitoring?.metricsPath ?? '/metrics',
 			},
 			externalServices: {
-				requestTimeout: externalRequestTimeout,
-				maxRetries: externalMaxRetries,
+				requestTimeout: config.externalServices?.requestTimeout ?? 30000,
+				maxRetries: config.externalServices?.maxRetries ?? 3,
 			},
 			rateLimit: {
-				enabled: rateLimitEnabled,
+				enabled: config.rateLimit?.enabled ?? true,
 				default: {
-					windowMs: rateLimitDefaultWindowMs,
-					max: rateLimitDefaultMax,
+					windowMs: config.rateLimit?.default?.windowMs ?? 60000,
+					max: config.rateLimit?.default?.max ?? 100,
 				},
 				imageProcessing: {
-					windowMs: rateLimitImageProcessingWindowMs,
-					max: rateLimitImageProcessingMax,
+					windowMs: config.rateLimit?.imageProcessing?.windowMs ?? 60000,
+					max: config.rateLimit?.imageProcessing?.max ?? 50,
 				},
 				healthCheck: {
-					windowMs: rateLimitHealthCheckWindowMs,
-					max: rateLimitHealthCheckMax,
+					windowMs: config.rateLimit?.healthCheck?.windowMs ?? 10000,
+					max: config.rateLimit?.healthCheck?.max ?? 1000,
 				},
 				bypass: {
-					healthChecks: rateLimitBypassHealthChecks,
-					metricsEndpoint: rateLimitBypassMetricsEndpoint,
-					staticAssets: rateLimitBypassStaticAssets,
-					whitelistedDomains: rateLimitBypassWhitelistedDomains,
-					bots: rateLimitBypassBots,
+					healthChecks: config.rateLimit?.bypass?.healthChecks ?? true,
+					metricsEndpoint: config.rateLimit?.bypass?.metricsEndpoint ?? true,
+					staticAssets: config.rateLimit?.bypass?.staticAssets ?? true,
+					whitelistedDomains: config.rateLimit?.bypass?.whitelistedDomains ?? '',
+					bots: config.rateLimit?.bypass?.bots ?? true,
 				},
+			},
+			shutdown: {
+				timeout: config.shutdown?.timeout ?? 30000,
+				forceTimeout: config.shutdown?.forceTimeout ?? 60000,
 			},
 		}
 	}

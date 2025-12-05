@@ -166,7 +166,10 @@ export class SharpHealthIndicator extends BaseHealthIndicator {
 			.map(([name]) => name)
 
 		return {
-			versions: sharp.versions,
+			versions: {
+				sharp: sharp.versions.sharp || 'unknown',
+				libvips: sharp.versions.vips || 'unknown',
+			},
 			formats: {
 				input: inputFormats,
 				output: outputFormats,
@@ -226,9 +229,9 @@ export class SharpHealthIndicator extends BaseHealthIndicator {
 
 		return {
 			cache: {
-				memory: cache.memory || 0,
-				files: cache.files || 0,
-				items: cache.items || 0,
+				memory: typeof cache.memory === 'object' ? cache.memory.current || 0 : (cache.memory || 0),
+				files: typeof cache.files === 'object' ? cache.files.current || 0 : (cache.files || 0),
+				items: typeof cache.items === 'object' ? cache.items.current || 0 : (cache.items || 0),
 			},
 			counters: {
 				process: counters.process || 0,

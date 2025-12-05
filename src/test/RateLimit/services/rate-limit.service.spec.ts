@@ -59,13 +59,20 @@ describe('rateLimitService', () => {
 
 	describe('generateAdvancedKey', () => {
 		it('should generate an advanced key with user agent hash', () => {
+			// For image-processing endpoint, we use IP-only to prevent UA spoofing bypass
 			const key = service.generateAdvancedKey('192.168.1.1', 'Mozilla/5.0', 'image-processing')
-			expect(key).toMatch(/^192\.168\.1\.1:[a-z0-9]+:image-processing$/)
+			expect(key).toBe('192.168.1.1:image-processing')
 		})
 
 		it('should handle empty user agent', () => {
+			// For image-processing endpoint, we use IP-only to prevent UA spoofing bypass
 			const key = service.generateAdvancedKey('192.168.1.1', '', 'image-processing')
-			expect(key).toMatch(/^192\.168\.1\.1:[a-z0-9]+:image-processing$/)
+			expect(key).toBe('192.168.1.1:image-processing')
+		})
+
+		it('should include user agent hash for non-image-processing endpoints', () => {
+			const key = service.generateAdvancedKey('192.168.1.1', 'Mozilla/5.0', 'default')
+			expect(key).toMatch(/^192\.168\.1\.1:[a-z0-9]+:default$/)
 		})
 	})
 

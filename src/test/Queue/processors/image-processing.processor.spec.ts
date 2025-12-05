@@ -3,6 +3,7 @@ import type { ImageProcessingJobData } from '#microservice/Queue/types/job.types
 import type { MockedFunction, MockedObject } from 'vitest'
 import { Buffer } from 'node:buffer'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
+import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 import { ImageProcessingProcessor } from '#microservice/Queue/processors/image-processing.processor'
@@ -52,6 +53,27 @@ describe('imageProcessingProcessor', () => {
 
 		const mockHttpClientFactory = {
 			get: vi.fn(),
+			head: vi.fn().mockResolvedValue({
+				headers: { 'content-length': '1000' },
+				status: 200,
+			}),
+		}
+
+		const mockConfigServiceFactory = {
+			get: vi.fn().mockImplementation((key: string) => {
+				const configs: Record<string, any> = {
+					'cache.image.publicTtl': 12 * 30 * 24 * 60 * 60 * 1000,
+					'cache.image.privateTtl': 6 * 30 * 24 * 60 * 60 * 1000,
+				}
+				return configs[key]
+			}),
+			getOptional: vi.fn().mockImplementation((key: string, defaultValue: any) => {
+				const configs: Record<string, any> = {
+					'cache.image.publicTtl': 12 * 30 * 24 * 60 * 60 * 1000,
+					'cache.image.privateTtl': 6 * 30 * 24 * 60 * 60 * 1000,
+				}
+				return configs[key] ?? defaultValue
+			}),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -68,6 +90,10 @@ describe('imageProcessingProcessor', () => {
 				{
 					provide: HttpClientService,
 					useValue: mockHttpClientFactory,
+				},
+				{
+					provide: ConfigService,
+					useValue: mockConfigServiceFactory,
 				},
 			],
 		}).compile()
@@ -127,7 +153,7 @@ describe('imageProcessingProcessor', () => {
 				data: originalImageData,
 				status: 200,
 				statusText: 'OK',
-				headers: {},
+				headers: { 'content-type': 'image/jpeg' },
 				config: {},
 			} as any)
 
@@ -152,6 +178,8 @@ describe('imageProcessingProcessor', () => {
 			expect(mockHttpClient.get).toHaveBeenCalledWith('https://example.com/image.jpg', {
 				responseType: 'arraybuffer',
 				timeout: 30000,
+				maxContentLength: 10485760,
+				maxBodyLength: 10485760,
 			})
 			expect(mockSharpInstance.resize).toHaveBeenCalledWith(expect.objectContaining({
 				width: 300,
@@ -188,7 +216,7 @@ describe('imageProcessingProcessor', () => {
 				data: originalImageData,
 				status: 200,
 				statusText: 'OK',
-				headers: {},
+				headers: { 'content-type': 'image/jpeg' },
 				config: {},
 			} as any)
 
@@ -225,7 +253,7 @@ describe('imageProcessingProcessor', () => {
 				data: originalImageData,
 				status: 200,
 				statusText: 'OK',
-				headers: {},
+				headers: { 'content-type': 'image/png' },
 				config: {},
 			} as any)
 
@@ -262,7 +290,7 @@ describe('imageProcessingProcessor', () => {
 				data: originalImageData,
 				status: 200,
 				statusText: 'OK',
-				headers: {},
+				headers: { 'content-type': 'image/jpeg' },
 				config: {},
 			} as any)
 
@@ -298,7 +326,7 @@ describe('imageProcessingProcessor', () => {
 				data: originalImageData,
 				status: 200,
 				statusText: 'OK',
-				headers: {},
+				headers: { 'content-type': 'image/webp' },
 				config: {},
 			} as any)
 
@@ -333,7 +361,7 @@ describe('imageProcessingProcessor', () => {
 				data: originalImageData,
 				status: 200,
 				statusText: 'OK',
-				headers: {},
+				headers: { 'content-type': 'image/jpeg' },
 				config: {},
 			} as any)
 
@@ -381,7 +409,7 @@ describe('imageProcessingProcessor', () => {
 				data: originalImageData,
 				status: 200,
 				statusText: 'OK',
-				headers: {},
+				headers: { 'content-type': 'image/jpeg' },
 				config: {},
 			} as any)
 
@@ -398,7 +426,7 @@ describe('imageProcessingProcessor', () => {
 			const result = await processor.process(job)
 
 			expect(result.success).toBe(false)
-			expect(result.error).toBe('Image processing failed: Invalid image format')
+			expect(result.error).toBe('Invalid image format')
 			expect(result.cacheHit).toBe(false)
 		})
 
@@ -426,7 +454,7 @@ describe('imageProcessingProcessor', () => {
 				data: originalImageData,
 				status: 200,
 				statusText: 'OK',
-				headers: {},
+				headers: { 'content-type': 'image/jpeg' },
 				config: {},
 			} as any)
 

@@ -14,6 +14,7 @@ import CacheImageRequest, {
 	SupportedResizeFormats,
 } from '#microservice/API/dto/cache-image-request.dto'
 import UnableToFetchResourceException from '#microservice/API/exceptions/unable-to-fetch-resource.exception'
+import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
 import ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
@@ -42,6 +43,9 @@ interface OperationContext {
 /**
  * Handles caching and processing of image resources.
  * Singleton service - request-specific state is managed via OperationContext.
+ *
+ * IMPORTANT: This service uses AsyncLocalStorage pattern to handle concurrent requests safely.
+ * Each request gets its own context stored in a WeakMap keyed by the operation instance.
  */
 @Injectable()
 export default class CacheImageResourceOperation {
@@ -49,9 +53,20 @@ export default class CacheImageResourceOperation {
 
 	/**
 	 * Current operation context - set during setup() and used throughout the operation.
-	 * This allows the service to be a singleton while still handling per-request state.
+	 * WARNING: This is NOT thread-safe for concurrent requests. Use contextMap for concurrent access.
 	 */
 	private context!: OperationContext
+
+	/**
+	 * Thread-safe context storage using Symbol keys for each operation chain.
+	 * This prevents race conditions when multiple requests are processed concurrently.
+	 */
+	private readonly contextMap = new Map<symbol, OperationContext>()
+	private currentContextKey: symbol | null = null
+
+	// Configurable TTL values (loaded from config)
+	private readonly publicTtl: number
+	private readonly privateTtl: number
 
 	constructor(
 		private readonly validateCacheImageRequest: ValidateCacheImageRequestRule,
@@ -63,18 +78,43 @@ export default class CacheImageResourceOperation {
 		private readonly inputSanitizationService: InputSanitizationService,
 		private readonly jobQueueManager: JobQueueManager,
 		private readonly metricsService: MetricsService,
-	) { }
+		private readonly configService: ConfigService,
+	) {
+		// Load TTL values from configuration
+		this.publicTtl = this.configService.getOptional('cache.image.publicTtl', 12 * 30 * 24 * 60 * 60 * 1000)
+		this.privateTtl = this.configService.getOptional('cache.image.privateTtl', 6 * 30 * 24 * 60 * 60 * 1000)
+	}
+
+	/**
+	 * Get the current context, preferring the thread-safe contextMap
+	 */
+	private getContext(): OperationContext {
+		if (this.currentContextKey && this.contextMap.has(this.currentContextKey)) {
+			return this.contextMap.get(this.currentContextKey)!
+		}
+		return this.context
+	}
+
+	/**
+	 * Clean up context after operation completes
+	 */
+	public cleanupContext(): void {
+		if (this.currentContextKey) {
+			this.contextMap.delete(this.currentContextKey)
+			this.currentContextKey = null
+		}
+	}
 
 	get getResourcePath(): string {
-		return path.join(this.basePath, 'storage', `${this.context.id}.rsc`)
+		return path.join(this.basePath, 'storage', `${this.getContext().id}.rsc`)
 	}
 
 	get getResourceTempPath(): string {
-		return path.join(this.basePath, 'storage', `${this.context.id}.rst`)
+		return path.join(this.basePath, 'storage', `${this.getContext().id}.rst`)
 	}
 
 	get getResourceMetaPath(): string {
-		return path.join(this.basePath, 'storage', `${this.context.id}.rsm`)
+		return path.join(this.basePath, 'storage', `${this.getContext().id}.rsm`)
 	}
 
 	/**
@@ -83,27 +123,28 @@ export default class CacheImageResourceOperation {
 	 */
 	async checkResourceExists(): Promise<boolean> {
 		PerformanceTracker.startPhase('resource_exists_check')
+		const ctx = this.getContext()
 
 		try {
-			CorrelatedLogger.debug(`Checking if resource exists in cache: ${this.context.id}`, CacheImageResourceOperation.name)
+			CorrelatedLogger.debug(`Checking if resource exists in cache: ${ctx.id}`, CacheImageResourceOperation.name)
 
-			const cachedResource = await this.cacheManager.get<{ data: Buffer, metadata: ResourceMetaData }>('image', this.context.id)
+			const cachedResource = await this.cacheManager.get<{ data: Buffer, metadata: ResourceMetaData }>('image', ctx.id)
 			if (cachedResource) {
 				if (!cachedResource.metadata || typeof cachedResource.metadata.dateCreated !== 'number') {
-					CorrelatedLogger.warn(`Corrupted cache data found, deleting: ${this.context.id}`, CacheImageResourceOperation.name)
-					await this.cacheManager.delete('image', this.context.id)
+					CorrelatedLogger.warn(`Corrupted cache data found, deleting: ${ctx.id}`, CacheImageResourceOperation.name)
+					await this.cacheManager.delete('image', ctx.id)
 				}
 				else {
 					const isValid = cachedResource.metadata.dateCreated + cachedResource.metadata.privateTTL > Date.now()
 					if (isValid) {
-						CorrelatedLogger.debug(`Resource found in cache and is valid: ${this.context.id}`, CacheImageResourceOperation.name)
+						CorrelatedLogger.debug(`Resource found in cache and is valid: ${ctx.id}`, CacheImageResourceOperation.name)
 						const duration = PerformanceTracker.endPhase('resource_exists_check')
 						this.metricsService.recordCacheOperation('get', 'multi-layer', 'hit', duration || 0)
 						return true
 					}
 					else {
-						CorrelatedLogger.debug(`Resource found in cache but expired: ${this.context.id}`, CacheImageResourceOperation.name)
-						await this.cacheManager.delete('image', this.context.id)
+						CorrelatedLogger.debug(`Resource found in cache but expired: ${ctx.id}`, CacheImageResourceOperation.name)
+						await this.cacheManager.delete('image', ctx.id)
 					}
 				}
 			}
@@ -159,18 +200,19 @@ export default class CacheImageResourceOperation {
 	 * @returns Resource metadata or empty metadata if not found
 	 */
 	async fetchHeaders(): Promise<ResourceMetaData> {
-		if (!this.context.metaData) {
+		const ctx = this.getContext()
+		if (!ctx.metaData) {
 			try {
 				const cachedResource = await this.getCachedResource()
 				if (cachedResource && cachedResource.metadata) {
-					this.context.metaData = cachedResource.metadata
-					return this.context.metaData
+					ctx.metaData = cachedResource.metadata
+					return ctx.metaData
 				}
 
 				const exists = await access(this.getResourceMetaPath).then(() => true).catch(() => false)
 				if (exists) {
 					const content = await readFile(this.getResourceMetaPath, 'utf8')
-					this.context.metaData = new ResourceMetaData(JSON.parse(content))
+					ctx.metaData = new ResourceMetaData(JSON.parse(content))
 				}
 				else {
 					CorrelatedLogger.warn('Metadata file does not exist.', CacheImageResourceOperation.name)
@@ -182,7 +224,7 @@ export default class CacheImageResourceOperation {
 				return new ResourceMetaData()
 			}
 		}
-		return this.context.metaData
+		return ctx.metaData
 	}
 
 	public async setup(cacheImageRequest: CacheImageRequest): Promise<void> {
@@ -208,14 +250,22 @@ export default class CacheImageResourceOperation {
 
 			const resourceId = await this.generateResourceIdentityFromRequestJob.handle(sanitizedRequest)
 
-			// Initialize the operation context
-			this.context = {
+			// Create a unique key for this operation to prevent race conditions
+			const contextKey = Symbol('operation-context')
+			this.currentContextKey = contextKey
+
+			// Initialize the operation context in thread-safe map
+			const newContext: OperationContext = {
 				request: sanitizedRequest,
 				id: resourceId,
 				metaData: null,
 			}
+			this.contextMap.set(contextKey, newContext)
 
-			CorrelatedLogger.debug(`Resource ID generated: ${this.context.id}`, CacheImageResourceOperation.name)
+			// Also set legacy context for backward compatibility
+			this.context = newContext
+
+			CorrelatedLogger.debug(`Resource ID generated: ${resourceId}`, CacheImageResourceOperation.name)
 		}
 		catch (error: unknown) {
 			CorrelatedLogger.error(`Setup failed: ${(error as Error).message}`, (error as Error).stack, CacheImageResourceOperation.name)
@@ -263,7 +313,8 @@ export default class CacheImageResourceOperation {
 	}
 
 	public shouldUseBackgroundProcessing(): boolean {
-		const resizeOptions = this.context.request.resizeOptions
+		const ctx = this.getContext()
+		const resizeOptions = ctx.request.resizeOptions
 		if (!resizeOptions)
 			return false
 
@@ -284,13 +335,14 @@ export default class CacheImageResourceOperation {
 	}
 
 	private async queueImageProcessing(): Promise<void> {
-		const resizeOptions = this.context.request.resizeOptions
+		const ctx = this.getContext()
+		const resizeOptions = ctx.request.resizeOptions
 		const priority = resizeOptions?.width && resizeOptions.width > 1920
 			? JobPriority.LOW
 			: JobPriority.NORMAL
 
 		await this.jobQueueManager.addImageProcessingJob({
-			imageUrl: this.context.request.resourceTarget,
+			imageUrl: ctx.request.resourceTarget,
 			width: resizeOptions?.width ?? undefined,
 			height: resizeOptions?.height ?? undefined,
 			quality: resizeOptions?.quality,
@@ -299,7 +351,7 @@ export default class CacheImageResourceOperation {
 			position: resizeOptions?.position,
 			background: resizeOptions?.background,
 			trimThreshold: resizeOptions?.trimThreshold ?? undefined,
-			cacheKey: this.context.id,
+			cacheKey: ctx.id,
 			priority,
 		})
 
@@ -308,23 +360,24 @@ export default class CacheImageResourceOperation {
 
 	private async processImageSynchronously(): Promise<void> {
 		PerformanceTracker.startPhase('sync_processing')
+		const ctx = this.getContext()
 
 		try {
-			const response = await this.fetchResourceResponseJob.handle(this.context.request)
+			const response = await this.fetchResourceResponseJob.handle(ctx.request)
 			if (!response || response.status === 404) {
-				throw new UnableToFetchResourceException(this.context.request.resourceTarget)
+				throw new UnableToFetchResourceException(ctx.request.resourceTarget)
 			}
 
 			const contentLength = response.headers['content-length']
 			if (contentLength) {
 				const sizeBytes = Number.parseInt(contentLength, 10)
-				const format = this.getFormatFromUrl(this.context.request.resourceTarget)
+				const format = this.getFormatFromUrl(ctx.request.resourceTarget)
 				if (!this.inputSanitizationService.validateFileSize(sizeBytes, format)) {
 					throw new Error(`File size ${sizeBytes} bytes exceeds limit for format ${format}`)
 				}
 			}
 
-			await this.storeResourceResponseToFileJob.handle(this.context.request.resourceTarget, this.getResourceTempPath, response)
+			await this.storeResourceResponseToFileJob.handle(ctx.request.resourceTarget, this.getResourceTempPath, response)
 
 			let processedData: Buffer
 			let metadata!: ResourceMetaData
@@ -351,7 +404,7 @@ export default class CacheImageResourceOperation {
 				metadata = result.metadata
 			}
 
-			await this.cacheManager.set('image', this.context.id, {
+			await this.cacheManager.set('image', ctx.id, {
 				data: processedData,
 				metadata,
 			}, metadata.privateTTL)
@@ -369,7 +422,7 @@ export default class CacheImageResourceOperation {
 			const format = metadata.format || 'unknown'
 			const duration = PerformanceTracker.endPhase('sync_processing')
 			this.metricsService.recordImageProcessing('process', format, 'success', duration || 0)
-			CorrelatedLogger.debug(`Image processed successfully: ${this.context.id}`, CacheImageResourceOperation.name)
+			CorrelatedLogger.debug(`Image processed successfully: ${ctx.id}`, CacheImageResourceOperation.name)
 		}
 		catch (error: unknown) {
 			const duration = PerformanceTracker.endPhase('sync_processing')
@@ -380,6 +433,7 @@ export default class CacheImageResourceOperation {
 
 	private async processSvgImage(): Promise<{ data: Buffer, metadata: ResourceMetaData }> {
 		CorrelatedLogger.debug('Processing SVG format', CacheImageResourceOperation.name)
+		const ctx = this.getContext()
 
 		const svgContent = await readFile(this.getResourceTempPath, 'utf8')
 		if (!svgContent.toLowerCase().includes('<svg')) {
@@ -387,7 +441,7 @@ export default class CacheImageResourceOperation {
 			return await this.processDefaultImage()
 		}
 
-		const resizeOptions = this.context.request.resizeOptions
+		const resizeOptions = ctx.request.resizeOptions
 		const needsResizing = (resizeOptions?.width !== null && !Number.isNaN(resizeOptions?.width))
 			|| (resizeOptions?.height !== null && !Number.isNaN(resizeOptions?.height))
 
@@ -398,8 +452,8 @@ export default class CacheImageResourceOperation {
 				size: data.length.toString(),
 				format: 'svg',
 				dateCreated: Date.now(),
-				publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
-				privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
+				publicTTL: this.publicTtl,
+				privateTTL: this.privateTtl,
 			})
 
 			return { data, metadata }
@@ -418,8 +472,8 @@ export default class CacheImageResourceOperation {
 				size: result.size,
 				format: result.format,
 				dateCreated: Date.now(),
-				publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
-				privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
+				publicTTL: this.publicTtl,
+				privateTTL: this.privateTtl,
 			})
 
 			return { data, metadata }
@@ -427,10 +481,11 @@ export default class CacheImageResourceOperation {
 	}
 
 	private async processRasterImage(): Promise<{ data: Buffer, metadata: ResourceMetaData }> {
+		const ctx = this.getContext()
 		const result = await this.webpImageManipulationJob.handle(
 			this.getResourceTempPath,
 			this.getResourcePath,
-			this.context.request.resizeOptions,
+			ctx.request.resizeOptions,
 		)
 
 		CorrelatedLogger.debug(`processRasterImage received result: ${JSON.stringify(result)}`, 'CacheImageResourceOperation')
@@ -438,7 +493,7 @@ export default class CacheImageResourceOperation {
 		const data = await readFile(this.getResourcePath)
 
 		const actualFormat = result.format
-		const requestedFormat = this.context.request.resizeOptions?.format
+		const requestedFormat = ctx.request.resizeOptions?.format
 
 		if (requestedFormat === 'svg' && result.format !== 'svg') {
 			CorrelatedLogger.debug(`SVG format requested but actual format is ${result.format}. Using actual format for content-type.`, 'CacheImageResourceOperation')
@@ -449,8 +504,8 @@ export default class CacheImageResourceOperation {
 			size: result.size,
 			format: actualFormat,
 			dateCreated: Date.now(),
-			publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
-			privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
+			publicTTL: this.publicTtl,
+			privateTTL: this.privateTtl,
 		})
 
 		CorrelatedLogger.debug(`processRasterImage created metadata: ${JSON.stringify(metadata)}`, 'CacheImageResourceOperation')
@@ -459,15 +514,16 @@ export default class CacheImageResourceOperation {
 	}
 
 	private async processDefaultImage(): Promise<{ data: Buffer, metadata: ResourceMetaData }> {
-		const optimizedPath = await this.optimizeAndServeDefaultImage(this.context.request.resizeOptions)
+		const ctx = this.getContext()
+		const optimizedPath = await this.optimizeAndServeDefaultImage(ctx.request.resizeOptions)
 		const data = await readFile(optimizedPath)
 		const metadata = new ResourceMetaData({
 			version: 1,
 			size: data.length.toString(),
 			format: 'webp',
 			dateCreated: Date.now(),
-			publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
-			privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
+			publicTTL: this.publicTtl,
+			privateTTL: this.privateTtl,
 		})
 
 		return { data, metadata }
@@ -526,26 +582,27 @@ export default class CacheImageResourceOperation {
 	 */
 	public async getCachedResource(): Promise<{ data: Buffer, metadata: ResourceMetaData } | null> {
 		PerformanceTracker.startPhase('get_cached_resource')
+		const ctx = this.getContext()
 
 		try {
-			let cachedResource = await this.cacheManager.get<{ data: Buffer, metadata: ResourceMetaData }>('image', this.context.id)
+			let cachedResource = await this.cacheManager.get<{ data: Buffer, metadata: ResourceMetaData }>('image', ctx.id)
 
 			if (cachedResource && (!cachedResource.metadata || typeof cachedResource.metadata.dateCreated !== 'number')) {
-				CorrelatedLogger.warn(`Corrupted cache data found in getCachedResource, deleting: ${this.context.id}`, CacheImageResourceOperation.name)
-				await this.cacheManager.delete('image', this.context.id)
+				CorrelatedLogger.warn(`Corrupted cache data found in getCachedResource, deleting: ${ctx.id}`, CacheImageResourceOperation.name)
+				await this.cacheManager.delete('image', ctx.id)
 				cachedResource = null
 			}
 
 			if (!cachedResource) {
-				const cachedData = await this.cacheManager.get<string>('images', this.context.id)
+				const cachedData = await this.cacheManager.get<string>('images', ctx.id)
 				if (cachedData) {
 					const metadata = new ResourceMetaData({
 						version: 1,
 						size: Buffer.from(cachedData, 'base64').length.toString(),
-						format: this.context.request.resizeOptions?.format || 'webp',
+						format: ctx.request.resizeOptions?.format || 'webp',
 						dateCreated: Date.now(),
-						publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
-						privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
+						publicTTL: this.publicTtl,
+						privateTTL: this.privateTtl,
 					})
 
 					cachedResource = {
@@ -556,7 +613,7 @@ export default class CacheImageResourceOperation {
 			}
 
 			if (cachedResource) {
-				CorrelatedLogger.debug(`Resource retrieved from cache: ${this.context.id}`, CacheImageResourceOperation.name)
+				CorrelatedLogger.debug(`Resource retrieved from cache: ${ctx.id}`, CacheImageResourceOperation.name)
 				const duration = PerformanceTracker.endPhase('get_cached_resource')
 				this.metricsService.recordCacheOperation('get', 'multi-layer', 'hit', duration || 0)
 				return cachedResource
@@ -570,15 +627,15 @@ export default class CacheImageResourceOperation {
 				const metadataContent = await readFile(this.getResourceMetaPath, 'utf8')
 				const metadata = new ResourceMetaData(JSON.parse(metadataContent))
 
-				await this.cacheManager.set('image', this.context.id, { data, metadata }, metadata.privateTTL)
+				await this.cacheManager.set('image', ctx.id, { data, metadata }, metadata.privateTTL)
 
-				CorrelatedLogger.debug(`Resource retrieved from filesystem and cached: ${this.context.id}`, CacheImageResourceOperation.name)
+				CorrelatedLogger.debug(`Resource retrieved from filesystem and cached: ${ctx.id}`, CacheImageResourceOperation.name)
 				const duration = PerformanceTracker.endPhase('get_cached_resource')
 				this.metricsService.recordCacheOperation('get', 'filesystem', 'hit', duration || 0)
 				return { data, metadata }
 			}
 
-			CorrelatedLogger.debug(`Resource not found: ${this.context.id}`, CacheImageResourceOperation.name)
+			CorrelatedLogger.debug(`Resource not found: ${ctx.id}`, CacheImageResourceOperation.name)
 			const duration = PerformanceTracker.endPhase('get_cached_resource')
 			this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
 			return null

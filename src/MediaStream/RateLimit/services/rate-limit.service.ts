@@ -57,10 +57,36 @@ export class RateLimitService {
 
 	/**
 	 * Generate key based on IP and user agent for more granular control
+	 * For critical endpoints (image-processing), use IP-only to prevent UA spoofing bypass
 	 */
 	generateAdvancedKey(ip: string, userAgent: string, requestType: string): string {
-		const userAgentHash = this.simpleHash(userAgent || 'unknown')
+		// For image processing, use IP-only key to prevent user-agent spoofing bypass
+		// This is a security measure as user-agent can be easily spoofed
+		if (requestType === 'image-processing') {
+			return `${ip}:${requestType}`
+		}
+
+		// For other request types, include hashed user-agent for more granular control
+		// This allows different rate limits for different clients from the same IP
+		const userAgentHash = this.hashUserAgent(userAgent || 'unknown')
 		return `${ip}:${userAgentHash}:${requestType}`
+	}
+
+	/**
+	 * Generate a secure hash of the user agent
+	 * Uses a more robust hashing approach than simple hash
+	 */
+	private hashUserAgent(userAgent: string): string {
+		// Normalize user agent to reduce variations
+		const normalized = userAgent
+			.toLowerCase()
+			.replace(/\s+/g, ' ')
+			.trim()
+			// Remove version numbers to group similar browsers
+			.replace(/\/[\d.]+/g, '')
+			.substring(0, 100) // Limit length
+
+		return this.simpleHash(normalized)
 	}
 
 	/**

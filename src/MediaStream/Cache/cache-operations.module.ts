@@ -1,3 +1,4 @@
+import { ConfigModule } from '#microservice/Config/config.module'
 import { HttpModule } from '#microservice/HTTP/http.module'
 import { MetricsModule } from '#microservice/Metrics/metrics.module'
 import FetchResourceResponseJob from '#microservice/Queue/jobs/fetch-resource-response.job'
@@ -19,6 +20,7 @@ import CacheImageResourceOperation from './operations/cache-image-resource.opera
 @Module({
 	imports: [
 		CacheModule,
+		ConfigModule,
 		HttpModule,
 		QueueModule,
 		ValidationModule,

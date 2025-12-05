@@ -1,8 +1,9 @@
 import { BullModule } from '@nestjs/bull'
 import { Module } from '@nestjs/common'
-import { ConfigModule, ConfigService } from '@nestjs/config'
+import { ConfigService, ConfigModule as NestConfigModule } from '@nestjs/config'
 import { TerminusModule } from '@nestjs/terminus'
 import { CacheModule } from '../Cache/cache.module.js'
+import { ConfigModule } from '../Config/config.module.js'
 import { CorrelationModule } from '../Correlation/correlation.module.js'
 import { HttpModule } from '../HTTP/http.module.js'
 import { JobQueueHealthIndicator } from './indicators/job-queue-health.indicator.js'
@@ -14,7 +15,7 @@ import { JobQueueManager } from './services/job-queue.manager.js'
 @Module({
 	imports: [
 		BullModule.forRootAsync({
-			imports: [ConfigModule],
+			imports: [NestConfigModule],
 			useFactory: async (_configService: ConfigService) => ({
 				redis: {
 					host: _configService.get('REDIS_HOST', 'localhost'),
@@ -55,6 +56,7 @@ import { JobQueueManager } from './services/job-queue.manager.js'
 				},
 			},
 		),
+		ConfigModule,
 		CorrelationModule,
 		HttpModule,
 		CacheModule,

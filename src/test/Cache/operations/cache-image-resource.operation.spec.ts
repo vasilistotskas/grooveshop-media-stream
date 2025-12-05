@@ -11,6 +11,7 @@ import CacheImageRequest, {
 } from '#microservice/API/dto/cache-image-request.dto'
 import CacheImageResourceOperation from '#microservice/Cache/operations/cache-image-resource.operation'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
+import { ConfigService } from '#microservice/Config/config.service'
 import ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import ManipulationJobResult from '#microservice/Queue/dto/manipulation-job-result.dto'
@@ -163,6 +164,23 @@ describe('cacheImageResourceOperation', () => {
 
 		vi.spyOn(mockJobQueueManager, 'addImageProcessingJob').mockResolvedValue({} as any)
 
+		const mockConfigService = {
+			get: vi.fn().mockImplementation((key: string) => {
+				const configs: Record<string, any> = {
+					'cache.image.publicTtl': 12 * 30 * 24 * 60 * 60 * 1000,
+					'cache.image.privateTtl': 6 * 30 * 24 * 60 * 60 * 1000,
+				}
+				return configs[key]
+			}),
+			getOptional: vi.fn().mockImplementation((key: string, defaultValue: any) => {
+				const configs: Record<string, any> = {
+					'cache.image.publicTtl': 12 * 30 * 24 * 60 * 60 * 1000,
+					'cache.image.privateTtl': 6 * 30 * 24 * 60 * 60 * 1000,
+				}
+				return configs[key] ?? defaultValue
+			}),
+		}
+
 		moduleRef = await Test.createTestingModule({
 			providers: [
 				CacheImageResourceOperation,
@@ -178,6 +196,7 @@ describe('cacheImageResourceOperation', () => {
 				{ provide: JobQueueManager, useValue: mockJobQueueManager },
 				{ provide: MetricsService, useValue: mockMetricsService },
 				{ provide: Logger, useValue: mockLogger },
+				{ provide: ConfigService, useValue: mockConfigService },
 			],
 		}).compile()
 

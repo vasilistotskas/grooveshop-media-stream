@@ -5,6 +5,8 @@ import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { cwd, hrtime } from 'node:process'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
+import { MAX_FILE_SIZES } from '#microservice/common/constants/image-limits.constant'
+import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
@@ -15,36 +17,39 @@ import sharp from 'sharp'
 export class ImageProcessingProcessor {
 	private readonly _logger = new Logger(ImageProcessingProcessor.name)
 	private static readonly MAX_SHARP_INSTANCES = 4
+	private static readonly MAX_FILE_SIZE = MAX_FILE_SIZES.default // 10MB default
+
+	// Configurable TTL values (loaded from config)
+	private readonly publicTtl: number
+	private readonly privateTtl: number
 
 	constructor(
 		private readonly _correlationService: CorrelationService,
 		private readonly httpClient: HttpClientService,
 		private readonly cacheManager: MultiLayerCacheManager,
+		private readonly configService: ConfigService,
 	) {
+		// Load TTL values from configuration
+		this.publicTtl = this.configService.getOptional('cache.image.publicTtl', 12 * 30 * 24 * 60 * 60 * 1000)
+		this.privateTtl = this.configService.getOptional('cache.image.privateTtl', 6 * 30 * 24 * 60 * 60 * 1000)
+		// Configure Sharp for optimal memory management
+		// Lower memory cache to prevent memory bloat
 		sharp.cache({
-			memory: 50,
-			files: 10,
-			items: 100,
+			memory: 50, // 50MB memory cache
+			files: 10, // Max 10 files cached
+			items: 100, // Max 100 items
 		})
 
+		// Limit concurrent Sharp operations
 		sharp.concurrency(ImageProcessingProcessor.MAX_SHARP_INSTANCES)
+
+		// Enable SIMD for better performance
 		sharp.simd(true)
 	}
-
-	private processedCount = 0
 
 	async process(job: Job<ImageProcessingJobData>): Promise<JobResult> {
 		const startTime = Date.now()
 		const { imageUrl, width, height, quality, format, cacheKey, correlationId, fit, position, background, trimThreshold } = job.data
-
-		this.processedCount++
-		if (this.processedCount % 20 === 0 && globalThis.gc) {
-			try {
-				globalThis.gc()
-				this._logger.debug(`Triggered garbage collection after ${this.processedCount} processed images`)
-			}
-			catch {}
-		}
 
 		return this._correlationService.runWithContext(
 			{
@@ -103,8 +108,8 @@ export class ImageProcessingProcessor {
 						size: processedBuffer.length.toString(),
 						format: format || 'webp',
 						dateCreated: Date.now(),
-						publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
-						privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
+						publicTTL: this.publicTtl,
+						privateTTL: this.privateTtl,
 					})
 
 					await this.cacheManager.set('image', cacheKey, {
@@ -154,14 +159,53 @@ export class ImageProcessingProcessor {
 		)
 	}
 
+	/**
+	 * Download image with Content-Length validation
+	 * Prevents memory exhaustion from oversized files
+	 */
 	private async downloadImage(url: string): Promise<Buffer> {
 		try {
+			// First, check Content-Length with HEAD request
+			try {
+				const headResponse = await this.httpClient.head(url, { timeout: 5000 })
+				const contentLength = headResponse.headers['content-length']
+
+				if (contentLength) {
+					const size = Number.parseInt(contentLength, 10)
+					if (size > ImageProcessingProcessor.MAX_FILE_SIZE) {
+						throw new Error(`Image too large: ${size} bytes exceeds maximum ${ImageProcessingProcessor.MAX_FILE_SIZE} bytes`)
+					}
+					this._logger.debug(`Content-Length validated: ${size} bytes`)
+				}
+			}
+			catch (headError: unknown) {
+				// HEAD request failed, continue with GET but with size limit
+				this._logger.warn(`HEAD request failed, proceeding with size-limited GET: ${(headError as Error).message}`)
+			}
+
+			// Download the image
 			const response = await this.httpClient.get(url, {
 				responseType: 'arraybuffer',
 				timeout: 30000,
+				maxContentLength: ImageProcessingProcessor.MAX_FILE_SIZE,
+				maxBodyLength: ImageProcessingProcessor.MAX_FILE_SIZE,
 			})
 
-			return Buffer.from(response.data)
+			// Validate Content-Type
+			const contentType = response.headers['content-type'] || ''
+			const allowedTypes = ['image/', 'application/octet-stream']
+			if (!allowedTypes.some(type => contentType.startsWith(type))) {
+				throw new Error(`Invalid content type: ${contentType}. Expected image/*`)
+			}
+
+			const buffer = Buffer.from(response.data)
+
+			// Final size check
+			if (buffer.length > ImageProcessingProcessor.MAX_FILE_SIZE) {
+				throw new Error(`Downloaded image too large: ${buffer.length} bytes`)
+			}
+
+			return buffer
 		}
 		catch (error: unknown) {
 			this._logger.error(`Failed to download image from ${url}:`, error)
@@ -169,6 +213,10 @@ export class ImageProcessingProcessor {
 		}
 	}
 
+	/**
+	 * Process image with proper memory management
+	 * Uses Sharp's built-in memory management instead of manual GC
+	 */
 	private async processImage(
 		buffer: Buffer,
 		options: {
@@ -184,7 +232,11 @@ export class ImageProcessingProcessor {
 	): Promise<Buffer> {
 		let pipeline: sharp.Sharp | null = null
 		try {
-			pipeline = sharp(buffer)
+			// Create pipeline with memory limit
+			pipeline = sharp(buffer, {
+				limitInputPixels: 268402689, // ~16K x 16K pixels max
+				sequentialRead: true, // Better memory usage for large images
+			})
 
 			if (options.trimThreshold !== undefined && options.trimThreshold > 0) {
 				pipeline = pipeline.trim({
@@ -218,6 +270,7 @@ export class ImageProcessingProcessor {
 					pipeline = pipeline.webp({
 						quality: qual,
 						smartSubsample: true,
+						effort: 4, // Balance between speed and compression
 					})
 					break
 				case 'jpeg':
@@ -235,40 +288,42 @@ export class ImageProcessingProcessor {
 						quality: qual,
 						adaptiveFiltering: true,
 						palette: qual < 95,
+						compressionLevel: 6, // Balance between speed and size
 					})
 					break
 				case 'avif':
+					// AVIF quality capped at 75 for performance
 					pipeline = pipeline.avif({
 						quality: Math.min(qual, 75),
 						chromaSubsampling: '4:2:0',
+						effort: 4, // Balance between speed and compression
 					})
 					break
 				default:
 					pipeline = pipeline.webp({
+						quality: qual,
 						smartSubsample: true,
 					})
 					break
 			}
 
+			// Process and get result
 			const result = await pipeline
 				.withMetadata({ density: 72 })
 				.toBuffer()
 
-			if (pipeline) {
-				pipeline.destroy()
-			}
-
 			return result
 		}
-		catch (error: unknown) {
+		finally {
+			// Always destroy pipeline to free memory
 			if (pipeline) {
 				try {
 					pipeline.destroy()
 				}
-				catch {}
+				catch {
+					// Ignore destroy errors
+				}
 			}
-			this._logger.error('Failed to process image:', error)
-			throw new Error(`Image processing failed: ${(error as Error).message}`)
 		}
 	}
 
