@@ -199,7 +199,8 @@ export class ImageStreamService {
 			await this.serveFallbackImage(request, res, correlationId)
 		}
 		finally {
-			await this.cacheImageResourceOperation.execute()
+			// Clean up operation context to prevent memory leaks
+			this.cacheImageResourceOperation.cleanupContext()
 		}
 	}
 

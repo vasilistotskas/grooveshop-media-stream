@@ -57,8 +57,9 @@ export function negotiateImageFormat(
 ): NegotiatedFormat {
 	const acceptHeader = req.headers.accept || ''
 
-	// If a specific format is requested in the URL, honor it
-	if (requestedFormat && requestedFormat !== SupportedResizeFormats.webp) {
+	// If a specific format is explicitly requested in the URL, always honor it
+	// This ensures URL-based format requests are respected
+	if (requestedFormat) {
 		const formatConfig = FORMAT_PRIORITY.find(f => f.format === requestedFormat)
 		if (formatConfig) {
 			return {
@@ -67,8 +68,15 @@ export function negotiateImageFormat(
 				mimeType: formatConfig.mimeType,
 			}
 		}
+		// Handle formats not in priority list (e.g., svg, gif)
+		return {
+			format: requestedFormat,
+			quality: requestedQuality || 80,
+			mimeType: getMimeType(requestedFormat),
+		}
 	}
 
+	// No format requested - negotiate based on Accept header
 	// Check Accept header for supported formats (in priority order)
 	for (const formatConfig of FORMAT_PRIORITY) {
 		if (formatConfig.acceptPattern.test(acceptHeader)) {
