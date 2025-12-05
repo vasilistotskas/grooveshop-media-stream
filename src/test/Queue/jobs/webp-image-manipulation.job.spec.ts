@@ -17,6 +17,7 @@ describe('webpImageManipulationJob', () => {
 		png: vi.fn().mockReturnThis(),
 		gif: vi.fn().mockReturnThis(),
 		tiff: vi.fn().mockReturnThis(),
+		avif: vi.fn().mockReturnThis(),
 		resize: vi.fn().mockReturnThis(),
 		trim: vi.fn().mockReturnThis(),
 		toBuffer: vi.fn().mockResolvedValue(Buffer.from('test')),
@@ -194,6 +195,40 @@ describe('webpImageManipulationJob', () => {
 				threshold: 5,
 			})
 			expect(mockManipulation.tiff).toHaveBeenCalled()
+			expect(mockManipulation.toFile).toHaveBeenCalledWith(filePathTo)
+			expect(result).toBeInstanceOf(ManipulationJobResult)
+			expect(result.size).toBe('1000')
+		})
+
+		it('should handle avif format with quality capped at 75', async () => {
+			const filePathFrom = 'test.avif'
+			const filePathTo = 'test.output.avif'
+			const options = new ResizeOptions({
+				width: 800,
+				height: 600,
+				fit: FitOptions.contain,
+				position: PositionOptions.entropy,
+				background: BackgroundOptions.transparent,
+				trimThreshold: 5,
+				format: SupportedResizeFormats.avif,
+				quality: 80,
+			})
+
+			const result = await job.handle(filePathFrom, filePathTo, options)
+
+			expect(sharp).toHaveBeenCalledWith(filePathFrom)
+			expect(mockManipulation.resize).toHaveBeenCalledWith({
+				width: 800,
+				height: 600,
+				fit: FitOptions.contain,
+				position: PositionOptions.entropy,
+				background: { r: 0, g: 0, b: 0, alpha: 0 },
+			})
+			expect(mockManipulation.trim).toHaveBeenCalledWith({
+				background: { r: 0, g: 0, b: 0, alpha: 0 },
+				threshold: 5,
+			})
+			expect(mockManipulation.avif).toHaveBeenCalledWith({ quality: 75, chromaSubsampling: '4:2:0' })
 			expect(mockManipulation.toFile).toHaveBeenCalledWith(filePathTo)
 			expect(result).toBeInstanceOf(ManipulationJobResult)
 			expect(result.size).toBe('1000')

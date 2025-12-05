@@ -35,7 +35,7 @@
     "test": "vitest run",
     "test:e2e": "vitest run --config src/test/vitest.e2e.ts",
     "test:coverage": "vitest run --coverage && coveralls < coverage/lcov.info",
-    "cache:clear": "node scripts/clear-cache.js",
+    "cache:clear": "node scripts/clear-cache.cjs",
     "semantic-release": "semantic-release"
   },
   "dependencies": {
@@ -68,7 +68,7 @@
     "sharp": "0.34.5"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "6.3.0",
+    "@antfu/eslint-config": "6.4.2",
     "@nestjs/cli": "11.0.14",
     "@nestjs/schematics": "11.0.9",
     "@nestjs/testing": "11.1.9",

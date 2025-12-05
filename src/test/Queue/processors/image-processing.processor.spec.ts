@@ -246,6 +246,45 @@ describe('imageProcessingProcessor', () => {
 			}))
 		})
 
+		it('should handle AVIF format processing with quality capped at 75', async () => {
+			const job = createMockJob({
+				width: 300,
+				height: 200,
+				quality: 90,
+				format: 'avif',
+			})
+
+			mockCacheManager.get.mockResolvedValue(null)
+			mockCacheManager.set.mockResolvedValue(undefined)
+
+			const originalImageData = Buffer.from('original-image-data')
+			mockHttpClient.get.mockResolvedValue({
+				data: originalImageData,
+				status: 200,
+				statusText: 'OK',
+				headers: {},
+				config: {},
+			} as any)
+
+			const processedImageData = Buffer.from('processed-avif-data')
+			const mockSharpInstance = {
+				resize: vi.fn().mockReturnThis(),
+				avif: vi.fn().mockReturnThis(),
+				withMetadata: vi.fn().mockReturnThis(),
+				toBuffer: vi.fn().mockResolvedValue(processedImageData),
+				destroy: vi.fn(),
+			}
+			mockSharp.mockReturnValue(mockSharpInstance as any)
+
+			const result = await processor.process(job)
+
+			expect(result.success).toBe(true)
+			expect(mockSharpInstance.avif).toHaveBeenCalledWith(expect.objectContaining({
+				quality: 75,
+				chromaSubsampling: '4:2:0',
+			}))
+		})
+
 		it('should handle processing without dimensions', async () => {
 			const job = createMockJob({
 				format: 'webp',

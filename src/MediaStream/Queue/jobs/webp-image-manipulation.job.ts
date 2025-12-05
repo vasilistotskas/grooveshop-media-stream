@@ -136,6 +136,9 @@ export default class WebpImageManipulationJob {
 			case 'webp':
 				manipulation.webp({ quality: options.quality })
 				break
+			case 'avif':
+				manipulation.avif({ quality: Math.min(options.quality, 75), chromaSubsampling: '4:2:0' })
+				break
 			case 'gif':
 				manipulation.gif()
 				break

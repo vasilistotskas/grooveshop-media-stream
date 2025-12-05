@@ -14,6 +14,7 @@ export enum SupportedResizeFormats {
 	gif = 'gif',
 	tiff = 'tiff',
 	svg = 'svg',
+	avif = 'avif',
 }
 
 export enum PositionOptions {
