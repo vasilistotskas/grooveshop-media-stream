@@ -1,3 +1,10 @@
+# [2.23.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.22.0...v2.23.0) (2025-12-05)
+
+
+### Features
+
+* add comprehensive improvements for reliability and performance ([0994cbc](https://github.com/vasilistotskas/grooveshop-media-stream/commit/0994cbc292dc3d7bd72be87e06c09a861c74fdeb))
+
 # [2.22.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.21.0...v2.22.0) (2025-12-05)
 
 
