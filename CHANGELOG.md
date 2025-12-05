@@ -1,3 +1,10 @@
+## [2.23.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.23.0...v2.23.1) (2025-12-05)
+
+
+### Bug Fixes
+
+* context ([1d8c60b](https://github.com/vasilistotskas/grooveshop-media-stream/commit/1d8c60be4c3596e3f453b5ad5de7bd66b996e11f))
+
 # [2.23.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.22.0...v2.23.0) (2025-12-05)
 
 
