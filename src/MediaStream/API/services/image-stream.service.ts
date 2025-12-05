@@ -1,3 +1,4 @@
+import type { OperationContext } from '#microservice/Cache/operations/cache-image-resource.operation'
 import type ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
 import type { Request, Response } from 'express'
 import type { ImageProcessingContext } from '../types/image-source.types.js'
@@ -48,14 +49,16 @@ export class ImageStreamService {
 
 		try {
 			this.metricsService.incrementCounter('image_requests_total')
-			await this.cacheImageResourceOperation.setup(request)
+
+			// Setup returns the operation context - this is the key change for thread safety
+			const opCtx = await this.cacheImageResourceOperation.setup(request)
 
 			// Use request deduplication to prevent duplicate processing
-			const resourceId = this.cacheImageResourceOperation.getResourcePath
-			await imageProcessingDeduplicator.execute(resourceId, async () => {
-				if (await this.cacheImageResourceOperation.checkResourceExists()) {
+			const resourcePath = this.cacheImageResourceOperation.getResourcePath(opCtx)
+			await imageProcessingDeduplicator.execute(resourcePath, async () => {
+				if (await this.cacheImageResourceOperation.checkResourceExists(opCtx)) {
 					// Check for conditional request (ETag/If-Modified-Since)
-					const headers = await this.cacheImageResourceOperation.fetchHeaders()
+					const headers = await this.cacheImageResourceOperation.fetchHeaders(opCtx)
 					if (headers && req) {
 						const notModified = this.checkConditionalRequest(req, headers)
 						if (notModified) {
@@ -63,10 +66,10 @@ export class ImageStreamService {
 							return
 						}
 					}
-					await this.streamResource(request, res, correlationId)
+					await this.streamResource(opCtx, request, res, correlationId)
 				}
 				else {
-					await this.fetchAndWaitForResource(request, res, correlationId)
+					await this.fetchAndWaitForResource(opCtx, request, res, correlationId)
 				}
 			})
 		}
@@ -119,13 +122,14 @@ export class ImageStreamService {
 	 * Uses AbortController for proper timeout handling
 	 */
 	private async fetchAndWaitForResource(
+		opCtx: OperationContext,
 		request: CacheImageRequest,
 		res: Response,
 		correlationId: string,
 	): Promise<void> {
 		this._logger.debug('Resource does not exist, fetching', { correlationId })
 
-		const shouldUseQueue = this.cacheImageResourceOperation.shouldUseBackgroundProcessing()
+		const shouldUseQueue = this.cacheImageResourceOperation.shouldUseBackgroundProcessing(opCtx)
 		const maxWaitTime = shouldUseQueue ? 15000 : 10000
 
 		// Create AbortController for timeout
@@ -133,15 +137,15 @@ export class ImageStreamService {
 		const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT)
 
 		try {
-			await this.cacheImageResourceOperation.execute()
+			await this.cacheImageResourceOperation.execute(opCtx)
 
 			const pollInterval = 150
 			let waitTime = 0
 
 			while (waitTime < maxWaitTime && !controller.signal.aborted) {
-				if (await this.cacheImageResourceOperation.checkResourceExists()) {
+				if (await this.cacheImageResourceOperation.checkResourceExists(opCtx)) {
 					this._logger.debug('Resource available after waiting', { waitTime, correlationId })
-					await this.streamResource(request, res, correlationId)
+					await this.streamResource(opCtx, request, res, correlationId)
 					return
 				}
 				await new Promise((resolve, reject) => {
@@ -173,11 +177,12 @@ export class ImageStreamService {
 	 * Stream the resource to the response
 	 */
 	private async streamResource(
+		opCtx: OperationContext,
 		request: CacheImageRequest,
 		res: Response,
 		correlationId: string,
 	): Promise<void> {
-		const headers = await this.cacheImageResourceOperation.fetchHeaders()
+		const headers = await this.cacheImageResourceOperation.fetchHeaders(opCtx)
 
 		if (!headers) {
 			this._logger.warn('Resource metadata missing', { correlationId })
@@ -186,21 +191,17 @@ export class ImageStreamService {
 		}
 
 		try {
-			const cachedResource = await this.cacheImageResourceOperation.getCachedResource()
+			const cachedResource = await this.cacheImageResourceOperation.getCachedResource(opCtx)
 			if (cachedResource?.data) {
-				await this.streamFromMemory(cachedResource.data, headers, res, correlationId)
+				await this.streamFromMemory(cachedResource.data, headers, res, correlationId, opCtx)
 			}
 			else {
-				await this.streamFromFile(headers, res, correlationId)
+				await this.streamFromFile(opCtx, headers, res, correlationId)
 			}
 		}
 		catch (error: unknown) {
 			this._logger.error('Error streaming resource', error, { correlationId })
 			await this.serveFallbackImage(request, res, correlationId)
-		}
-		finally {
-			// Clean up operation context to prevent memory leaks
-			this.cacheImageResourceOperation.cleanupContext()
 		}
 	}
 
@@ -212,6 +213,7 @@ export class ImageStreamService {
 		headers: ResourceMetaData,
 		res: Response,
 		correlationId: string,
+		opCtx: OperationContext,
 	): Promise<void> {
 		this.addHeadersToResponse(res, headers, correlationId)
 
@@ -227,7 +229,7 @@ export class ImageStreamService {
 		}
 		else {
 			this._logger.warn('Unexpected data type, falling back to file', { correlationId })
-			await this.streamFromFile(headers, res, correlationId)
+			await this.streamFromFile(opCtx, headers, res, correlationId)
 			return
 		}
 
@@ -238,11 +240,12 @@ export class ImageStreamService {
 	 * Stream image from file system
 	 */
 	private async streamFromFile(
+		opCtx: OperationContext,
 		headers: ResourceMetaData,
 		res: Response,
 		correlationId: string,
 	): Promise<void> {
-		const filePath = this.cacheImageResourceOperation.getResourcePath
+		const filePath = this.cacheImageResourceOperation.getResourcePath(opCtx)
 		PerformanceTracker.startPhase('file_streaming')
 		let fd = null as any
 

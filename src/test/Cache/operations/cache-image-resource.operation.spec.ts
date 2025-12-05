@@ -1,3 +1,4 @@
+import type { OperationContext } from '#microservice/Cache/operations/cache-image-resource.operation'
 import type { AxiosResponse } from 'axios'
 import { Buffer } from 'node:buffer'
 import * as fs from 'node:fs/promises'
@@ -51,6 +52,7 @@ describe('cacheImageResourceOperation', () => {
 	let mockCwd: string
 	let mockRequest: CacheImageRequest
 	let moduleRef: any
+	let opCtx: OperationContext
 
 	beforeEach(async () => {
 		mockCwd = '/mock/cwd'
@@ -205,32 +207,32 @@ describe('cacheImageResourceOperation', () => {
 
 	describe('resource Path Getters', () => {
 		beforeEach(async () => {
-			// Setup the operation first, which will generate the id
-			await operation.setup(mockRequest)
+			// Setup the operation first, which will generate the context with id
+			opCtx = await operation.setup(mockRequest)
 		})
 
 		it('should return correct resource path', () => {
 			const expected = path.normalize(path.join(mockCwd, 'storage', 'mock-resource-id.rsc'))
-			const resourcePath = operation.getResourcePath
+			const resourcePath = operation.getResourcePath(opCtx)
 			expect(resourcePath).toBe(expected)
 		})
 
 		it('should return correct resource temp path', () => {
 			const expected = path.normalize(path.join(mockCwd, 'storage', 'mock-resource-id.rst'))
-			const resourceTempPath = operation.getResourceTempPath
+			const resourceTempPath = operation.getResourceTempPath(opCtx)
 			expect(resourceTempPath).toBe(expected)
 		})
 
 		it('should return correct resource meta path', () => {
 			const expected = path.normalize(path.join(mockCwd, 'storage', 'mock-resource-id.rsm'))
-			const resourceMetaPath = operation.getResourceMetaPath
+			const resourceMetaPath = operation.getResourceMetaPath(opCtx)
 			expect(resourceMetaPath).toBe(expected)
 		})
 	})
 
 	describe('setup with new infrastructure', () => {
 		it('should sanitize input and validate URL', async () => {
-			await operation.setup(mockRequest)
+			opCtx = await operation.setup(mockRequest)
 
 			expect(mockInputSanitizationService.sanitize).toHaveBeenCalledWith(mockRequest)
 			expect(mockInputSanitizationService.validateUrl).toHaveBeenCalledWith(mockRequest.resourceTarget)
@@ -250,11 +252,20 @@ describe('cacheImageResourceOperation', () => {
 			await expect(operation.setup(mockRequest)).rejects.toThrow('Invalid image dimensions')
 			expect(mockMetricsService.recordError).toHaveBeenCalledWith('validation', 'setup')
 		})
+
+		it('should return operation context with correct id', async () => {
+			opCtx = await operation.setup(mockRequest)
+
+			expect(opCtx).toBeDefined()
+			expect(opCtx.id).toBe('mock-resource-id')
+			expect(opCtx.request).toBeDefined()
+			expect(opCtx.metaData).toBeNull()
+		})
 	})
 
 	describe('checkResourceExists with cache integration', () => {
 		beforeEach(async () => {
-			await operation.setup(mockRequest)
+			opCtx = await operation.setup(mockRequest)
 		})
 
 		it('should return true when resource exists in cache and is valid', async () => {
@@ -272,7 +283,7 @@ describe('cacheImageResourceOperation', () => {
 
 			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(mockCachedResource)
 
-			const result = await operation.checkResourceExists()
+			const result = await operation.checkResourceExists(opCtx)
 			expect(result).toBe(true)
 			expect(mockCacheManager.get).toHaveBeenCalledWith('image', 'mock-resource-id')
 			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'hit', expect.any(Number))
@@ -295,7 +306,7 @@ describe('cacheImageResourceOperation', () => {
 			const mockedFs = vi.mocked(fs)
 			mockedFs.access.mockResolvedValue()
 
-			await operation.checkResourceExists()
+			await operation.checkResourceExists(opCtx)
 			expect(mockCacheManager.delete).toHaveBeenCalledWith('image', 'mock-resource-id')
 		})
 
@@ -312,7 +323,7 @@ describe('cacheImageResourceOperation', () => {
 				privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
 			}))
 
-			const result = await operation.checkResourceExists()
+			const result = await operation.checkResourceExists(opCtx)
 			expect(result).toBe(true)
 			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'hit', expect.any(Number))
 		})
@@ -320,7 +331,7 @@ describe('cacheImageResourceOperation', () => {
 
 	describe('execute with background processing', () => {
 		beforeEach(async () => {
-			await operation.setup(mockRequest)
+			opCtx = await operation.setup(mockRequest)
 		})
 
 		it('should return early if resource already exists', async () => {
@@ -338,20 +349,17 @@ describe('cacheImageResourceOperation', () => {
 
 			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(mockCachedResource)
 
-			await operation.execute()
+			await operation.execute(opCtx)
 
 			expect(mockFetchResourceResponseJob.handle).not.toHaveBeenCalled()
 			expect(mockMetricsService.recordImageProcessing).toHaveBeenCalledWith('cache_check', 'cached', 'success', expect.any(Number))
 		})
 
 		it('should queue large image processing in background', async () => {
-			// Set up large image dimensions (> 2MP threshold)
-			mockRequest.resizeOptions.width = 2000
-			mockRequest.resizeOptions.height = 1500 // 3MP total
-			await operation.setup(mockRequest)
-
-			// Mock shouldUseBackgroundProcessing to return true for this test
-			vi.spyOn(operation, 'shouldUseBackgroundProcessing').mockReturnValue(true)
+			// Set up large image dimensions (> 8MP threshold)
+			mockRequest.resizeOptions.width = 4000
+			mockRequest.resizeOptions.height = 3000 // 12MP total
+			opCtx = await operation.setup(mockRequest)
 
 			// Ensure cache returns null so resource doesn't exist
 			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
@@ -360,7 +368,7 @@ describe('cacheImageResourceOperation', () => {
 			const mockedFs = vi.mocked(fs)
 			mockedFs.access.mockRejectedValue(new Error('File not found'))
 
-			await operation.execute()
+			await operation.execute(opCtx)
 
 			expect(mockJobQueueManager.addImageProcessingJob).toHaveBeenCalledWith({
 				imageUrl: mockRequest.resourceTarget,
@@ -380,9 +388,12 @@ describe('cacheImageResourceOperation', () => {
 		it('should process small images synchronously', async () => {
 			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
 			const mockedFs = vi.mocked(fs)
+			mockedFs.access.mockRejectedValue(new Error('File not found'))
 			mockedFs.readFile.mockResolvedValue(Buffer.from('processed-image-data'))
+			mockedFs.writeFile.mockResolvedValue()
+			mockedFs.unlink.mockResolvedValue()
 
-			await operation.execute()
+			await operation.execute(opCtx)
 
 			expect(mockFetchResourceResponseJob.handle).toHaveBeenCalled()
 			expect(mockWebpImageManipulationJob.handle).toHaveBeenCalled()
@@ -392,6 +403,9 @@ describe('cacheImageResourceOperation', () => {
 		it('should validate file size during processing', async () => {
 			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
 			vi.spyOn(mockInputSanitizationService, 'validateFileSize').mockReturnValue(false)
+
+			const mockedFs = vi.mocked(fs)
+			mockedFs.access.mockRejectedValue(new Error('File not found'))
 
 			const mockResponse = {
 				status: 200,
@@ -403,14 +417,14 @@ describe('cacheImageResourceOperation', () => {
 
 			vi.spyOn(mockFetchResourceResponseJob, 'handle').mockResolvedValue(mockResponse)
 
-			await expect(operation.execute()).rejects.toThrow('Error fetching or processing image.')
+			await expect(operation.execute(opCtx)).rejects.toThrow('Error fetching or processing image.')
 			expect(mockMetricsService.recordImageProcessing).toHaveBeenCalledWith('execute', 'unknown', 'error', expect.any(Number))
 		})
 	})
 
 	describe('getCachedResource', () => {
 		beforeEach(async () => {
-			await operation.setup(mockRequest)
+			opCtx = await operation.setup(mockRequest)
 		})
 
 		it('should return cached resource from multi-layer cache', async () => {
@@ -428,7 +442,7 @@ describe('cacheImageResourceOperation', () => {
 
 			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(mockCachedResource)
 
-			const result = await operation.getCachedResource()
+			const result = await operation.getCachedResource(opCtx)
 
 			expect(result).toEqual(mockCachedResource)
 			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'hit', expect.any(Number))
@@ -449,7 +463,7 @@ describe('cacheImageResourceOperation', () => {
 					privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
 				}))
 
-			const result = await operation.getCachedResource()
+			const result = await operation.getCachedResource(opCtx)
 
 			expect(result).toBeDefined()
 			expect(result?.data).toEqual(Buffer.from('file-data'))
@@ -462,7 +476,7 @@ describe('cacheImageResourceOperation', () => {
 			const mockedFs = vi.mocked(fs)
 			mockedFs.access.mockRejectedValue(new Error('File not found'))
 
-			const result = await operation.getCachedResource()
+			const result = await operation.getCachedResource(opCtx)
 
 			expect(result).toBeNull()
 			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'miss', expect.any(Number))
@@ -471,7 +485,7 @@ describe('cacheImageResourceOperation', () => {
 		it('should handle errors gracefully', async () => {
 			vi.spyOn(mockCacheManager, 'get').mockRejectedValue(new Error('Cache error'))
 
-			const result = await operation.getCachedResource()
+			const result = await operation.getCachedResource(opCtx)
 
 			expect(result).toBeNull()
 			expect(mockMetricsService.recordError).toHaveBeenCalledWith('cache_retrieval', 'get_cached_resource')
@@ -510,6 +524,37 @@ describe('cacheImageResourceOperation', () => {
 					quality: 100,
 				}),
 			)
+		})
+	})
+
+	describe('shouldUseBackgroundProcessing', () => {
+		beforeEach(async () => {
+			opCtx = await operation.setup(mockRequest)
+		})
+
+		it('should return false for small images', () => {
+			opCtx.request.resizeOptions.width = 800
+			opCtx.request.resizeOptions.height = 600
+
+			const result = operation.shouldUseBackgroundProcessing(opCtx)
+			expect(result).toBe(false)
+		})
+
+		it('should return true for large images over 8MP', () => {
+			opCtx.request.resizeOptions.width = 4000
+			opCtx.request.resizeOptions.height = 3000 // 12MP
+
+			const result = operation.shouldUseBackgroundProcessing(opCtx)
+			expect(result).toBe(true)
+		})
+
+		it('should return false for SVG format', () => {
+			opCtx.request.resizeOptions.width = 4000
+			opCtx.request.resizeOptions.height = 3000
+			opCtx.request.resizeOptions.format = 'svg' as any
+
+			const result = operation.shouldUseBackgroundProcessing(opCtx)
+			expect(result).toBe(false)
 		})
 	})
 })
