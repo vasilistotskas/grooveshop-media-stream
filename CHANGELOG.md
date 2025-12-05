@@ -1,3 +1,10 @@
+# [2.22.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.21.0...v2.22.0) (2025-12-05)
+
+
+### Features
+
+* remove deprecated code and fix test failures ([bbb4abc](https://github.com/vasilistotskas/grooveshop-media-stream/commit/bbb4abc4a59ea4282c31e24ab14996b40e6af462))
+
 # [2.21.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.20.0...v2.21.0) (2025-12-05)
 
 
