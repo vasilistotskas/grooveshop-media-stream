@@ -1,3 +1,10 @@
+# [2.21.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.20.0...v2.21.0) (2025-12-05)
+
+
+### Features
+
+* avif support ([9c987a9](https://github.com/vasilistotskas/grooveshop-media-stream/commit/9c987a919e4b3fcd11ed27255d59331b12e9b24a))
+
 # [2.20.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.19.0...v2.20.0) (2025-12-03)
 
 
