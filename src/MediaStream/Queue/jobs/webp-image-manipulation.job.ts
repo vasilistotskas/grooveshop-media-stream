@@ -43,8 +43,10 @@ export default class WebpImageManipulationJob {
 			}
 
 			if (isSourceSvg) {
-				const needsResizing = (options.width !== null && !Number.isNaN(options.width))
-					|| (options.height !== null && !Number.isNaN(options.height))
+				// Only resize if dimensions are positive (> 0)
+				// 0 means "use original dimensions"
+				const needsResizing = (options.width !== null && !Number.isNaN(options.width) && options.width > 0)
+					|| (options.height !== null && !Number.isNaN(options.height) && options.height > 0)
 
 				if (!needsResizing) {
 					this.logger.debug(`SVG file needs no resizing, copying original`)
@@ -63,19 +65,23 @@ export default class WebpImageManipulationJob {
 
 					const resizeScales: { width?: number, height?: number } = {}
 
-					if (options.width !== null && !Number.isNaN(options.width)) {
+					// Only add dimensions if they are positive (> 0)
+					if (options.width !== null && !Number.isNaN(options.width) && options.width > 0) {
 						resizeScales.width = Number(options.width)
 					}
-					if (options.height !== null && !Number.isNaN(options.height)) {
+					if (options.height !== null && !Number.isNaN(options.height) && options.height > 0) {
 						resizeScales.height = Number(options.height)
 					}
 
-					manipulation.resize({
-						...resizeScales,
-						fit: options.fit,
-						position: options.position,
-						background: options.background,
-					})
+					// Only resize if we have valid dimensions
+					if (Object.keys(resizeScales).length > 0) {
+						manipulation.resize({
+							...resizeScales,
+							fit: options.fit,
+							position: options.position,
+							background: options.background,
+						})
+					}
 
 					const manipulatedFile = await manipulation.toFile(filePathTo)
 					const result = new ManipulationJobResult({
@@ -93,10 +99,11 @@ export default class WebpImageManipulationJob {
 				manipulation.png({ quality: options.quality })
 
 				const resizeScales: { width?: number, height?: number } = {}
-				if (options.width !== null && !Number.isNaN(options.width)) {
+				// Only add dimensions if they are positive (> 0)
+				if (options.width !== null && !Number.isNaN(options.width) && options.width > 0) {
 					resizeScales.width = Number(options.width)
 				}
-				if (options.height !== null && !Number.isNaN(options.height)) {
+				if (options.height !== null && !Number.isNaN(options.height) && options.height > 0) {
 					resizeScales.height = Number(options.height)
 				}
 
@@ -160,9 +167,11 @@ export default class WebpImageManipulationJob {
 
 		const resizeScales: { width?: number, height?: number } = {};
 
+		// Only add dimensions if they are positive (> 0)
+		// 0 means "use original dimensions" - skip resizing
 		(['width', 'height'] as const).forEach((scale: 'width' | 'height') => {
 			const value = options[scale]
-			if (value !== null && !Number.isNaN(value)) {
+			if (value !== null && !Number.isNaN(value) && value > 0) {
 				resizeScales[scale] = Number(value)
 			}
 		})
@@ -187,6 +196,9 @@ export default class WebpImageManipulationJob {
 			})
 
 			manipulation.resize(resizeConfig)
+		}
+		else {
+			this.logger.debug(`Skipping resize - using original image dimensions (width: ${options.width}, height: ${options.height})`)
 		}
 
 		const manipulatedFile = await manipulation.toFile(filePathTo)
