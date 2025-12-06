@@ -1,3 +1,10 @@
+## [2.24.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.24.0...v2.24.1) (2025-12-06)
+
+
+### Bug Fixes
+
+* sizes ([4766051](https://github.com/vasilistotskas/grooveshop-media-stream/commit/476605166fdd83bd2661e668b24473d82a3000b5))
+
 # [2.24.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.23.2...v2.24.0) (2025-12-06)
 
 
