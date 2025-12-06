@@ -174,9 +174,27 @@ export class InputSanitizationService implements ISanitizer<any> {
 		return sizeBytes > 0 && sizeBytes <= maxSize
 	}
 
+	/**
+	 * Validate image dimensions
+	 * @param width - Image width (0 = use original dimensions, skip resize)
+	 * @param height - Image height (0 = use original dimensions, skip resize)
+	 * @returns true if dimensions are valid
+	 */
 	validateImageDimensions(width: number, height: number): boolean {
-		if (width <= 0 || height <= 0)
+		// Allow 0 as a special value meaning "use original dimensions"
+		// When both are 0, the image processor will skip resizing
+		if (width === 0 && height === 0)
+			return true
+
+		// If one is 0 and the other is not, that's invalid
+		// (we don't support scaling only one dimension with 0)
+		if (width === 0 || height === 0)
 			return false
+
+		// Reject negative dimensions
+		if (width < 0 || height < 0)
+			return false
+
 		if (width > MAX_IMAGE_WIDTH || height > MAX_IMAGE_HEIGHT)
 			return false
 		if ((width * height) > MAX_TOTAL_PIXELS)

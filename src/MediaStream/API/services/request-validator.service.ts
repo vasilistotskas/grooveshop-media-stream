@@ -21,11 +21,13 @@ interface ValidationRule {
 	max?: number
 	required?: boolean
 	pattern?: RegExp
+	/** Allow zero as a special value (e.g., 0 = use original dimensions) */
+	allowZero?: boolean
 }
 
 const VALIDATION_RULES: Record<string, ValidationRule> = {
-	width: { min: MIN_IMAGE_DIMENSION, max: MAX_IMAGE_WIDTH },
-	height: { min: MIN_IMAGE_DIMENSION, max: MAX_IMAGE_HEIGHT },
+	width: { min: MIN_IMAGE_DIMENSION, max: MAX_IMAGE_WIDTH, allowZero: true },
+	height: { min: MIN_IMAGE_DIMENSION, max: MAX_IMAGE_HEIGHT, allowZero: true },
 	quality: { min: MIN_QUALITY, max: MAX_QUALITY },
 	trimThreshold: { min: MIN_TRIM_THRESHOLD, max: MAX_TRIM_THRESHOLD },
 }
@@ -116,12 +118,16 @@ export class RequestValidatorService {
 				})
 			}
 
+			// Skip minimum check if allowZero is true and value is exactly 0
+			// 0 is a special value meaning "use original dimensions"
 			if (rule.min !== undefined && numValue < rule.min) {
-				throw new InvalidRequestError(`Invalid ${key} parameter: below minimum ${rule.min}`, {
-					correlationId,
-					[key]: value,
-					min: rule.min,
-				})
+				if (!(rule.allowZero && numValue === 0)) {
+					throw new InvalidRequestError(`Invalid ${key} parameter: below minimum ${rule.min}`, {
+						correlationId,
+						[key]: value,
+						min: rule.min,
+					})
+				}
 			}
 
 			if (rule.max !== undefined && numValue > rule.max) {

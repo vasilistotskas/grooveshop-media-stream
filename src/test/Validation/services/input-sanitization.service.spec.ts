@@ -157,10 +157,21 @@ describe('inputSanitizationService', () => {
 			expect(service.validateImageDimensions(100, 8193)).toBe(false)
 		})
 
-		it('should reject zero or negative dimensions', () => {
+		it('should allow zero dimensions (use original)', () => {
+			// 0x0 means "use original dimensions" - skip resizing
+			expect(service.validateImageDimensions(0, 0)).toBe(true)
+		})
+
+		it('should reject mixed zero dimensions', () => {
+			// One dimension 0 and other non-zero is invalid
 			expect(service.validateImageDimensions(0, 100)).toBe(false)
 			expect(service.validateImageDimensions(100, 0)).toBe(false)
+		})
+
+		it('should reject negative dimensions', () => {
 			expect(service.validateImageDimensions(-100, 100)).toBe(false)
+			expect(service.validateImageDimensions(100, -100)).toBe(false)
+			expect(service.validateImageDimensions(-100, -100)).toBe(false)
 		})
 
 		it('should enforce total pixel limit', () => {
