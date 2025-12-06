@@ -1,3 +1,10 @@
+# [2.24.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.23.2...v2.24.0) (2025-12-06)
+
+
+### Features
+
+* supported dimensions ([94e73e5](https://github.com/vasilistotskas/grooveshop-media-stream/commit/94e73e5217e72ee9f8508df8e1542e10cdf7d2bb))
+
 ## [2.23.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.23.1...v2.23.2) (2025-12-05)
 
 
