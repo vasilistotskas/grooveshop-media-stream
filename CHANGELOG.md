@@ -1,3 +1,10 @@
+## [2.25.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.25.0...v2.25.1) (2025-12-07)
+
+
+### Bug Fixes
+
+* allowed domains ([02b623a](https://github.com/vasilistotskas/grooveshop-media-stream/commit/02b623ac5d4375b766d1ed345b9572459ffba7c5))
+
 # [2.25.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.24.1...v2.25.0) (2025-12-07)
 
 
