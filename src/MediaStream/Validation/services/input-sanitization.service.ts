@@ -27,6 +27,7 @@ export class InputSanitizationService implements ISanitizer<any> {
 				'assets.webside.gr',
 				'api.webside.gr',
 				'static.webside.gr',
+				'static-svc',
 				'frontend-nuxt-service',
 				'media-stream-service',
 			])
