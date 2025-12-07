@@ -138,16 +138,11 @@ export class HealthController {
 	@Get('ready')
 	async readiness(): Promise<{ status: string, timestamp: string, checks?: any, error?: string }> {
 		try {
+			// Lightweight readiness check - only critical dependencies
+			// Full health check is available at /health for detailed diagnostics
 			const result = await this.health.check([
-				() => this.diskSpaceIndicator.isHealthy(),
 				() => this.memoryIndicator.isHealthy(),
-				() => this.httpHealthIndicator.isHealthy(),
-				() => this.cacheHealthIndicator.isHealthy(),
 				() => this.redisHealthIndicator.isHealthy(),
-				() => this.alertingHealthIndicator.isHealthy(),
-				() => this.systemHealthIndicator.isHealthy(),
-				() => this.jobQueueHealthIndicator.isHealthy(),
-				() => this.storageHealthIndicator.isHealthy(),
 				() => this.sharpHealthIndicator.isHealthy(),
 			])
 

@@ -1,5 +1,6 @@
 import type CacheImageRequest from '#microservice/API/dto/cache-image-request.dto'
 import type { AxiosResponse } from 'axios'
+import { ConfigService } from '#microservice/Config/config.service'
 import { HttpService } from '@nestjs/axios'
 import { Injectable, Logger } from '@nestjs/common'
 import { isAxiosError } from 'axios'
@@ -11,8 +12,15 @@ import { isAxiosError } from 'axios'
 @Injectable()
 export default class FetchResourceResponseJob {
 	private readonly _logger = new Logger(FetchResourceResponseJob.name)
-	constructor(private readonly _httpService: HttpService) {
+	private readonly requestTimeout: number
+
+	constructor(
+		private readonly _httpService: HttpService,
+		private readonly _configService: ConfigService,
+	) {
 		this._logger.debug('HttpService has been injected successfully')
+		// Use external request timeout from config, default 15s
+		this.requestTimeout = this._configService.getOptional('externalServices.requestTimeout', 15000)
 	}
 
 	async handle(request: CacheImageRequest): Promise<AxiosResponse> {
@@ -21,6 +29,7 @@ export default class FetchResourceResponseJob {
 				url: request.resourceTarget,
 				method: 'GET',
 				responseType: 'stream',
+				timeout: this.requestTimeout,
 			})
 		}
 		catch (error: unknown) {

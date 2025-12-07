@@ -238,6 +238,7 @@ export class ImageStreamService {
 
 	/**
 	 * Stream image from file system
+	 * Properly handles file descriptor cleanup even on client disconnect
 	 */
 	private async streamFromFile(
 		opCtx: OperationContext,
@@ -248,6 +249,7 @@ export class ImageStreamService {
 		const filePath = this.cacheImageResourceOperation.getResourcePath(opCtx)
 		PerformanceTracker.startPhase('file_streaming')
 		let fd = null as any
+		let streamClosed = false
 
 		try {
 			this._logger.debug('Streaming file', { filePath, correlationId })
@@ -263,14 +265,26 @@ export class ImageStreamService {
 			fileStream.pipe(res)
 
 			await new Promise<void>((resolve, reject) => {
-				fileStream.on('end', resolve)
+				const cleanup: () => void = () => {
+					if (!streamClosed) {
+						streamClosed = true
+						fileStream.destroy()
+					}
+				}
+
+				fileStream.on('end', () => {
+					cleanup()
+					resolve()
+				})
 				fileStream.on('error', (error: unknown) => {
+					cleanup()
 					this._logger.error('Stream error', error, { filePath, correlationId })
 					this.metricsService.recordError('file_stream', 'stream_error')
 					reject(new ResourceStreamingError('Error streaming file', { filePath, error, correlationId }))
 				})
+				// Handle client disconnect - cleanup but don't reject (not an error)
 				res.on('close', () => {
-					fileStream.destroy()
+					cleanup()
 					resolve()
 				})
 			})

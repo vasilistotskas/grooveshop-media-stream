@@ -29,6 +29,7 @@ describe('storeResourceResponseToFileJob', () => {
 						}
 					}),
 				}),
+				close: vi.fn().mockResolvedValue(undefined),
 			}
 
 			const mockResponse: Partial<AxiosResponse> = {
@@ -43,6 +44,7 @@ describe('storeResourceResponseToFileJob', () => {
 
 			expect(open).toHaveBeenCalledWith('test/path', 'w')
 			expect(mockResponse.data.pipe).toHaveBeenCalledWith(mockFileHandle.createWriteStream())
+			expect(mockFileHandle.close).toHaveBeenCalled()
 		})
 
 		it('should throw UnableToStoreFetchedResourceException when response data is not streamable', async () => {
@@ -74,6 +76,7 @@ describe('storeResourceResponseToFileJob', () => {
 						}
 					}),
 				}),
+				close: vi.fn().mockResolvedValue(undefined),
 			}
 
 			const mockResponse: Partial<AxiosResponse> = {
@@ -87,6 +90,9 @@ describe('storeResourceResponseToFileJob', () => {
 			await expect(job.handle('test-resource', 'test/path', mockResponse as AxiosResponse))
 				.rejects
 				.toThrow(UnableToStoreFetchedResourceException)
+
+			// Verify file handle is closed even on error
+			expect(mockFileHandle.close).toHaveBeenCalled()
 		})
 	})
 })

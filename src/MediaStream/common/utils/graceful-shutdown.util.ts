@@ -37,8 +37,18 @@ export function trackRequestStart(): void {
 
 /**
  * Track request completion (call at end of request)
+ * Uses WeakSet to prevent double-counting when both 'finish' and 'close' events fire
  */
-export function trackRequestEnd(): void {
+const trackedResponses = new WeakSet<object>()
+
+export function trackRequestEnd(res?: object): void {
+	// If response object provided, check if already tracked to prevent double-counting
+	if (res) {
+		if (trackedResponses.has(res)) {
+			return // Already tracked this response completion
+		}
+		trackedResponses.add(res)
+	}
 	state.activeRequests = Math.max(0, state.activeRequests - 1)
 }
 
@@ -152,9 +162,10 @@ export function shutdownMiddleware(_req: any, res: any, next: any): void {
 
 	trackRequestStart()
 
-	// Track request completion
-	res.on('finish', trackRequestEnd)
-	res.on('close', trackRequestEnd)
+	// Track request completion - pass res to prevent double-counting
+	// Both 'finish' and 'close' can fire for the same response
+	res.on('finish', () => trackRequestEnd(res))
+	res.on('close', () => trackRequestEnd(res))
 
 	next()
 }

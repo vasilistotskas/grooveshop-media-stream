@@ -349,8 +349,22 @@ export default class CacheImageResourceOperation {
 		PerformanceTracker.startPhase('sync_processing')
 
 		try {
+			// Check negative cache first to avoid repeated failed fetches
+			const negativeCacheKey = `negative:${ctx.id}`
+			const negativeCached = await this.cacheManager.get<{ status: number, timestamp: number }>('image', negativeCacheKey)
+			if (negativeCached && Date.now() - negativeCached.timestamp < 300000) { // 5 minutes
+				CorrelatedLogger.debug(`Negative cache hit for ${ctx.request.resourceTarget}`, CacheImageResourceOperation.name)
+				throw new UnableToFetchResourceException(ctx.request.resourceTarget)
+			}
+
 			const response = await this.fetchResourceResponseJob.handle(ctx.request)
-			if (!response || response.status === 404) {
+			if (!response || response.status === 404 || response.status >= 400) {
+				// Cache the failure to prevent repeated requests
+				await this.cacheManager.set('image', negativeCacheKey, {
+					status: response?.status || 404,
+					timestamp: Date.now(),
+				}, 300000) // 5 minutes TTL
+				CorrelatedLogger.warn(`Caching negative result for ${ctx.request.resourceTarget} (status: ${response?.status || 404})`, CacheImageResourceOperation.name)
 				throw new UnableToFetchResourceException(ctx.request.resourceTarget)
 			}
 

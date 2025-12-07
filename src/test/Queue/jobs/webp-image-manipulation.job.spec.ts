@@ -200,7 +200,7 @@ describe('webpImageManipulationJob', () => {
 			expect(result.size).toBe('1000')
 		})
 
-		it('should handle avif format with quality capped at 75', async () => {
+		it('should handle avif format with optimized encoding settings', async () => {
 			const filePathFrom = 'test.avif'
 			const filePathTo = 'test.output.avif'
 			const options = new ResizeOptions({
@@ -228,7 +228,13 @@ describe('webpImageManipulationJob', () => {
 				background: { r: 0, g: 0, b: 0, alpha: 0 },
 				threshold: 5,
 			})
-			expect(mockManipulation.avif).toHaveBeenCalledWith({ quality: 75, chromaSubsampling: '4:2:0' })
+			// AVIF encoding optimized: quality capped at 65, effort 4 for balanced speed/compression
+			expect(mockManipulation.avif).toHaveBeenCalledWith({
+				quality: 65,
+				effort: 4,
+				chromaSubsampling: '4:2:0',
+				lossless: false,
+			})
 			expect(mockManipulation.toFile).toHaveBeenCalledWith(filePathTo)
 			expect(result).toBeInstanceOf(ManipulationJobResult)
 			expect(result.size).toBe('1000')

@@ -1,7 +1,7 @@
 import type { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
 import { copyFile, readFile } from 'node:fs/promises'
 import { extname } from 'node:path'
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import sharp from 'sharp'
 import ManipulationJobResult from '../dto/manipulation-job-result.dto.js'
 
@@ -10,8 +10,24 @@ import ManipulationJobResult from '../dto/manipulation-job-result.dto.js'
  * Stateless service - all request data is passed via method parameters.
  */
 @Injectable()
-export default class WebpImageManipulationJob {
+export default class WebpImageManipulationJob implements OnModuleInit {
 	private readonly logger = new Logger(WebpImageManipulationJob.name)
+
+	/**
+	 * Initialize Sharp with optimized concurrency settings
+	 * Limit concurrent operations to prevent CPU starvation under load
+	 */
+	onModuleInit(): void {
+		// Limit Sharp concurrency to prevent CPU contention
+		// Default is based on CPU cores, but with multiple pods this causes issues
+		const concurrency = Math.max(2, Math.min(4, sharp.concurrency()))
+		sharp.concurrency(concurrency)
+		this.logger.log(`Sharp concurrency set to ${concurrency}`)
+
+		// Enable Sharp caching for repeated operations
+		sharp.cache({ memory: 100, files: 20, items: 100 })
+	}
+
 	async handle(
 		filePathFrom: string,
 		filePathTo: string,
@@ -148,12 +164,19 @@ export default class WebpImageManipulationJob {
 				manipulation.webp({ quality: options.quality })
 				break
 			case 'avif':
-				// AVIF quality is capped at 75 because:
-				// 1. Diminishing returns: quality above 75 provides minimal visual improvement
-				// 2. Encoding speed: higher quality significantly increases encoding time (exponential)
-				// 3. File size: quality 75 provides excellent compression with near-lossless appearance
-				// 4. Browser compatibility: some decoders struggle with very high quality AVIF
-				manipulation.avif({ quality: Math.min(options.quality, 75), chromaSubsampling: '4:2:0' })
+				// AVIF encoding optimization:
+				// 1. Quality capped at 65 - visually excellent with much faster encoding
+				// 2. effort: 4 (default 4, range 0-9) - balanced speed/compression
+				// 3. chromaSubsampling: '4:2:0' - standard for photos, reduces file size
+				// 4. lossless: false - ensures we use lossy compression for speed
+				// Note: AVIF encoding is inherently slow (10-50x slower than WebP)
+				// Consider using WebP for time-sensitive requests
+				manipulation.avif({
+					quality: Math.min(options.quality, 65),
+					effort: 4,
+					chromaSubsampling: '4:2:0',
+					lossless: false,
+				})
 				break
 			case 'gif':
 				manipulation.gif()

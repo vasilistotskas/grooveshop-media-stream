@@ -115,7 +115,8 @@ describe('intelligentEvictionService', () => {
 			expect(result.sizeFreed).toBeGreaterThan(0)
 			expect(result.strategy).toBe('intelligent')
 			expect(result.errors).toEqual([])
-			expect(result.duration).toBeGreaterThan(0)
+			// Duration can be 0 if operation completes within same millisecond
+			expect(result.duration).toBeGreaterThanOrEqual(0)
 		})
 
 		it('should return zero results when no candidates available', async () => {

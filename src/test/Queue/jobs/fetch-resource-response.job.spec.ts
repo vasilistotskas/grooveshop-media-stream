@@ -1,4 +1,5 @@
 import CacheImageRequest, { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
+import { ConfigService } from '#microservice/Config/config.service'
 import FetchResourceResponseJob from '#microservice/Queue/jobs/fetch-resource-response.job'
 import { HttpService } from '@nestjs/axios'
 import { Test, TestingModule } from '@nestjs/testing'
@@ -17,6 +18,12 @@ describe('fetchResourceResponseJob', () => {
 					provide: HttpService,
 					useValue: {
 						axiosRef: vi.fn(),
+					},
+				},
+				{
+					provide: ConfigService,
+					useValue: {
+						getOptional: vi.fn().mockReturnValue(15000),
 					},
 				},
 			],
@@ -50,6 +57,7 @@ describe('fetchResourceResponseJob', () => {
 				url: request.resourceTarget,
 				method: 'GET',
 				responseType: 'stream',
+				timeout: 15000,
 			})
 			expect(result).toEqual(mockResponse)
 		})

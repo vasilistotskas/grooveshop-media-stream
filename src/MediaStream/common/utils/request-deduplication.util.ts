@@ -15,12 +15,25 @@ export class RequestDeduplicator<T = void> {
 	private readonly _logger = new Logger(RequestDeduplicator.name)
 	private readonly pendingRequests = new Map<string, PendingRequest<T>>()
 	private readonly maxPendingAge: number
+	private cleanupInterval: NodeJS.Timeout | null = null
 
 	constructor(maxPendingAgeMs: number = 60000) {
 		this.maxPendingAge = maxPendingAgeMs
 
 		// Cleanup stale entries periodically
-		setInterval(() => this.cleanupStaleEntries(), 30000)
+		this.cleanupInterval = setInterval(() => this.cleanupStaleEntries(), 30000)
+	}
+
+	/**
+	 * Destroy the deduplicator and clean up resources
+	 */
+	destroy(): void {
+		if (this.cleanupInterval) {
+			clearInterval(this.cleanupInterval)
+			this.cleanupInterval = null
+		}
+		this.pendingRequests.clear()
+		this._logger.log('Request deduplicator destroyed')
 	}
 
 	/**
