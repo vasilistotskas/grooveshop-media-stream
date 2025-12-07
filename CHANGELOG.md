@@ -1,3 +1,10 @@
+# [2.25.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.24.1...v2.25.0) (2025-12-07)
+
+
+### Features
+
+* perf fixes ([7b81bfa](https://github.com/vasilistotskas/grooveshop-media-stream/commit/7b81bfa691b37dcbdf6f3c08c90faf8998d95953))
+
 ## [2.24.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.24.0...v2.24.1) (2025-12-06)
 
 
