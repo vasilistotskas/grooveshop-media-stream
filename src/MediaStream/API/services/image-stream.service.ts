@@ -20,7 +20,6 @@ import CacheImageRequest from '../dto/cache-image-request.dto.js'
 @Injectable()
 export class ImageStreamService {
 	private readonly _logger = new Logger(ImageStreamService.name)
-	private readonly REQUEST_TIMEOUT = 30000 // 30 seconds
 
 	constructor(
 		private readonly cacheImageResourceOperation: CacheImageResourceOperation,

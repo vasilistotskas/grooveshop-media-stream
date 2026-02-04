@@ -154,7 +154,7 @@ export class CacheOperationsProcessor {
 		try {
 			const cacheKey = this.generateCacheKey(imageUrl)
 
-			const cached = await this.cacheManager.get('images', cacheKey)
+			const cached = await this.cacheManager.get('image', cacheKey)
 			if (cached) {
 				this._logger.debug(`Image already cached: ${imageUrl}`)
 				return
@@ -166,7 +166,7 @@ export class CacheOperationsProcessor {
 			})
 
 			const buffer = Buffer.from(response.data)
-			await this.cacheManager.set('images', cacheKey, buffer.toString('base64'), 3600)
+			await this.cacheManager.set('image', cacheKey, buffer.toString('base64'), 3600)
 
 			this._logger.debug(`Cached image: ${imageUrl}`)
 		}

@@ -10,53 +10,53 @@ describe('defaultCacheKeyStrategy', () => {
 
 	describe('generateKey', () => {
 		it('should generate key with namespace and identifier', () => {
-			const key = strategy.generateKey('images', 'test-image')
-			expect(key).toBe('images:test-image')
+			const key = strategy.generateKey('image', 'test-image')
+			expect(key).toBe('image:test-image')
 		})
 
 		it('should include hashed parameters when provided', () => {
-			const key = strategy.generateKey('images', 'test-image', { width: 100, height: 200 })
-			expect(key).toMatch(/^images:test-image:[a-f0-9]{16}$/)
+			const key = strategy.generateKey('image', 'test-image', { width: 100, height: 200 })
+			expect(key).toMatch(/^image:test-image:[a-f0-9]{16}$/)
 		})
 
 		it('should generate consistent keys for same parameters', () => {
-			const key1 = strategy.generateKey('images', 'test-image', { width: 100, height: 200 })
-			const key2 = strategy.generateKey('images', 'test-image', { width: 100, height: 200 })
+			const key1 = strategy.generateKey('image', 'test-image', { width: 100, height: 200 })
+			const key2 = strategy.generateKey('image', 'test-image', { width: 100, height: 200 })
 			expect(key1).toBe(key2)
 		})
 
 		it('should generate consistent keys regardless of parameter order', () => {
-			const key1 = strategy.generateKey('images', 'test-image', { width: 100, height: 200 })
-			const key2 = strategy.generateKey('images', 'test-image', { height: 200, width: 100 })
+			const key1 = strategy.generateKey('image', 'test-image', { width: 100, height: 200 })
+			const key2 = strategy.generateKey('image', 'test-image', { height: 200, width: 100 })
 			expect(key1).toBe(key2)
 		})
 
 		it('should generate different keys for different parameters', () => {
-			const key1 = strategy.generateKey('images', 'test-image', { width: 100, height: 200 })
-			const key2 = strategy.generateKey('images', 'test-image', { width: 150, height: 200 })
+			const key1 = strategy.generateKey('image', 'test-image', { width: 100, height: 200 })
+			const key2 = strategy.generateKey('image', 'test-image', { width: 150, height: 200 })
 			expect(key1).not.toBe(key2)
 		})
 
 		it('should handle empty parameters object', () => {
-			const key = strategy.generateKey('images', 'test-image', {})
-			expect(key).toBe('images:test-image')
+			const key = strategy.generateKey('image', 'test-image', {})
+			expect(key).toBe('image:test-image')
 		})
 	})
 
 	describe('parseKey', () => {
 		it('should parse simple key', () => {
-			const parsed = strategy.parseKey('images:test-image')
+			const parsed = strategy.parseKey('image:test-image')
 			expect(parsed).toEqual({
-				namespace: 'images',
+				namespace: 'image',
 				identifier: 'test-image',
 				params: undefined,
 			})
 		})
 
 		it('should parse key with hash', () => {
-			const parsed = strategy.parseKey('images:test-image:abc123def456')
+			const parsed = strategy.parseKey('image:test-image:abc123def456')
 			expect(parsed).toEqual({
-				namespace: 'images',
+				namespace: 'image',
 				identifier: 'test-image',
 				params: { hash: 'abc123def456' },
 			})

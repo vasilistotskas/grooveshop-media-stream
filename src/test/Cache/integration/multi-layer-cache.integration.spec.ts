@@ -106,12 +106,12 @@ describe('multiLayerCacheManager Integration', () => {
 			mockMemoryCacheService.get.mockResolvedValue(testValue)
 			mockRedisCacheService.get.mockResolvedValue(null)
 
-			const result = await cacheManager.get('images', 'test-key')
+			const result = await cacheManager.get('image', 'test-key')
 
 			expect(result).toEqual(testValue)
-			expect(mockMemoryCacheService.get).toHaveBeenCalledWith('images:test-key')
+			expect(mockMemoryCacheService.get).toHaveBeenCalledWith('image:test-key')
 			// Parallel cache checks now call both layers
-			expect(mockRedisCacheService.get).toHaveBeenCalledWith('images:test-key')
+			expect(mockRedisCacheService.get).toHaveBeenCalledWith('image:test-key')
 			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'memory', 'hit')
 		})
 
@@ -121,12 +121,12 @@ describe('multiLayerCacheManager Integration', () => {
 			mockRedisCacheService.get.mockResolvedValue(testValue)
 			mockMemoryCacheService.set.mockResolvedValue(undefined)
 
-			const result = await cacheManager.get('images', 'test-key')
+			const result = await cacheManager.get('image', 'test-key')
 
 			expect(result).toEqual(testValue)
-			expect(mockMemoryCacheService.get).toHaveBeenCalledWith('images:test-key')
-			expect(mockRedisCacheService.get).toHaveBeenCalledWith('images:test-key')
-			expect(mockMemoryCacheService.set).toHaveBeenCalledWith('images:test-key', testValue, undefined)
+			expect(mockMemoryCacheService.get).toHaveBeenCalledWith('image:test-key')
+			expect(mockRedisCacheService.get).toHaveBeenCalledWith('image:test-key')
+			expect(mockMemoryCacheService.set).toHaveBeenCalledWith('image:test-key', testValue, undefined)
 			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'redis', 'hit')
 		})
 
@@ -134,7 +134,7 @@ describe('multiLayerCacheManager Integration', () => {
 			mockMemoryCacheService.get.mockResolvedValue(null)
 			mockRedisCacheService.get.mockResolvedValue(null)
 
-			const result = await cacheManager.get('images', 'test-key')
+			const result = await cacheManager.get('image', 'test-key')
 
 			expect(result).toBeNull()
 			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'miss')
@@ -146,7 +146,7 @@ describe('multiLayerCacheManager Integration', () => {
 			mockRedisCacheService.get.mockResolvedValue(testValue)
 			mockMemoryCacheService.set.mockResolvedValue(undefined)
 
-			const result = await cacheManager.get('images', 'test-key')
+			const result = await cacheManager.get('image', 'test-key')
 
 			expect(result).toEqual(testValue)
 			expect(mockRedisCacheService.get).toHaveBeenCalled()
@@ -159,10 +159,10 @@ describe('multiLayerCacheManager Integration', () => {
 			mockMemoryCacheService.set.mockResolvedValue(undefined)
 			mockRedisCacheService.set.mockResolvedValue(undefined)
 
-			await cacheManager.set('images', 'test-key', testValue, 3600)
+			await cacheManager.set('image', 'test-key', testValue, 3600)
 
-			expect(mockMemoryCacheService.set).toHaveBeenCalledWith('images:test-key', testValue, 3600)
-			expect(mockRedisCacheService.set).toHaveBeenCalledWith('images:test-key', testValue, 3600)
+			expect(mockMemoryCacheService.set).toHaveBeenCalledWith('image:test-key', testValue, 3600)
+			expect(mockRedisCacheService.set).toHaveBeenCalledWith('image:test-key', testValue, 3600)
 			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('set', 'multi-layer', 'success')
 		})
 
@@ -170,10 +170,10 @@ describe('multiLayerCacheManager Integration', () => {
 			mockMemoryCacheService.delete.mockResolvedValue(undefined)
 			mockRedisCacheService.delete.mockResolvedValue(undefined)
 
-			await cacheManager.delete('images', 'test-key')
+			await cacheManager.delete('image', 'test-key')
 
-			expect(mockMemoryCacheService.delete).toHaveBeenCalledWith('images:test-key')
-			expect(mockRedisCacheService.delete).toHaveBeenCalledWith('images:test-key')
+			expect(mockMemoryCacheService.delete).toHaveBeenCalledWith('image:test-key')
+			expect(mockRedisCacheService.delete).toHaveBeenCalledWith('image:test-key')
 			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('delete', 'multi-layer', 'success')
 		})
 
@@ -181,12 +181,12 @@ describe('multiLayerCacheManager Integration', () => {
 			mockMemoryCacheService.has.mockResolvedValue(false)
 			mockRedisCacheService.has.mockResolvedValue(true)
 
-			const result = await cacheManager.exists('images', 'test-key')
+			const result = await cacheManager.exists('image', 'test-key')
 
 			expect(result).toBe(true)
 			// Both layers are checked in parallel now
-			expect(mockMemoryCacheService.has).toHaveBeenCalledWith('images:test-key')
-			expect(mockRedisCacheService.has).toHaveBeenCalledWith('images:test-key')
+			expect(mockMemoryCacheService.has).toHaveBeenCalledWith('image:test-key')
+			expect(mockRedisCacheService.has).toHaveBeenCalledWith('image:test-key')
 		})
 
 		it('should clear all layers', async () => {
@@ -206,11 +206,11 @@ describe('multiLayerCacheManager Integration', () => {
 			const testValue = { data: 'test' }
 			mockMemoryCacheService.get.mockResolvedValue(testValue)
 
-			await cacheManager.get('images', 'test-key', { width: 100, height: 200 })
+			await cacheManager.get('image', 'test-key', { width: 100, height: 200 })
 
 			// Key should include hashed parameters
 			expect(mockMemoryCacheService.get).toHaveBeenCalledWith(
-				expect.stringMatching(/^images:test-key:[a-f0-9]{16}$/),
+				expect.stringMatching(/^image:test-key:[a-f0-9]{16}$/),
 			)
 		})
 
@@ -218,8 +218,8 @@ describe('multiLayerCacheManager Integration', () => {
 			const testValue = { data: 'test' }
 			mockMemoryCacheService.get.mockResolvedValue(testValue)
 
-			await cacheManager.get('images', 'test-key', { width: 100, height: 200 })
-			await cacheManager.get('images', 'test-key', { height: 200, width: 100 }) // Different order
+			await cacheManager.get('image', 'test-key', { width: 100, height: 200 })
+			await cacheManager.get('image', 'test-key', { height: 200, width: 100 }) // Different order
 
 			// Should generate the same key both times
 			const calls = mockMemoryCacheService.get.mock.calls
@@ -292,7 +292,7 @@ describe('multiLayerCacheManager Integration', () => {
 			mockMemoryCacheService.clear.mockResolvedValue(undefined)
 			mockRedisCacheService.clear.mockResolvedValue(undefined)
 
-			await cacheManager.invalidateNamespace('images')
+			await cacheManager.invalidateNamespace('image')
 
 			expect(mockMemoryCacheService.clear).toHaveBeenCalled()
 			expect(mockRedisCacheService.clear).toHaveBeenCalled()
@@ -307,17 +307,17 @@ describe('multiLayerCacheManager Integration', () => {
 			mockRedisCacheService.get.mockResolvedValue(testValue)
 			mockMemoryCacheService.set.mockResolvedValue(undefined)
 
-			await cacheManager.get('images', 'test-key')
+			await cacheManager.get('image', 'test-key')
 
 			// Should backfill memory cache
-			expect(mockMemoryCacheService.set).toHaveBeenCalledWith('images:test-key', testValue, undefined)
+			expect(mockMemoryCacheService.set).toHaveBeenCalledWith('image:test-key', testValue, undefined)
 		})
 
 		it('should not backfill when hit is in highest priority layer', async () => {
 			const testValue = { data: 'test' }
 			mockMemoryCacheService.get.mockResolvedValue(testValue)
 
-			await cacheManager.get('images', 'test-key')
+			await cacheManager.get('image', 'test-key')
 
 			// Should not call set on any layer
 			expect(mockMemoryCacheService.set).not.toHaveBeenCalled()
