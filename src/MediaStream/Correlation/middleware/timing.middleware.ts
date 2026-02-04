@@ -8,7 +8,7 @@ import { PerformanceTracker } from '../utils/performance-tracker.util.js'
 
 @Injectable()
 export class TimingMiddleware implements NestMiddleware {
-	constructor(private readonly _correlationService: CorrelationService) {}
+	constructor(private readonly _correlationService: CorrelationService) { }
 
 	use(req: Request, res: Response, next: NextFunction): void {
 		const startTime = process.hrtime.bigint()
@@ -59,6 +59,10 @@ export class TimingMiddleware implements NestMiddleware {
 				}
 
 				PerformanceTracker.logSummary()
+
+				// Ensure cleanup happens even if logSummary didn't clear it (redundancy)
+				// or if logSummary wasn't called
+				PerformanceTracker.cleanup(context.correlationId)
 			}
 
 			return originalEnd(chunk, encoding, cb)

@@ -1,3 +1,4 @@
+import { CacheModule } from '#microservice/Cache/cache.module'
 import { ConfigModule } from '#microservice/Config/config.module'
 import { HttpModule as NestHttpModule } from '@nestjs/axios'
 import { Module } from '@nestjs/common'
@@ -8,6 +9,7 @@ import { HttpClientService } from './services/http-client.service.js'
 	imports: [
 		NestHttpModule.register({}),
 		ConfigModule,
+		CacheModule,
 	],
 	providers: [
 		HttpClientService,
@@ -19,4 +21,4 @@ import { HttpClientService } from './services/http-client.service.js'
 		NestHttpModule,
 	],
 })
-export class HttpModule {}
+export class HttpModule { }

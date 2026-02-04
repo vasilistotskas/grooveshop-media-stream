@@ -1,7 +1,7 @@
 import type { OnModuleInit } from '@nestjs/common'
 import type { AccessPattern } from './storage-monitoring.service.js'
 import { Buffer } from 'node:buffer'
-import { promises as fs } from 'node:fs'
+import { createReadStream, promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
@@ -361,8 +361,16 @@ export class StorageOptimizationService implements OnModuleInit {
 		for (const file of files) {
 			try {
 				const filePath = join(this.storageDirectory, file.file)
-				const data = await fs.readFile(filePath)
-				const hash = crypto.createHash('md5').update(data).digest('hex')
+
+				// Use streaming to compute hash for memory efficiency
+				const hash = await new Promise<string>((resolve, reject) => {
+					const hashSum = crypto.createHash('md5')
+					const stream = createReadStream(filePath)
+
+					stream.on('data', (chunk: Buffer) => hashSum.update(chunk))
+					stream.on('end', () => resolve(hashSum.digest('hex')))
+					stream.on('error', reject)
+				})
 
 				if (!hashMap.has(hash)) {
 					hashMap.set(hash, [])
@@ -370,10 +378,8 @@ export class StorageOptimizationService implements OnModuleInit {
 				hashMap.get(hash)!.push(file)
 			}
 			catch (error: unknown) {
-				CorrelatedLogger.warn(
-					`Failed to hash ${file.file}: ${(error as Error).message}`,
-					StorageOptimizationService.name,
-				)
+				// File might have been deleted or is inaccessible
+				this._logger.warn(`Failed to process file for deduplication: ${file.file} - ${(error as Error).message}`)
 			}
 		}
 

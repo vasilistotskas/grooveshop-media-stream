@@ -81,8 +81,7 @@ export class PerformanceTracker {
 		const logger = logLevel === 'warn' ? CorrelatedLogger.warn : CorrelatedLogger.debug
 
 		logger(
-			`Performance phase completed: ${phaseName} - ${phase.duration.toFixed(2)}ms${
-				phase.metadata ? ` (${JSON.stringify(phase.metadata)})` : ''
+			`Performance phase completed: ${phaseName} - ${phase.duration.toFixed(2)}ms${phase.metadata ? ` (${JSON.stringify(phase.metadata)})` : ''
 			}`,
 			'PerformanceTracker',
 		)
@@ -127,12 +126,13 @@ export class PerformanceTracker {
 	}
 
 	/**
-	 * Clear performance data for the current request
+	 * Clean up tracking data for a request
+	 * effectively preventing memory leaks
 	 */
-	static clearPhases(): void {
-		const correlationId = this.getCorrelationService().getCorrelationId()
-		if (correlationId) {
-			this.phases.delete(correlationId)
+	static cleanup(correlationId?: string): void {
+		const id = correlationId || this.getCorrelationService().getCorrelationId()
+		if (id && this.phases.has(id)) {
+			this.phases.delete(id)
 		}
 	}
 
@@ -190,12 +190,11 @@ export class PerformanceTracker {
 
 		CorrelatedLogger.log(
 			`Performance Summary: ${summary.completedPhases}/${summary.totalPhases} phases completed, `
-			+ `total phase time: ${summary.totalDuration.toFixed(2)}ms${
-				requestDuration ? `, request time: ${requestDuration.toFixed(2)}ms` : ''
+			+ `total phase time: ${summary.totalDuration.toFixed(2)}ms${requestDuration ? `, request time: ${requestDuration.toFixed(2)}ms` : ''
 			}${summary.slowestPhase ? `, slowest: ${summary.slowestPhase.name} (${summary.slowestPhase.duration?.toFixed(2)}ms)` : ''}`,
 			'PerformanceTracker',
 		)
 
-		this.clearPhases()
+		this.cleanup()
 	}
 }

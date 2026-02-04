@@ -532,19 +532,23 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		}
 	}
 
-	private collectDiskSpaceMetrics(): void {
+	private async collectDiskSpaceMetrics(): Promise<void> {
 		try {
 			const storagePaths = ['./storage', './public', './build']
 
 			for (const path of storagePaths) {
-				if (fs.existsSync(path)) {
-					const stats = fs.statSync(path)
+				try {
+					await fs.promises.access(path)
+					const stats = await fs.promises.stat(path)
 					if (stats.isDirectory()) {
-						const diskUsage = this.getDiskUsage(path)
+						const diskUsage = await this.getDiskUsage(path)
 						if (diskUsage) {
 							this.updateDiskSpaceMetrics(path, diskUsage.total, diskUsage.used, diskUsage.free)
 						}
 					}
+				}
+				catch {
+					// Path doesn't exist or not accessible, ignore
 				}
 			}
 		}
@@ -554,10 +558,10 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		}
 	}
 
-	private getDiskUsage(path: string): { total: number, used: number, free: number } | null {
+	private async getDiskUsage(path: string): Promise<{ total: number, used: number, free: number } | null> {
 		try {
 			// In production, you'd use a library like 'node-disk-info' or 'statvfs'
-			const size = this.getDirectorySize(path)
+			const size = await this.getDirectorySize(path)
 
 			return {
 				total: size * 2,
@@ -570,22 +574,24 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		}
 	}
 
-	private getDirectorySize(dirPath: string): number {
+	private async getDirectorySize(dirPath: string): Promise<number> {
 		try {
 			let totalSize = 0
-			const files = fs.readdirSync(dirPath)
+			const files = await fs.promises.readdir(dirPath)
 
-			for (const file of files) {
-				const filePath = `${dirPath}/${file}`
-				const stats = fs.statSync(filePath)
+			await Promise.all(
+				files.map(async (file) => {
+					const filePath = `${dirPath}/${file}`
+					const stats = await fs.promises.stat(filePath)
 
-				if (stats.isDirectory()) {
-					totalSize += this.getDirectorySize(filePath)
-				}
-				else {
-					totalSize += stats.size
-				}
-			}
+					if (stats.isDirectory()) {
+						totalSize += await this.getDirectorySize(filePath)
+					}
+					else {
+						totalSize += stats.size
+					}
+				}),
+			)
 
 			return totalSize
 		}

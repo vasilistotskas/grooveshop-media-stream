@@ -1,5 +1,7 @@
 import type { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
 import type { OnModuleInit } from '@nestjs/common'
+import { Buffer } from 'node:buffer'
+import * as fs from 'node:fs/promises'
 import { copyFile, readFile } from 'node:fs/promises'
 import { extname } from 'node:path'
 import { Injectable, Logger } from '@nestjs/common'
@@ -51,13 +53,23 @@ export default class WebpImageManipulationJob implements OnModuleInit {
 
 			if (!isSourceSvg) {
 				try {
-					const fileContent = await readFile(filePathFrom, 'utf8')
-					isSourceSvg = fileContent.trim().startsWith('<svg') || fileContent.includes('xmlns="http://www.w3.org/2000/svg"')
-					this.logger.debug(`Content-based SVG detection: ${isSourceSvg}`)
+					// Read only the first 512 bytes to check for SVG signature
+					// This avoids reading large files entirely into memory
+					const fileHandle = await fs.open(filePathFrom, 'r')
+					try {
+						const buffer = Buffer.alloc(512)
+						const { bytesRead } = await fileHandle.read(buffer, 0, 512, 0)
+						const content = buffer.toString('utf8', 0, bytesRead)
+						isSourceSvg = content.trim().startsWith('<svg') || content.includes('xmlns="http://www.w3.org/2000/svg"')
+						this.logger.debug(`Content-based SVG detection (header only): ${isSourceSvg}`)
+					}
+					finally {
+						await fileHandle.close()
+					}
 				}
-				catch {
+				catch (error: unknown) {
 					isSourceSvg = false
-					this.logger.debug('Could not read file as text, assuming not SVG')
+					this.logger.debug(`Could not read file header: ${(error as Error).message}, assuming not SVG`)
 				}
 			}
 

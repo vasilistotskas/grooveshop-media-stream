@@ -16,6 +16,20 @@ vi.mock('node:fs', () => ({
 		copyFile: vi.fn(),
 		link: vi.fn(),
 	},
+	createReadStream: vi.fn(() => ({
+		on: vi.fn((event, callback) => {
+			if (event === 'data') {
+				// Simulate data chunk
+				callback(Buffer.from('test-content'))
+			}
+			if (event === 'end') {
+				// Simulate stream end
+				callback()
+			}
+			return { on: vi.fn() } // partial stream mock return
+		}),
+		pipe: vi.fn(),
+	})),
 }))
 
 vi.mock('node:zlib', () => ({

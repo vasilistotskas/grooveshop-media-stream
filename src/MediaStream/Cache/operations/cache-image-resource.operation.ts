@@ -619,7 +619,7 @@ export default class CacheImageResourceOperation {
 			}
 
 			if (!cachedResource) {
-				const cachedData = await this.cacheManager.get<string>('images', ctx.id)
+				const cachedData = await this.cacheManager.get<string>('image', ctx.id)
 				if (cachedData) {
 					const metadata = new ResourceMetaData({
 						version: 1,

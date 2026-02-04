@@ -31,6 +31,8 @@ import { UrlBuilderService } from '../services/url-builder.service.js'
 export default class MediaStreamImageController {
 	private readonly _logger = new Logger(MediaStreamImageController.name)
 
+	private readonly compiledPatterns = new Map<string, RegExp>()
+
 	constructor(
 		private readonly imageStreamService: ImageStreamService,
 		private readonly requestValidatorService: RequestValidatorService,
@@ -41,6 +43,10 @@ export default class MediaStreamImageController {
 		this._logger.log('Image controller initialized with sources:')
 		Object.entries(IMAGE_SOURCES).forEach(([key, config]) => {
 			this._logger.log(`  - ${key}: /${IMAGE}/${config.routePattern}`)
+
+			// Pre-compile regex patterns
+			const regex = this.compilePattern(config.routePattern)
+			this.compiledPatterns.set(key, regex)
 		})
 	}
 
@@ -48,7 +54,7 @@ export default class MediaStreamImageController {
 	 * Catch-all route handler for all image sources
 	 * Matches request path against IMAGE_SOURCES patterns
 	 */
-	@Get('*')
+	@Get('*path')
 	public async handleImageRequest(
 		@Req() req: Request,
 		@Res() res: Response,
@@ -91,7 +97,11 @@ export default class MediaStreamImageController {
 	 */
 	private findMatchingSource(path: string): { sourceKey: ImageSourceKey, params: ImageProcessingParams } | null {
 		for (const [key, config] of Object.entries(IMAGE_SOURCES)) {
-			const params = this.matchPattern(path, config.routePattern, config.routeParams)
+			const regex = this.compiledPatterns.get(key)
+			if (!regex)
+				continue
+
+			const params = this.matchCompiledPattern(path, regex, config.routeParams)
 			if (params) {
 				return { sourceKey: key as ImageSourceKey, params }
 			}
@@ -100,13 +110,9 @@ export default class MediaStreamImageController {
 	}
 
 	/**
-	 * Match path against pattern and extract parameters
+	 * Compile pattern string to RegExp
 	 */
-	private matchPattern(
-		path: string,
-		pattern: string,
-		paramNames: string[],
-	): ImageProcessingParams | null {
+	private compilePattern(pattern: string): RegExp {
 		// Replace :param with capture groups, handling dots and wildcards specially
 		// :imagePath+ captures nested paths like blog/post/main/image.jpg
 		// :quality.:format becomes ([^/.]+)\.([^/]+) to match "90.webp"
@@ -116,7 +122,17 @@ export default class MediaStreamImageController {
 			.replace(/:([^/]+)/g, '([^/]+)') // Handle remaining :param
 			.replace(/\//g, '\\/') // Escape slashes
 
-		const regex = new RegExp(`^${regexPattern}$`)
+		return new RegExp(`^${regexPattern}$`)
+	}
+
+	/**
+	 * Match path against pre-compiled regex and extract parameters
+	 */
+	private matchCompiledPattern(
+		path: string,
+		regex: RegExp,
+		paramNames: string[],
+	): ImageProcessingParams | null {
 		const match = path.match(regex)
 
 		if (!match) {

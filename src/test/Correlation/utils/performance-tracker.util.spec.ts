@@ -37,12 +37,12 @@ describe('performanceTracker', () => {
 		mockCorrelationService.getCorrelationId.mockReturnValue('test-correlation-id')
 
 		// Clear any existing phases by directly accessing the private phases map
-		;(PerformanceTracker as any).phases = new Map()
+		; (PerformanceTracker as any).phases = new Map()
 	})
 
 	afterEach(() => {
-		// Clear phases directly since clearPhases() also depends on correlation ID
-		;(PerformanceTracker as any).phases = new Map()
+		// Clear phases directly since cleanup() also depends on correlation ID
+		; (PerformanceTracker as any).phases = new Map()
 		vi.clearAllMocks()
 	})
 
@@ -208,14 +208,14 @@ describe('performanceTracker', () => {
 		})
 	})
 
-	describe('clear Phases', () => {
+	describe('cleanup', () => {
 		it('should clear all phases for current correlation', () => {
 			PerformanceTracker.startPhase('phase-1')
 			PerformanceTracker.startPhase('phase-2')
 
 			expect(PerformanceTracker.getPhases()).toHaveLength(2)
 
-			PerformanceTracker.clearPhases()
+			PerformanceTracker.cleanup()
 
 			expect(PerformanceTracker.getPhases()).toHaveLength(0)
 		})

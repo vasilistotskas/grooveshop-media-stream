@@ -1,4 +1,5 @@
 import type { AxiosResponse } from 'axios'
+import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { ConfigService } from '#microservice/Config/config.service'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 import { HttpService, HttpModule as NestHttpModule } from '@nestjs/axios'
@@ -13,15 +14,24 @@ describe('httpClientService', () => {
 
 	const mockConfigService = {
 		getOptional: vi.fn(),
+		get: vi.fn(),
+	}
+
+	const mockRedisCacheService = {
+		set: vi.fn(),
+		get: vi.fn(),
 	}
 
 	beforeEach(async () => {
 		vi.clearAllMocks()
 
 		// Setup default config values
-		mockConfigService.getOptional.mockImplementation((_key: string, defaultValue: any) => {
+		const configImplementation = (_key: string, defaultValue: any) => {
 			return defaultValue
-		})
+		}
+
+		mockConfigService.getOptional.mockImplementation(configImplementation)
+		// Removed Redis config mock for get() as it is no longer used manually
 
 		const module: TestingModule = await Test.createTestingModule({
 			imports: [NestHttpModule],
@@ -30,6 +40,10 @@ describe('httpClientService', () => {
 				{
 					provide: ConfigService,
 					useValue: mockConfigService,
+				},
+				{
+					provide: RedisCacheService,
+					useValue: mockRedisCacheService,
 				},
 			],
 		}).compile()
