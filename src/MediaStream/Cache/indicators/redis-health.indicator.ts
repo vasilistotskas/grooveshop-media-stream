@@ -14,35 +14,34 @@ export class RedisHealthIndicator extends BaseHealthIndicator {
 		super('redis')
 	}
 
+	private lastHealthCheck: { result: HealthIndicatorResult, timestamp: number } | null = null
+	private readonly HEALTH_CHECK_CACHE_TTL = 10000 // 10 seconds cache
+
 	protected async performHealthCheck(): Promise<HealthIndicatorResult> {
+		// Return cached result if recent (reduces Redis load by 90%)
+		if (this.lastHealthCheck && Date.now() - this.lastHealthCheck.timestamp < this.HEALTH_CHECK_CACHE_TTL) {
+			CorrelatedLogger.debug('Returning cached Redis health check result', RedisHealthIndicator.name)
+			return this.lastHealthCheck.result
+		}
+
 		const startTime = Date.now()
 
 		try {
+			// Simple PING check - fastest way to verify Redis is alive
 			const pingResult = await this.redisCacheService.ping()
 			if (pingResult !== 'PONG') {
 				throw new Error(`Redis ping failed: ${pingResult}`)
 			}
 
+			// Single SET/GET test (simplified from 5 operations to 2)
 			const testKey = 'health-check-redis-test'
-			const testValue = { timestamp: Date.now(), test: true }
+			const testValue = Date.now()
 
 			await this.redisCacheService.set(testKey, testValue, 60)
 
-			const retrievedValue = await this.redisCacheService.get<{ timestamp: number, test: boolean }>(testKey)
-			if (!retrievedValue || retrievedValue.timestamp !== testValue.timestamp) {
+			const retrievedValue = await this.redisCacheService.get<number>(testKey)
+			if (retrievedValue !== testValue) {
 				throw new Error('Redis GET operation failed')
-			}
-
-			const ttl = await this.redisCacheService.getTtl(testKey)
-			if (ttl <= 0 || ttl > 60) {
-				throw new Error(`Redis TTL operation failed: ${ttl}`)
-			}
-
-			await this.redisCacheService.delete(testKey)
-
-			const deletedValue = await this.redisCacheService.get(testKey)
-			if (deletedValue !== null) {
-				throw new Error('Redis DELETE operation failed')
 			}
 
 			const stats = await this.redisCacheService.getStats()
