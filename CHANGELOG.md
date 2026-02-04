@@ -1,3 +1,15 @@
+# [2.32.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.31.1...v2.32.0) (2026-02-04)
+
+
+### Bug Fixes
+
+* performance ([dd619ce](https://github.com/vasilistotskas/grooveshop-media-stream/commit/dd619cefe4779d570efa1d92a539435f6f8ed003))
+
+
+### Features
+
+* performance ([69a8e3d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/69a8e3dc1f465899d6cd1d417ff2dde84c6d333c))
+
 ## [2.31.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.31.0...v2.31.1) (2026-02-04)
 
 
