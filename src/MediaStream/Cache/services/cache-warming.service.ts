@@ -29,6 +29,7 @@ interface FileAccessInfo {
 export class CacheWarmingService implements OnModuleInit {
 	private readonly config: CacheWarmingConfig
 	private readonly storagePath: string
+	private readonly baseCacheTtl: number
 
 	constructor(
 		private readonly memoryCacheService: MemoryCacheService,
@@ -44,6 +45,9 @@ export class CacheWarmingService implements OnModuleInit {
 		}
 
 		this.storagePath = join(cwd(), 'storage')
+
+		// ✅ Load base cache TTL from configuration (default: 3600 seconds = 1 hour)
+		this.baseCacheTtl = this._configService.getOptional('cache.warming.baseTtl', 3600)
 	}
 
 	async onModuleInit(): Promise<void> {
@@ -163,9 +167,9 @@ export class CacheWarmingService implements OnModuleInit {
 		try {
 			const content = await readFile(fileInfo.path)
 
-			const baseTtl = 3600
+			// ✅ Use configurable base TTL instead of hardcoded value
 			const accessMultiplier = Math.min(fileInfo.accessCount / 10, 5)
-			const ttl = Math.floor(baseTtl * (1 + accessMultiplier))
+			const ttl = Math.floor(this.baseCacheTtl * (1 + accessMultiplier))
 
 			await this.memoryCacheService.set(cacheKey, content, ttl)
 

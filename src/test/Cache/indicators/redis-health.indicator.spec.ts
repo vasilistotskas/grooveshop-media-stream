@@ -44,6 +44,11 @@ describe('redisHealthIndicator', () => {
 					return mockConfig.maxRetries
 				return undefined
 			}),
+			getOptional: vi.fn().mockImplementation((key: string, defaultValue?: any) => {
+				if (key === 'health.redis.cacheTtl')
+					return 10000 // 10 seconds cache TTL for tests
+				return defaultValue
+			}),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -133,51 +138,8 @@ describe('redisHealthIndicator', () => {
 			expect(result.redis.error).toContain('Redis GET operation failed')
 		})
 
-		it('should return unhealthy status when TTL operation fails', async () => {
-			let storedValue: any = null
-
-			redisCacheService.ping.mockResolvedValue('PONG')
-			redisCacheService.set.mockImplementation((key, value) => {
-				storedValue = value
-				return Promise.resolve(undefined)
-			})
-			redisCacheService.get.mockImplementation(() => Promise.resolve(storedValue))
-			redisCacheService.getTtl.mockResolvedValue(-1) // Invalid TTL
-
-			const result = await indicator.isHealthy()
-
-			expect(result.redis.status).toBe('down')
-			expect(result.redis.error).toContain('Redis TTL operation failed')
-		})
-
-		it('should return unhealthy status when DELETE operation fails', async () => {
-			let storedValue: any = null
-			let getCallCount = 0
-
-			redisCacheService.ping.mockResolvedValue('PONG')
-			redisCacheService.set.mockImplementation(async (key, value) => {
-				storedValue = value
-				return undefined
-			})
-			redisCacheService.get.mockImplementation(async (_key) => {
-				getCallCount++
-				if (getCallCount === 1) {
-					// First GET call: return the stored value (for GET operation test)
-					return storedValue
-				}
-				else {
-					// Second GET call: return the stored value again (should be null after delete, but we return the value to simulate delete failure)
-					return storedValue
-				}
-			})
-			redisCacheService.getTtl.mockResolvedValue(59)
-			redisCacheService.delete.mockResolvedValue(undefined)
-
-			const result = await indicator.isHealthy()
-
-			expect(result.redis.status).toBe('down')
-			expect(result.redis.error).toContain('Redis DELETE operation failed')
-		})
+		// Note: TTL and DELETE operation tests removed as the implementation was simplified
+		// to only perform PING and SET/GET operations for better performance
 
 		it('should handle Redis connection errors', async () => {
 			redisCacheService.ping.mockRejectedValue(new Error('Connection refused'))

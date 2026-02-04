@@ -56,6 +56,7 @@ export default class CacheImageResourceOperation {
 	// Configurable TTL values (loaded from config)
 	private readonly publicTtl: number
 	private readonly privateTtl: number
+	private readonly negativeCacheTtl: number
 
 	constructor(
 		private readonly validateCacheImageRequest: ValidateCacheImageRequestRule,
@@ -72,6 +73,8 @@ export default class CacheImageResourceOperation {
 		// Load TTL values from configuration
 		this.publicTtl = this.configService.getOptional('cache.image.publicTtl', 12 * 30 * 24 * 60 * 60 * 1000)
 		this.privateTtl = this.configService.getOptional('cache.image.privateTtl', 6 * 30 * 24 * 60 * 60 * 1000)
+		// ✅ Negative cache TTL for failed fetches (default: 5 minutes)
+		this.negativeCacheTtl = this.configService.getOptional('cache.image.negativeCacheTtl', 300000)
 	}
 
 	/**
@@ -301,9 +304,12 @@ export default class CacheImageResourceOperation {
 	 * Determine if background processing should be used
 	 * @param ctx - Operation context containing request-specific state
 	 *
-	 * SMART DECISION: Use background processing only for large/complex images
-	 * Small images (< 2MP) process fast enough (50-200ms) to serve synchronously
-	 * Large images (> 2MP) use background to avoid blocking
+	 * ✅ OPTIMIZED: Lowered threshold from 2MP to 1MP for better performance
+	 * - Small images (< 1MP) process fast (50-200ms) → serve synchronously
+	 * - Large images (> 1MP) take longer → use background queue
+	 * - High quality images (≥90) also use background processing
+	 *
+	 * This prevents blocking requests like the 43s image processing seen in production.
 	 */
 	public shouldUseBackgroundProcessing(ctx: OperationContext): boolean {
 		const resizeOptions = ctx.request.resizeOptions
@@ -318,15 +324,28 @@ export default class CacheImageResourceOperation {
 		// Calculate total pixels to process
 		const width = resizeOptions.width || 1920
 		const height = resizeOptions.height || 1080
+		const quality = resizeOptions.quality || 80
 		const totalPixels = width * height
 
-		// Use background processing for large images (> 2MP)
-		// These take longer to process and benefit from async handling
-		const LARGE_IMAGE_THRESHOLD = 2073600 // 1920x1080
+		// ✅ OPTIMIZED: Lowered from 2MP (2073600) to 1MP (1000000)
+		// This ensures images like 1920×1920 (3.6MP) are processed in background
+		const LARGE_IMAGE_THRESHOLD = 1000000 // 1MP (1000×1000)
+		const HIGH_QUALITY_THRESHOLD = 90
 
+		// Use background for large images
 		if (totalPixels > LARGE_IMAGE_THRESHOLD) {
 			CorrelatedLogger.debug(
-				`Large image (${totalPixels}px), using background processing`,
+				`Large image (${totalPixels}px > ${LARGE_IMAGE_THRESHOLD}px), using background processing`,
+				CacheImageResourceOperation.name,
+			)
+			return true
+		}
+
+		// ✅ NEW: High quality images take longer, process in background
+		// Quality ≥90 with medium-sized images (>500K pixels) should use background
+		if (quality >= HIGH_QUALITY_THRESHOLD && totalPixels > 500000) {
+			CorrelatedLogger.debug(
+				`High quality image (quality=${quality}, ${totalPixels}px), using background processing`,
 				CacheImageResourceOperation.name,
 			)
 			return true
@@ -334,7 +353,7 @@ export default class CacheImageResourceOperation {
 
 		// Small images process fast (50-200ms), serve synchronously
 		CorrelatedLogger.debug(
-			`Small image (${totalPixels}px), using synchronous processing`,
+			`Small image (${totalPixels}px ≤ ${LARGE_IMAGE_THRESHOLD}px, quality=${quality}), using synchronous processing`,
 			CacheImageResourceOperation.name,
 		)
 		return false
@@ -370,7 +389,7 @@ export default class CacheImageResourceOperation {
 			// Check negative cache first to avoid repeated failed fetches
 			const negativeCacheKey = `negative:${ctx.id}`
 			const negativeCached = await this.cacheManager.get<{ status: number, timestamp: number }>('image', negativeCacheKey)
-			if (negativeCached && Date.now() - negativeCached.timestamp < 300000) { // 5 minutes
+			if (negativeCached && Date.now() - negativeCached.timestamp < this.negativeCacheTtl) {
 				CorrelatedLogger.debug(`Negative cache hit for ${ctx.request.resourceTarget}`, CacheImageResourceOperation.name)
 				throw new UnableToFetchResourceException(ctx.request.resourceTarget)
 			}
@@ -381,7 +400,7 @@ export default class CacheImageResourceOperation {
 				await this.cacheManager.set('image', negativeCacheKey, {
 					status: response?.status || 404,
 					timestamp: Date.now(),
-				}, 300000) // 5 minutes TTL
+				}, this.negativeCacheTtl)
 				CorrelatedLogger.warn(`Caching negative result for ${ctx.request.resourceTarget} (status: ${response?.status || 404})`, CacheImageResourceOperation.name)
 				throw new UnableToFetchResourceException(ctx.request.resourceTarget)
 			}

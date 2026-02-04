@@ -7,19 +7,21 @@ import { RedisCacheService } from '../services/redis-cache.service.js'
 
 @Injectable()
 export class RedisHealthIndicator extends BaseHealthIndicator {
+	private lastHealthCheck: { result: HealthIndicatorResult, timestamp: number } | null = null
+	private readonly healthCheckCacheTtl: number
+
 	constructor(
 		private readonly redisCacheService: RedisCacheService,
 		private readonly _configService: ConfigService,
 	) {
 		super('redis')
+		// ✅ Load health check cache TTL from configuration (default: 10 seconds)
+		this.healthCheckCacheTtl = this._configService.getOptional('health.redis.cacheTtl', 10000)
 	}
-
-	private lastHealthCheck: { result: HealthIndicatorResult, timestamp: number } | null = null
-	private readonly HEALTH_CHECK_CACHE_TTL = 10000 // 10 seconds cache
 
 	protected async performHealthCheck(): Promise<HealthIndicatorResult> {
 		// Return cached result if recent (reduces Redis load by 90%)
-		if (this.lastHealthCheck && Date.now() - this.lastHealthCheck.timestamp < this.HEALTH_CHECK_CACHE_TTL) {
+		if (this.lastHealthCheck && Date.now() - this.lastHealthCheck.timestamp < this.healthCheckCacheTtl) {
 			CorrelatedLogger.debug('Returning cached Redis health check result', RedisHealthIndicator.name)
 			return this.lastHealthCheck.result
 		}

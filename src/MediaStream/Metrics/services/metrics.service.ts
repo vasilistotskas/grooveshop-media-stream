@@ -47,8 +47,18 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	private systemMetricsInterval?: NodeJS.Timeout
 	private performanceMetricsInterval?: NodeJS.Timeout
 
+	// ✅ Load intervals from configuration
+	private readonly systemMetricsIntervalMs: number
+	private readonly performanceMetricsIntervalMs: number
+	private readonly diskSpaceCacheTtl: number
+
 	constructor(private readonly _configService: ConfigService) {
 		this.register = new promClient.Registry()
+
+		// Load monitoring configuration
+		this.systemMetricsIntervalMs = this._configService.getOptional('monitoring.systemMetricsInterval', 60000)
+		this.performanceMetricsIntervalMs = this._configService.getOptional('monitoring.performanceMetricsInterval', 30000)
+		this.diskSpaceCacheTtl = this._configService.getOptional('monitoring.diskSpaceCacheTtl', 300000)
 
 		promClient.collectDefaultMetrics({
 			register: this.register,
@@ -475,15 +485,16 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	private startPeriodicMetricsCollection(): void {
+		// ✅ Use configurable intervals instead of hardcoded values
 		this.systemMetricsInterval = setInterval(() => {
 			this.collectSystemMetrics()
-		}, 30000)
+		}, this.systemMetricsIntervalMs)
 
 		this.performanceMetricsInterval = setInterval(() => {
 			this.collectPerformanceMetrics()
-		}, 10000)
+		}, this.performanceMetricsIntervalMs)
 
-		this._logger.log('Started periodic metrics collection')
+		this._logger.log(`Started periodic metrics collection (system: ${this.systemMetricsIntervalMs}ms, performance: ${this.performanceMetricsIntervalMs}ms)`)
 	}
 
 	private collectSystemMetrics(): void {
@@ -574,8 +585,20 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		}
 	}
 
+	// ✅ OPTIMIZED: Cache disk space calculation for configurable TTL
+	// Recursive directory traversal is expensive, especially for large storage directories
+	private diskSpaceCache: Map<string, { size: number, timestamp: number }> = new Map()
+
 	private async getDirectorySize(dirPath: string): Promise<number> {
 		try {
+			// Check cache first
+			const cached = this.diskSpaceCache.get(dirPath)
+			if (cached && Date.now() - cached.timestamp < this.diskSpaceCacheTtl) {
+				this._logger.debug(`Using cached disk space for ${dirPath}: ${cached.size} bytes`)
+				return cached.size
+			}
+
+			// Calculate actual size
 			let totalSize = 0
 			const files = await fs.promises.readdir(dirPath)
 
@@ -592,6 +615,10 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 					}
 				}),
 			)
+
+			// Cache the result
+			this.diskSpaceCache.set(dirPath, { size: totalSize, timestamp: Date.now() })
+			this._logger.debug(`Calculated and cached disk space for ${dirPath}: ${totalSize} bytes`)
 
 			return totalSize
 		}

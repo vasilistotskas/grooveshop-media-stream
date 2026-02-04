@@ -14,6 +14,7 @@ export interface CircuitBreakerOptions {
 	name?: string
 	persistState?: (state: CircuitBreakerPersistedState) => Promise<void>
 	loadState?: () => Promise<CircuitBreakerPersistedState | null>
+	persistenceInterval?: number // ✅ Configurable persistence interval (default: 10000ms)
 }
 
 export interface CircuitBreakerPersistedState {
@@ -49,9 +50,10 @@ export class CircuitBreaker {
 		// Load persisted state on initialization
 		this.loadPersistedState()
 
-		// Setup periodic state persistence
+		// ✅ Setup periodic state persistence with configurable interval
 		if (this.options.persistState) {
-			this.persistenceTimer = setInterval(() => this.persistCurrentState(), 10000)
+			const persistenceInterval = this.options.persistenceInterval || 10000
+			this.persistenceTimer = setInterval(() => this.persistCurrentState(), persistenceInterval)
 		}
 	}
 

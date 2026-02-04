@@ -33,6 +33,12 @@ describe('cacheWarmingService', () => {
 
 		const mockConfigService = {
 			get: vi.fn(),
+			getOptional: vi.fn((key: string, defaultValue: any) => {
+				// Return configuration value for cache warming base TTL
+				if (key === 'cache.warming.baseTtl')
+					return 3600
+				return defaultValue
+			}),
 		}
 
 		const mockMetricsService = {

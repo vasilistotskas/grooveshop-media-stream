@@ -11,6 +11,7 @@ import { CacheOperationsProcessor } from './processors/cache-operations.processo
 import { ImageProcessingProcessor } from './processors/image-processing.processor.js'
 import { BullQueueService } from './services/bull-queue.service.js'
 import { JobQueueManager } from './services/job-queue.manager.js'
+import { SharpConfigService } from './services/sharp-config.service.js'
 
 @Module({
 	imports: [
@@ -63,6 +64,7 @@ import { JobQueueManager } from './services/job-queue.manager.js'
 		TerminusModule,
 	],
 	providers: [
+		SharpConfigService, // ✅ Centralized Sharp configuration
 		BullQueueService,
 		JobQueueManager,
 		ImageProcessingProcessor,

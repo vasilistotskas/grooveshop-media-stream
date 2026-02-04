@@ -16,6 +16,16 @@ describe('metricsService', () => {
 					return true
 				return undefined
 			}),
+			getOptional: vi.fn((key: string, defaultValue: any) => {
+				// Return configuration values for metrics intervals
+				if (key === 'monitoring.systemMetricsInterval')
+					return 60000
+				if (key === 'monitoring.performanceMetricsInterval')
+					return 30000
+				if (key === 'monitoring.diskSpaceCacheTtl')
+					return 300000
+				return defaultValue
+			}),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({

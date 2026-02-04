@@ -1,5 +1,4 @@
 import type { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
-import type { OnModuleInit } from '@nestjs/common'
 import { Buffer } from 'node:buffer'
 import * as fs from 'node:fs/promises'
 import { copyFile, readFile } from 'node:fs/promises'
@@ -11,27 +10,13 @@ import ManipulationJobResult from '../dto/manipulation-job-result.dto.js'
 /**
  * Handles image manipulation and format conversion using Sharp.
  * Stateless service - all request data is passed via method parameters.
+ *
+ * NOTE: Sharp configuration is now centralized in SharpConfigService.
+ * This ensures consistent settings across all image processing operations.
  */
 @Injectable()
-export default class WebpImageManipulationJob implements OnModuleInit {
+export default class WebpImageManipulationJob {
 	private readonly logger = new Logger(WebpImageManipulationJob.name)
-
-	/**
-	 * Initialize Sharp with optimized concurrency settings
-	 */
-	onModuleInit(): void {
-		// With 1500m CPU, we can handle more concurrent operations
-		const concurrency = Math.max(4, Math.min(8, sharp.concurrency()))
-		sharp.concurrency(concurrency)
-		this.logger.log(`Sharp concurrency set to ${concurrency}`)
-
-		// Increase cache for better performance
-		sharp.cache({
-			memory: 200, // Increase from 100MB
-			files: 30, // Increase from 20
-			items: 200, // Increase from 100
-		})
-	}
 
 	async handle(
 		filePathFrom: string,

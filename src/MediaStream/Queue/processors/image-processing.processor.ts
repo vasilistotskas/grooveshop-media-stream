@@ -13,10 +13,15 @@ import { HttpClientService } from '#microservice/HTTP/services/http-client.servi
 import { Injectable, Logger } from '@nestjs/common'
 import sharp from 'sharp'
 
+/**
+ * Processes image jobs from the queue.
+ *
+ * NOTE: Sharp configuration is now centralized in SharpConfigService.
+ * This ensures consistent settings across all image processing operations.
+ */
 @Injectable()
 export class ImageProcessingProcessor {
 	private readonly _logger = new Logger(ImageProcessingProcessor.name)
-	private static readonly MAX_SHARP_INSTANCES = 4
 	private static readonly MAX_FILE_SIZE = MAX_FILE_SIZES.default // 10MB default
 
 	// Configurable TTL values (loaded from config)
@@ -32,19 +37,9 @@ export class ImageProcessingProcessor {
 		// Load TTL values from configuration
 		this.publicTtl = this.configService.getOptional('cache.image.publicTtl', 12 * 30 * 24 * 60 * 60 * 1000)
 		this.privateTtl = this.configService.getOptional('cache.image.privateTtl', 6 * 30 * 24 * 60 * 60 * 1000)
-		// Configure Sharp for optimal memory management
-		// Lower memory cache to prevent memory bloat
-		sharp.cache({
-			memory: 50, // 50MB memory cache
-			files: 10, // Max 10 files cached
-			items: 100, // Max 100 items
-		})
 
-		// Limit concurrent Sharp operations
-		sharp.concurrency(ImageProcessingProcessor.MAX_SHARP_INSTANCES)
-
-		// Enable SIMD for better performance
-		sharp.simd(true)
+		// Sharp configuration is now handled by SharpConfigService
+		// This ensures consistent settings across all image processing operations
 	}
 
 	async process(job: Job<ImageProcessingJobData>): Promise<JobResult> {
