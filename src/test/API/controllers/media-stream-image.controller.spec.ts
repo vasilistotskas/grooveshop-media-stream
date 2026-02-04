@@ -150,8 +150,7 @@ describe('mediaStreamImageController', () => {
 			expect(mockRequestValidatorService.validateRequest).toHaveBeenCalledWith(
 				expect.objectContaining({
 					params: expect.objectContaining({
-						imageType: 'test type',
-						image: 'image name.webp',
+						imagePath: 'test type/image name.webp',
 					}),
 				}),
 			)
@@ -170,8 +169,7 @@ describe('mediaStreamImageController', () => {
 			expect(mockRequestValidatorService.validateRequest).toHaveBeenCalledWith(
 				expect.objectContaining({
 					params: expect.objectContaining({
-						imageType: 'blog',
-						image: 'πωσ_cover.png', // Should be decoded to Greek characters
+						imagePath: 'blog/πωσ_cover.png', // Should be decoded to Greek characters
 					}),
 				}),
 			)

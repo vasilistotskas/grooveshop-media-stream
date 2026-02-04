@@ -11,9 +11,10 @@ export const IMAGE_SOURCES = {
 	UPLOADED_MEDIA: {
 		name: 'uploaded_media',
 		baseUrl: 'BACKEND_URL', // Environment variable key
-		urlPattern: '{baseUrl}/media/uploads/{imageType}/{image}',
-		routePattern: 'media/uploads/:imageType/:image/:width/:height/:fit/:position/:background/:trimThreshold/:quality.:format',
-		routeParams: ['imageType', 'image', 'width', 'height', 'fit', 'position', 'background', 'trimThreshold', 'quality', 'format'],
+		urlPattern: '{baseUrl}/media/uploads/{imagePath}',
+		// Use wildcard to capture full nested path (e.g., blog/post/main/image.jpg)
+		routePattern: 'media/uploads/:imagePath+/:width/:height/:fit/:position/:background/:trimThreshold/:quality.:format',
+		routeParams: ['imagePath', 'width', 'height', 'fit', 'position', 'background', 'trimThreshold', 'quality', 'format'],
 	},
 	STATIC_IMAGES: {
 		name: 'static_images',

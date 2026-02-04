@@ -107,9 +107,11 @@ export default class MediaStreamImageController {
 		pattern: string,
 		paramNames: string[],
 	): ImageProcessingParams | null {
-		// Replace :param with capture groups, handling dots specially
+		// Replace :param with capture groups, handling dots and wildcards specially
+		// :imagePath+ captures nested paths like blog/post/main/image.jpg
 		// :quality.:format becomes ([^/.]+)\.([^/]+) to match "90.webp"
 		const regexPattern = pattern
+			.replace(/:([^/.]+)\+/g, '(.+?)') // Handle :param+ (one or more segments, non-greedy)
 			.replace(/:([^/.]+)\.([^/.]+)/g, '([^/.]+)\\.([^/]+)') // Handle :param1.:param2
 			.replace(/:([^/]+)/g, '([^/]+)') // Handle remaining :param
 			.replace(/\//g, '\\/') // Escape slashes

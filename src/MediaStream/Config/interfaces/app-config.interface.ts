@@ -75,6 +75,21 @@ export interface ExternalServicesConfig {
 	maxRetries: number
 }
 
+export interface CircuitBreakerConfig {
+	enabled: boolean
+	failureThreshold: number
+	resetTimeout: number
+	monitoringPeriod: number
+	minimumRequests: number
+}
+
+export interface HttpConfig {
+	timeout: number
+	maxRetries: number
+	retryDelay: number
+	circuitBreaker: CircuitBreakerConfig
+}
+
 export interface RateLimitThrottlerConfig {
 	windowMs: number
 	max: number
@@ -107,6 +122,7 @@ export interface AppConfig {
 	processing: ProcessingConfig
 	monitoring: MonitoringConfig
 	externalServices: ExternalServicesConfig
+	http: HttpConfig
 	rateLimit: RateLimitConfig
 	shutdown: ShutdownConfig
 }

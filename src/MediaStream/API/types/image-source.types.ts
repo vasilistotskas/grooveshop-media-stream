@@ -25,7 +25,8 @@ export interface ImageSourceConfig {
 
 	/**
 	 * Route pattern for NestJS controller
-	 * Example: 'media/uploads/:imageType/:image/:width/:height/:fit/:position/:background/:trimThreshold/:format/:quality'
+	 * Example: 'media/uploads/:imagePath+/:width/:height/:fit/:position/:background/:trimThreshold/:quality.:format'
+	 * Note: :imagePath+ captures nested paths like blog/post/main/image.jpg
 	 */
 	routePattern: string
 
@@ -54,8 +55,8 @@ export interface ImageSourceConfig {
  * Image processing parameters
  */
 export interface ImageProcessingParams {
-	imageType?: string
-	image?: string
+	imagePath?: string // Captures full nested path (e.g., blog/post/main/image.jpg)
+	image?: string // For static images
 	width?: number | string | null
 	height?: number | string | null
 	fit?: string

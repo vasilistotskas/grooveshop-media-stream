@@ -104,12 +104,14 @@ describe('multiLayerCacheManager Integration', () => {
 		it('should get value from memory cache first', async () => {
 			const testValue = { data: 'test' }
 			mockMemoryCacheService.get.mockResolvedValue(testValue)
+			mockRedisCacheService.get.mockResolvedValue(null)
 
 			const result = await cacheManager.get('images', 'test-key')
 
 			expect(result).toEqual(testValue)
 			expect(mockMemoryCacheService.get).toHaveBeenCalledWith('images:test-key')
-			expect(mockRedisCacheService.get).not.toHaveBeenCalled()
+			// Parallel cache checks now call both layers
+			expect(mockRedisCacheService.get).toHaveBeenCalledWith('images:test-key')
 			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'memory', 'hit')
 		})
 
@@ -182,6 +184,7 @@ describe('multiLayerCacheManager Integration', () => {
 			const result = await cacheManager.exists('images', 'test-key')
 
 			expect(result).toBe(true)
+			// Both layers are checked in parallel now
 			expect(mockMemoryCacheService.has).toHaveBeenCalledWith('images:test-key')
 			expect(mockRedisCacheService.has).toHaveBeenCalledWith('images:test-key')
 		})

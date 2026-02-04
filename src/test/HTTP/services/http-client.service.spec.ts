@@ -44,10 +44,11 @@ describe('httpClientService', () => {
 		})
 
 		it('should load configuration from ConfigService', () => {
-			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.retry.retries', 3)
-			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.retry.retryDelay', 1000)
+			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.maxRetries', 3)
+			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.retryDelay', 1000)
 			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.retry.maxRetryDelay', 10000)
-			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.connectionPool.timeout', 30000)
+			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.timeout', 30000)
+			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.circuitBreaker.enabled', true)
 			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.circuitBreaker.failureThreshold', 50)
 			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.circuitBreaker.resetTimeout', 30000)
 			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.circuitBreaker.monitoringPeriod', 60000)

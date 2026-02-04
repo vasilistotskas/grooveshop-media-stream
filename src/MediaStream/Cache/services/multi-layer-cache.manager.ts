@@ -68,27 +68,36 @@ export class MultiLayerCacheManager implements OnModuleInit, OnModuleDestroy {
 		const key = this.keyStrategy.generateKey(namespace, identifier, params)
 		this.trackKeyAccess(key)
 
-		for (const layer of this.layers) {
-			try {
-				const value = await layer.get<T>(key)
-				if (value !== null) {
-					CorrelatedLogger.debug(
-						`Cache HIT in ${layer.getLayerName()} layer for key: ${key}`,
+		// Check all layers in parallel for better performance
+		const results = await Promise.allSettled(
+			this.layers.map(layer =>
+				layer.get<T>(key).catch((error) => {
+					CorrelatedLogger.warn(
+						`Cache layer ${layer.getLayerName()} failed for key ${key}: ${(error as Error).message}`,
 						MultiLayerCacheManager.name,
 					)
+					return null
+				}),
+			),
+		)
 
-					this.metricsService.recordCacheOperation('get', layer.getLayerName(), 'hit')
+		// Return first successful result (highest priority)
+		for (let i = 0; i < results.length; i++) {
+			if (results[i].status === 'fulfilled' && (results[i] as any).value !== null) {
+				const value = (results[i] as any).value
+				const layer = this.layers[i]
 
-					await this.backfillLayers(key, value, layer)
-
-					return value
-				}
-			}
-			catch (error: unknown) {
-				CorrelatedLogger.warn(
-					`Cache layer ${layer.getLayerName()} failed for key ${key}: ${(error as Error).message}`,
+				CorrelatedLogger.debug(
+					`Cache HIT in ${layer.getLayerName()} layer for key: ${key}`,
 					MultiLayerCacheManager.name,
 				)
+
+				this.metricsService.recordCacheOperation('get', layer.getLayerName(), 'hit')
+
+				// Backfill higher priority layers asynchronously (don't wait)
+				this.backfillLayers(key, value, layer).catch(() => {})
+
+				return value
 			}
 		}
 

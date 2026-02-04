@@ -136,6 +136,16 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	'externalServices.requestTimeout': { env: 'EXTERNAL_REQUEST_TIMEOUT', default: 30000, type: 'number' },
 	'externalServices.maxRetries': { env: 'EXTERNAL_MAX_RETRIES', default: 3, type: 'number' },
 
+	// HTTP client configuration
+	'http.timeout': { env: 'HTTP_TIMEOUT', default: 30000, type: 'number' },
+	'http.maxRetries': { env: 'HTTP_MAX_RETRIES', default: 3, type: 'number' },
+	'http.retryDelay': { env: 'HTTP_RETRY_DELAY', default: 1000, type: 'number' },
+	'http.circuitBreaker.enabled': { env: 'HTTP_CIRCUIT_BREAKER_ENABLED', default: true, type: 'boolean' },
+	'http.circuitBreaker.failureThreshold': { env: 'HTTP_CIRCUIT_BREAKER_FAILURE_THRESHOLD', default: 50, type: 'number' },
+	'http.circuitBreaker.resetTimeout': { env: 'HTTP_CIRCUIT_BREAKER_RESET_TIMEOUT', default: 30000, type: 'number' },
+	'http.circuitBreaker.monitoringPeriod': { env: 'HTTP_CIRCUIT_BREAKER_MONITORING_PERIOD', default: 60000, type: 'number' },
+	'http.circuitBreaker.minimumRequests': { env: 'HTTP_CIRCUIT_BREAKER_MINIMUM_REQUESTS', default: 10, type: 'number' },
+
 	// Rate limit configuration
 	'rateLimit.enabled': { env: 'RATE_LIMIT_ENABLED', default: true, type: 'boolean' },
 	'rateLimit.default.windowMs': { env: 'RATE_LIMIT_DEFAULT_WINDOW_MS', default: 60000, type: 'number' },

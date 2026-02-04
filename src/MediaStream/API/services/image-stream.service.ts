@@ -53,24 +53,27 @@ export class ImageStreamService {
 			// Setup returns the operation context - this is the key change for thread safety
 			const opCtx = await this.cacheImageResourceOperation.setup(request)
 
-			// Use request deduplication to prevent duplicate processing
-			const resourcePath = this.cacheImageResourceOperation.getResourcePath(opCtx)
-			await imageProcessingDeduplicator.execute(resourcePath, async () => {
-				if (await this.cacheImageResourceOperation.checkResourceExists(opCtx)) {
-					// Check for conditional request (ETag/If-Modified-Since)
+			// Fast path for cached images (no deduplication overhead)
+			if (await this.cacheImageResourceOperation.checkResourceExists(opCtx)) {
+				// Check for conditional request (ETag/If-Modified-Since)
+				if (req) {
 					const headers = await this.cacheImageResourceOperation.fetchHeaders(opCtx)
-					if (headers && req) {
+					if (headers) {
 						const notModified = this.checkConditionalRequest(req, headers)
 						if (notModified) {
 							this.send304Response(res, headers, correlationId)
 							return
 						}
 					}
-					await this.streamResource(opCtx, request, res, correlationId)
 				}
-				else {
-					await this.fetchAndWaitForResource(opCtx, request, res, correlationId)
-				}
+				await this.streamResource(opCtx, request, res, correlationId)
+				return
+			}
+
+			// Only deduplicate for non-cached images
+			const resourcePath = this.cacheImageResourceOperation.getResourcePath(opCtx)
+			await imageProcessingDeduplicator.execute(resourcePath, async () => {
+				await this.fetchAndWaitForResource(opCtx, request, res, correlationId)
 			})
 		}
 		catch (error: unknown) {
@@ -118,8 +121,7 @@ export class ImageStreamService {
 	}
 
 	/**
-	 * Fetch resource and wait for it to be processed
-	 * Uses AbortController for proper timeout handling
+	 * Fetch resource and wait for processing to complete
 	 */
 	private async fetchAndWaitForResource(
 		opCtx: OperationContext,
@@ -127,49 +129,20 @@ export class ImageStreamService {
 		res: Response,
 		correlationId: string,
 	): Promise<void> {
-		this._logger.debug('Resource does not exist, fetching', { correlationId })
-
-		const shouldUseQueue = this.cacheImageResourceOperation.shouldUseBackgroundProcessing(opCtx)
-		const maxWaitTime = shouldUseQueue ? 15000 : 10000
-
-		// Create AbortController for timeout
-		const controller = new AbortController()
-		const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT)
+		this._logger.debug('Resource does not exist, processing image', { correlationId })
 
 		try {
+			// Process image and wait for completion (fast: 50-200ms)
 			await this.cacheImageResourceOperation.execute(opCtx)
 
-			const pollInterval = 150
-			let waitTime = 0
-
-			while (waitTime < maxWaitTime && !controller.signal.aborted) {
-				if (await this.cacheImageResourceOperation.checkResourceExists(opCtx)) {
-					this._logger.debug('Resource available after waiting', { waitTime, correlationId })
-					await this.streamResource(opCtx, request, res, correlationId)
-					return
-				}
-				await new Promise((resolve, reject) => {
-					const timer = setTimeout(resolve, pollInterval)
-					controller.signal.addEventListener('abort', () => {
-						clearTimeout(timer)
-						reject(new Error('Request timeout'))
-					}, { once: true })
-				})
-				waitTime += pollInterval
-			}
-
-			this._logger.warn('Timeout waiting for resource', { waitTime, correlationId })
+			// Image processed successfully, stream it
+			await this.streamResource(opCtx, request, res, correlationId)
+		}
+		catch (error) {
+			// Processing failed, serve fallback
+			this._logger.warn('Image processing failed, serving fallback', { error, correlationId })
+			this.metricsService.recordError('image_processing', 'processing_failed')
 			await this.serveFallbackImage(request, res, correlationId)
-		}
-		catch (error: unknown) {
-			if ((error as Error).message === 'Request timeout') {
-				this._logger.warn('Request aborted due to timeout', { correlationId })
-				this.metricsService.recordError('image_request', 'timeout')
-			}
-			throw error
-		}
-		finally {
-			clearTimeout(timeoutId)
 		}
 	}
 

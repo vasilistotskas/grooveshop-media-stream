@@ -300,25 +300,43 @@ export default class CacheImageResourceOperation {
 	/**
 	 * Determine if background processing should be used
 	 * @param ctx - Operation context containing request-specific state
+	 *
+	 * SMART DECISION: Use background processing only for large/complex images
+	 * Small images (< 2MP) process fast enough (50-200ms) to serve synchronously
+	 * Large images (> 2MP) use background to avoid blocking
 	 */
 	public shouldUseBackgroundProcessing(ctx: OperationContext): boolean {
 		const resizeOptions = ctx.request.resizeOptions
 		if (!resizeOptions)
 			return false
 
-		const width = resizeOptions.width || 0
-		const height = resizeOptions.height || 0
-		const totalPixels = width * height
-
+		// SVG files can be served directly without processing
 		if (resizeOptions.format === 'svg') {
 			return false
 		}
 
-		if (totalPixels > 8000000) {
-			CorrelatedLogger.warn(`Image is too large to be processed synchronously: ${totalPixels} pixels`, CacheImageResourceOperation.name)
+		// Calculate total pixels to process
+		const width = resizeOptions.width || 1920
+		const height = resizeOptions.height || 1080
+		const totalPixels = width * height
+
+		// Use background processing for large images (> 2MP)
+		// These take longer to process and benefit from async handling
+		const LARGE_IMAGE_THRESHOLD = 2073600 // 1920x1080
+
+		if (totalPixels > LARGE_IMAGE_THRESHOLD) {
+			CorrelatedLogger.debug(
+				`Large image (${totalPixels}px), using background processing`,
+				CacheImageResourceOperation.name,
+			)
 			return true
 		}
 
+		// Small images process fast (50-200ms), serve synchronously
+		CorrelatedLogger.debug(
+			`Small image (${totalPixels}px), using synchronous processing`,
+			CacheImageResourceOperation.name,
+		)
 		return false
 	}
 

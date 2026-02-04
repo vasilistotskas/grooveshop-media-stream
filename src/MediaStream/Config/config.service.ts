@@ -39,7 +39,8 @@ export class ConfigService implements OnModuleInit {
 			throw new Error(`Configuration key '${key}' not found`)
 		}
 
-		return value as T
+		// Ensure boolean values are properly typed
+		return this.ensureProperType(value) as T
 	}
 
 	/**
@@ -47,11 +48,31 @@ export class ConfigService implements OnModuleInit {
 	 */
 	getOptional<T = any>(key: string, defaultValue?: T): T {
 		try {
-			return this.get<T>(key)
+			const value = this.get<T>(key)
+			// Ensure boolean values are properly typed
+			return this.ensureProperType(value) as T
 		}
 		catch {
 			return defaultValue as T
 		}
+	}
+
+	/**
+	 * Ensure configuration values are properly typed
+	 * This is critical for boolean values which can be strings from environment variables
+	 */
+	private ensureProperType<T>(value: any): T {
+		// If it's a string that looks like a boolean, convert it
+		if (typeof value === 'string') {
+			const lowerValue = value.toLowerCase()
+			if (lowerValue === 'true') {
+				return true as T
+			}
+			if (lowerValue === 'false') {
+				return false as T
+			}
+		}
+		return value as T
 	}
 
 	/**
@@ -294,6 +315,18 @@ export class ConfigService implements OnModuleInit {
 			externalServices: {
 				requestTimeout: config.externalServices?.requestTimeout ?? 30000,
 				maxRetries: config.externalServices?.maxRetries ?? 3,
+			},
+			http: {
+				timeout: config.http?.timeout ?? 30000,
+				maxRetries: config.http?.maxRetries ?? 3,
+				retryDelay: config.http?.retryDelay ?? 1000,
+				circuitBreaker: {
+					enabled: config.http?.circuitBreaker?.enabled ?? true,
+					failureThreshold: config.http?.circuitBreaker?.failureThreshold ?? 50,
+					resetTimeout: config.http?.circuitBreaker?.resetTimeout ?? 30000,
+					monitoringPeriod: config.http?.circuitBreaker?.monitoringPeriod ?? 60000,
+					minimumRequests: config.http?.circuitBreaker?.minimumRequests ?? 10,
+				},
 			},
 			rateLimit: {
 				enabled: config.rateLimit?.enabled ?? true,

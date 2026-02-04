@@ -22,6 +22,7 @@ describe('webpImageManipulationJob', () => {
 		trim: vi.fn().mockReturnThis(),
 		toBuffer: vi.fn().mockResolvedValue(Buffer.from('test')),
 		toFile: vi.fn().mockResolvedValue({ size: 1000, format: 'webp' }),
+		metadata: vi.fn().mockResolvedValue({ width: 800, height: 600, format: 'avif' }),
 	}
 
 	beforeEach(() => {
@@ -214,6 +215,9 @@ describe('webpImageManipulationJob', () => {
 				quality: 80,
 			})
 
+			// Mock toFile to return proper metadata for AVIF
+			mockManipulation.toFile.mockResolvedValue({ size: 1000, format: 'avif' })
+
 			const result = await job.handle(filePathFrom, filePathTo, options)
 
 			expect(sharp).toHaveBeenCalledWith(filePathFrom)
@@ -228,10 +232,10 @@ describe('webpImageManipulationJob', () => {
 				background: { r: 0, g: 0, b: 0, alpha: 0 },
 				threshold: 5,
 			})
-			// AVIF encoding optimized: quality capped at 65, effort 4 for balanced speed/compression
+			// AVIF encoding optimized: quality capped at 60, effort 2 for faster encoding
 			expect(mockManipulation.avif).toHaveBeenCalledWith({
-				quality: 65,
-				effort: 4,
+				quality: 60,
+				effort: 2,
 				chromaSubsampling: '4:2:0',
 				lossless: false,
 			})

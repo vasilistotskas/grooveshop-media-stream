@@ -165,22 +165,28 @@ export class ImageProcessingProcessor {
 	 */
 	private async downloadImage(url: string): Promise<Buffer> {
 		try {
-			// First, check Content-Length with HEAD request
-			try {
-				const headResponse = await this.httpClient.head(url, { timeout: 5000 })
-				const contentLength = headResponse.headers['content-length']
+			// Skip HEAD request for localhost/Django (returns malformed HTTP response)
+			// Go straight to GET with size limits
+			const skipHead = url.includes('localhost') || url.includes('127.0.0.1')
 
-				if (contentLength) {
-					const size = Number.parseInt(contentLength, 10)
-					if (size > ImageProcessingProcessor.MAX_FILE_SIZE) {
-						throw new Error(`Image too large: ${size} bytes exceeds maximum ${ImageProcessingProcessor.MAX_FILE_SIZE} bytes`)
+			if (!skipHead) {
+				// For external URLs, try HEAD request for size validation
+				try {
+					const headResponse = await this.httpClient.head(url, { timeout: 5000 })
+					const contentLength = headResponse.headers['content-length']
+
+					if (contentLength) {
+						const size = Number.parseInt(contentLength, 10)
+						if (size > ImageProcessingProcessor.MAX_FILE_SIZE) {
+							throw new Error(`Image too large: ${size} bytes exceeds maximum ${ImageProcessingProcessor.MAX_FILE_SIZE} bytes`)
+						}
+						this._logger.debug(`Content-Length validated: ${size} bytes`)
 					}
-					this._logger.debug(`Content-Length validated: ${size} bytes`)
 				}
-			}
-			catch (headError: unknown) {
-				// HEAD request failed, continue with GET but with size limit
-				this._logger.warn(`HEAD request failed, proceeding with size-limited GET: ${(headError as Error).message}`)
+				catch (headError: unknown) {
+					// HEAD request failed, continue with GET but with size limit
+					this._logger.debug(`HEAD request failed, proceeding with size-limited GET: ${(headError as Error).message}`)
+				}
 			}
 
 			// Download the image

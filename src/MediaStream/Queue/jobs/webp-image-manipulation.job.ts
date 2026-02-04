@@ -1,7 +1,8 @@
 import type { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
+import type { OnModuleInit } from '@nestjs/common'
 import { copyFile, readFile } from 'node:fs/promises'
 import { extname } from 'node:path'
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import sharp from 'sharp'
 import ManipulationJobResult from '../dto/manipulation-job-result.dto.js'
 
@@ -15,17 +16,19 @@ export default class WebpImageManipulationJob implements OnModuleInit {
 
 	/**
 	 * Initialize Sharp with optimized concurrency settings
-	 * Limit concurrent operations to prevent CPU starvation under load
 	 */
 	onModuleInit(): void {
-		// Limit Sharp concurrency to prevent CPU contention
-		// Default is based on CPU cores, but with multiple pods this causes issues
-		const concurrency = Math.max(2, Math.min(4, sharp.concurrency()))
+		// With 1500m CPU, we can handle more concurrent operations
+		const concurrency = Math.max(4, Math.min(8, sharp.concurrency()))
 		sharp.concurrency(concurrency)
 		this.logger.log(`Sharp concurrency set to ${concurrency}`)
 
-		// Enable Sharp caching for repeated operations
-		sharp.cache({ memory: 100, files: 20, items: 100 })
+		// Increase cache for better performance
+		sharp.cache({
+			memory: 200, // Increase from 100MB
+			files: 30, // Increase from 20
+			items: 200, // Increase from 100
+		})
 	}
 
 	async handle(
@@ -163,21 +166,32 @@ export default class WebpImageManipulationJob implements OnModuleInit {
 			case 'webp':
 				manipulation.webp({ quality: options.quality })
 				break
-			case 'avif':
-				// AVIF encoding optimization:
-				// 1. Quality capped at 65 - visually excellent with much faster encoding
-				// 2. effort: 4 (default 4, range 0-9) - balanced speed/compression
-				// 3. chromaSubsampling: '4:2:0' - standard for photos, reduces file size
-				// 4. lossless: false - ensures we use lossy compression for speed
-				// Note: AVIF encoding is inherently slow (10-50x slower than WebP)
-				// Consider using WebP for time-sensitive requests
+			case 'avif': {
+				// For large images, use WebP fallback for better performance
+				const metadata = await sharp(filePathFrom).metadata()
+				const totalPixels = (metadata.width || 0) * (metadata.height || 0)
+
+				if (totalPixels > 2073600) { // > 1920x1080
+					this.logger.warn(`Image too large for AVIF (${totalPixels}px), using WebP fallback`)
+					manipulation.webp({
+						quality: options.quality,
+						smartSubsample: true,
+						effort: 4,
+					})
+					break
+				}
+
+				// Optimize AVIF for speed while maintaining quality
+				// quality: 60 (down from 65) - minimal visual difference, faster encoding
+				// effort: 2 (down from 4) - 2x faster encoding with acceptable compression
 				manipulation.avif({
-					quality: Math.min(options.quality, 65),
-					effort: 4,
+					quality: Math.min(options.quality, 60),
+					effort: 2,
 					chromaSubsampling: '4:2:0',
 					lossless: false,
 				})
 				break
+			}
 			case 'gif':
 				manipulation.gif()
 				break

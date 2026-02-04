@@ -39,15 +39,25 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	private readonly retryDelay: number
 	private readonly maxRetryDelay: number
 	private readonly timeout: number
+	private readonly circuitBreakerEnabled: boolean
 
 	constructor(
 		private readonly _httpService: HttpService,
 		private readonly _configService: ConfigService,
 	) {
-		this.maxRetries = this._configService.getOptional('http.retry.retries', 3)
-		this.retryDelay = this._configService.getOptional('http.retry.retryDelay', 1000)
+		this.maxRetries = this._configService.getOptional('http.maxRetries', 3)
+		this.retryDelay = this._configService.getOptional('http.retryDelay', 1000)
 		this.maxRetryDelay = this._configService.getOptional('http.retry.maxRetryDelay', 10000)
-		this.timeout = this._configService.getOptional('http.connectionPool.timeout', 30000)
+		this.timeout = this._configService.getOptional('http.timeout', 30000)
+
+		// Boolean is now properly parsed by config schema
+		this.circuitBreakerEnabled = this._configService.getOptional('http.circuitBreaker.enabled', true)
+
+		// Log the actual value and type for debugging
+		CorrelatedLogger.log(
+			`HTTP Client initialized with circuit breaker ${this.circuitBreakerEnabled ? 'enabled' : 'disabled'} (value: ${this.circuitBreakerEnabled}, type: ${typeof this.circuitBreakerEnabled})`,
+			HttpClientService.name,
+		)
 
 		// Initialize Redis for circuit breaker state persistence
 		this.initializeRedis()
@@ -270,8 +280,21 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	 * Execute a request with circuit breaker and retry logic
 	 */
 	private async executeRequest<T>(requestFn: () => any): Promise<AxiosResponse<T>> {
-		if (this.circuitBreaker.isOpen()) {
-			throw new Error('Circuit breaker is open')
+		// Skip circuit breaker check if disabled
+		if (this.circuitBreakerEnabled) {
+			if (this.circuitBreaker.isOpen()) {
+				CorrelatedLogger.warn(
+					'Circuit breaker is open, rejecting request',
+					HttpClientService.name,
+				)
+				throw new Error('Circuit breaker is open')
+			}
+		}
+		else {
+			CorrelatedLogger.debug(
+				'Circuit breaker is disabled, allowing request',
+				HttpClientService.name,
+			)
 		}
 
 		const startTime = performance.now()
@@ -306,7 +329,13 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 					tap({
 						error: (error: unknown) => {
 							this.stats.failedRequests++
-							this.circuitBreaker.recordFailure()
+							if (this.circuitBreakerEnabled) {
+								this.circuitBreaker.recordFailure()
+								CorrelatedLogger.debug(
+									'Circuit breaker recorded failure',
+									HttpClientService.name,
+								)
+							}
 							CorrelatedLogger.error(
 								`HTTP request failed: ${(error as Error).message}`,
 								(error as Error).stack,
@@ -315,7 +344,9 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 						},
 						next: (response: AxiosResponse<T>) => {
 							this.stats.successfulRequests++
-							this.circuitBreaker.recordSuccess()
+							if (this.circuitBreakerEnabled) {
+								this.circuitBreaker.recordSuccess()
+							}
 							CorrelatedLogger.debug(
 								`HTTP request succeeded: ${response.config?.method?.toUpperCase()} ${response.config?.url} ${response.status}`,
 								HttpClientService.name,
