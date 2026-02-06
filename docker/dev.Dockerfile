@@ -1,4 +1,4 @@
-FROM node:25.2.1-alpine AS development
+FROM node:25.6.0-alpine AS development
 
 # Copy the entrypoint script into the container
 COPY ./grooveshop-media-stream/docker/docker_entrypoint.sh /app/docker_entrypoint.sh
