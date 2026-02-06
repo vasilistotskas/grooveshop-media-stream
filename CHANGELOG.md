@@ -1,3 +1,10 @@
+# [2.33.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.32.0...v2.33.0) (2026-02-06)
+
+
+### Features
+
+* Bump Node ([82bf631](https://github.com/vasilistotskas/grooveshop-media-stream/commit/82bf63189ac6fcfcba4871431f1220376c876a90))
+
 # [2.32.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.31.1...v2.32.0) (2026-02-04)
 
 
