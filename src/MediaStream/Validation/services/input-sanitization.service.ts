@@ -239,9 +239,7 @@ export class InputSanitizationService implements ISanitizer<any> {
 		let i = 0
 
 		while (i < input.length) {
-			if (i <= input.length - 2
-				&& input.substring(i, i + 2).toLowerCase() === 'on'
-				&& this.isWordBoundary(input, i)) {
+			if (i <= input.length - 2 && input.substring(i, i + 2).toLowerCase() === 'on' && this.isWordBoundary(input, i)) {
 				i = this.skipEventHandler(input, i)
 				continue
 			}
@@ -258,9 +256,7 @@ export class InputSanitizationService implements ISanitizer<any> {
 		let i = 0
 
 		while (i < input.length) {
-			if (i <= input.length - 5
-				&& input.substring(i, i + 5).toLowerCase() === 'style'
-				&& this.isWordBoundary(input, i)) {
+			if (i <= input.length - 5 && input.substring(i, i + 5).toLowerCase() === 'style' && this.isWordBoundary(input, i)) {
 				i = this.skipStyleAttribute(input, i)
 				continue
 			}

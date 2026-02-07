@@ -54,8 +54,7 @@ export class MemoryHealthIndicator extends BaseHealthIndicator {
 			}
 
 			let detailStatus = 'healthy'
-			if (memoryInfo.memoryUsagePercentage >= this._warningThreshold
-				|| memoryInfo.heapUsagePercentage >= this.heapWarningThreshold) {
+			if (memoryInfo.memoryUsagePercentage >= this._warningThreshold || memoryInfo.heapUsagePercentage >= this.heapWarningThreshold) {
 				detailStatus = 'warning'
 			}
 
