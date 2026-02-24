@@ -5,7 +5,6 @@ import { MetricsModule } from '#microservice/Metrics/metrics.module'
 import { Module } from '@nestjs/common'
 import { ThrottlerModule } from '@nestjs/throttler'
 import { AdaptiveRateLimitGuard } from './guards/adaptive-rate-limit.guard.js'
-import { RateLimitMetricsService } from './services/rate-limit-metrics.service.js'
 import { RateLimitService } from './services/rate-limit.service.js'
 
 @Module({
@@ -36,7 +35,7 @@ import { RateLimitService } from './services/rate-limit.service.js'
 			}),
 		}),
 	],
-	providers: [RateLimitService, AdaptiveRateLimitGuard, RateLimitMetricsService],
-	exports: [RateLimitService, AdaptiveRateLimitGuard, RateLimitMetricsService],
+	providers: [RateLimitService, AdaptiveRateLimitGuard],
+	exports: [RateLimitService, AdaptiveRateLimitGuard],
 })
 export class RateLimitModule {}

@@ -13,6 +13,7 @@ import CacheImageRequest, {
 	PositionOptions,
 	SupportedResizeFormats,
 } from '#microservice/API/dto/cache-image-request.dto'
+
 import UnableToFetchResourceException from '#microservice/API/exceptions/unable-to-fetch-resource.exception'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
@@ -23,8 +24,6 @@ import FetchResourceResponseJob from '#microservice/Queue/jobs/fetch-resource-re
 import GenerateResourceIdentityFromRequestJob from '#microservice/Queue/jobs/generate-resource-identity-from-request.job'
 import StoreResourceResponseToFileJob from '#microservice/Queue/jobs/store-resource-response-to-file.job'
 import WebpImageManipulationJob from '#microservice/Queue/jobs/webp-image-manipulation.job'
-import { JobQueueManager } from '#microservice/Queue/services/job-queue.manager'
-import { JobPriority } from '#microservice/Queue/types/job.types'
 import ValidateCacheImageRequestRule from '#microservice/Validation/rules/validate-cache-image-request.rule'
 import { InputSanitizationService } from '#microservice/Validation/services/input-sanitization.service'
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
@@ -66,15 +65,14 @@ export default class CacheImageResourceOperation {
 		private readonly generateResourceIdentityFromRequestJob: GenerateResourceIdentityFromRequestJob,
 		private readonly cacheManager: MultiLayerCacheManager,
 		private readonly inputSanitizationService: InputSanitizationService,
-		private readonly jobQueueManager: JobQueueManager,
 		private readonly metricsService: MetricsService,
 		private readonly configService: ConfigService,
 	) {
-		// Load TTL values from configuration
-		this.publicTtl = this.configService.getOptional('cache.image.publicTtl', 12 * 30 * 24 * 60 * 60 * 1000)
-		this.privateTtl = this.configService.getOptional('cache.image.privateTtl', 6 * 30 * 24 * 60 * 60 * 1000)
-		// ✅ Negative cache TTL for failed fetches (default: 5 minutes)
-		this.negativeCacheTtl = this.configService.getOptional('cache.image.negativeCacheTtl', 300000)
+		// Load TTL values from configuration (in seconds — Redis/cache layers expect seconds)
+		this.publicTtl = this.configService.getOptional('cache.image.publicTtl', 12 * 30 * 24 * 3600)
+		this.privateTtl = this.configService.getOptional('cache.image.privateTtl', 6 * 30 * 24 * 3600)
+		// Negative cache TTL for failed fetches (default: 5 minutes in seconds)
+		this.negativeCacheTtl = this.configService.getOptional('cache.image.negativeCacheTtl', 300)
 	}
 
 	/**
@@ -278,14 +276,6 @@ export default class CacheImageResourceOperation {
 				return
 			}
 
-			const shouldUseQueue = this.shouldUseBackgroundProcessing(ctx)
-
-			if (shouldUseQueue) {
-				CorrelatedLogger.debug('Queuing image processing job for background processing', CacheImageResourceOperation.name)
-				await this.queueImageProcessing(ctx)
-				return
-			}
-
 			await this.processImageSynchronously(ctx)
 		}
 		catch (error: unknown) {
@@ -298,88 +288,6 @@ export default class CacheImageResourceOperation {
 		finally {
 			PerformanceTracker.endPhase('execute')
 		}
-	}
-
-	/**
-	 * Determine if background processing should be used
-	 * @param ctx - Operation context containing request-specific state
-	 *
-	 * ✅ OPTIMIZED: Lowered threshold from 2MP to 1MP for better performance
-	 * - Small images (< 1MP) process fast (50-200ms) → serve synchronously
-	 * - Large images (> 1MP) take longer → use background queue
-	 * - High quality images (≥90) also use background processing
-	 *
-	 * This prevents blocking requests like the 43s image processing seen in production.
-	 */
-	public shouldUseBackgroundProcessing(ctx: OperationContext): boolean {
-		const resizeOptions = ctx.request.resizeOptions
-		if (!resizeOptions)
-			return false
-
-		// SVG files can be served directly without processing
-		if (resizeOptions.format === 'svg') {
-			return false
-		}
-
-		// Calculate total pixels to process
-		const width = resizeOptions.width || 1920
-		const height = resizeOptions.height || 1080
-		const quality = resizeOptions.quality || 80
-		const totalPixels = width * height
-
-		// ✅ OPTIMIZED: Lowered from 2MP (2073600) to 1MP (1000000)
-		// This ensures images like 1920×1920 (3.6MP) are processed in background
-		const LARGE_IMAGE_THRESHOLD = 1000000 // 1MP (1000×1000)
-		const HIGH_QUALITY_THRESHOLD = 90
-
-		// Use background for large images
-		if (totalPixels > LARGE_IMAGE_THRESHOLD) {
-			CorrelatedLogger.debug(
-				`Large image (${totalPixels}px > ${LARGE_IMAGE_THRESHOLD}px), using background processing`,
-				CacheImageResourceOperation.name,
-			)
-			return true
-		}
-
-		// ✅ NEW: High quality images take longer, process in background
-		// Quality ≥90 with medium-sized images (>500K pixels) should use background
-		if (quality >= HIGH_QUALITY_THRESHOLD && totalPixels > 500000) {
-			CorrelatedLogger.debug(
-				`High quality image (quality=${quality}, ${totalPixels}px), using background processing`,
-				CacheImageResourceOperation.name,
-			)
-			return true
-		}
-
-		// Small images process fast (50-200ms), serve synchronously
-		CorrelatedLogger.debug(
-			`Small image (${totalPixels}px ≤ ${LARGE_IMAGE_THRESHOLD}px, quality=${quality}), using synchronous processing`,
-			CacheImageResourceOperation.name,
-		)
-		return false
-	}
-
-	private async queueImageProcessing(ctx: OperationContext): Promise<void> {
-		const resizeOptions = ctx.request.resizeOptions
-		const priority = resizeOptions?.width && resizeOptions.width > 1920
-			? JobPriority.LOW
-			: JobPriority.NORMAL
-
-		await this.jobQueueManager.addImageProcessingJob({
-			imageUrl: ctx.request.resourceTarget,
-			width: resizeOptions?.width ?? undefined,
-			height: resizeOptions?.height ?? undefined,
-			quality: resizeOptions?.quality,
-			format: resizeOptions?.format as 'webp' | 'jpeg' | 'png',
-			fit: resizeOptions?.fit,
-			position: resizeOptions?.position,
-			background: resizeOptions?.background,
-			trimThreshold: resizeOptions?.trimThreshold ?? undefined,
-			cacheKey: ctx.id,
-			priority,
-		})
-
-		CorrelatedLogger.debug(`Image processing job queued with priority: ${priority}`, CacheImageResourceOperation.name)
 	}
 
 	private async processImageSynchronously(ctx: OperationContext): Promise<void> {
@@ -495,8 +403,8 @@ export default class CacheImageResourceOperation {
 				size: data.length.toString(),
 				format: 'svg',
 				dateCreated: Date.now(),
-				publicTTL: this.publicTtl,
-				privateTTL: this.privateTtl,
+				publicTTL: this.publicTtl * 1000,
+				privateTTL: this.privateTtl * 1000,
 			})
 
 			return { data, metadata }
@@ -515,8 +423,8 @@ export default class CacheImageResourceOperation {
 				size: result.size,
 				format: result.format,
 				dateCreated: Date.now(),
-				publicTTL: this.publicTtl,
-				privateTTL: this.privateTtl,
+				publicTTL: this.publicTtl * 1000,
+				privateTTL: this.privateTtl * 1000,
 			})
 
 			return { data, metadata }
@@ -549,8 +457,8 @@ export default class CacheImageResourceOperation {
 			size: result.size,
 			format: actualFormat,
 			dateCreated: Date.now(),
-			publicTTL: this.publicTtl,
-			privateTTL: this.privateTtl,
+			publicTTL: this.publicTtl * 1000,
+			privateTTL: this.privateTtl * 1000,
 		})
 
 		CorrelatedLogger.debug(`processRasterImage created metadata: ${JSON.stringify(metadata)}`, 'CacheImageResourceOperation')
@@ -566,8 +474,8 @@ export default class CacheImageResourceOperation {
 			size: data.length.toString(),
 			format: 'webp',
 			dateCreated: Date.now(),
-			publicTTL: this.publicTtl,
-			privateTTL: this.privateTtl,
+			publicTTL: this.publicTtl * 1000,
+			privateTTL: this.privateTtl * 1000,
 		})
 
 		return { data, metadata }
@@ -645,8 +553,8 @@ export default class CacheImageResourceOperation {
 						size: Buffer.from(cachedData, 'base64').length.toString(),
 						format: ctx.request.resizeOptions?.format || 'webp',
 						dateCreated: Date.now(),
-						publicTTL: this.publicTtl,
-						privateTTL: this.privateTtl,
+						publicTTL: this.publicTtl * 1000,
+						privateTTL: this.privateTtl * 1000,
 					})
 
 					cachedResource = {

@@ -89,7 +89,7 @@ export default class MediaStreamImageController {
 
 		const { sourceKey, params } = match
 
-		await this.processImageRequest(sourceKey, params, res)
+		await this.processImageRequest(sourceKey, params, res, req)
 	}
 
 	/**
@@ -155,6 +155,7 @@ export default class MediaStreamImageController {
 		sourceName: ImageSourceKey,
 		params: ImageProcessingParams,
 		res: Response,
+		req: Request,
 	): Promise<void> {
 		const correlationId = this.correlationService.getCorrelationId() || 'unknown'
 		const source = IMAGE_SOURCES[sourceName]
@@ -193,7 +194,7 @@ export default class MediaStreamImageController {
 			res.locals.requestedFormat = resizeOptions.format
 			res.locals.originalUrl = resourceUrl
 
-			await this.imageStreamService.processAndStream(context, request, res)
+			await this.imageStreamService.processAndStream(context, request, res, req)
 		}
 		catch (error: unknown) {
 			const errorName = error instanceof Error ? error.constructor.name : 'UnknownError'

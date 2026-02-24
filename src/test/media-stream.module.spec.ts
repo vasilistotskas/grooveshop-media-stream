@@ -5,7 +5,6 @@ import FetchResourceResponseJob from '#microservice/Queue/jobs/fetch-resource-re
 import GenerateResourceIdentityFromRequestJob from '#microservice/Queue/jobs/generate-resource-identity-from-request.job'
 import StoreResourceResponseToFileJob from '#microservice/Queue/jobs/store-resource-response-to-file.job'
 import WebpImageManipulationJob from '#microservice/Queue/jobs/webp-image-manipulation.job'
-import { TasksModule } from '#microservice/Tasks/tasks.module'
 import ValidateCacheImageRequestResizeTargetRule from '#microservice/Validation/rules/validate-cache-image-request-resize-target.rule'
 import ValidateCacheImageRequestRule from '#microservice/Validation/rules/validate-cache-image-request.rule'
 import { HttpModule } from '@nestjs/axios'
@@ -18,7 +17,7 @@ describe('mediaStreamModule', () => {
 
 	beforeEach(async () => {
 		module = await Test.createTestingModule({
-			imports: [HttpModule, ScheduleModule.forRoot(), TasksModule, MediaStreamModule],
+			imports: [HttpModule, ScheduleModule.forRoot(), MediaStreamModule],
 		}).compile()
 	})
 
@@ -76,10 +75,5 @@ describe('mediaStreamModule', () => {
 	it('should import ScheduleModule', () => {
 		const importedScheduleModule = module.get(ScheduleModule)
 		expect(importedScheduleModule).toBeDefined()
-	})
-
-	it('should import TasksModule', () => {
-		const importedTasksModule = module.get<TasksModule>(TasksModule)
-		expect(importedTasksModule).toBeDefined()
 	})
 })

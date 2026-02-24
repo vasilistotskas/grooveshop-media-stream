@@ -110,8 +110,15 @@ export abstract class BaseHealthIndicator implements IHealthIndicator {
 	/**
 	 * Helper method to create an unhealthy result
 	 */
-	protected createUnhealthyResult(message: string, _details: DetailsMap = {}): HealthIndicatorResult {
-		throw new Error(`${this.key} health check failed: ${message}`)
+	protected createUnhealthyResult(message: string, details: DetailsMap = {}): HealthIndicatorResult {
+		return {
+			[this.key]: {
+				status: 'down',
+				message,
+				timestamp: new Date().toISOString(),
+				...details,
+			},
+		}
 	}
 
 	/**

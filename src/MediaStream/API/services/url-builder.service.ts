@@ -27,17 +27,6 @@ export class UrlBuilderService {
 			}
 		}
 
-		try {
-			url = this.ensureProperEncoding(url)
-		}
-		catch (error) {
-			this._logger.warn('Failed to decode URL, using as-is', {
-				url,
-				error: (error as Error).message,
-				correlationId: context.correlationId,
-			})
-		}
-
 		this._logger.debug('Built resource URL', {
 			source: source.name,
 			url,
@@ -70,39 +59,5 @@ export class UrlBuilderService {
 		}
 
 		return envValue
-	}
-
-	/**
-	 * Ensure proper URL encoding while handling already-encoded parts
-	 */
-	private ensureProperEncoding(url: string): string {
-		return UrlBuilderService.decodeUrlSafely(url)
-	}
-
-	/**
-	 * Safely decode a URL-encoded string, handling already-decoded or malformed URLs
-	 *
-	 * @param encodedString - The potentially encoded string
-	 * @returns The decoded string, or the original if decoding fails
-	 *
-	 * @example
-	 * decodeUrlSafely('hello%20world') // 'hello world'
-	 * decodeUrlSafely('hello world')   // 'hello world'
-	 * decodeUrlSafely('%CF%80%CF%89%CF%83') // 'πωσ' (Greek)
-	 */
-	static decodeUrlSafely(encodedString: string | undefined | null): string {
-		if (!encodedString) {
-			return ''
-		}
-
-		if (encodedString.includes('%')) {
-			try {
-				return decodeURIComponent(encodedString)
-			}
-			catch {
-				return encodedString
-			}
-		}
-		return encodedString
 	}
 }

@@ -5,8 +5,6 @@ import { HealthModule } from '#microservice/Health/health.module'
 import { DiskSpaceHealthIndicator } from '#microservice/Health/indicators/disk-space-health.indicator'
 import { MemoryHealthIndicator } from '#microservice/Health/indicators/memory-health.indicator'
 import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
-import { AlertingHealthIndicator } from '#microservice/Monitoring/indicators/alerting-health.indicator'
-import { SystemHealthIndicator } from '#microservice/Monitoring/indicators/system-health.indicator'
 import { JobQueueHealthIndicator } from '#microservice/Queue/indicators/job-queue-health.indicator'
 import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
 import { Test, TestingModule } from '@nestjs/testing'
@@ -59,18 +57,6 @@ describe('health Indicators Integration', () => {
 			expect(indicator.key).toBe('redis')
 		})
 
-		it('should register AlertingHealthIndicator', () => {
-			const indicator = module.get<AlertingHealthIndicator>(AlertingHealthIndicator)
-			expect(indicator).toBeDefined()
-			expect(indicator.key).toBe('alerting')
-		})
-
-		it('should register SystemHealthIndicator', () => {
-			const indicator = module.get<SystemHealthIndicator>(SystemHealthIndicator)
-			expect(indicator).toBeDefined()
-			expect(indicator.key).toBe('system')
-		})
-
 		it('should register JobQueueHealthIndicator', () => {
 			const indicator = module.get<JobQueueHealthIndicator>(JobQueueHealthIndicator)
 			expect(indicator).toBeDefined()
@@ -105,15 +91,6 @@ describe('health Indicators Integration', () => {
 
 		it('should execute cache health check', async () => {
 			const indicator = module.get<CacheHealthIndicator>(CacheHealthIndicator)
-
-			// Health checks might fail in test environment
-			const result = await Promise.allSettled([indicator.isHealthy()])
-			expect(result).toBeDefined()
-			expect(result.length).toBe(1)
-		})
-
-		it('should execute system health check', async () => {
-			const indicator = module.get<SystemHealthIndicator>(SystemHealthIndicator)
 
 			// Health checks might fail in test environment
 			const result = await Promise.allSettled([indicator.isHealthy()])
@@ -183,7 +160,6 @@ describe('health Indicators Integration', () => {
 			const indicators = [
 				module.get<DiskSpaceHealthIndicator>(DiskSpaceHealthIndicator),
 				module.get<MemoryHealthIndicator>(MemoryHealthIndicator),
-				module.get<SystemHealthIndicator>(SystemHealthIndicator),
 			]
 
 			// Individual health checks might fail, but should be handled
@@ -205,8 +181,6 @@ describe('health Indicators Integration', () => {
 				HttpHealthIndicator,
 				CacheHealthIndicator,
 				RedisHealthIndicator,
-				AlertingHealthIndicator,
-				SystemHealthIndicator,
 				JobQueueHealthIndicator,
 				StorageHealthIndicator,
 			]

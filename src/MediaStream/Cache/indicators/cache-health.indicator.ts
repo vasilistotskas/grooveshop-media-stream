@@ -68,7 +68,6 @@ export class CacheHealthIndicator extends BaseHealthIndicator {
 					warming: {
 						enabled: warmupStats.enabled,
 						filesWarmed: warmupStats.filesWarmed,
-						cacheSize: warmupStats.cacheSize,
 					},
 					thresholds: {
 						responseTime: '100ms',

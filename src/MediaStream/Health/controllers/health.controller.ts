@@ -11,8 +11,6 @@ import { RedisHealthIndicator } from '#microservice/Cache/indicators/redis-healt
 import { ConfigService } from '#microservice/Config/config.service'
 import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
-import { AlertingHealthIndicator } from '#microservice/Monitoring/indicators/alerting-health.indicator'
-import { SystemHealthIndicator } from '#microservice/Monitoring/indicators/system-health.indicator'
 import { JobQueueHealthIndicator } from '#microservice/Queue/indicators/job-queue-health.indicator'
 import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
 import { Controller, Get, Post } from '@nestjs/common'
@@ -30,8 +28,6 @@ export class HealthController {
 		private readonly httpHealthIndicator: HttpHealthIndicator,
 		private readonly cacheHealthIndicator: CacheHealthIndicator,
 		private readonly redisHealthIndicator: RedisHealthIndicator,
-		private readonly alertingHealthIndicator: AlertingHealthIndicator,
-		private readonly systemHealthIndicator: SystemHealthIndicator,
 		private readonly jobQueueHealthIndicator: JobQueueHealthIndicator,
 		private readonly storageHealthIndicator: StorageHealthIndicator,
 		private readonly sharpHealthIndicator: SharpHealthIndicator,
@@ -48,8 +44,6 @@ export class HealthController {
 			() => this.httpHealthIndicator.isHealthy(),
 			() => this.cacheHealthIndicator.isHealthy(),
 			() => this.redisHealthIndicator.isHealthy(),
-			() => this.alertingHealthIndicator.isHealthy(),
-			() => this.systemHealthIndicator.isHealthy(),
 			() => this.jobQueueHealthIndicator.isHealthy(),
 			() => this.storageHealthIndicator.isHealthy(),
 			() => this.sharpHealthIndicator.isHealthy(),
@@ -93,8 +87,6 @@ export class HealthController {
 			() => this.httpHealthIndicator.isHealthy(),
 			() => this.cacheHealthIndicator.isHealthy(),
 			() => this.redisHealthIndicator.isHealthy(),
-			() => this.alertingHealthIndicator.isHealthy(),
-			() => this.systemHealthIndicator.isHealthy(),
 			() => this.jobQueueHealthIndicator.isHealthy(),
 			() => this.storageHealthIndicator.isHealthy(),
 			() => this.sharpHealthIndicator.isHealthy(),
@@ -105,8 +97,8 @@ export class HealthController {
 
 		return {
 			status: healthResults.status,
-			info: healthResults.info || {},
-			error: healthResults.error || {},
+			info: (healthResults.info || {}) as HealthIndicatorResult,
+			error: (healthResults.error || {}) as HealthIndicatorResult,
 			details: healthResults.details,
 			timestamp: new Date().toISOString(),
 			uptime: process.uptime(),

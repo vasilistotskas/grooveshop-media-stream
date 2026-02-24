@@ -1,28 +1,20 @@
-import { CorrelationService } from '../services/correlation.service.js'
+import { requestContextStorage } from '../async-local-storage.js'
 
 export class CorrelatedLogger {
-	private static _correlationService: CorrelationService | null = null
-
-	static setCorrelationService(service: CorrelationService): void {
-		this._correlationService = service
-	}
-
-	private static getCorrelationService(): CorrelationService {
-		if (!this._correlationService) {
-			this._correlationService = new CorrelationService()
-		}
-		return this._correlationService
+	private static getCorrelationId(): string | null {
+		const store = requestContextStorage.getStore()
+		return store?.correlationId || null
 	}
 
 	static log(message: string, context?: string): void {
-		const correlationId = this.getCorrelationService().getCorrelationId()
+		const correlationId = this.getCorrelationId()
 		const prefix = correlationId ? `[${correlationId}]` : ''
 		const contextStr = context ? ` [${context}]` : ''
 		console.log(`${prefix}${contextStr} ${message}`)
 	}
 
 	static error(message: string, trace?: string, context?: string): void {
-		const correlationId = this.getCorrelationService().getCorrelationId()
+		const correlationId = this.getCorrelationId()
 		const prefix = correlationId ? `[${correlationId}]` : ''
 		const contextStr = context ? ` [${context}]` : ''
 		console.error(`${prefix}${contextStr} ERROR: ${message}`)
@@ -32,21 +24,21 @@ export class CorrelatedLogger {
 	}
 
 	static warn(message: string, context?: string): void {
-		const correlationId = this.getCorrelationService().getCorrelationId()
+		const correlationId = this.getCorrelationId()
 		const prefix = correlationId ? `[${correlationId}]` : ''
 		const contextStr = context ? ` [${context}]` : ''
 		console.warn(`${prefix}${contextStr} WARN: ${message}`)
 	}
 
 	static debug(message: string, context?: string): void {
-		const correlationId = this.getCorrelationService().getCorrelationId()
+		const correlationId = this.getCorrelationId()
 		const prefix = correlationId ? `[${correlationId}]` : ''
 		const contextStr = context ? ` [${context}]` : ''
 		console.debug(`${prefix}${contextStr} DEBUG: ${message}`)
 	}
 
 	static verbose(message: string, context?: string): void {
-		const correlationId = this.getCorrelationService().getCorrelationId()
+		const correlationId = this.getCorrelationId()
 		const prefix = correlationId ? `[${correlationId}]` : ''
 		const contextStr = context ? ` [${context}]` : ''
 		console.log(`${prefix}${contextStr} VERBOSE: ${message}`)

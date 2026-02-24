@@ -9,7 +9,6 @@ import { HttpClientService } from '#microservice/HTTP/services/http-client.servi
 import MediaStreamModule from '#microservice/media-stream.module'
 import { MetricsController } from '#microservice/Metrics/controllers/metrics.controller'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-import { MonitoringController } from '#microservice/Monitoring/controllers/monitoring.controller'
 import { JobQueueManager } from '#microservice/Queue/services/job-queue.manager'
 import { AdaptiveRateLimitGuard } from '#microservice/RateLimit/guards/adaptive-rate-limit.guard'
 import { SimpleValidationService } from '#microservice/Validation/services/simple-validation.service'
@@ -91,11 +90,6 @@ describe('module Integration', () => {
 		it('should register MetricsController', () => {
 			const metricsController = module.get<MetricsController>(MetricsController)
 			expect(metricsController).toBeDefined()
-		})
-
-		it('should register MonitoringController', () => {
-			const monitoringController = module.get<MonitoringController>(MonitoringController)
-			expect(monitoringController).toBeDefined()
 		})
 	})
 

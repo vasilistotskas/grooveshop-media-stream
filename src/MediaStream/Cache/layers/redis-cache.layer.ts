@@ -36,6 +36,28 @@ export class RedisCacheLayer implements CacheLayer {
 		}
 	}
 
+	async deleteByPrefix(prefix: string): Promise<number> {
+		try {
+			const client = this.redisCacheService.getClient()
+			if (!client)
+				return 0
+			let count = 0
+			let cursor = '0'
+			do {
+				const [nextCursor, keys] = await client.scan(cursor, 'MATCH', `${prefix}*`, 'COUNT', 100)
+				cursor = nextCursor
+				if (keys.length > 0) {
+					await client.del(...keys)
+					count += keys.length
+				}
+			} while (cursor !== '0')
+			return count
+		}
+		catch {
+			return 0
+		}
+	}
+
 	async exists(key: string): Promise<boolean> {
 		try {
 			return await this.redisCacheService.has(key)

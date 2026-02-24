@@ -8,7 +8,7 @@ import CacheImageResourceOperation from '#microservice/Cache/operations/cache-im
 import { DefaultImageFallbackError, InvalidRequestError, ResourceStreamingError } from '#microservice/common/errors/media-stream.errors'
 import { getMimeType, getVaryHeader, negotiateImageFormat } from '#microservice/common/utils/content-negotiation.util'
 import { checkETagMatch, checkIfModifiedSince, formatLastModified, generateWeakETag } from '#microservice/common/utils/etag.util'
-import { imageProcessingDeduplicator } from '#microservice/common/utils/request-deduplication.util'
+import { RequestDeduplicator } from '#microservice/common/utils/request-deduplication.util'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Injectable, Logger } from '@nestjs/common'
@@ -24,6 +24,7 @@ export class ImageStreamService {
 	constructor(
 		private readonly cacheImageResourceOperation: CacheImageResourceOperation,
 		private readonly metricsService: MetricsService,
+		private readonly requestDeduplicator: RequestDeduplicator,
 	) {}
 
 	/**
@@ -71,7 +72,7 @@ export class ImageStreamService {
 
 			// Only deduplicate for non-cached images
 			const resourcePath = this.cacheImageResourceOperation.getResourcePath(opCtx)
-			await imageProcessingDeduplicator.execute(resourcePath, async () => {
+			await this.requestDeduplicator.execute(resourcePath, async () => {
 				await this.fetchAndWaitForResource(opCtx, request, res, correlationId)
 			})
 		}

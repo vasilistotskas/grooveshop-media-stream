@@ -3,7 +3,8 @@
  * Prevents duplicate processing of identical concurrent requests
  */
 
-import { Logger } from '@nestjs/common'
+import type { OnModuleDestroy } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 
 export interface PendingRequest<T> {
 	promise: Promise<T>
@@ -11,25 +12,19 @@ export interface PendingRequest<T> {
 	refCount: number
 }
 
-export class RequestDeduplicator<T = void> {
+@Injectable()
+export class RequestDeduplicator<T = void> implements OnModuleDestroy {
 	private readonly _logger = new Logger(RequestDeduplicator.name)
 	private readonly pendingRequests = new Map<string, PendingRequest<T>>()
-	private readonly maxPendingAge: number
-	private readonly cleanupIntervalMs: number
+	private readonly maxPendingAge: number = 60000
+	private readonly cleanupIntervalMs: number = 30000
 	private cleanupInterval: NodeJS.Timeout | null = null
 
-	constructor(maxPendingAgeMs: number = 60000, cleanupIntervalMs: number = 30000) {
-		this.maxPendingAge = maxPendingAgeMs
-		this.cleanupIntervalMs = cleanupIntervalMs
-
-		// ✅ Cleanup stale entries periodically (configurable interval)
+	constructor() {
 		this.cleanupInterval = setInterval(() => this.cleanupStaleEntries(), this.cleanupIntervalMs)
 	}
 
-	/**
-	 * Destroy the deduplicator and clean up resources
-	 */
-	destroy(): void {
+	onModuleDestroy(): void {
 		if (this.cleanupInterval) {
 			clearInterval(this.cleanupInterval)
 			this.cleanupInterval = null
@@ -126,8 +121,3 @@ export class RequestDeduplicator<T = void> {
 		}
 	}
 }
-
-/**
- * Singleton instance for image processing deduplication
- */
-export const imageProcessingDeduplicator = new RequestDeduplicator<void>(60000)

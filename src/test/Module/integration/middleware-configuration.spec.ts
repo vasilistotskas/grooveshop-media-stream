@@ -9,8 +9,6 @@ import { MemoryHealthIndicator } from '#microservice/Health/indicators/memory-he
 import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
 import MediaStreamModule from '#microservice/media-stream.module'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-import { AlertingHealthIndicator } from '#microservice/Monitoring/indicators/alerting-health.indicator'
-import { SystemHealthIndicator } from '#microservice/Monitoring/indicators/system-health.indicator'
 import { JobQueueHealthIndicator } from '#microservice/Queue/indicators/job-queue-health.indicator'
 import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
 import { Test, TestingModule } from '@nestjs/testing'
@@ -106,14 +104,6 @@ describe('middleware Configuration', () => {
 			.overrideProvider(HttpHealthIndicator)
 			.useValue({
 				isHealthy: vi.fn().mockResolvedValue({ http: { status: 'up' } }),
-			})
-			.overrideProvider(AlertingHealthIndicator)
-			.useValue({
-				isHealthy: vi.fn().mockResolvedValue({ alerting: { status: 'up' } }),
-			})
-			.overrideProvider(SystemHealthIndicator)
-			.useValue({
-				isHealthy: vi.fn().mockResolvedValue({ system: { status: 'up' } }),
 			})
 			.overrideProvider(JobQueueHealthIndicator)
 			.useValue({

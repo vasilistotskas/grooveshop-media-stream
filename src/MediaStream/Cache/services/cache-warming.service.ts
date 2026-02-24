@@ -8,7 +8,7 @@ import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Injectable } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
-import { MemoryCacheService } from './memory-cache.service.js'
+import { MultiLayerCacheManager } from './multi-layer-cache.manager.js'
 
 interface CacheWarmingConfig {
 	enabled: boolean
@@ -32,7 +32,7 @@ export class CacheWarmingService implements OnModuleInit {
 	private readonly baseCacheTtl: number
 
 	constructor(
-		private readonly memoryCacheService: MemoryCacheService,
+		private readonly cacheManager: MultiLayerCacheManager,
 		private readonly _configService: ConfigService,
 		private readonly metricsService: MetricsService,
 	) {
@@ -157,9 +157,9 @@ export class CacheWarmingService implements OnModuleInit {
 	}
 
 	private async warmupFile(fileInfo: FileAccessInfo): Promise<void> {
-		const cacheKey = this.generateCacheKey(fileInfo.path)
+		const resourceId = this.extractResourceId(fileInfo.path)
 
-		if (await this.memoryCacheService.has(cacheKey)) {
+		if (await this.cacheManager.exists('image', resourceId)) {
 			CorrelatedLogger.debug(`File already in cache: ${fileInfo.path}`, CacheWarmingService.name)
 			return
 		}
@@ -167,11 +167,10 @@ export class CacheWarmingService implements OnModuleInit {
 		try {
 			const content = await readFile(fileInfo.path)
 
-			// ✅ Use configurable base TTL instead of hardcoded value
 			const accessMultiplier = Math.min(fileInfo.accessCount / 10, 5)
 			const ttl = Math.floor(this.baseCacheTtl * (1 + accessMultiplier))
 
-			await this.memoryCacheService.set(cacheKey, content, ttl)
+			await this.cacheManager.set('image', resourceId, content, ttl)
 
 			CorrelatedLogger.debug(`Warmed up file: ${fileInfo.path} (TTL: ${ttl}s)`, CacheWarmingService.name)
 		}
@@ -181,15 +180,14 @@ export class CacheWarmingService implements OnModuleInit {
 		}
 	}
 
-	private generateCacheKey(filePath: string): string {
+	private extractResourceId(filePath: string): string {
 		const filename = filePath.split('/').pop() || filePath.split('\\').pop()
-		return `file:${filename?.replace(/\.[^/.]+$/, '')}`
+		return filename?.replace(/\.[^/.]+$/, '') || ''
 	}
 
 	async warmupSpecificFile(resourceId: string, content: Buffer, ttl?: number): Promise<void> {
 		try {
-			const cacheKey = `file:${resourceId}`
-			await this.memoryCacheService.set(cacheKey, content, ttl)
+			await this.cacheManager.set('image', resourceId, content, ttl)
 			CorrelatedLogger.debug(`Manually warmed up resource: ${resourceId}`, CacheWarmingService.name)
 		}
 		catch (error: unknown) {
@@ -202,15 +200,11 @@ export class CacheWarmingService implements OnModuleInit {
 		enabled: boolean
 		lastWarmup: Date | null
 		filesWarmed: number
-		cacheSize: number
 	}> {
-		const stats = await this.memoryCacheService.getStats()
-
 		return {
 			enabled: this.config.enabled,
-			lastWarmup: null, // TODO: Track last warmup time
-			filesWarmed: stats.keys,
-			cacheSize: stats.vsize + stats.ksize,
+			lastWarmup: null,
+			filesWarmed: 0,
 		}
 	}
 }

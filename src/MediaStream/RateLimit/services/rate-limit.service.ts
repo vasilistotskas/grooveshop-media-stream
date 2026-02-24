@@ -198,49 +198,38 @@ export class RateLimitService {
 	}
 
 	/**
-	 * Redis-based distributed rate limiting using atomic increment
+	 * Redis-based distributed rate limiting using atomic INCR + EXPIRE pipeline
 	 */
 	private async checkRateLimitRedis(
 		redisKey: string,
 		config: RateLimitConfig,
-		now: number,
+		_now: number,
 		resetTime: Date,
 	): Promise<{ allowed: boolean, info: RateLimitInfo }> {
-		// Get current count from Redis
-		const cached = await this.redisCacheService.get<{ count: number, resetTime: number }>(redisKey)
-
-		if (!cached || cached.resetTime <= now) {
-			// Window expired or new key - start fresh
-			const newEntry = { count: 1, resetTime: now + config.windowMs }
-			const ttlSeconds = Math.ceil(config.windowMs / 1000)
-			await this.redisCacheService.set(redisKey, newEntry, ttlSeconds)
-
-			return {
-				allowed: true,
-				info: {
-					limit: config.max,
-					current: 1,
-					remaining: config.max - 1,
-					resetTime,
-				},
-			}
+		const client = this.redisCacheService.getClient()
+		if (!client) {
+			throw new Error('Redis client not available')
 		}
 
-		// Increment count
-		const newCount = cached.count + 1
-		const updatedEntry = { count: newCount, resetTime: cached.resetTime }
-		const remainingTtl = Math.ceil((cached.resetTime - now) / 1000)
-		await this.redisCacheService.set(redisKey, updatedEntry, Math.max(1, remainingTtl))
+		const ttlSeconds = Math.ceil(config.windowMs / 1000)
 
-		const allowed = newCount <= config.max
+		// Atomic increment — INCR creates the key with value 1 if it doesn't exist
+		const currentCount = await client.incr(redisKey)
+
+		// Set TTL only on the first request in the window (count === 1)
+		if (currentCount === 1) {
+			await client.expire(redisKey, ttlSeconds)
+		}
+
+		const allowed = currentCount <= config.max
 
 		return {
 			allowed,
 			info: {
 				limit: config.max,
-				current: newCount,
-				remaining: Math.max(0, config.max - newCount),
-				resetTime: new Date(cached.resetTime),
+				current: currentCount,
+				remaining: Math.max(0, config.max - currentCount),
+				resetTime,
 			},
 		}
 	}

@@ -305,7 +305,7 @@ export class StorageCleanupService implements OnModuleInit {
 				description: 'Remove cache files older than 30 days',
 				maxAge: 30,
 				maxSize: 0,
-				filePattern: /\.(json|cache)$/,
+				filePattern: /\.(json|cache|rsc|rsm)$/,
 				enabled: true,
 			},
 			{
@@ -313,7 +313,7 @@ export class StorageCleanupService implements OnModuleInit {
 				description: 'Remove large image files older than 7 days',
 				maxAge: 7,
 				maxSize: 100 * 1024 * 1024,
-				filePattern: /\.(jpg|jpeg|png|webp|gif)$/,
+				filePattern: /\.(jpg|jpeg|png|webp|gif|rsc)$/,
 				enabled: true,
 			},
 			{
@@ -321,7 +321,7 @@ export class StorageCleanupService implements OnModuleInit {
 				description: 'Remove temporary files older than 1 day',
 				maxAge: 1,
 				maxSize: 0,
-				filePattern: /\.(tmp|temp)$/,
+				filePattern: /\.(tmp|temp|rst)$/,
 				enabled: true,
 			},
 			{

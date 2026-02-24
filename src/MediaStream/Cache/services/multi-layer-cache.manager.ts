@@ -6,7 +6,6 @@ import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Injectable } from '@nestjs/common'
-import { FileCacheLayer } from '../layers/file-cache.layer.js'
 import { MemoryCacheLayer } from '../layers/memory-cache.layer.js'
 import { RedisCacheLayer } from '../layers/redis-cache.layer.js'
 
@@ -33,7 +32,6 @@ export class MultiLayerCacheManager implements OnModuleInit, OnModuleDestroy {
 		private readonly metricsService: MetricsService,
 		private readonly memoryCacheLayer: MemoryCacheLayer,
 		private readonly redisCacheLayer: RedisCacheLayer,
-		private readonly fileCacheLayer: FileCacheLayer,
 	) {
 		this.keyStrategy = new DefaultCacheKeyStrategy()
 		this.preloadingEnabled = this._configService.getOptional('cache.preloading.enabled', false)
@@ -43,7 +41,6 @@ export class MultiLayerCacheManager implements OnModuleInit, OnModuleDestroy {
 		this.layers = [
 			this.memoryCacheLayer,
 			this.redisCacheLayer,
-			this.fileCacheLayer,
 		].sort((a: any, b: any) => a.getPriority() - b.getPriority())
 
 		CorrelatedLogger.debug(
@@ -62,42 +59,34 @@ export class MultiLayerCacheManager implements OnModuleInit, OnModuleDestroy {
 	}
 
 	/**
-	 * Get a value from cache using cache-aside pattern with automatic fallback
+	 * Get a value from cache, checking layers sequentially by priority.
+	 * Stops on first hit and backfills higher-priority layers asynchronously.
 	 */
 	async get<T>(namespace: string, identifier: string, params?: StringMap): Promise<T | null> {
 		const key = this.keyStrategy.generateKey(namespace, identifier, params)
 		this.trackKeyAccess(key)
 
-		// Check all layers in parallel for better performance
-		const results = await Promise.allSettled(
-			this.layers.map(layer =>
-				layer.get<T>(key).catch((error) => {
-					CorrelatedLogger.warn(
-						`Cache layer ${layer.getLayerName()} failed for key ${key}: ${(error as Error).message}`,
+		for (const layer of this.layers) {
+			try {
+				const value = await layer.get<T>(key)
+				if (value !== null) {
+					CorrelatedLogger.debug(
+						`Cache HIT in ${layer.getLayerName()} layer for key: ${key}`,
 						MultiLayerCacheManager.name,
 					)
-					return null
-				}),
-			),
-		)
+					this.metricsService.recordCacheOperation('get', layer.getLayerName(), 'hit')
 
-		// Return first successful result (highest priority)
-		for (let i = 0; i < results.length; i++) {
-			if (results[i].status === 'fulfilled' && (results[i] as any).value !== null) {
-				const value = (results[i] as any).value
-				const layer = this.layers[i]
+					// Backfill higher priority layers asynchronously (don't wait)
+					this.backfillLayers(key, value, layer).catch(() => {})
 
-				CorrelatedLogger.debug(
-					`Cache HIT in ${layer.getLayerName()} layer for key: ${key}`,
+					return value
+				}
+			}
+			catch (error: unknown) {
+				CorrelatedLogger.warn(
+					`Cache layer ${layer.getLayerName()} failed for key ${key}: ${(error as Error).message}`,
 					MultiLayerCacheManager.name,
 				)
-
-				this.metricsService.recordCacheOperation('get', layer.getLayerName(), 'hit')
-
-				// Backfill higher priority layers asynchronously (don't wait)
-				this.backfillLayers(key, value, layer).catch(() => {})
-
-				return value
 			}
 		}
 
@@ -215,16 +204,34 @@ export class MultiLayerCacheManager implements OnModuleInit, OnModuleDestroy {
 	}
 
 	/**
-	 * Invalidate keys by namespace
+	 * Invalidate keys by namespace prefix
 	 */
 	async invalidateNamespace(namespace: string): Promise<void> {
+		const prefix = this.keyStrategy.generateKey(namespace, '')
 		CorrelatedLogger.debug(
-			`Invalidating cache namespace: ${namespace}`,
+			`Invalidating cache namespace: ${namespace} (prefix: ${prefix})`,
 			MultiLayerCacheManager.name,
 		)
 
-		await this.clear()
-		this.metricsService.recordCacheOperation('flush', 'multi-layer', 'success')
+		let totalDeleted = 0
+		for (const layer of this.layers) {
+			try {
+				const deleted = await layer.deleteByPrefix(prefix)
+				totalDeleted += deleted
+			}
+			catch (error: unknown) {
+				CorrelatedLogger.warn(
+					`Failed to invalidate namespace in ${layer.getLayerName()}: ${(error as Error).message}`,
+					MultiLayerCacheManager.name,
+				)
+			}
+		}
+
+		CorrelatedLogger.debug(
+			`Namespace ${namespace} invalidated: ${totalDeleted} keys deleted`,
+			MultiLayerCacheManager.name,
+		)
+		this.metricsService.recordCacheOperation('clear', 'multi-layer', 'success')
 	}
 
 	/**

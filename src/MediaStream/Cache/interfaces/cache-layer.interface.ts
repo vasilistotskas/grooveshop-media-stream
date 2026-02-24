@@ -20,6 +20,11 @@ export interface CacheLayer {
 	exists: (key: string) => Promise<boolean>
 
 	/**
+	 * Delete all keys matching a prefix
+	 */
+	deleteByPrefix: (prefix: string) => Promise<number>
+
+	/**
 	 * Clear all keys from the cache layer
 	 */
 	clear: () => Promise<void>

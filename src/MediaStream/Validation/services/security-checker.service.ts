@@ -54,16 +54,17 @@ export class SecurityCheckerService implements ISecurityChecker {
 			return this.checkString(input)
 		}
 
-		if (typeof input === 'object') {
-			return this.checkObject(input)
-		}
-
 		if (Array.isArray(input)) {
 			for (const item of input) {
 				if (await this.checkForMaliciousContent(item)) {
 					return true
 				}
 			}
+			return false
+		}
+
+		if (typeof input === 'object') {
+			return this.checkObject(input)
 		}
 
 		return false

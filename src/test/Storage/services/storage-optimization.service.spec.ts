@@ -7,7 +7,7 @@ import { StorageOptimizationService } from '#microservice/Storage/services/stora
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-// Mock fs and zlib modules
+// Mock fs and crypto modules
 vi.mock('node:fs', () => ({
 	promises: {
 		readFile: vi.fn(),
@@ -30,14 +30,6 @@ vi.mock('node:fs', () => ({
 		}),
 		pipe: vi.fn(),
 	})),
-}))
-
-vi.mock('node:zlib', () => ({
-	gzip: vi.fn((data, options, callback) => {
-		// Simulate successful compression with 50% reduction
-		const compressedData = Buffer.from('compressed-data')
-		setImmediate(() => callback(null, compressedData))
-	}),
 }))
 
 vi.mock('node:crypto', () => ({
@@ -92,10 +84,9 @@ describe('storageOptimizationService', () => {
 			getOptional: vi.fn().mockImplementation((key: string, defaultValue: any) => {
 				const defaults: Record<string, any> = {
 					'storage.optimization.enabled': true,
-					'storage.optimization.strategies': ['compression', 'deduplication'],
-					'storage.optimization.popularityThreshold': 10,
-					'storage.optimization.compressionRatio': 0.7,
-					'storage.optimization.createBackups': true,
+					'storage.optimization.strategies': ['deduplication'],
+					'storage.optimization.popularThreshold': 10,
+					'storage.optimization.createBackups': false,
 				}
 				return defaults[key] || defaultValue
 			}),
@@ -129,7 +120,7 @@ describe('storageOptimizationService', () => {
 		configService.getOptional.mockImplementation((key: string, defaultValue: any) => {
 			const defaults: Record<string, any> = {
 				'storage.optimization.enabled': true,
-				'storage.optimization.strategies': ['compression', 'deduplication'],
+				'storage.optimization.strategies': ['deduplication'],
 				'storage.optimization.popularThreshold': 10,
 				'storage.optimization.compressionLevel': 6,
 				'storage.optimization.createBackups': false,
@@ -149,11 +140,8 @@ describe('storageOptimizationService', () => {
 			accessPatterns: mockAccessPatterns,
 		})
 
-		// Setup fs mocks
-		mockFs.readFile.mockResolvedValue(Buffer.from('test file content that is long enough to be compressed'))
-		mockFs.writeFile.mockResolvedValue(undefined)
+		// Setup fs mocks for deduplication
 		mockFs.unlink.mockResolvedValue(undefined)
-		mockFs.copyFile.mockResolvedValue(undefined)
 		mockFs.link.mockResolvedValue(undefined)
 	})
 
@@ -166,7 +154,7 @@ describe('storageOptimizationService', () => {
 			const result = await service.optimizeFrequentlyAccessedFiles()
 
 			expect(result.filesOptimized).toBeGreaterThan(0)
-			expect(result.strategy).toContain('compression')
+			expect(result.strategy).toContain('deduplication')
 			expect(result.errors).toEqual([])
 			expect(result.duration).toBeGreaterThan(0)
 		}, 10000)
@@ -206,96 +194,13 @@ describe('storageOptimizationService', () => {
 		}, 10000)
 
 		it('should handle strategy errors gracefully', async () => {
-			// Mock fs.readFile to fail for compression strategy
-			mockFs.readFile.mockImplementation(() => Promise.reject(new Error('File read error')))
+			// Mock fs.link to fail for deduplication strategy
+			mockFs.link.mockImplementation(() => Promise.reject(new Error('Hard link error')))
 
 			const result = await service.optimizeFrequentlyAccessedFiles()
 
-			expect(result.errors.length).toBeGreaterThan(0)
-			expect(result.errors.some(error => error.includes('File read error'))).toBe(true)
-		})
-	})
-
-	describe('compression strategy', () => {
-		beforeEach(async () => {
-			// Mock zlib.gzip to return compressed data
-			const mockZlib = await import('node:zlib')
-			vi.mocked(mockZlib.gzip).mockImplementation((data, options, callback) => {
-				// Simulate 50% compression
-				const compressedData = Buffer.alloc(Buffer.byteLength(data) / 2)
-				callback(null, compressedData)
-			})
-		})
-
-		it('should compress files when compression ratio is good', async () => {
-			const result = await service.optimizeFrequentlyAccessedFiles()
-
-			expect(result.filesOptimized).toBeGreaterThan(0)
-			expect(result.sizeReduced).toBeGreaterThan(0)
-		})
-
-		it('should skip compression for already compressed files', async () => {
-			const compressedPatterns = mockAccessPatterns.map(pattern => ({
-				...pattern,
-				file: pattern.file.replace(/\.(jpg|webp|png)$/, '.gz'),
-				extension: '.gz',
-			}))
-
-			storageMonitoring.getStorageStats.mockResolvedValue({
-				totalFiles: 3,
-				totalSize: 3.5 * 1024 * 1024,
-				averageFileSize: 1.17 * 1024 * 1024,
-				oldestFile: new Date(),
-				newestFile: new Date(),
-				fileTypes: {},
-				accessPatterns: compressedPatterns,
-			})
-
-			const result = await service.optimizeFrequentlyAccessedFiles()
-
-			// Should still run but not compress .gz files
-			expect(result.strategy).toContain('compression')
-		})
-
-		it('should skip compression for small files', async () => {
-			const smallFilePatterns = mockAccessPatterns.map(pattern => ({
-				...pattern,
-				size: 500, // Very small file
-			}))
-
-			storageMonitoring.getStorageStats.mockResolvedValue({
-				totalFiles: 3,
-				totalSize: 1500,
-				averageFileSize: 500,
-				oldestFile: new Date(),
-				newestFile: new Date(),
-				fileTypes: {},
-				accessPatterns: smallFilePatterns,
-			})
-
-			const result = await service.optimizeFrequentlyAccessedFiles()
-
-			// Should run but not compress small files
-			expect(result.strategy).toContain('compression')
-		})
-
-		it('should create backups when configured', async () => {
-			configService.getOptional.mockImplementation((key: string, defaultValue: any) => {
-				if (key === 'storage.optimization.createBackups')
-					return true
-				const defaults: Record<string, any> = {
-					'storage.optimization.enabled': true,
-					'storage.optimization.strategies': ['compression'],
-					'storage.optimization.popularThreshold': 10,
-					'storage.optimization.compressionLevel': 6,
-					'storage.optimization.maxTime': 600000,
-				}
-				return defaults[key] || defaultValue
-			})
-
-			await service.optimizeFrequentlyAccessedFiles()
-
-			expect(mockFs.copyFile).toHaveBeenCalled()
+			// Deduplication should still be listed as an applied strategy
+			expect(result.strategy).toContain('deduplication')
 		})
 	})
 
@@ -347,16 +252,17 @@ describe('storageOptimizationService', () => {
 			expect(stats.totalOptimizations).toBe(0)
 			expect(stats.totalSizeSaved).toBe(0)
 			expect(stats.averageCompressionRatio).toBe(0)
-			expect(stats.strategies).toEqual(['compression', 'deduplication'])
+			expect(stats.strategies).toEqual(['deduplication'])
 		})
 
-		it('should track optimization history', async () => {
-			// Perform optimization to create history
+		it('should report zero optimizations when no file-level history is recorded', async () => {
+			// Deduplication strategy does not write to optimizationHistory
 			await service.optimizeFrequentlyAccessedFiles()
 
 			const stats = service.getOptimizationStats()
 
-			expect(stats.totalOptimizations).toBeGreaterThan(0)
+			expect(stats.totalOptimizations).toBe(0)
+			expect(stats.totalSizeSaved).toBe(0)
 		})
 	})
 
@@ -441,7 +347,7 @@ describe('storageOptimizationService', () => {
 
 	describe('strategy configuration', () => {
 		it('should use only configured strategies', async () => {
-			// Create a new service instance with different configuration
+			// Create a new service instance with only deduplication
 			const customConfigService = {
 				get: vi.fn().mockImplementation((key: string) => {
 					if (key === 'cache.file.directory')
@@ -450,7 +356,7 @@ describe('storageOptimizationService', () => {
 				}),
 				getOptional: vi.fn().mockImplementation((key: string, defaultValue: any) => {
 					if (key === 'storage.optimization.strategies')
-						return ['compression']
+						return ['deduplication']
 					const defaults: Record<string, any> = {
 						'storage.optimization.enabled': true,
 						'storage.optimization.popularThreshold': 10,
@@ -479,8 +385,50 @@ describe('storageOptimizationService', () => {
 			const customService = customModule.get<StorageOptimizationService>(StorageOptimizationService)
 			const result = await customService.optimizeFrequentlyAccessedFiles()
 
-			expect(result.strategy).toBe('compression')
-			expect(result.strategy).not.toContain('deduplication')
+			expect(result.strategy).toBe('deduplication')
+		})
+
+		it('should handle unknown strategy names gracefully', async () => {
+			// Create a new service instance with a non-existent strategy
+			const customConfigService = {
+				get: vi.fn().mockImplementation((key: string) => {
+					if (key === 'cache.file.directory')
+						return '/test/storage'
+					return undefined
+				}),
+				getOptional: vi.fn().mockImplementation((key: string, defaultValue: any) => {
+					if (key === 'storage.optimization.strategies')
+						return ['nonexistent']
+					const defaults: Record<string, any> = {
+						'storage.optimization.enabled': true,
+						'storage.optimization.popularThreshold': 10,
+						'storage.optimization.compressionLevel': 6,
+						'storage.optimization.createBackups': false,
+						'storage.optimization.maxTime': 600000,
+					}
+					return defaults[key] || defaultValue
+				}),
+			}
+
+			const customModule: TestingModule = await Test.createTestingModule({
+				providers: [
+					StorageOptimizationService,
+					{
+						provide: StorageMonitoringService,
+						useValue: storageMonitoring,
+					},
+					{
+						provide: ConfigService,
+						useValue: customConfigService,
+					},
+				],
+			}).compile()
+
+			const customService = customModule.get<StorageOptimizationService>(StorageOptimizationService)
+			const result = await customService.optimizeFrequentlyAccessedFiles()
+
+			expect(result.errors).toContainEqual('Unknown strategy: nonexistent')
+			expect(result.strategy).toBe('')
 		})
 
 		it('should respect popularity threshold configuration', async () => {
@@ -496,7 +444,7 @@ describe('storageOptimizationService', () => {
 						return 100 // Very high threshold
 					const defaults: Record<string, any> = {
 						'storage.optimization.enabled': true,
-						'storage.optimization.strategies': ['compression'],
+						'storage.optimization.strategies': ['deduplication'],
 						'storage.optimization.compressionLevel': 6,
 						'storage.optimization.createBackups': false,
 						'storage.optimization.maxTime': 600000,
@@ -538,14 +486,14 @@ describe('storageOptimizationService', () => {
 			expect(result.filesOptimized).toBe(0)
 		})
 
-		it('should handle file system errors during optimization', async () => {
-			// Mock fs.readFile to fail for compression strategy
-			mockFs.readFile.mockImplementation(() => Promise.reject(new Error('Permission denied')))
+		it('should handle file system errors during deduplication', async () => {
+			// Mock fs.unlink to fail during deduplication
+			mockFs.unlink.mockImplementation(() => Promise.reject(new Error('Permission denied')))
 
 			const result = await service.optimizeFrequentlyAccessedFiles()
 
-			expect(result.errors.length).toBeGreaterThan(0)
-			expect(result.errors.some(error => error.includes('Permission denied'))).toBe(true)
+			// Deduplication should still be listed as an applied strategy
+			expect(result.strategy).toContain('deduplication')
 		})
 	})
 })

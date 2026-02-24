@@ -244,9 +244,9 @@ describe('rate Limiting Integration', () => {
 
 					.expect(429)
 
-				// Wait for window to reset
+				// Wait for Redis key TTL to expire (ceil(100ms / 1000) = 1 second)
 
-				await new Promise(resolve => setTimeout(resolve, 150))
+				await new Promise(resolve => setTimeout(resolve, 1200))
 
 				// Should be allowed again
 

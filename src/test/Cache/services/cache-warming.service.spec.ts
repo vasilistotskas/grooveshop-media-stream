@@ -3,7 +3,7 @@ import { Buffer } from 'node:buffer'
 import { readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { CacheWarmingService } from '#microservice/Cache/services/cache-warming.service'
-import { MemoryCacheService } from '#microservice/Cache/services/memory-cache.service'
+import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
 import { ConfigService } from '#microservice/Config/config.service'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Test, TestingModule } from '@nestjs/testing'
@@ -20,21 +20,23 @@ const mockJoin = join as unknown as MockedFunction<typeof join>
 
 describe('cacheWarmingService', () => {
 	let service: CacheWarmingService
-	let memoryCacheService: MockedObject<MemoryCacheService>
+	let cacheManager: MockedObject<MultiLayerCacheManager>
 	let configService: MockedObject<ConfigService>
 	let metricsService: MockedObject<MetricsService>
 
 	beforeEach(async () => {
-		const mockMemoryCacheService = {
-			has: vi.fn(),
+		const mockCacheManager = {
+			exists: vi.fn(),
 			set: vi.fn(),
+			get: vi.fn(),
+			delete: vi.fn(),
+			clear: vi.fn(),
 			getStats: vi.fn(),
 		}
 
 		const mockConfigService = {
 			get: vi.fn(),
 			getOptional: vi.fn((key: string, defaultValue: any) => {
-				// Return configuration value for cache warming base TTL
 				if (key === 'cache.warming.baseTtl')
 					return 3600
 				return defaultValue
@@ -49,8 +51,8 @@ describe('cacheWarmingService', () => {
 			providers: [
 				CacheWarmingService,
 				{
-					provide: MemoryCacheService,
-					useValue: mockMemoryCacheService,
+					provide: MultiLayerCacheManager,
+					useValue: mockCacheManager,
 				},
 				{
 					provide: ConfigService,
@@ -64,7 +66,7 @@ describe('cacheWarmingService', () => {
 		}).compile()
 
 		service = module.get<CacheWarmingService>(CacheWarmingService)
-		memoryCacheService = module.get(MemoryCacheService)
+		cacheManager = module.get(MultiLayerCacheManager)
 		configService = module.get(ConfigService)
 		metricsService = module.get(MetricsService)
 
@@ -84,14 +86,6 @@ describe('cacheWarmingService', () => {
 
 		// Setup default mocks
 		mockJoin.mockImplementation((...paths) => paths.join('/'))
-		memoryCacheService.getStats.mockResolvedValue({
-			hits: 10,
-			misses: 5,
-			keys: 3,
-			ksize: 100,
-			vsize: 1000,
-			hitRate: 0.67,
-		})
 	})
 
 	afterEach(() => {
@@ -122,13 +116,13 @@ describe('cacheWarmingService', () => {
 				.mockResolvedValueOnce('{"accessCount": 6}') // metadata
 				.mockResolvedValue(Buffer.from('file content')) // file content
 
-			memoryCacheService.has.mockResolvedValue(false)
-			memoryCacheService.set.mockResolvedValue()
+			cacheManager.exists.mockResolvedValue(false)
+			cacheManager.set.mockResolvedValue()
 
 			await service.warmupCache()
 
 			expect(mockReaddir).toHaveBeenCalled()
-			expect(memoryCacheService.set).toHaveBeenCalledTimes(3)
+			expect(cacheManager.set).toHaveBeenCalledTimes(3)
 			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('warmup', 'memory', 'success')
 		})
 
@@ -140,12 +134,12 @@ describe('cacheWarmingService', () => {
 			} as any)
 			mockReadFile.mockResolvedValue('{"accessCount": 10}')
 
-			memoryCacheService.has.mockResolvedValue(true) // Already in cache
-			memoryCacheService.set.mockResolvedValue()
+			cacheManager.exists.mockResolvedValue(true) // Already in cache
+			cacheManager.set.mockResolvedValue()
 
 			await service.warmupCache()
 
-			expect(memoryCacheService.set).not.toHaveBeenCalled()
+			expect(cacheManager.set).not.toHaveBeenCalled()
 		})
 
 		it('should limit number of files warmed up', async () => {
@@ -168,8 +162,8 @@ describe('cacheWarmingService', () => {
 				providers: [
 					CacheWarmingService,
 					{
-						provide: MemoryCacheService,
-						useValue: memoryCacheService,
+						provide: MultiLayerCacheManager,
+						useValue: cacheManager,
 					},
 					{
 						provide: ConfigService,
@@ -195,12 +189,12 @@ describe('cacheWarmingService', () => {
 				.mockResolvedValueOnce('{"accessCount": 6}')
 				.mockResolvedValue(Buffer.from('file content'))
 
-			memoryCacheService.has.mockResolvedValue(false)
-			memoryCacheService.set.mockResolvedValue()
+			cacheManager.exists.mockResolvedValue(false)
+			cacheManager.set.mockResolvedValue()
 
 			await limitedService.warmupCache()
 
-			expect(memoryCacheService.set).toHaveBeenCalledTimes(2) // Limited to 2 files
+			expect(cacheManager.set).toHaveBeenCalledTimes(2) // Limited to 2 files
 		})
 
 		it('should filter files by popularity threshold', async () => {
@@ -214,12 +208,12 @@ describe('cacheWarmingService', () => {
 				.mockResolvedValueOnce('{"accessCount": 2}') // Below threshold
 				.mockResolvedValue(Buffer.from('file content'))
 
-			memoryCacheService.has.mockResolvedValue(false)
-			memoryCacheService.set.mockResolvedValue()
+			cacheManager.exists.mockResolvedValue(false)
+			cacheManager.set.mockResolvedValue()
 
 			await service.warmupCache()
 
-			expect(memoryCacheService.set).toHaveBeenCalledTimes(1) // Only 1 file above threshold
+			expect(cacheManager.set).toHaveBeenCalledTimes(1) // Only 1 file above threshold
 		})
 
 		it('should handle file system errors gracefully', async () => {
@@ -242,12 +236,12 @@ describe('cacheWarmingService', () => {
 				.mockResolvedValueOnce(Buffer.from('file content')) // First file succeeds
 				.mockRejectedValueOnce(new Error('File read error')) // Second file fails
 
-			memoryCacheService.has.mockResolvedValue(false)
-			memoryCacheService.set.mockResolvedValue()
+			cacheManager.exists.mockResolvedValue(false)
+			cacheManager.set.mockResolvedValue()
 
 			await service.warmupCache()
 
-			expect(memoryCacheService.set).toHaveBeenCalledTimes(1) // Only successful file
+			expect(cacheManager.set).toHaveBeenCalledTimes(1) // Only successful file
 			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('warmup', 'memory', 'success')
 		})
 	})
@@ -258,18 +252,18 @@ describe('cacheWarmingService', () => {
 			const content = Buffer.from('test content')
 			const ttl = 3600
 
-			memoryCacheService.set.mockResolvedValue()
+			cacheManager.set.mockResolvedValue()
 
 			await service.warmupSpecificFile(resourceId, content, ttl)
 
-			expect(memoryCacheService.set).toHaveBeenCalledWith(`file:${resourceId}`, content, ttl)
+			expect(cacheManager.set).toHaveBeenCalledWith('image', resourceId, content, ttl)
 		})
 
 		it('should handle manual warmup errors', async () => {
 			const resourceId = 'test-resource'
 			const content = Buffer.from('test content')
 
-			memoryCacheService.set.mockRejectedValue(new Error('Cache error'))
+			cacheManager.set.mockRejectedValue(new Error('Cache error'))
 
 			await expect(service.warmupSpecificFile(resourceId, content)).rejects.toThrow('Cache error')
 		})
@@ -282,9 +276,8 @@ describe('cacheWarmingService', () => {
 			expect(stats).toHaveProperty('enabled')
 			expect(stats).toHaveProperty('lastWarmup')
 			expect(stats).toHaveProperty('filesWarmed')
-			expect(stats).toHaveProperty('cacheSize')
 			expect(stats.enabled).toBe(true)
-			expect(stats.filesWarmed).toBe(3)
+			expect(stats.filesWarmed).toBe(0)
 		})
 	})
 
@@ -308,8 +301,8 @@ describe('cacheWarmingService', () => {
 				providers: [
 					CacheWarmingService,
 					{
-						provide: MemoryCacheService,
-						useValue: memoryCacheService,
+						provide: MultiLayerCacheManager,
+						useValue: cacheManager,
 					},
 					{
 						provide: ConfigService,
@@ -337,8 +330,8 @@ describe('cacheWarmingService', () => {
 				providers: [
 					CacheWarmingService,
 					{
-						provide: MemoryCacheService,
-						useValue: memoryCacheService,
+						provide: MultiLayerCacheManager,
+						useValue: cacheManager,
 					},
 					{
 						provide: ConfigService,
@@ -366,19 +359,20 @@ describe('cacheWarmingService', () => {
 				.mockResolvedValueOnce('{"accessCount": 20}') // High access count
 				.mockResolvedValueOnce(Buffer.from('file content'))
 
-			memoryCacheService.has.mockResolvedValue(false)
-			memoryCacheService.set.mockResolvedValue()
+			cacheManager.exists.mockResolvedValue(false)
+			cacheManager.set.mockResolvedValue()
 
 			await service.warmupCache()
 
 			// Should set with higher TTL due to high access count
-			expect(memoryCacheService.set).toHaveBeenCalledWith(
+			expect(cacheManager.set).toHaveBeenCalledWith(
+				'image',
 				expect.any(String),
 				expect.any(Buffer),
 				expect.any(Number),
 			)
 
-			const [, , ttl] = memoryCacheService.set.mock.calls[0]
+			const [, , , ttl] = cacheManager.set.mock.calls[0]
 			expect(ttl).toBeGreaterThan(3600) // Should be higher than base TTL
 		})
 	})

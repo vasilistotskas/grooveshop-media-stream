@@ -1,7 +1,7 @@
 import type { ExecutionContext } from '@nestjs/common'
 import type { MockedObject } from 'vitest'
+import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { AdaptiveRateLimitGuard } from '#microservice/RateLimit/guards/adaptive-rate-limit.guard'
-import { RateLimitMetricsService } from '#microservice/RateLimit/services/rate-limit-metrics.service'
 import { RateLimitService } from '#microservice/RateLimit/services/rate-limit.service'
 import { Test, TestingModule } from '@nestjs/testing'
 import { ThrottlerException } from '@nestjs/throttler'
@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 describe('adaptiveRateLimitGuard', () => {
 	let guard: AdaptiveRateLimitGuard
 	let rateLimitService: MockedObject<RateLimitService>
-	let rateLimitMetricsService: MockedObject<RateLimitMetricsService>
+	let metricsService: MockedObject<MetricsService>
 
 	const mockRequest = {
 		url: '/api/v1/image/media/uploads/test.jpg/100/100/contain/entropy/transparent/5/webp/100',
@@ -45,7 +45,7 @@ describe('adaptiveRateLimitGuard', () => {
 			isBot: vi.fn(),
 		}
 
-		const mockRateLimitMetricsService = {
+		const mockMetricsService = {
 			recordRateLimitAttempt: vi.fn(),
 		}
 
@@ -53,13 +53,13 @@ describe('adaptiveRateLimitGuard', () => {
 			providers: [
 				AdaptiveRateLimitGuard,
 				{ provide: RateLimitService, useValue: mockRateLimitService },
-				{ provide: RateLimitMetricsService, useValue: mockRateLimitMetricsService },
+				{ provide: MetricsService, useValue: mockMetricsService },
 			],
 		}).compile()
 
 		guard = module.get<AdaptiveRateLimitGuard>(AdaptiveRateLimitGuard)
 		rateLimitService = module.get(RateLimitService)
-		rateLimitMetricsService = module.get(RateLimitMetricsService)
+		metricsService = module.get(MetricsService)
 		rateLimitService.getWhitelistedDomains.mockReturnValue([])
 		rateLimitService.getBypassBotsConfig.mockReturnValue(true)
 		rateLimitService.isBot.mockReturnValue(false)
@@ -83,7 +83,7 @@ describe('adaptiveRateLimitGuard', () => {
 
 			expect(result).toBe(true)
 			expect(rateLimitService.recordRateLimitMetrics).toHaveBeenCalledWith('image-processing', true, mockInfo)
-			expect(rateLimitMetricsService.recordRateLimitAttempt).toHaveBeenCalledWith('image-processing', '192.168.1.1', true)
+			expect(metricsService.recordRateLimitAttempt).toHaveBeenCalledWith('image-processing', true)
 			expect(mockResponse.setHeader).toHaveBeenCalledWith('X-RateLimit-Limit', '100')
 			expect(mockResponse.setHeader).toHaveBeenCalledWith('X-RateLimit-Remaining', '99')
 		})
@@ -100,7 +100,7 @@ describe('adaptiveRateLimitGuard', () => {
 			await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(ThrottlerException)
 
 			expect(rateLimitService.recordRateLimitMetrics).toHaveBeenCalledWith('image-processing', false, mockInfo)
-			expect(rateLimitMetricsService.recordRateLimitAttempt).toHaveBeenCalledWith('image-processing', '192.168.1.1', false)
+			expect(metricsService.recordRateLimitAttempt).toHaveBeenCalledWith('image-processing', false)
 		})
 
 		it('should skip rate limiting for health check requests', async () => {

@@ -153,6 +153,46 @@ export default class WebpImageManipulationJob {
 
 		const manipulation = sharp(filePathFrom)
 
+		const resizeScales: { width?: number, height?: number } = {};
+
+		// Only add dimensions if they are positive (> 0)
+		// 0 means "use original dimensions" - skip resizing
+		(['width', 'height'] as const).forEach((scale: 'width' | 'height') => {
+			const value = options[scale]
+			if (value !== null && !Number.isNaN(value) && value > 0) {
+				resizeScales[scale] = Number(value)
+			}
+		})
+
+		// Pipeline order: trim → resize → format conversion
+		if (Object.keys(resizeScales).length > 0) {
+			// 1. Trim first (before resize to get accurate content bounds)
+			if (options.trimThreshold !== null && !Number.isNaN(options.trimThreshold)) {
+				manipulation.trim({
+					background: options.background,
+					threshold: Number(options.trimThreshold),
+				})
+			}
+
+			// 2. Resize second
+			const resizeConfig = {
+				...resizeScales,
+				fit: options.fit,
+				position: options.position,
+				background: options.background,
+			}
+
+			this.logger.debug(`Applying Sharp resize with config:`, {
+				resizeConfig: JSON.stringify(resizeConfig, null, 2),
+			})
+
+			manipulation.resize(resizeConfig)
+		}
+		else {
+			this.logger.debug(`Skipping resize - using original image dimensions (width: ${options.width}, height: ${options.height})`)
+		}
+
+		// 3. Format conversion last
 		switch (options.format) {
 			case 'jpeg':
 				manipulation.jpeg({ quality: options.quality })
@@ -164,11 +204,10 @@ export default class WebpImageManipulationJob {
 				manipulation.webp({ quality: options.quality })
 				break
 			case 'avif': {
-				// For large images, use WebP fallback for better performance
 				const metadata = await sharp(filePathFrom).metadata()
 				const totalPixels = (metadata.width || 0) * (metadata.height || 0)
 
-				if (totalPixels > 2073600) { // > 1920x1080
+				if (totalPixels > 2073600) {
 					this.logger.warn(`Image too large for AVIF (${totalPixels}px), using WebP fallback`)
 					manipulation.webp({
 						quality: options.quality,
@@ -178,9 +217,6 @@ export default class WebpImageManipulationJob {
 					break
 				}
 
-				// Optimize AVIF for speed while maintaining quality
-				// quality: 60 (down from 65) - minimal visual difference, faster encoding
-				// effort: 2 (down from 4) - 2x faster encoding with acceptable compression
 				manipulation.avif({
 					quality: Math.min(options.quality, 60),
 					effort: 2,
@@ -197,42 +233,6 @@ export default class WebpImageManipulationJob {
 				break
 			default:
 				manipulation.webp({ quality: options.quality })
-		}
-
-		const resizeScales: { width?: number, height?: number } = {};
-
-		// Only add dimensions if they are positive (> 0)
-		// 0 means "use original dimensions" - skip resizing
-		(['width', 'height'] as const).forEach((scale: 'width' | 'height') => {
-			const value = options[scale]
-			if (value !== null && !Number.isNaN(value) && value > 0) {
-				resizeScales[scale] = Number(value)
-			}
-		})
-
-		if (Object.keys(resizeScales).length > 0) {
-			if (options.trimThreshold !== null && !Number.isNaN(options.trimThreshold)) {
-				manipulation.trim({
-					background: options.background,
-					threshold: Number(options.trimThreshold),
-				})
-			}
-
-			const resizeConfig = {
-				...resizeScales,
-				fit: options.fit,
-				position: options.position,
-				background: options.background,
-			}
-
-			this.logger.debug(`Applying Sharp resize with config:`, {
-				resizeConfig: JSON.stringify(resizeConfig, null, 2),
-			})
-
-			manipulation.resize(resizeConfig)
-		}
-		else {
-			this.logger.debug(`Skipping resize - using original image dimensions (width: ${options.width}, height: ${options.height})`)
 		}
 
 		const manipulatedFile = await manipulation.toFile(filePathTo)

@@ -21,6 +21,15 @@ export class MemoryCacheLayer implements CacheLayer {
 		await this.memoryCacheService.delete(key)
 	}
 
+	async deleteByPrefix(prefix: string): Promise<number> {
+		const allKeys = await this.memoryCacheService.keys()
+		const matchingKeys = allKeys.filter(k => k.startsWith(prefix))
+		for (const key of matchingKeys) {
+			await this.memoryCacheService.delete(key)
+		}
+		return matchingKeys.length
+	}
+
 	async exists(key: string): Promise<boolean> {
 		return this.memoryCacheService.has(key)
 	}

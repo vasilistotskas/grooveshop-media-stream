@@ -57,7 +57,7 @@ export class StorageOptimizationService implements OnModuleInit {
 		this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage')
 		this.config = {
 			enabled: this._configService.getOptional('storage.optimization.enabled', true),
-			strategies: this._configService.getOptional('storage.optimization.strategies', ['compression', 'deduplication']),
+			strategies: this._configService.getOptional('storage.optimization.strategies', ['deduplication']),
 			popularFileThreshold: this._configService.getOptional('storage.optimization.popularThreshold', 10),
 			compressionLevel: this._configService.getOptional('storage.optimization.compressionLevel', 6),
 			createBackups: this._configService.getOptional('storage.optimization.createBackups', false),
@@ -225,38 +225,6 @@ export class StorageOptimizationService implements OnModuleInit {
 	}
 
 	private initializeStrategies(): void {
-		this.strategies.set('compression', {
-			name: 'Compression',
-			description: 'Compress frequently accessed files using gzip',
-			execute: async (files: AccessPattern[]) => {
-				let filesOptimized = 0
-				let sizeReduced = 0
-				const errors: string[] = []
-
-				for (const file of files) {
-					try {
-						const result = await this.compressFile(file)
-						if (result) {
-							filesOptimized++
-							sizeReduced += result.originalSize - result.optimizedSize
-							this.optimizationHistory.set(file.file, result)
-						}
-					}
-					catch (error: unknown) {
-						errors.push(`Compression failed for ${file.file}: ${(error as Error).message}`)
-					}
-				}
-
-				return {
-					filesOptimized,
-					sizeReduced,
-					errors,
-					strategy: 'compression',
-					duration: 0,
-				}
-			},
-		})
-
 		this.strategies.set('deduplication', {
 			name: 'Deduplication',
 			description: 'Remove duplicate files and create hard links',
@@ -303,55 +271,6 @@ export class StorageOptimizationService implements OnModuleInit {
 				}
 			},
 		})
-	}
-
-	private async compressFile(file: AccessPattern): Promise<FileOptimization | null> {
-		const filePath = join(this.storageDirectory, file.file)
-		const compressedPath = `${filePath}.gz`
-
-		if (file.extension === '.gz' || file.size < 1024) {
-			return null
-		}
-
-		try {
-			const zlib = await import('node:zlib')
-			const originalData = await fs.readFile(filePath)
-			const compressedData = await new Promise<Buffer>((resolve, reject) => {
-				zlib.gzip(originalData, { level: this.config.compressionLevel }, (err, result) => {
-					if (err)
-						reject(err)
-					else resolve(result)
-				})
-			})
-
-			const compressionRatio = compressedData.length / originalData.length
-			if (compressionRatio < 0.8) {
-				if (this.config.createBackups) {
-					await fs.copyFile(filePath, `${filePath}.backup`)
-				}
-
-				await fs.writeFile(compressedPath, compressedData)
-				await fs.unlink(filePath)
-
-				return {
-					originalPath: filePath,
-					optimizedPath: compressedPath,
-					originalSize: originalData.length,
-					optimizedSize: compressedData.length,
-					compressionRatio,
-					strategy: 'compression',
-				}
-			}
-		}
-		catch (error: unknown) {
-			CorrelatedLogger.warn(
-				`Failed to compress ${file.file}: ${(error as Error).message}`,
-				StorageOptimizationService.name,
-			)
-			throw error
-		}
-
-		return null
 	}
 
 	private async findDuplicateFiles(files: AccessPattern[]): Promise<AccessPattern[][]> {

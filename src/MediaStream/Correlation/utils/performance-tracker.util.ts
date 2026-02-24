@@ -1,6 +1,6 @@
 import type { Metadata } from '#microservice/common/types/common.types'
 import * as process from 'node:process'
-import { CorrelationService } from '../services/correlation.service.js'
+import { requestContextStorage } from '../async-local-storage.js'
 
 import { CorrelatedLogger } from './logger.util.js'
 
@@ -15,15 +15,16 @@ export interface PerformancePhase {
 export class PerformanceTracker {
 	private static phases = new Map<string, PerformancePhase[]>()
 
-	private static getCorrelationService(): CorrelationService {
-		return new CorrelationService()
+	private static getCorrelationId(): string | null {
+		const store = requestContextStorage.getStore()
+		return store?.correlationId || null
 	}
 
 	/**
 	 * Start tracking a performance phase
 	 */
 	static startPhase(phaseName: string, metadata?: Metadata): void {
-		const correlationId = this.getCorrelationService().getCorrelationId()
+		const correlationId = this.getCorrelationId()
 		if (!correlationId)
 			return
 
@@ -49,7 +50,7 @@ export class PerformanceTracker {
 	 * End tracking a performance phase
 	 */
 	static endPhase(phaseName: string, metadata?: Metadata): number | null {
-		const correlationId = this.getCorrelationService().getCorrelationId()
+		const correlationId = this.getCorrelationId()
 		if (!correlationId)
 			return null
 
@@ -77,14 +78,14 @@ export class PerformanceTracker {
 			phase.metadata = { ...phase.metadata, ...metadata }
 		}
 
-		const logLevel = phase.duration > 1000 ? 'warn' : 'debug'
-		const logger = logLevel === 'warn' ? CorrelatedLogger.warn : CorrelatedLogger.debug
+		const message = `Performance phase completed: ${phaseName} - ${phase.duration.toFixed(2)}ms${phase.metadata ? ` (${JSON.stringify(phase.metadata)})` : ''}`
 
-		logger(
-			`Performance phase completed: ${phaseName} - ${phase.duration.toFixed(2)}ms${phase.metadata ? ` (${JSON.stringify(phase.metadata)})` : ''
-			}`,
-			'PerformanceTracker',
-		)
+		if (phase.duration > 1000) {
+			CorrelatedLogger.warn(message, 'PerformanceTracker')
+		}
+		else {
+			CorrelatedLogger.debug(message, 'PerformanceTracker')
+		}
 
 		return phase.duration
 	}
@@ -93,7 +94,7 @@ export class PerformanceTracker {
 	 * Get all performance phases for the current request
 	 */
 	static getPhases(): PerformancePhase[] {
-		const correlationId = this.getCorrelationService().getCorrelationId()
+		const correlationId = this.getCorrelationId()
 		if (!correlationId)
 			return []
 
@@ -130,7 +131,7 @@ export class PerformanceTracker {
 	 * effectively preventing memory leaks
 	 */
 	static cleanup(correlationId?: string): void {
-		const id = correlationId || this.getCorrelationService().getCorrelationId()
+		const id = correlationId || this.getCorrelationId()
 		if (id && this.phases.has(id)) {
 			this.phases.delete(id)
 		}
@@ -185,8 +186,8 @@ export class PerformanceTracker {
 		if (summary.totalPhases === 0)
 			return
 
-		const context = this.getCorrelationService().getContext()
-		const requestDuration = context?.duration
+		const store = requestContextStorage.getStore()
+		const requestDuration = store?.duration
 
 		CorrelatedLogger.log(
 			`Performance Summary: ${summary.completedPhases}/${summary.totalPhases} phases completed, `

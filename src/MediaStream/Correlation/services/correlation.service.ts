@@ -1,12 +1,10 @@
 import type { CorrelationService as ICorrelationService, RequestContext } from '../interfaces/correlation.interface.js'
-import { AsyncLocalStorage } from 'node:async_hooks'
 import { randomUUID } from 'node:crypto'
 import { Injectable } from '@nestjs/common'
+import { requestContextStorage } from '../async-local-storage.js'
 
 @Injectable()
 export class CorrelationService implements ICorrelationService {
-	private readonly asyncLocalStorage = new AsyncLocalStorage<RequestContext>()
-
 	/**
 	 * Generate a new correlation ID using UUID v4
 	 */
@@ -18,14 +16,14 @@ export class CorrelationService implements ICorrelationService {
 	 * Set the request context for the current async context
 	 */
 	setContext(context: RequestContext): void {
-		this.asyncLocalStorage.enterWith(context)
+		requestContextStorage.enterWith(context)
 	}
 
 	/**
 	 * Get the current request context
 	 */
 	getContext(): RequestContext | null {
-		return this.asyncLocalStorage.getStore() || null
+		return requestContextStorage.getStore() || null
 	}
 
 	/**
@@ -40,14 +38,14 @@ export class CorrelationService implements ICorrelationService {
 	 * Clear the current context (mainly for testing)
 	 */
 	clearContext(): void {
-		this.asyncLocalStorage.disable()
+		requestContextStorage.enterWith(undefined as unknown as RequestContext)
 	}
 
 	/**
 	 * Run a function within a specific correlation context
 	 */
 	runWithContext<T>(context: RequestContext, fn: () => T): T {
-		return this.asyncLocalStorage.run(context, fn)
+		return requestContextStorage.run(context, fn)
 	}
 
 	/**

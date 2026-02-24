@@ -1,8 +1,8 @@
 import type { CanActivate, ExecutionContext } from '@nestjs/common'
 import * as process from 'node:process'
+import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Injectable, Logger } from '@nestjs/common'
 import { ThrottlerException } from '@nestjs/throttler'
-import { RateLimitMetricsService } from '../services/rate-limit-metrics.service.js'
 import { RateLimitService } from '../services/rate-limit.service.js'
 
 @Injectable()
@@ -11,7 +11,7 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 
 	constructor(
 		private readonly rateLimitService: RateLimitService,
-		private readonly rateLimitMetricsService: RateLimitMetricsService,
+		private readonly metricsService: MetricsService,
 	) { }
 
 	async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -48,7 +48,7 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 			const { allowed, info } = await this.rateLimitService.checkRateLimit(rateLimitKey, adaptiveConfig)
 
 			this.rateLimitService.recordRateLimitMetrics(requestType, allowed, info)
-			this.rateLimitMetricsService.recordRateLimitAttempt(requestType, clientIp, allowed)
+			this.metricsService.recordRateLimitAttempt(requestType, allowed)
 
 			this.addRateLimitHeaders(response, info)
 

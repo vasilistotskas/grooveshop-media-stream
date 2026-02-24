@@ -332,6 +332,13 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 		}
 	}
 
+	/**
+	 * Expose raw ioredis client for atomic operations (e.g., rate limiting pipelines)
+	 */
+	getClient(): Redis | null {
+		return this.isConnected ? this.redis : null
+	}
+
 	getConnectionStatus(): { connected: boolean, stats: { hits: number, misses: number, operations: number, errors: number } } {
 		return {
 			connected: this.isConnected,

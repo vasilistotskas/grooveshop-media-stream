@@ -20,7 +20,6 @@ import FetchResourceResponseJob from '#microservice/Queue/jobs/fetch-resource-re
 import GenerateResourceIdentityFromRequestJob from '#microservice/Queue/jobs/generate-resource-identity-from-request.job'
 import StoreResourceResponseToFileJob from '#microservice/Queue/jobs/store-resource-response-to-file.job'
 import WebpImageManipulationJob from '#microservice/Queue/jobs/webp-image-manipulation.job'
-import { JobQueueManager } from '#microservice/Queue/services/job-queue.manager'
 import ValidateCacheImageRequestResizeTargetRule from '#microservice/Validation/rules/validate-cache-image-request-resize-target.rule'
 import ValidateCacheImageRequestRule from '#microservice/Validation/rules/validate-cache-image-request.rule'
 import { InputSanitizationService } from '#microservice/Validation/services/input-sanitization.service'
@@ -46,7 +45,6 @@ describe('cacheImageResourceOperation', () => {
 	let mockValidateCacheImageRequestResizeTargetRule: ValidateCacheImageRequestResizeTargetRule
 	let mockCacheManager: MultiLayerCacheManager
 	let mockInputSanitizationService: InputSanitizationService
-	let mockJobQueueManager: JobQueueManager
 	let mockMetricsService: MetricsService
 	let mockLogger: Logger
 	let mockCwd: string
@@ -135,10 +133,6 @@ describe('cacheImageResourceOperation', () => {
 			validateImageDimensions: vi.fn(),
 		} as unknown as InputSanitizationService
 
-		mockJobQueueManager = {
-			addImageProcessingJob: vi.fn(),
-		} as unknown as JobQueueManager
-
 		mockMetricsService = {
 			recordCacheOperation: vi.fn(),
 			recordImageProcessing: vi.fn(),
@@ -163,8 +157,6 @@ describe('cacheImageResourceOperation', () => {
 		vi.spyOn(mockInputSanitizationService, 'validateUrl').mockReturnValue(true)
 		vi.spyOn(mockInputSanitizationService, 'validateFileSize').mockReturnValue(true)
 		vi.spyOn(mockInputSanitizationService, 'validateImageDimensions').mockReturnValue(true)
-
-		vi.spyOn(mockJobQueueManager, 'addImageProcessingJob').mockResolvedValue({} as any)
 
 		const mockConfigService = {
 			get: vi.fn().mockImplementation((key: string) => {
@@ -195,7 +187,6 @@ describe('cacheImageResourceOperation', () => {
 				{ provide: ValidateCacheImageRequestResizeTargetRule, useValue: mockValidateCacheImageRequestResizeTargetRule },
 				{ provide: MultiLayerCacheManager, useValue: mockCacheManager },
 				{ provide: InputSanitizationService, useValue: mockInputSanitizationService },
-				{ provide: JobQueueManager, useValue: mockJobQueueManager },
 				{ provide: MetricsService, useValue: mockMetricsService },
 				{ provide: Logger, useValue: mockLogger },
 				{ provide: ConfigService, useValue: mockConfigService },
@@ -329,7 +320,7 @@ describe('cacheImageResourceOperation', () => {
 		})
 	})
 
-	describe('execute with background processing', () => {
+	describe('execute', () => {
 		beforeEach(async () => {
 			opCtx = await operation.setup(mockRequest)
 		})
@@ -355,37 +346,26 @@ describe('cacheImageResourceOperation', () => {
 			expect(mockMetricsService.recordImageProcessing).toHaveBeenCalledWith('cache_check', 'cached', 'success', expect.any(Number))
 		})
 
-		it('should queue large image processing in background', async () => {
-			// Set up large image dimensions (> 8MP threshold)
-			mockRequest.resizeOptions.width = 4000
-			mockRequest.resizeOptions.height = 3000 // 12MP total
-			opCtx = await operation.setup(mockRequest)
-
-			// Ensure cache returns null so resource doesn't exist
+		it('should process images synchronously', async () => {
 			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
-
-			// Mock filesystem access to return false (resource doesn't exist)
 			const mockedFs = vi.mocked(fs)
 			mockedFs.access.mockRejectedValue(new Error('File not found'))
+			mockedFs.readFile.mockResolvedValue(Buffer.from('processed-image-data'))
+			mockedFs.writeFile.mockResolvedValue()
+			mockedFs.unlink.mockResolvedValue()
 
 			await operation.execute(opCtx)
 
-			expect(mockJobQueueManager.addImageProcessingJob).toHaveBeenCalledWith({
-				imageUrl: mockRequest.resourceTarget,
-				width: mockRequest.resizeOptions.width,
-				height: mockRequest.resizeOptions.height,
-				quality: mockRequest.resizeOptions.quality,
-				format: mockRequest.resizeOptions.format,
-				fit: mockRequest.resizeOptions.fit,
-				position: mockRequest.resizeOptions.position,
-				background: mockRequest.resizeOptions.background,
-				trimThreshold: mockRequest.resizeOptions.trimThreshold,
-				cacheKey: 'mock-resource-id',
-				priority: expect.any(Number),
-			})
+			expect(mockFetchResourceResponseJob.handle).toHaveBeenCalled()
+			expect(mockWebpImageManipulationJob.handle).toHaveBeenCalled()
+			expect(mockCacheManager.set).toHaveBeenCalledWith('image', 'mock-resource-id', expect.any(Object), expect.any(Number))
 		})
 
-		it('should process small images synchronously', async () => {
+		it('should process large images synchronously', async () => {
+			mockRequest.resizeOptions.width = 4000
+			mockRequest.resizeOptions.height = 3000
+			opCtx = await operation.setup(mockRequest)
+
 			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
 			const mockedFs = vi.mocked(fs)
 			mockedFs.access.mockRejectedValue(new Error('File not found'))
@@ -524,37 +504,6 @@ describe('cacheImageResourceOperation', () => {
 					quality: 100,
 				}),
 			)
-		})
-	})
-
-	describe('shouldUseBackgroundProcessing', () => {
-		beforeEach(async () => {
-			opCtx = await operation.setup(mockRequest)
-		})
-
-		it('should return false for small images', () => {
-			opCtx.request.resizeOptions.width = 800
-			opCtx.request.resizeOptions.height = 600
-
-			const result = operation.shouldUseBackgroundProcessing(opCtx)
-			expect(result).toBe(false)
-		})
-
-		it('should return true for large images over 8MP', () => {
-			opCtx.request.resizeOptions.width = 4000
-			opCtx.request.resizeOptions.height = 3000 // 12MP
-
-			const result = operation.shouldUseBackgroundProcessing(opCtx)
-			expect(result).toBe(true)
-		})
-
-		it('should return false for SVG format', () => {
-			opCtx.request.resizeOptions.width = 4000
-			opCtx.request.resizeOptions.height = 3000
-			opCtx.request.resizeOptions.format = 'svg' as any
-
-			const result = operation.shouldUseBackgroundProcessing(opCtx)
-			expect(result).toBe(false)
 		})
 	})
 })

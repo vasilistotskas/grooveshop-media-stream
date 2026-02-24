@@ -21,6 +21,7 @@ export class ConfigService implements OnModuleInit {
 	}
 
 	async onModuleInit(): Promise<void> {
+		await this.validate()
 		this._logger.log('Configuration loaded and validated successfully')
 	}
 
@@ -295,8 +296,8 @@ export class ConfigService implements OnModuleInit {
 					popularImageThreshold: config.cache?.warming?.popularImageThreshold ?? 5,
 				},
 				image: {
-					publicTtl: config.cache?.image?.publicTtl ?? 12 * 30 * 24 * 60 * 60 * 1000,
-					privateTtl: config.cache?.image?.privateTtl ?? 6 * 30 * 24 * 60 * 60 * 1000,
+					publicTtl: config.cache?.image?.publicTtl ?? 12 * 30 * 24 * 3600,
+					privateTtl: config.cache?.image?.privateTtl ?? 6 * 30 * 24 * 3600,
 				},
 			},
 			processing: {

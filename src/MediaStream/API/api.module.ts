@@ -1,4 +1,5 @@
 import { CacheOperationsModule } from '#microservice/Cache/cache-operations.module'
+import { RequestDeduplicator } from '#microservice/common/utils/request-deduplication.util'
 import { ConfigModule } from '#microservice/Config/config.module'
 import { MetricsModule } from '#microservice/Metrics/metrics.module'
 import { ValidationModule } from '#microservice/Validation/validation.module'
@@ -21,6 +22,7 @@ import { UrlBuilderService } from './services/url-builder.service.js'
 		ImageStreamService,
 		RequestValidatorService,
 		UrlBuilderService,
+		RequestDeduplicator,
 	],
 	exports: [
 		ImageStreamService,

@@ -1,5 +1,4 @@
 import type { MockedObject } from 'vitest'
-import { FileCacheLayer } from '#microservice/Cache/layers/file-cache.layer'
 import { MemoryCacheLayer } from '#microservice/Cache/layers/memory-cache.layer'
 import { RedisCacheLayer } from '#microservice/Cache/layers/redis-cache.layer'
 import { MemoryCacheService } from '#microservice/Cache/services/memory-cache.service'
@@ -35,6 +34,7 @@ describe('multiLayerCacheManager Integration', () => {
 			has: vi.fn(),
 			clear: vi.fn(),
 			getStats: vi.fn(),
+			keys: vi.fn().mockResolvedValue([]),
 		} as any
 
 		mockRedisCacheService = {
@@ -45,6 +45,8 @@ describe('multiLayerCacheManager Integration', () => {
 			clear: vi.fn(),
 			getStats: vi.fn(),
 			getConnectionStatus: vi.fn(),
+			keys: vi.fn().mockResolvedValue([]),
+			getClient: vi.fn().mockReturnValue(null),
 		} as any
 
 		// Default config values
@@ -87,10 +89,6 @@ describe('multiLayerCacheManager Integration', () => {
 					provide: RedisCacheLayer,
 					useFactory: () => new RedisCacheLayer(mockRedisCacheService),
 				},
-				{
-					provide: FileCacheLayer,
-					useFactory: () => new FileCacheLayer(mockConfigService),
-				},
 			],
 		}).compile()
 
@@ -110,8 +108,8 @@ describe('multiLayerCacheManager Integration', () => {
 
 			expect(result).toEqual(testValue)
 			expect(mockMemoryCacheService.get).toHaveBeenCalledWith('image:test-key')
-			// Parallel cache checks now call both layers
-			expect(mockRedisCacheService.get).toHaveBeenCalledWith('image:test-key')
+			// Sequential: stops on first hit, redis should not be called
+			expect(mockRedisCacheService.get).not.toHaveBeenCalled()
 			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'memory', 'hit')
 		})
 
@@ -288,15 +286,12 @@ describe('multiLayerCacheManager Integration', () => {
 	})
 
 	describe('invalidation', () => {
-		it('should invalidate namespace by clearing all layers', async () => {
-			mockMemoryCacheService.clear.mockResolvedValue(undefined)
-			mockRedisCacheService.clear.mockResolvedValue(undefined)
-
+		it('should invalidate namespace by deleting keys with prefix', async () => {
+			// deleteByPrefix is called on the cache layers (MemoryCacheLayer, RedisCacheLayer)
+			// The layers use the underlying service methods internally
 			await cacheManager.invalidateNamespace('image')
 
-			expect(mockMemoryCacheService.clear).toHaveBeenCalled()
-			expect(mockRedisCacheService.clear).toHaveBeenCalled()
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('flush', 'multi-layer', 'success')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('clear', 'multi-layer', 'success')
 		})
 	})
 

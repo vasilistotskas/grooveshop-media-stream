@@ -39,6 +39,9 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	private readonly requestsInFlight: promClient.Gauge
 	private readonly uptime: promClient.Gauge
 
+	private readonly rateLimitAttemptsTotal: promClient.Counter
+	private readonly rateLimitBlockedTotal: promClient.Counter
+
 	private readonly gcDuration: promClient.Histogram
 	private readonly eventLoopLag: promClient.Histogram
 
@@ -50,7 +53,6 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	// ✅ Load intervals from configuration
 	private readonly systemMetricsIntervalMs: number
 	private readonly performanceMetricsIntervalMs: number
-	private readonly diskSpaceCacheTtl: number
 
 	constructor(private readonly _configService: ConfigService) {
 		this.register = new promClient.Registry()
@@ -58,7 +60,6 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		// Load monitoring configuration
 		this.systemMetricsIntervalMs = this._configService.getOptional('monitoring.systemMetricsInterval', 60000)
 		this.performanceMetricsIntervalMs = this._configService.getOptional('monitoring.performanceMetricsInterval', 30000)
-		this.diskSpaceCacheTtl = this._configService.getOptional('monitoring.diskSpaceCacheTtl', 300000)
 
 		promClient.collectDefaultMetrics({
 			register: this.register,
@@ -236,6 +237,20 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			registers: [this.register],
 		})
 
+		this.rateLimitAttemptsTotal = new promClient.Counter({
+			name: 'mediastream_rate_limit_attempts_total',
+			help: 'Total number of rate limit attempts',
+			labelNames: ['request_type', 'status'],
+			registers: [this.register],
+		})
+
+		this.rateLimitBlockedTotal = new promClient.Counter({
+			name: 'mediastream_rate_limit_blocked_total',
+			help: 'Total number of blocked requests due to rate limiting',
+			labelNames: ['request_type'],
+			registers: [this.register],
+		})
+
 		this.errorTotal = new promClient.Counter({
 			name: 'mediastream_errors_total',
 			help: 'Total number of errors',
@@ -365,6 +380,18 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	 */
 	recordError(type: string, operation: string): void {
 		this.errorTotal.inc({ type, operation })
+	}
+
+	/**
+	 * Record a rate limit attempt
+	 */
+	recordRateLimitAttempt(requestType: string, allowed: boolean): void {
+		const status = allowed ? 'allowed' : 'blocked'
+		this.rateLimitAttemptsTotal.inc({ request_type: requestType, status })
+
+		if (!allowed) {
+			this.rateLimitBlockedTotal.inc({ request_type: requestType })
+		}
 	}
 
 	/**
@@ -571,59 +598,14 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 
 	private async getDiskUsage(path: string): Promise<{ total: number, used: number, free: number } | null> {
 		try {
-			// In production, you'd use a library like 'node-disk-info' or 'statvfs'
-			const size = await this.getDirectorySize(path)
-
-			return {
-				total: size * 2,
-				used: size,
-				free: size,
-			}
+			const stats = await fs.promises.statfs(path)
+			const total = stats.bsize * stats.blocks
+			const free = stats.bsize * stats.bfree
+			const used = total - free
+			return { total, used, free }
 		}
 		catch {
 			return null
-		}
-	}
-
-	// ✅ OPTIMIZED: Cache disk space calculation for configurable TTL
-	// Recursive directory traversal is expensive, especially for large storage directories
-	private diskSpaceCache: Map<string, { size: number, timestamp: number }> = new Map()
-
-	private async getDirectorySize(dirPath: string): Promise<number> {
-		try {
-			// Check cache first
-			const cached = this.diskSpaceCache.get(dirPath)
-			if (cached && Date.now() - cached.timestamp < this.diskSpaceCacheTtl) {
-				this._logger.debug(`Using cached disk space for ${dirPath}: ${cached.size} bytes`)
-				return cached.size
-			}
-
-			// Calculate actual size
-			let totalSize = 0
-			const files = await fs.promises.readdir(dirPath)
-
-			await Promise.all(
-				files.map(async (file) => {
-					const filePath = `${dirPath}/${file}`
-					const stats = await fs.promises.stat(filePath)
-
-					if (stats.isDirectory()) {
-						totalSize += await this.getDirectorySize(filePath)
-					}
-					else {
-						totalSize += stats.size
-					}
-				}),
-			)
-
-			// Cache the result
-			this.diskSpaceCache.set(dirPath, { size: totalSize, timestamp: Date.now() })
-			this._logger.debug(`Calculated and cached disk space for ${dirPath}: ${totalSize} bytes`)
-
-			return totalSize
-		}
-		catch {
-			return 0
 		}
 	}
 }

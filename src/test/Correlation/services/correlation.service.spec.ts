@@ -149,4 +149,110 @@ describe('correlationService', () => {
 			expect(service.getContext()).toBeNull()
 		})
 	})
+
+	describe('context Isolation', () => {
+		it('should isolate contexts between concurrent async operations', async () => {
+			const context1: RequestContext = {
+				correlationId: 'ctx-1',
+				timestamp: Date.now(),
+				clientIp: '10.0.0.1',
+				method: 'GET',
+				url: '/api/1',
+				startTime: BigInt(Date.now() * 1000000),
+			}
+
+			const context2: RequestContext = {
+				correlationId: 'ctx-2',
+				timestamp: Date.now(),
+				clientIp: '10.0.0.2',
+				method: 'POST',
+				url: '/api/2',
+				startTime: BigInt(Date.now() * 1000000),
+			}
+
+			const results = await Promise.all([
+				service.runWithContext(context1, async () => {
+					await new Promise(resolve => setTimeout(resolve, 20))
+					return service.getCorrelationId()
+				}),
+				service.runWithContext(context2, async () => {
+					await new Promise(resolve => setTimeout(resolve, 10))
+					return service.getCorrelationId()
+				}),
+			])
+
+			expect(results[0]).toBe('ctx-1')
+			expect(results[1]).toBe('ctx-2')
+		})
+
+		it('should support nested runWithContext calls', () => {
+			const outerContext: RequestContext = {
+				correlationId: 'outer',
+				timestamp: Date.now(),
+				clientIp: '127.0.0.1',
+				method: 'GET',
+				url: '/outer',
+				startTime: BigInt(Date.now() * 1000000),
+			}
+
+			const innerContext: RequestContext = {
+				correlationId: 'inner',
+				timestamp: Date.now(),
+				clientIp: '127.0.0.1',
+				method: 'POST',
+				url: '/inner',
+				startTime: BigInt(Date.now() * 1000000),
+			}
+
+			service.runWithContext(outerContext, () => {
+				expect(service.getCorrelationId()).toBe('outer')
+
+				service.runWithContext(innerContext, () => {
+					expect(service.getCorrelationId()).toBe('inner')
+				})
+
+				// Outer context restored after inner scope
+				expect(service.getCorrelationId()).toBe('outer')
+			})
+		})
+	})
+
+	describe('helper Methods', () => {
+		it('should return client IP from context', () => {
+			const mockContext: RequestContext = {
+				correlationId: 'test-id',
+				timestamp: Date.now(),
+				clientIp: '192.168.1.100',
+				method: 'GET',
+				url: '/test',
+				startTime: BigInt(Date.now() * 1000000),
+			}
+
+			service.setContext(mockContext)
+			expect(service.getClientIp()).toBe('192.168.1.100')
+		})
+
+		it('should return "unknown" for client IP when no context', () => {
+			expect(service.getClientIp()).toBe('unknown')
+		})
+
+		it('should return user agent from context', () => {
+			const mockContext: RequestContext = {
+				correlationId: 'test-id',
+				timestamp: Date.now(),
+				clientIp: '127.0.0.1',
+				userAgent: 'Mozilla/5.0 Test',
+				method: 'GET',
+				url: '/test',
+				startTime: BigInt(Date.now() * 1000000),
+			}
+
+			service.setContext(mockContext)
+			expect(service.getUserAgent()).toBe('Mozilla/5.0 Test')
+		})
+
+		it('should return "unknown" for user agent when no context', () => {
+			expect(service.getUserAgent()).toBe('unknown')
+		})
+	})
 })

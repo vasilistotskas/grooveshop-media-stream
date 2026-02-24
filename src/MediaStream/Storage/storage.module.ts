@@ -1,7 +1,6 @@
 import { ConfigModule } from '#microservice/Config/config.module'
 import { CorrelationModule } from '#microservice/Correlation/correlation.module'
 import { Module } from '@nestjs/common'
-import { ScheduleModule } from '@nestjs/schedule'
 
 import { StorageHealthIndicator } from './indicators/storage-health.indicator.js'
 import { IntelligentEvictionService } from './services/intelligent-eviction.service.js'
@@ -14,7 +13,6 @@ import { StorageOptimizationService } from './services/storage-optimization.serv
 	imports: [
 		ConfigModule,
 		CorrelationModule,
-		ScheduleModule.forRoot(),
 	],
 	providers: [
 		StorageMonitoringService,
