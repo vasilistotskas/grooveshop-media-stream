@@ -228,7 +228,7 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 		const url = request.url || ''
 		const method = request.method || 'GET'
 
-		if (url.includes('/media/uploads/') || url.includes('/static/images/') || url.includes('/image-processing')) {
+		if (url.includes('/media_stream-image/')) {
 			return 'image-processing'
 		}
 

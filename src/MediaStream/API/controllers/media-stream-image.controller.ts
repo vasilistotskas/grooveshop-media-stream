@@ -5,8 +5,7 @@ import { IMAGE } from '#microservice/common/constants/route-prefixes.constant'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-import { AdaptiveRateLimitGuard } from '#microservice/RateLimit/guards/adaptive-rate-limit.guard'
-import { Controller, Get, Logger, NotFoundException, Req, Res, UseGuards } from '@nestjs/common'
+import { Controller, Get, Logger, NotFoundException, Req, Res } from '@nestjs/common'
 import { IMAGE_SOURCES } from '../config/image-sources.config.js'
 import CacheImageRequest, {
 	BackgroundOptions,
@@ -27,7 +26,6 @@ import { UrlBuilderService } from '../services/url-builder.service.js'
  * Note: Controllers are stateless by design, no need for REQUEST scope.
  */
 @Controller(IMAGE)
-@UseGuards(AdaptiveRateLimitGuard)
 export default class MediaStreamImageController {
 	private readonly _logger = new Logger(MediaStreamImageController.name)
 

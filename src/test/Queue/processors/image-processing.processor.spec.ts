@@ -1,26 +1,24 @@
 import type { Job } from '#microservice/Queue/interfaces/job-queue.interface'
 import type { ImageProcessingJobData } from '#microservice/Queue/types/job.types'
-import type { MockedFunction, MockedObject } from 'vitest'
+import type { MockedObject } from 'vitest'
 import { Buffer } from 'node:buffer'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
+import ManipulationJobResult from '#microservice/Queue/dto/manipulation-job-result.dto'
+import WebpImageManipulationJob from '#microservice/Queue/jobs/webp-image-manipulation.job'
 import { ImageProcessingProcessor } from '#microservice/Queue/processors/image-processing.processor'
 import { JobPriority } from '#microservice/Queue/types/job.types'
 import { Logger } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
-import sharp from 'sharp'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-
-// Mock sharp
-vi.mock('sharp')
-const mockSharp = sharp as MockedFunction<typeof sharp>
 
 describe('imageProcessingProcessor', () => {
 	let processor: ImageProcessingProcessor
 	let mockCacheManager: MockedObject<MultiLayerCacheManager>
 	let mockHttpClient: MockedObject<HttpClientService>
+	let mockImageManipulationJob: MockedObject<WebpImageManipulationJob>
 
 	const createMockJob = (data: Partial<ImageProcessingJobData>): Job<ImageProcessingJobData> => ({
 		id: 'test-job',
@@ -62,18 +60,23 @@ describe('imageProcessingProcessor', () => {
 		const mockConfigServiceFactory = {
 			get: vi.fn().mockImplementation((key: string) => {
 				const configs: Record<string, any> = {
-					'cache.image.publicTtl': 12 * 30 * 24 * 60 * 60 * 1000,
-					'cache.image.privateTtl': 6 * 30 * 24 * 60 * 60 * 1000,
+					'cache.image.publicTtl': 12 * 30 * 24 * 3600,
+					'cache.image.privateTtl': 6 * 30 * 24 * 3600,
 				}
 				return configs[key]
 			}),
 			getOptional: vi.fn().mockImplementation((key: string, defaultValue: any) => {
 				const configs: Record<string, any> = {
-					'cache.image.publicTtl': 12 * 30 * 24 * 60 * 60 * 1000,
-					'cache.image.privateTtl': 6 * 30 * 24 * 60 * 60 * 1000,
+					'cache.image.publicTtl': 12 * 30 * 24 * 3600,
+					'cache.image.privateTtl': 6 * 30 * 24 * 3600,
 				}
 				return configs[key] ?? defaultValue
 			}),
+		}
+
+		const mockImageManipulationJobFactory = {
+			handle: vi.fn(),
+			handleBuffer: vi.fn(),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -95,12 +98,17 @@ describe('imageProcessingProcessor', () => {
 					provide: ConfigService,
 					useValue: mockConfigServiceFactory,
 				},
+				{
+					provide: WebpImageManipulationJob,
+					useValue: mockImageManipulationJobFactory,
+				},
 			],
 		}).compile()
 
 		processor = module.get<ImageProcessingProcessor>(ImageProcessingProcessor)
 		mockCacheManager = module.get(MultiLayerCacheManager)
 		mockHttpClient = module.get(HttpClientService)
+		mockImageManipulationJob = module.get(WebpImageManipulationJob)
 
 		// Mock logger to avoid console output during tests
 		vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => {})
@@ -143,11 +151,9 @@ describe('imageProcessingProcessor', () => {
 				format: 'webp',
 			})
 
-			// Mock cache miss
 			mockCacheManager.get.mockResolvedValue(null)
 			mockCacheManager.set.mockResolvedValue(undefined)
 
-			// Mock HTTP response
 			const originalImageData = Buffer.from('original-image-data')
 			mockHttpClient.get.mockResolvedValue({
 				data: originalImageData,
@@ -157,21 +163,19 @@ describe('imageProcessingProcessor', () => {
 				config: {},
 			} as any)
 
-			// Mock sharp processing
 			const processedImageData = Buffer.from('processed-image-data')
-			const mockSharpInstance = {
-				resize: vi.fn().mockReturnThis(),
-				webp: vi.fn().mockReturnThis(),
-				withMetadata: vi.fn().mockReturnThis(),
-				toBuffer: vi.fn().mockResolvedValue(processedImageData),
-				destroy: vi.fn(),
-			}
-			mockSharp.mockReturnValue(mockSharpInstance as any)
+			mockImageManipulationJob.handleBuffer.mockResolvedValue(
+				new ManipulationJobResult({
+					size: String(processedImageData.length),
+					format: 'webp',
+					buffer: processedImageData,
+				}),
+			)
 
 			const result = await processor.process(job)
 
 			expect(result.success).toBe(true)
-			expect(result.data).toBe(processedImageData)
+			expect(result.data).toEqual(processedImageData)
 			expect(result.cacheHit).toBe(false)
 			expect(result.processingTime).toBeGreaterThanOrEqual(0)
 
@@ -181,14 +185,15 @@ describe('imageProcessingProcessor', () => {
 				maxContentLength: 10485760,
 				maxBodyLength: 10485760,
 			})
-			expect(mockSharpInstance.resize).toHaveBeenCalledWith(expect.objectContaining({
-				width: 300,
-				height: 200,
-			}))
-			expect(mockSharpInstance.webp).toHaveBeenCalledWith(expect.objectContaining({
-				quality: 80,
-				smartSubsample: true,
-			}))
+			expect(mockImageManipulationJob.handleBuffer).toHaveBeenCalledWith(
+				expect.any(Buffer),
+				expect.objectContaining({
+					width: 300,
+					height: 200,
+					quality: 80,
+					format: 'webp',
+				}),
+			)
 			expect(mockCacheManager.set).toHaveBeenCalledWith(
 				'image',
 				'test-cache-key',
@@ -221,96 +226,21 @@ describe('imageProcessingProcessor', () => {
 			} as any)
 
 			const processedImageData = Buffer.from('processed-jpeg-data')
-			const mockSharpInstance = {
-				resize: vi.fn().mockReturnThis(),
-				jpeg: vi.fn().mockReturnThis(),
-				withMetadata: vi.fn().mockReturnThis(),
-				toBuffer: vi.fn().mockResolvedValue(processedImageData),
-				destroy: vi.fn(),
-			}
-			mockSharp.mockReturnValue(mockSharpInstance as any)
+			mockImageManipulationJob.handleBuffer.mockResolvedValue(
+				new ManipulationJobResult({
+					size: String(processedImageData.length),
+					format: 'jpeg',
+					buffer: processedImageData,
+				}),
+			)
 
 			const result = await processor.process(job)
 
 			expect(result.success).toBe(true)
-			expect(mockSharpInstance.jpeg).toHaveBeenCalledWith(expect.objectContaining({
-				quality: 90,
-				progressive: true,
-			}))
-		})
-
-		it('should handle PNG format processing', async () => {
-			const job = createMockJob({
-				format: 'png',
-				quality: 95,
-			})
-
-			mockCacheManager.get.mockResolvedValue(null)
-			mockCacheManager.set.mockResolvedValue(undefined)
-
-			const originalImageData = Buffer.from('original-image-data')
-			mockHttpClient.get.mockResolvedValue({
-				data: originalImageData,
-				status: 200,
-				statusText: 'OK',
-				headers: { 'content-type': 'image/png' },
-				config: {},
-			} as any)
-
-			const processedImageData = Buffer.from('processed-png-data')
-			const mockSharpInstance = {
-				png: vi.fn().mockReturnThis(),
-				withMetadata: vi.fn().mockReturnThis(),
-				toBuffer: vi.fn().mockResolvedValue(processedImageData),
-				destroy: vi.fn(),
-			}
-			mockSharp.mockReturnValue(mockSharpInstance as any)
-
-			const result = await processor.process(job)
-
-			expect(result.success).toBe(true)
-			expect(mockSharpInstance.png).toHaveBeenCalledWith(expect.objectContaining({
-				quality: 95,
-			}))
-		})
-
-		it('should handle AVIF format processing with quality capped at 75', async () => {
-			const job = createMockJob({
-				width: 300,
-				height: 200,
-				quality: 90,
-				format: 'avif',
-			})
-
-			mockCacheManager.get.mockResolvedValue(null)
-			mockCacheManager.set.mockResolvedValue(undefined)
-
-			const originalImageData = Buffer.from('original-image-data')
-			mockHttpClient.get.mockResolvedValue({
-				data: originalImageData,
-				status: 200,
-				statusText: 'OK',
-				headers: { 'content-type': 'image/jpeg' },
-				config: {},
-			} as any)
-
-			const processedImageData = Buffer.from('processed-avif-data')
-			const mockSharpInstance = {
-				resize: vi.fn().mockReturnThis(),
-				avif: vi.fn().mockReturnThis(),
-				withMetadata: vi.fn().mockReturnThis(),
-				toBuffer: vi.fn().mockResolvedValue(processedImageData),
-				destroy: vi.fn(),
-			}
-			mockSharp.mockReturnValue(mockSharpInstance as any)
-
-			const result = await processor.process(job)
-
-			expect(result.success).toBe(true)
-			expect(mockSharpInstance.avif).toHaveBeenCalledWith(expect.objectContaining({
-				quality: 75,
-				chromaSubsampling: '4:2:0',
-			}))
+			expect(mockImageManipulationJob.handleBuffer).toHaveBeenCalledWith(
+				expect.any(Buffer),
+				expect.objectContaining({ format: 'jpeg', quality: 90 }),
+			)
 		})
 
 		it('should handle processing without dimensions', async () => {
@@ -331,53 +261,18 @@ describe('imageProcessingProcessor', () => {
 			} as any)
 
 			const processedImageData = Buffer.from('processed-image-data')
-			const mockSharpInstance = {
-				webp: vi.fn().mockReturnThis(),
-				withMetadata: vi.fn().mockReturnThis(),
-				toBuffer: vi.fn().mockResolvedValue(processedImageData),
-				destroy: vi.fn(),
-			}
-			mockSharp.mockReturnValue(mockSharpInstance as any)
+			mockImageManipulationJob.handleBuffer.mockResolvedValue(
+				new ManipulationJobResult({
+					size: String(processedImageData.length),
+					format: 'webp',
+					buffer: processedImageData,
+				}),
+			)
 
 			const result = await processor.process(job)
 
 			expect(result.success).toBe(true)
-			expect(mockSharpInstance.webp).toHaveBeenCalledWith(expect.objectContaining({
-				quality: 80,
-				smartSubsample: true,
-			}))
-			// resize should not be called when no dimensions provided
-			// (mock doesn't have resize method when dimensions aren't needed)
-		})
-
-		it('should handle unknown format by keeping original', async () => {
-			const job = createMockJob({})
-
-			mockCacheManager.get.mockResolvedValue(null)
-			mockCacheManager.set.mockResolvedValue(undefined)
-
-			const originalImageData = Buffer.from('original-image-data')
-			mockHttpClient.get.mockResolvedValue({
-				data: originalImageData,
-				status: 200,
-				statusText: 'OK',
-				headers: { 'content-type': 'image/jpeg' },
-				config: {},
-			} as any)
-
-			const processedImageData = Buffer.from('processed-image-data')
-			const mockSharpInstance = {
-				webp: vi.fn().mockReturnThis(),
-				withMetadata: vi.fn().mockReturnThis(),
-				toBuffer: vi.fn().mockResolvedValue(processedImageData),
-				destroy: vi.fn(),
-			}
-			mockSharp.mockReturnValue(mockSharpInstance as any)
-
-			const result = await processor.process(job)
-
-			expect(result.success).toBe(true)
-			expect(mockSharpInstance.toBuffer).toHaveBeenCalled()
+			expect(mockImageManipulationJob.handleBuffer).toHaveBeenCalled()
 		})
 
 		it('should handle HTTP download errors', async () => {
@@ -413,15 +308,7 @@ describe('imageProcessingProcessor', () => {
 				config: {},
 			} as any)
 
-			// Mock sharp processing error
-			const mockSharpInstance = {
-				resize: vi.fn().mockReturnThis(),
-				webp: vi.fn().mockReturnThis(),
-				withMetadata: vi.fn().mockReturnThis(),
-				toBuffer: vi.fn().mockRejectedValue(new Error('Invalid image format')),
-				destroy: vi.fn(),
-			}
-			mockSharp.mockReturnValue(mockSharpInstance as any)
+			mockImageManipulationJob.handleBuffer.mockRejectedValue(new Error('Invalid image format'))
 
 			const result = await processor.process(job)
 
@@ -433,7 +320,6 @@ describe('imageProcessingProcessor', () => {
 		it('should handle cache errors gracefully', async () => {
 			const job = createMockJob({})
 
-			// Mock cache get error
 			mockCacheManager.get.mockRejectedValue(new Error('Cache connection error'))
 
 			const result = await processor.process(job)
@@ -443,7 +329,7 @@ describe('imageProcessingProcessor', () => {
 			expect(result.cacheHit).toBe(false)
 		})
 
-		it('should handle cache set errors but still return processed image', async () => {
+		it('should handle cache set errors but still return error', async () => {
 			const job = createMockJob({})
 
 			mockCacheManager.get.mockResolvedValue(null)
@@ -459,13 +345,13 @@ describe('imageProcessingProcessor', () => {
 			} as any)
 
 			const processedImageData = Buffer.from('processed-image-data')
-			const mockSharpInstance = {
-				webp: vi.fn().mockReturnThis(),
-				withMetadata: vi.fn().mockReturnThis(),
-				toBuffer: vi.fn().mockResolvedValue(processedImageData),
-				destroy: vi.fn(),
-			}
-			mockSharp.mockReturnValue(mockSharpInstance as any)
+			mockImageManipulationJob.handleBuffer.mockResolvedValue(
+				new ManipulationJobResult({
+					size: String(processedImageData.length),
+					format: 'webp',
+					buffer: processedImageData,
+				}),
+			)
 
 			const result = await processor.process(job)
 

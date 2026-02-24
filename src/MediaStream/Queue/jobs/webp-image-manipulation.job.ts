@@ -1,7 +1,6 @@
 import type { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
 import { Buffer } from 'node:buffer'
 import * as fs from 'node:fs/promises'
-import { copyFile, readFile } from 'node:fs/promises'
 import { extname } from 'node:path'
 import { Injectable, Logger } from '@nestjs/common'
 import sharp from 'sharp'
@@ -10,153 +9,173 @@ import ManipulationJobResult from '../dto/manipulation-job-result.dto.js'
 /**
  * Handles image manipulation and format conversion using Sharp.
  * Stateless service - all request data is passed via method parameters.
- *
- * NOTE: Sharp configuration is now centralized in SharpConfigService.
- * This ensures consistent settings across all image processing operations.
+ * Returns processed image as a Buffer (no intermediate disk I/O).
  */
 @Injectable()
 export default class WebpImageManipulationJob {
 	private readonly logger = new Logger(WebpImageManipulationJob.name)
 
+	/**
+	 * Process an image from a file path.
+	 * Supports SVG detection/handling and all raster formats.
+	 */
 	async handle(
 		filePathFrom: string,
-		filePathTo: string,
 		options: ResizeOptions,
 	): Promise<ManipulationJobResult> {
-		this.logger.debug(`WebpImageManipulationJob.handle called with all options:`, {
+		this.logger.debug(`WebpImageManipulationJob.handle called with options:`, {
 			filePathFrom,
-			filePathTo,
 			options: JSON.stringify(options, null, 2),
 		})
 
 		if (options.format === 'svg') {
-			this.logger.debug(`SVG format requested. Source file: ${filePathFrom}`)
-			const sourceExtension = extname(filePathFrom).toLowerCase()
-			let isSourceSvg = sourceExtension === '.svg'
+			return this.handleSvgFormat(filePathFrom, options)
+		}
 
-			this.logger.debug(`Source extension: ${sourceExtension}, isSourceSvg: ${isSourceSvg}`)
+		return this.processRaster(filePathFrom, options)
+	}
 
-			if (!isSourceSvg) {
+	/**
+	 * Process an image from a Buffer.
+	 * Used by the queue processor for background jobs.
+	 * Skips SVG handling (queue only processes raster images).
+	 */
+	async handleBuffer(
+		buffer: Buffer,
+		options: ResizeOptions,
+	): Promise<ManipulationJobResult> {
+		this.logger.debug(`WebpImageManipulationJob.handleBuffer called`)
+		return this.processRaster(buffer, options)
+	}
+
+	private async handleSvgFormat(
+		filePathFrom: string,
+		options: ResizeOptions,
+	): Promise<ManipulationJobResult> {
+		this.logger.debug(`SVG format requested. Source file: ${filePathFrom}`)
+		const sourceExtension = extname(filePathFrom).toLowerCase()
+		let isSourceSvg = sourceExtension === '.svg'
+
+		this.logger.debug(`Source extension: ${sourceExtension}, isSourceSvg: ${isSourceSvg}`)
+
+		if (!isSourceSvg) {
+			try {
+				const fileHandle = await fs.open(filePathFrom, 'r')
 				try {
-					// Read only the first 512 bytes to check for SVG signature
-					// This avoids reading large files entirely into memory
-					const fileHandle = await fs.open(filePathFrom, 'r')
-					try {
-						const buffer = Buffer.alloc(512)
-						const { bytesRead } = await fileHandle.read(buffer, 0, 512, 0)
-						const content = buffer.toString('utf8', 0, bytesRead)
-						isSourceSvg = content.trim().startsWith('<svg') || content.includes('xmlns="http://www.w3.org/2000/svg"')
-						this.logger.debug(`Content-based SVG detection (header only): ${isSourceSvg}`)
-					}
-					finally {
-						await fileHandle.close()
-					}
+					const buffer = Buffer.alloc(512)
+					const { bytesRead } = await fileHandle.read(buffer, 0, 512, 0)
+					const content = buffer.toString('utf8', 0, bytesRead)
+					isSourceSvg = content.trim().startsWith('<svg') || content.includes('xmlns="http://www.w3.org/2000/svg"')
+					this.logger.debug(`Content-based SVG detection (header only): ${isSourceSvg}`)
 				}
-				catch (error: unknown) {
-					isSourceSvg = false
-					this.logger.debug(`Could not read file header: ${(error as Error).message}, assuming not SVG`)
+				finally {
+					await fileHandle.close()
 				}
 			}
-
-			if (isSourceSvg) {
-				// Only resize if dimensions are positive (> 0)
-				// 0 means "use original dimensions"
-				const needsResizing = (options.width !== null && !Number.isNaN(options.width) && options.width > 0)
-					|| (options.height !== null && !Number.isNaN(options.height) && options.height > 0)
-
-				if (!needsResizing) {
-					this.logger.debug(`SVG file needs no resizing, copying original`)
-					await copyFile(filePathFrom, filePathTo)
-					const stats = await readFile(filePathFrom)
-					const result = new ManipulationJobResult({
-						size: String(stats.length),
-						format: 'svg',
-					})
-					this.logger.debug(`SVG copy result: ${JSON.stringify(result)}`)
-					return result
-				}
-				else {
-					const manipulation = sharp(filePathFrom)
-					manipulation.png({ quality: options.quality })
-
-					const resizeScales: { width?: number, height?: number } = {}
-
-					// Only add dimensions if they are positive (> 0)
-					if (options.width !== null && !Number.isNaN(options.width) && options.width > 0) {
-						resizeScales.width = Number(options.width)
-					}
-					if (options.height !== null && !Number.isNaN(options.height) && options.height > 0) {
-						resizeScales.height = Number(options.height)
-					}
-
-					// Only resize if we have valid dimensions
-					if (Object.keys(resizeScales).length > 0) {
-						manipulation.resize({
-							...resizeScales,
-							fit: options.fit,
-							position: options.position,
-							background: options.background,
-						})
-					}
-
-					const manipulatedFile = await manipulation.toFile(filePathTo)
-					const result = new ManipulationJobResult({
-						size: String(manipulatedFile.size),
-						format: 'png',
-					})
-					this.logger.debug(`SVG resized to PNG. Result: ${JSON.stringify(result)}`)
-					return result
-				}
-			}
-			else {
-				this.logger.debug('Non-SVG source with SVG output requested, converting to PNG')
-
-				const manipulation = sharp(filePathFrom)
-				manipulation.png({ quality: options.quality })
-
-				const resizeScales: { width?: number, height?: number } = {}
-				// Only add dimensions if they are positive (> 0)
-				if (options.width !== null && !Number.isNaN(options.width) && options.width > 0) {
-					resizeScales.width = Number(options.width)
-				}
-				if (options.height !== null && !Number.isNaN(options.height) && options.height > 0) {
-					resizeScales.height = Number(options.height)
-				}
-
-				this.logger.debug(`Resize scales: ${JSON.stringify(resizeScales)}`)
-
-				if (Object.keys(resizeScales).length > 0) {
-					if (options.trimThreshold !== null && !Number.isNaN(options.trimThreshold)) {
-						manipulation.trim({
-							background: options.background,
-							threshold: Number(options.trimThreshold),
-						})
-					}
-
-					manipulation.resize({
-						...resizeScales,
-						fit: options.fit,
-						position: options.position,
-						background: options.background,
-					})
-				}
-
-				const manipulatedFile = await manipulation.toFile(filePathTo)
-				this.logger.debug(`Manipulation complete. Result format: png, size: ${manipulatedFile.size}`)
-
-				return new ManipulationJobResult({
-					size: String(manipulatedFile.size),
-					format: 'png',
-				})
+			catch (error: unknown) {
+				isSourceSvg = false
+				this.logger.debug(`Could not read file header: ${(error as Error).message}, assuming not SVG`)
 			}
 		}
 
+		if (isSourceSvg) {
+			const needsResizing = (options.width !== null && !Number.isNaN(options.width) && options.width > 0)
+				|| (options.height !== null && !Number.isNaN(options.height) && options.height > 0)
+
+			if (!needsResizing) {
+				this.logger.debug(`SVG file needs no resizing, returning original`)
+				const data = await fs.readFile(filePathFrom)
+				const result = new ManipulationJobResult({
+					size: String(data.length),
+					format: 'svg',
+					buffer: data,
+				})
+				this.logger.debug(`SVG copy result: ${JSON.stringify({ size: result.size, format: result.format })}`)
+				return result
+			}
+
+			// SVG that needs resizing → convert to PNG
+			const manipulation = sharp(filePathFrom)
+			manipulation.png({ quality: options.quality })
+
+			const resizeScales: { width?: number, height?: number } = {}
+			if (options.width !== null && !Number.isNaN(options.width) && options.width > 0) {
+				resizeScales.width = Number(options.width)
+			}
+			if (options.height !== null && !Number.isNaN(options.height) && options.height > 0) {
+				resizeScales.height = Number(options.height)
+			}
+
+			if (Object.keys(resizeScales).length > 0) {
+				manipulation.resize({
+					...resizeScales,
+					fit: options.fit,
+					position: options.position,
+					background: options.background,
+				})
+			}
+
+			const { data, info } = await manipulation.toBuffer({ resolveWithObject: true })
+			const result = new ManipulationJobResult({
+				size: String(info.size),
+				format: 'png',
+				buffer: data,
+			})
+			this.logger.debug(`SVG resized to PNG. Result: ${JSON.stringify({ size: result.size, format: result.format })}`)
+			return result
+		}
+
+		// Non-SVG source with SVG output requested → convert to PNG
+		this.logger.debug('Non-SVG source with SVG output requested, converting to PNG')
 		const manipulation = sharp(filePathFrom)
+		manipulation.png({ quality: options.quality })
+
+		const resizeScales: { width?: number, height?: number } = {}
+		if (options.width !== null && !Number.isNaN(options.width) && options.width > 0) {
+			resizeScales.width = Number(options.width)
+		}
+		if (options.height !== null && !Number.isNaN(options.height) && options.height > 0) {
+			resizeScales.height = Number(options.height)
+		}
+
+		this.logger.debug(`Resize scales: ${JSON.stringify(resizeScales)}`)
+
+		if (Object.keys(resizeScales).length > 0) {
+			if (options.trimThreshold !== null && !Number.isNaN(options.trimThreshold)) {
+				manipulation.trim({
+					background: options.background,
+					threshold: Number(options.trimThreshold),
+				})
+			}
+
+			manipulation.resize({
+				...resizeScales,
+				fit: options.fit,
+				position: options.position,
+				background: options.background,
+			})
+		}
+
+		const { data, info } = await manipulation.toBuffer({ resolveWithObject: true })
+		this.logger.debug(`Manipulation complete. Result format: png, size: ${info.size}`)
+
+		return new ManipulationJobResult({
+			size: String(info.size),
+			format: 'png',
+			buffer: data,
+		})
+	}
+
+	private async processRaster(
+		input: string | Buffer,
+		options: ResizeOptions,
+	): Promise<ManipulationJobResult> {
+		let manipulation = Buffer.isBuffer(input)
+			? sharp(input, { limitInputPixels: 268402689, sequentialRead: true })
+			: sharp(input)
 
 		const resizeScales: { width?: number, height?: number } = {};
 
-		// Only add dimensions if they are positive (> 0)
-		// 0 means "use original dimensions" - skip resizing
 		(['width', 'height'] as const).forEach((scale: 'width' | 'height') => {
 			const value = options[scale]
 			if (value !== null && !Number.isNaN(value) && value > 0) {
@@ -166,15 +185,13 @@ export default class WebpImageManipulationJob {
 
 		// Pipeline order: trim → resize → format conversion
 		if (Object.keys(resizeScales).length > 0) {
-			// 1. Trim first (before resize to get accurate content bounds)
 			if (options.trimThreshold !== null && !Number.isNaN(options.trimThreshold)) {
-				manipulation.trim({
+				manipulation = manipulation.trim({
 					background: options.background,
 					threshold: Number(options.trimThreshold),
 				})
 			}
 
-			// 2. Resize second
 			const resizeConfig = {
 				...resizeScales,
 				fit: options.fit,
@@ -186,30 +203,48 @@ export default class WebpImageManipulationJob {
 				resizeConfig: JSON.stringify(resizeConfig, null, 2),
 			})
 
-			manipulation.resize(resizeConfig)
+			manipulation = manipulation.resize(resizeConfig)
 		}
 		else {
 			this.logger.debug(`Skipping resize - using original image dimensions (width: ${options.width}, height: ${options.height})`)
 		}
 
-		// 3. Format conversion last
+		// Format conversion
 		switch (options.format) {
 			case 'jpeg':
-				manipulation.jpeg({ quality: options.quality })
+				manipulation = manipulation.jpeg({
+					quality: options.quality,
+					progressive: true,
+					mozjpeg: true,
+					trellisQuantisation: true,
+					overshootDeringing: true,
+				})
 				break
 			case 'png':
-				manipulation.png({ quality: options.quality })
+				manipulation = manipulation.png({
+					quality: options.quality,
+					adaptiveFiltering: true,
+					palette: options.quality < 95,
+					compressionLevel: 6,
+				})
 				break
 			case 'webp':
-				manipulation.webp({ quality: options.quality })
+				manipulation = manipulation.webp({
+					quality: options.quality,
+					smartSubsample: true,
+					effort: 4,
+				})
 				break
 			case 'avif': {
-				const metadata = await sharp(filePathFrom).metadata()
+				// Check pixel count to decide AVIF vs WebP fallback
+				const metadata = Buffer.isBuffer(input)
+					? await sharp(input, { limitInputPixels: 268402689, sequentialRead: true }).metadata()
+					: await sharp(input).metadata()
 				const totalPixels = (metadata.width || 0) * (metadata.height || 0)
 
 				if (totalPixels > 2073600) {
 					this.logger.warn(`Image too large for AVIF (${totalPixels}px), using WebP fallback`)
-					manipulation.webp({
+					manipulation = manipulation.webp({
 						quality: options.quality,
 						smartSubsample: true,
 						effort: 4,
@@ -217,7 +252,7 @@ export default class WebpImageManipulationJob {
 					break
 				}
 
-				manipulation.avif({
+				manipulation = manipulation.avif({
 					quality: Math.min(options.quality, 60),
 					effort: 2,
 					chromaSubsampling: '4:2:0',
@@ -226,20 +261,35 @@ export default class WebpImageManipulationJob {
 				break
 			}
 			case 'gif':
-				manipulation.gif()
+				manipulation = manipulation.gif()
 				break
 			case 'tiff':
-				manipulation.tiff()
+				manipulation = manipulation.tiff()
 				break
 			default:
-				manipulation.webp({ quality: options.quality })
+				manipulation = manipulation.webp({
+					quality: options.quality,
+					smartSubsample: true,
+					effort: 4,
+				})
 		}
 
-		const manipulatedFile = await manipulation.toFile(filePathTo)
+		try {
+			const { data, info } = await manipulation.toBuffer({ resolveWithObject: true })
 
-		return new ManipulationJobResult({
-			size: String(manipulatedFile.size),
-			format: manipulatedFile.format,
-		})
+			return new ManipulationJobResult({
+				size: String(info.size),
+				format: info.format,
+				buffer: data,
+			})
+		}
+		finally {
+			try {
+				manipulation.destroy()
+			}
+			catch {
+				// Ignore destroy errors
+			}
+		}
 	}
 }

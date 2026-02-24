@@ -13,9 +13,10 @@ import request from 'supertest'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Test controller for integration testing
-@Controller('test')
+// Uses media_stream-image prefix for image routes to match AdaptiveRateLimitGuard.getRequestType()
+@Controller()
 class TestController {
-	@Get('image-processing')
+	@Get('media_stream-image/test-image')
 	@UseGuards(AdaptiveRateLimitGuard)
 	async imageProcessing() {
 		return { message: 'Image processed' }
@@ -26,7 +27,7 @@ class TestController {
 		return { status: 'ok' }
 	}
 
-	@Get('default')
+	@Get('test/default')
 	@UseGuards(AdaptiveRateLimitGuard)
 	async defaultEndpoint() {
 		return { message: 'Default endpoint' }
@@ -290,7 +291,7 @@ describe('rate Limiting Integration', () => {
 			for (let i = 0; i < limit; i++) {
 				const response = await request(app.getHttpServer())
 
-					.get('/test/image-processing')
+					.get('/media_stream-image/test-image')
 
 					.set('X-Forwarded-For', uniqueIP)
 
@@ -313,7 +314,7 @@ describe('rate Limiting Integration', () => {
 
 			const response = await request(app.getHttpServer())
 
-				.get('/test/image-processing')
+				.get('/media_stream-image/test-image')
 
 				.set('X-Forwarded-For', uniqueIP)
 
@@ -342,7 +343,7 @@ describe('rate Limiting Integration', () => {
 			for (let i = 0; i < imageLimit; i++) {
 				const response = await request(app.getHttpServer())
 
-					.get('/test/image-processing')
+					.get('/media_stream-image/test-image')
 
 					.set('X-Forwarded-For', uniqueIP)
 
@@ -441,7 +442,7 @@ describe('rate Limiting Integration', () => {
 
 			await request(app.getHttpServer())
 
-				.get('/test/health')
+				.get('/health')
 
 				.set('X-Forwarded-For', uniqueIP)
 

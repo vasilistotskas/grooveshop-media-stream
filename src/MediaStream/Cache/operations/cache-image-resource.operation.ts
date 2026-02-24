@@ -52,7 +52,7 @@ export interface OperationContext {
 export default class CacheImageResourceOperation {
 	private readonly basePath = cwd()
 
-	// Configurable TTL values (loaded from config)
+	// Configurable TTL values in seconds (loaded from config; cache layers expect seconds)
 	private readonly publicTtl: number
 	private readonly privateTtl: number
 	private readonly negativeCacheTtl: number
@@ -297,7 +297,7 @@ export default class CacheImageResourceOperation {
 			// Check negative cache first to avoid repeated failed fetches
 			const negativeCacheKey = `negative:${ctx.id}`
 			const negativeCached = await this.cacheManager.get<{ status: number, timestamp: number }>('image', negativeCacheKey)
-			if (negativeCached && Date.now() - negativeCached.timestamp < this.negativeCacheTtl) {
+			if (negativeCached && Date.now() - negativeCached.timestamp < this.negativeCacheTtl * 1000) {
 				CorrelatedLogger.debug(`Negative cache hit for ${ctx.request.resourceTarget}`, CacheImageResourceOperation.name)
 				throw new UnableToFetchResourceException(ctx.request.resourceTarget)
 			}
@@ -356,7 +356,7 @@ export default class CacheImageResourceOperation {
 			await this.cacheManager.set('image', ctx.id, {
 				data: processedData,
 				metadata,
-			}, metadata.privateTTL)
+			}, this.privateTtl)
 
 			await writeFile(resourcePath, processedData)
 			await writeFile(resourceMetaPath, JSON.stringify(metadata), 'utf8')
@@ -384,7 +384,6 @@ export default class CacheImageResourceOperation {
 		CorrelatedLogger.debug('Processing SVG format', CacheImageResourceOperation.name)
 
 		const resourceTempPath = this.getResourceTempPath(ctx)
-		const resourcePath = this.getResourcePath(ctx)
 		const svgContent = await readFile(resourceTempPath, 'utf8')
 
 		if (!svgContent.toLowerCase().includes('<svg')) {
@@ -413,11 +412,9 @@ export default class CacheImageResourceOperation {
 			CorrelatedLogger.debug('SVG needs resizing, converting to PNG for better quality', CacheImageResourceOperation.name)
 			const result = await this.webpImageManipulationJob.handle(
 				resourceTempPath,
-				resourcePath,
 				resizeOptions,
 			)
 
-			const data = await readFile(resourcePath)
 			const metadata = new ResourceMetaData({
 				version: 1,
 				size: result.size,
@@ -427,23 +424,19 @@ export default class CacheImageResourceOperation {
 				privateTTL: this.privateTtl * 1000,
 			})
 
-			return { data, metadata }
+			return { data: result.buffer, metadata }
 		}
 	}
 
 	private async processRasterImage(ctx: OperationContext): Promise<{ data: Buffer, metadata: ResourceMetaData }> {
 		const resourceTempPath = this.getResourceTempPath(ctx)
-		const resourcePath = this.getResourcePath(ctx)
 
 		const result = await this.webpImageManipulationJob.handle(
 			resourceTempPath,
-			resourcePath,
 			ctx.request.resizeOptions,
 		)
 
-		CorrelatedLogger.debug(`processRasterImage received result: ${JSON.stringify(result)}`, 'CacheImageResourceOperation')
-
-		const data = await readFile(resourcePath)
+		CorrelatedLogger.debug(`processRasterImage received result: ${JSON.stringify({ size: result.size, format: result.format })}`, 'CacheImageResourceOperation')
 
 		const actualFormat = result.format
 		const requestedFormat = ctx.request.resizeOptions?.format
@@ -463,12 +456,11 @@ export default class CacheImageResourceOperation {
 
 		CorrelatedLogger.debug(`processRasterImage created metadata: ${JSON.stringify(metadata)}`, 'CacheImageResourceOperation')
 
-		return { data, metadata }
+		return { data: result.buffer, metadata }
 	}
 
 	private async processDefaultImage(ctx: OperationContext): Promise<{ data: Buffer, metadata: ResourceMetaData }> {
-		const optimizedPath = await this.optimizeAndServeDefaultImage(ctx.request.resizeOptions)
-		const data = await readFile(optimizedPath)
+		const data = await this.optimizeAndServeDefaultImage(ctx.request.resizeOptions)
 		const metadata = new ResourceMetaData({
 			version: 1,
 			size: data.length.toString(),
@@ -486,7 +478,7 @@ export default class CacheImageResourceOperation {
 		return extension || 'unknown'
 	}
 
-	public async optimizeAndServeDefaultImage(resizeOptions: ResizeOptions): Promise<string> {
+	public async optimizeAndServeDefaultImage(resizeOptions: ResizeOptions): Promise<Buffer> {
 		const resizeOptionsWithDefaults: ResizeOptions = {
 			width: resizeOptions.width || 800,
 			height: resizeOptions.height || 600,
@@ -501,15 +493,15 @@ export default class CacheImageResourceOperation {
 		const optionsString = this.createOptionsString(resizeOptionsWithDefaults)
 		const optimizedPath = path.join(this.basePath, 'storage', `default_optimized_${optionsString}.webp`)
 
+		// Check if already cached on disk
 		try {
 			await access(optimizedPath)
-			return optimizedPath
+			return await readFile(optimizedPath)
 		}
 		catch (error: unknown) {
 			if ((error as any).code === 'ENOENT') {
 				const result = await this.webpImageManipulationJob.handle(
 					path.join(this.basePath, 'public', 'default.png'),
-					optimizedPath,
 					resizeOptionsWithDefaults,
 				)
 
@@ -517,7 +509,9 @@ export default class CacheImageResourceOperation {
 					throw new Error('Failed to optimize default image')
 				}
 
-				return optimizedPath
+				// Cache to disk for subsequent requests
+				await writeFile(optimizedPath, result.buffer)
+				return result.buffer
 			}
 			throw error
 		}
@@ -582,7 +576,7 @@ export default class CacheImageResourceOperation {
 				const metadataContent = await readFile(resourceMetaPath, 'utf8')
 				const metadata = new ResourceMetaData(JSON.parse(metadataContent))
 
-				await this.cacheManager.set('image', ctx.id, { data, metadata }, metadata.privateTTL)
+				await this.cacheManager.set('image', ctx.id, { data, metadata }, this.privateTtl)
 
 				CorrelatedLogger.debug(`Resource retrieved from filesystem and cached: ${ctx.id}`, CacheImageResourceOperation.name)
 				const duration = PerformanceTracker.endPhase('get_cached_resource')

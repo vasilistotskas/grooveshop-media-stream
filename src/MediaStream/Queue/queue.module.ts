@@ -7,6 +7,7 @@ import { ConfigModule } from '../Config/config.module.js'
 import { CorrelationModule } from '../Correlation/correlation.module.js'
 import { HttpModule } from '../HTTP/http.module.js'
 import { JobQueueHealthIndicator } from './indicators/job-queue-health.indicator.js'
+import WebpImageManipulationJob from './jobs/webp-image-manipulation.job.js'
 import { CacheOperationsProcessor } from './processors/cache-operations.processor.js'
 import { ImageProcessingProcessor } from './processors/image-processing.processor.js'
 import { BullQueueService } from './services/bull-queue.service.js'
@@ -65,6 +66,7 @@ import { SharpConfigService } from './services/sharp-config.service.js'
 	],
 	providers: [
 		SharpConfigService, // ✅ Centralized Sharp configuration
+		WebpImageManipulationJob,
 		BullQueueService,
 		JobQueueManager,
 		ImageProcessingProcessor,

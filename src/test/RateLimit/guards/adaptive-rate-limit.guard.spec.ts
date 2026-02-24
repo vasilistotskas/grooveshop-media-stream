@@ -13,7 +13,7 @@ describe('adaptiveRateLimitGuard', () => {
 	let metricsService: MockedObject<MetricsService>
 
 	const mockRequest = {
-		url: '/api/v1/image/media/uploads/test.jpg/100/100/contain/entropy/transparent/5/webp/100',
+		url: '/media_stream-image/media/uploads/test.jpg/100/100/contain/entropy/transparent/5/80.webp',
 		method: 'GET',
 		headers: {
 			'user-agent': 'Mozilla/5.0 (Test Browser)',
@@ -256,8 +256,8 @@ describe('adaptiveRateLimitGuard', () => {
 
 		it('should identify different request types correctly', async () => {
 			const testCases = [
-				{ url: '/api/v1/image/media/uploads/test.jpg/100/100/contain/entropy/transparent/5/webp/100', expectedType: 'image-processing' },
-				{ url: '/api/v1/image/static/images/test.jpg/100/100/contain/entropy/transparent/5/webp/100', expectedType: 'image-processing' },
+				{ url: '/media_stream-image/media/uploads/test.jpg/100/100/contain/entropy/transparent/5/80.webp', expectedType: 'image-processing' },
+				{ url: '/media_stream-image/static/images/test.jpg/100/100/contain/entropy/transparent/5/80.webp', expectedType: 'image-processing' },
 				{ url: '/health', expectedType: 'health-check' },
 				{ url: '/api/v1/other', expectedType: 'get-default' },
 			]

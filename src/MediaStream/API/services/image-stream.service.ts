@@ -281,11 +281,12 @@ export class ImageStreamService {
 		correlationId: string,
 	): Promise<void> {
 		try {
-			const optimizedPath = await this.cacheImageResourceOperation.optimizeAndServeDefaultImage(
+			const imageBuffer = await this.cacheImageResourceOperation.optimizeAndServeDefaultImage(
 				request.resizeOptions,
 			)
 			res.header('X-Correlation-ID', correlationId)
-			res.sendFile(optimizedPath)
+			res.header('Content-Type', `image/${request.resizeOptions.format || 'webp'}`)
+			res.send(imageBuffer)
 		}
 		catch (error: unknown) {
 			const errorMessage = error instanceof Error ? error.message : String(error)

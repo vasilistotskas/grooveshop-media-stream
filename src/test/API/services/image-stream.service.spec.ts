@@ -22,6 +22,7 @@ function createMockResponse(): any {
 		status: vi.fn().mockReturnThis(),
 		header: vi.fn().mockReturnThis(),
 		end: vi.fn().mockReturnThis(),
+		send: vi.fn().mockReturnThis(),
 		sendFile: vi.fn().mockReturnThis(),
 		on: vi.fn(),
 		headersSent: false,
@@ -84,7 +85,7 @@ describe('imageStreamService', () => {
 			execute: vi.fn().mockResolvedValue(undefined),
 			getCachedResource: vi.fn().mockResolvedValue(null),
 			getResourcePath: vi.fn().mockReturnValue('/storage/test-resource.webp'),
-			optimizeAndServeDefaultImage: vi.fn().mockResolvedValue('/public/default.png'),
+			optimizeAndServeDefaultImage: vi.fn().mockResolvedValue(Buffer.from('default-image-data')),
 		} as any
 
 		mockMetricsService = {
@@ -207,7 +208,7 @@ describe('imageStreamService', () => {
 			await service.processAndStream(context, request, res)
 
 			expect(mockCacheOp.optimizeAndServeDefaultImage).toHaveBeenCalled()
-			expect(res.sendFile).toHaveBeenCalled()
+			expect(res.send).toHaveBeenCalled()
 		})
 
 		it('should record error metrics on failure', async () => {

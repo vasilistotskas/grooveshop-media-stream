@@ -105,6 +105,7 @@ describe('cacheImageResourceOperation', () => {
 		vi.spyOn(mockWebpImageManipulationJob, 'handle').mockResolvedValue({
 			format: 'webp',
 			size: '1000',
+			buffer: Buffer.from('optimized-image-data'),
 		} as ManipulationJobResult)
 
 		mockValidateCacheImageRequestRule = {
@@ -492,7 +493,6 @@ describe('cacheImageResourceOperation', () => {
 			expect(result).toBeDefined()
 			expect(mockWebpImageManipulationJob.handle).toHaveBeenCalledWith(
 				path.normalize(path.join(mockCwd, 'public', 'default.png')),
-				expect.any(String),
 				expect.objectContaining({
 					width: 100,
 					height: 100,

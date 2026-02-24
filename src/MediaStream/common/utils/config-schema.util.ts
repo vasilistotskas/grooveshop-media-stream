@@ -115,9 +115,9 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	'cache.warming.warmupCron': { env: 'CACHE_WARMING_CRON', default: '0 */6 * * *', type: 'string' },
 	'cache.warming.popularImageThreshold': { env: 'CACHE_WARMING_THRESHOLD', default: 5, type: 'number' },
 
-	// Image TTL configuration
-	'cache.image.publicTtl': { env: 'CACHE_IMAGE_PUBLIC_TTL', default: 12 * 30 * 24 * 60 * 60 * 1000, type: 'number' },
-	'cache.image.privateTtl': { env: 'CACHE_IMAGE_PRIVATE_TTL', default: 6 * 30 * 24 * 60 * 60 * 1000, type: 'number' },
+	// Image TTL configuration (in seconds — cache layers expect seconds)
+	'cache.image.publicTtl': { env: 'CACHE_IMAGE_PUBLIC_TTL', default: 12 * 30 * 24 * 3600, type: 'number' },
+	'cache.image.privateTtl': { env: 'CACHE_IMAGE_PRIVATE_TTL', default: 6 * 30 * 24 * 3600, type: 'number' },
 
 	// Processing configuration
 	'processing.maxConcurrent': { env: 'PROCESSING_MAX_CONCURRENT', default: 10, type: 'number' },

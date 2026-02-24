@@ -15,6 +15,7 @@ vi.mock('ioredis', () => {
 			connect: vi.fn().mockResolvedValue(undefined),
 			quit: vi.fn().mockResolvedValue('OK'),
 			get: vi.fn(),
+			getBuffer: vi.fn(),
 			set: vi.fn().mockResolvedValue('OK'),
 			setex: vi.fn().mockResolvedValue('OK'),
 			del: vi.fn().mockResolvedValue(1),
@@ -176,17 +177,17 @@ describe('redisCacheService', () => {
 		describe('get', () => {
 			it('should get value from Redis and parse JSON', async () => {
 				const testValue = { test: 'data', number: 42 }
-				mockRedis.get.mockResolvedValue(JSON.stringify(testValue))
+				mockRedis.getBuffer.mockResolvedValue(Buffer.from(JSON.stringify(testValue)))
 
 				const result = await service.get<typeof testValue>('test-key')
 
-				expect(mockRedis.get).toHaveBeenCalledWith('test-key')
+				expect(mockRedis.getBuffer).toHaveBeenCalledWith('test-key')
 				expect(result).toEqual(testValue)
 				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'redis', 'hit')
 			})
 
 			it('should return null when key does not exist', async () => {
-				mockRedis.get.mockResolvedValue(null)
+				mockRedis.getBuffer.mockResolvedValue(null)
 
 				const result = await service.get('non-existent-key')
 
@@ -195,7 +196,7 @@ describe('redisCacheService', () => {
 			})
 
 			it('should handle Redis errors gracefully', async () => {
-				mockRedis.get.mockRejectedValue(new Error('Redis connection failed'))
+				mockRedis.getBuffer.mockRejectedValue(new Error('Redis connection failed'))
 
 				const result = await service.get('test-key')
 
@@ -212,8 +213,44 @@ describe('redisCacheService', () => {
 				const result = await service.get('test-key')
 
 				expect(result).toBeNull()
-				expect(mockRedis.get).not.toHaveBeenCalled()
+				expect(mockRedis.getBuffer).not.toHaveBeenCalled()
 				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'redis', 'miss')
+			})
+
+			it('should deserialize binary format with Buffer data', async () => {
+				const imageData = Buffer.from('fake-image-binary-data')
+				const metadata = { metadata: { format: 'webp', size: '100' } }
+				const metaJson = Buffer.from(JSON.stringify(metadata), 'utf8')
+
+				// Build binary format: [0x00][4 bytes meta length][meta JSON][binary data]
+				const header = Buffer.alloc(5)
+				header[0] = 0x00
+				header.writeUInt32BE(metaJson.length, 1)
+				const stored = Buffer.concat([header, metaJson, imageData])
+
+				mockRedis.getBuffer.mockResolvedValue(stored)
+
+				const result = await service.get<{ data: Buffer, metadata: any }>('image-key')
+
+				expect(result).not.toBeNull()
+				expect(Buffer.isBuffer(result!.data)).toBe(true)
+				expect(result!.data).toEqual(imageData)
+				expect(result!.metadata).toEqual(metadata.metadata)
+			})
+
+			it('should handle legacy base64 format for backward compatibility', async () => {
+				const imageData = Buffer.from('legacy-image-data')
+				const legacyValue = JSON.stringify({
+					data: { type: 'Buffer', data: imageData.toString('base64') },
+					metadata: { format: 'webp' },
+				})
+				mockRedis.getBuffer.mockResolvedValue(Buffer.from(legacyValue))
+
+				const result = await service.get<{ data: Buffer, metadata: any }>('legacy-key')
+
+				expect(result).not.toBeNull()
+				expect(Buffer.isBuffer(result!.data)).toBe(true)
+				expect(result!.data).toEqual(imageData)
 			})
 		})
 
@@ -224,7 +261,12 @@ describe('redisCacheService', () => {
 
 				await service.set('test-key', testValue, ttl)
 
-				expect(mockRedis.setex).toHaveBeenCalledWith('test-key', ttl, JSON.stringify(testValue))
+				expect(mockRedis.set).toHaveBeenCalledWith(
+					'test-key',
+					expect.any(Buffer),
+					'EX',
+					ttl,
+				)
 				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('set', 'redis', 'success')
 			})
 
@@ -233,7 +275,12 @@ describe('redisCacheService', () => {
 
 				await service.set('test-key', testValue)
 
-				expect(mockRedis.setex).toHaveBeenCalledWith('test-key', mockConfig.ttl, JSON.stringify(testValue))
+				expect(mockRedis.set).toHaveBeenCalledWith(
+					'test-key',
+					expect.any(Buffer),
+					'EX',
+					mockConfig.ttl,
+				)
 				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('set', 'redis', 'success')
 			})
 
@@ -242,12 +289,12 @@ describe('redisCacheService', () => {
 
 				await service.set('test-key', testValue, 0)
 
-				expect(mockRedis.set).toHaveBeenCalledWith('test-key', JSON.stringify(testValue))
+				expect(mockRedis.set).toHaveBeenCalledWith('test-key', expect.any(Buffer))
 				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('set', 'redis', 'success')
 			})
 
 			it('should handle Redis errors', async () => {
-				mockRedis.setex.mockRejectedValue(new Error('Redis connection failed'))
+				mockRedis.set.mockRejectedValue(new Error('Redis connection failed'))
 
 				// The service should handle errors gracefully and not throw
 				await service.set('test-key', { test: 'data' })
@@ -262,8 +309,23 @@ describe('redisCacheService', () => {
 
 				await service.set('test-key', { test: 'data' })
 
-				expect(mockRedis.setex).not.toHaveBeenCalled()
 				expect(mockRedis.set).not.toHaveBeenCalled()
+			})
+
+			it('should use binary format for values with Buffer data', async () => {
+				const imageData = Buffer.from('test-image-binary')
+				const value = { data: imageData, metadata: { format: 'webp' } }
+
+				await service.set('image-key', value, 3600)
+
+				expect(mockRedis.set).toHaveBeenCalled()
+				const storedBuffer = mockRedis.set.mock.calls[0][1] as Buffer
+				// Binary format starts with 0x00 marker
+				expect(storedBuffer[0]).toBe(0x00)
+				// Verify it doesn't contain base64 (no bloat)
+				expect(storedBuffer.length).toBeLessThan(
+					Buffer.from(JSON.stringify({ data: { type: 'Buffer', data: imageData.toString('base64') }, metadata: { format: 'webp' } })).length,
+				)
 			})
 		})
 
@@ -385,11 +447,11 @@ describe('redisCacheService', () => {
 				})
 
 				// Simulate some cache operations to generate stats
-				mockRedis.get.mockResolvedValueOnce(null) // miss
+				mockRedis.getBuffer.mockResolvedValueOnce(null) // miss
 				await service.get('key1')
-				mockRedis.get.mockResolvedValueOnce(JSON.stringify({ test: 'data' })) // hit
+				mockRedis.getBuffer.mockResolvedValueOnce(Buffer.from(JSON.stringify({ test: 'data' }))) // hit
 				await service.get('key2')
-				mockRedis.get.mockResolvedValueOnce(JSON.stringify({ test: 'data2' })) // hit
+				mockRedis.getBuffer.mockResolvedValueOnce(Buffer.from(JSON.stringify({ test: 'data2' }))) // hit
 				await service.get('key3')
 
 				const stats = await service.getStats()

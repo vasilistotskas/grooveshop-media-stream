@@ -4,20 +4,20 @@ import { Buffer } from 'node:buffer'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { cwd, hrtime } from 'node:process'
+import { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
 import { MAX_FILE_SIZES } from '#microservice/common/constants/image-limits.constant'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
+import WebpImageManipulationJob from '#microservice/Queue/jobs/webp-image-manipulation.job'
 import { Injectable, Logger } from '@nestjs/common'
-import sharp from 'sharp'
 
 /**
  * Processes image jobs from the queue.
- *
- * NOTE: Sharp configuration is now centralized in SharpConfigService.
- * This ensures consistent settings across all image processing operations.
+ * Delegates Sharp processing to WebpImageManipulationJob for consistent
+ * format settings across sync and queue pipelines.
  */
 @Injectable()
 export class ImageProcessingProcessor {
@@ -33,13 +33,11 @@ export class ImageProcessingProcessor {
 		private readonly httpClient: HttpClientService,
 		private readonly cacheManager: MultiLayerCacheManager,
 		private readonly configService: ConfigService,
+		private readonly imageManipulationJob: WebpImageManipulationJob,
 	) {
-		// Load TTL values from configuration
-		this.publicTtl = this.configService.getOptional('cache.image.publicTtl', 12 * 30 * 24 * 60 * 60 * 1000)
-		this.privateTtl = this.configService.getOptional('cache.image.privateTtl', 6 * 30 * 24 * 60 * 60 * 1000)
-
-		// Sharp configuration is now handled by SharpConfigService
-		// This ensures consistent settings across all image processing operations
+		// Load TTL values from configuration (in seconds — cache layers expect seconds)
+		this.publicTtl = this.configService.getOptional('cache.image.publicTtl', 12 * 30 * 24 * 3600)
+		this.privateTtl = this.configService.getOptional('cache.image.privateTtl', 6 * 30 * 24 * 3600)
 	}
 
 	async process(job: Job<ImageProcessingJobData>): Promise<JobResult> {
@@ -85,32 +83,35 @@ export class ImageProcessingProcessor {
 
 					await this.updateProgress(job, 50, 'Processing image')
 
-					const processedBuffer = await this.processImage(imageBuffer, {
+					const resizeOptions = new ResizeOptions({
 						width: width ? Number(width) : undefined,
 						height: height ? Number(height) : undefined,
 						quality: quality ? Number(quality) : undefined,
-						format,
-						fit,
-						position,
-						background,
+						format: format as any,
+						fit: fit as any,
+						position: position as any,
+						background: background as any,
 						trimThreshold: trimThreshold ? Number(trimThreshold) : undefined,
 					})
+
+					const result = await this.imageManipulationJob.handleBuffer(imageBuffer, resizeOptions)
+					const processedBuffer = result.buffer
 
 					await this.updateProgress(job, 75, 'Caching result')
 
 					const metadata = new ResourceMetaData({
 						version: 1,
 						size: processedBuffer.length.toString(),
-						format: format || 'webp',
+						format: result.format || 'webp',
 						dateCreated: Date.now(),
-						publicTTL: this.publicTtl,
-						privateTTL: this.privateTtl,
+						publicTTL: this.publicTtl * 1000,
+						privateTTL: this.privateTtl * 1000,
 					})
 
 					await this.cacheManager.set('image', cacheKey, {
 						data: processedBuffer,
 						metadata,
-					}, metadata.privateTTL)
+					}, this.privateTtl)
 
 					const basePath = cwd()
 					const resourcePath = join(basePath, 'storage', `${cacheKey}.rsc`)
@@ -214,124 +215,8 @@ export class ImageProcessingProcessor {
 		}
 	}
 
-	/**
-	 * Process image with proper memory management
-	 * Uses Sharp's built-in memory management instead of manual GC
-	 */
-	private async processImage(
-		buffer: Buffer,
-		options: {
-			width?: number
-			height?: number
-			quality?: number
-			format?: string
-			fit?: string
-			position?: string
-			background?: any
-			trimThreshold?: number
-		},
-	): Promise<Buffer> {
-		let pipeline: sharp.Sharp | null = null
-		try {
-			// Create pipeline with memory limit
-			pipeline = sharp(buffer, {
-				limitInputPixels: 268402689, // ~16K x 16K pixels max
-				sequentialRead: true, // Better memory usage for large images
-			})
-
-			if (options.trimThreshold !== undefined && options.trimThreshold > 0) {
-				pipeline = pipeline.trim({
-					background: options.background,
-					threshold: options.trimThreshold,
-				})
-			}
-
-			if (options.width || options.height) {
-				const resizeOptions: any = {}
-
-				if (options.width)
-					resizeOptions.width = options.width
-				if (options.height)
-					resizeOptions.height = options.height
-				if (options.fit)
-					resizeOptions.fit = options.fit
-				if (options.position)
-					resizeOptions.position = options.position
-				if (options.background)
-					resizeOptions.background = options.background
-
-				this._logger.debug('Applying Sharp resize with options:', resizeOptions)
-				pipeline = pipeline.resize(resizeOptions)
-			}
-
-			const qual = options.quality || 80
-
-			switch (options.format) {
-				case 'webp':
-					pipeline = pipeline.webp({
-						quality: qual,
-						smartSubsample: true,
-						effort: 4, // Balance between speed and compression
-					})
-					break
-				case 'jpeg':
-				case 'jpg':
-					pipeline = pipeline.jpeg({
-						quality: qual,
-						progressive: true,
-						mozjpeg: true,
-						trellisQuantisation: true,
-						overshootDeringing: true,
-					})
-					break
-				case 'png':
-					pipeline = pipeline.png({
-						quality: qual,
-						adaptiveFiltering: true,
-						palette: qual < 95,
-						compressionLevel: 6, // Balance between speed and size
-					})
-					break
-				case 'avif':
-					// AVIF quality capped at 75 for performance
-					pipeline = pipeline.avif({
-						quality: Math.min(qual, 75),
-						chromaSubsampling: '4:2:0',
-						effort: 4, // Balance between speed and compression
-					})
-					break
-				default:
-					pipeline = pipeline.webp({
-						quality: qual,
-						smartSubsample: true,
-					})
-					break
-			}
-
-			// Process and get result
-			const result = await pipeline
-				.withMetadata({ density: 72 })
-				.toBuffer()
-
-			return result
-		}
-		finally {
-			// Always destroy pipeline to free memory
-			if (pipeline) {
-				try {
-					pipeline.destroy()
-				}
-				catch {
-					// Ignore destroy errors
-				}
-			}
-		}
-	}
-
 	private async updateProgress(job: Job, progress: number, message: string): Promise<void> {
 		try {
-			// Note: This would need to be implemented based on the actual Bull job instance
-			// For now, we'll just log the progress
 			this._logger.debug(`Job ${job.id} progress: ${progress}% - ${message}`)
 		}
 		catch (error: unknown) {

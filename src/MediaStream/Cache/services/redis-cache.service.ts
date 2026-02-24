@@ -97,7 +97,8 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 
 		try {
 			this.stats.operations++
-			const value = await this.redis.get(key)
+			// Use getBuffer to handle both binary and string values
+			const value = await this.redis.getBuffer(key)
 
 			if (value === null) {
 				this.stats.misses++
@@ -134,7 +135,7 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			const effectiveTtl = ttl !== undefined ? ttl : defaultTtl
 
 			if (effectiveTtl > 0) {
-				await this.redis.setex(key, effectiveTtl, serializedValue)
+				await this.redis.set(key, serializedValue, 'EX', effectiveTtl)
 			}
 			else {
 				await this.redis.set(key, serializedValue)
@@ -371,25 +372,50 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 	}
 
 	/**
-	 * Serialize value for Redis storage, handling Buffers properly
+	 * Binary format marker byte (0x00 is not valid JSON start).
+	 * Format: [0x00][4 bytes: metadata JSON length][metadata JSON][raw binary data]
 	 */
-	private serializeValue<T>(value: T): string {
-		return JSON.stringify(value, (_key, val) => {
-			if (Buffer.isBuffer(val)) {
-				return {
-					type: 'Buffer',
-					data: val.toString('base64'),
-				}
-			}
-			return val
-		})
+	private static readonly BINARY_MARKER = 0x00
+
+	/**
+	 * Serialize value for Redis storage.
+	 * For objects containing Buffer data, uses compact binary format (no base64 overhead).
+	 * For other values, uses plain JSON.
+	 */
+	private serializeValue<T>(value: T): Buffer {
+		if (value && typeof value === 'object' && 'data' in (value as any) && Buffer.isBuffer((value as any).data)) {
+			const { data, ...rest } = value as any
+			const metaJson = Buffer.from(JSON.stringify(rest), 'utf8')
+			const header = Buffer.alloc(5)
+			header[0] = RedisCacheService.BINARY_MARKER
+			header.writeUInt32BE(metaJson.length, 1)
+			return Buffer.concat([header, metaJson, data])
+		}
+		return Buffer.from(JSON.stringify(value), 'utf8')
 	}
 
 	/**
-	 * Deserialize value from Redis storage, reconstructing Buffers properly
+	 * Deserialize value from Redis storage.
+	 * Handles three formats:
+	 * 1. Binary format (0x00 prefix) — new compact format
+	 * 2. Legacy JSON with base64-encoded Buffers — backward compatible
+	 * 3. Plain JSON for non-binary values
 	 */
-	private deserializeValue<T>(value: string): T {
-		return JSON.parse(value, (_key, val) => {
+	private deserializeValue<T>(value: Buffer): T {
+		// Check for binary format marker
+		if (value.length >= 5 && value[0] === RedisCacheService.BINARY_MARKER) {
+			const metaLength = value.readUInt32BE(1)
+			if (metaLength > 0 && 5 + metaLength <= value.length) {
+				const metaJson = value.toString('utf8', 5, 5 + metaLength)
+				const rest = JSON.parse(metaJson)
+				const data = Buffer.from(value.subarray(5 + metaLength))
+				return { ...rest, data } as T
+			}
+		}
+
+		// Fall back to JSON parsing (handles legacy base64 format and plain objects)
+		const str = value.toString('utf8')
+		return JSON.parse(str, (_key, val) => {
 			if (val && typeof val === 'object' && val.type === 'Buffer' && typeof val.data === 'string') {
 				return Buffer.from(val.data, 'base64')
 			}
