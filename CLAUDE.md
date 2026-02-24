@@ -40,12 +40,12 @@ All source code lives under `src/MediaStream/`. Each domain is a NestJS module:
 
 - **API** — Controllers, DTOs, image source config, request validation, URL building, image streaming
 - **Cache** — Multi-layer caching (Memory → Redis → File), cache warming, eviction strategies
-- **Config** — Centralized config service wrapping `@nestjs/config`, schema-based validation
+- **Config** — Centralized config service wrapping `@nestjs/config`, schema-based validation, hot-reload for selected keys
 - **Correlation** — Request correlation IDs, timing middleware, performance tracking
 - **Health** — Health check indicators (disk, memory, Sharp, cache, HTTP, storage)
 - **HTTP** — HTTP client with circuit breaker pattern
 - **Metrics** — Prometheus metrics via prom-client (prefixed `mediastream_`), tracks HTTP requests, image processing, cache ops, system resources
-- **Monitoring** — System monitoring, alerting, performance tracking
+- **Monitoring** — System monitoring, alert rule engine with cooldowns, performance tracking
 - **Queue** — Bull/Redis job queue for background image processing
 - **RateLimit** — Adaptive rate limiting guard
 - **Storage** — File storage management, cleanup, intelligent eviction
@@ -63,19 +63,24 @@ Defined in `src/MediaStream/API/config/image-sources.config.ts`. Each source map
 
 ### Multi-Layer Cache
 
-Cache layers checked in order: Memory (node-cache) → Redis (ioredis) → File system (`./storage`). Automatic backfill to higher-priority layers on cache hits. Cache warming runs on a cron schedule for popular images. Storage files use extensions: `.rsc` (resource data), `.rst` (temp during write), `.rsm` (metadata JSON).
+Cache layers checked in parallel: Memory (node-cache, priority 1) → Redis (ioredis, priority 2) → File system (`./storage`, priority 3). Returns first hit from highest-priority layer. Automatic backfill to higher-priority layers on cache hits (fire-and-forget). Cache warming runs every 6 hours for popular images (5+ accesses). Storage files use extensions: `.rsc` (resource data), `.rst` (temp during write), `.rsm` (metadata JSON). Cache TTLs: public 360 days, private 180 days, negative cache 5 min for failed fetches.
 
 ### Processing Pipeline
 
 - **Two Bull queues**: `image-processing` (download → validate → Sharp → cache → filesystem) and `cache-operations` (warming, cleanup). Default: 3 attempts with exponential backoff.
-- **Sync vs background**: Images >1MP or quality >=90 are processed in background queue; smaller images are processed synchronously.
+- **Sync vs background**: Images >1MP (1,000,000 pixels) are processed in background queue; quality >=90 with >500K pixels also goes to background. Smaller images are processed synchronously.
 - **Content negotiation**: Format priority from Accept header: AVIF > WebP > JPEG > PNG. Explicit URL format param overrides.
 - **Sharp config**: Concurrency based on CPU cores, 100MB memory cache, SIMD enabled. AVIF falls back to WebP for images >1920x1080.
 - **Image limits**: Max 8192x8192, max 7680×4320 total pixels. File sizes: JPEG 5MB, PNG 8MB, WebP 3MB, GIF 2MB, SVG 1MB, default 10MB.
 
+### Additional Endpoints
+
+- `GET /config/image-sources` — Returns image source configuration, enums (fit, position, background, format), and defaults
+- `GET /metrics` — Prometheus-format metrics, `GET /metrics/health` — Metrics service health
+
 ### Health Endpoints
 
-`GET /health` (full), `/health/detailed` (system info), `/health/ready` (lightweight), `/health/live` (liveness), `/health/circuit-breaker` (status), `POST /health/circuit-breaker/reset`.
+`GET /health` (full), `/health/detailed` (system info), `/health/ready` (lightweight), `/health/live` (liveness), `/health/circuit-breaker` (status), `POST /health/circuit-breaker/reset`. Health indicators: disk space, memory, Sharp, cache, Redis, HTTP, storage, alerting, system, job queue.
 
 ### Security
 
@@ -87,28 +92,29 @@ Cache layers checked in order: Memory (node-cache) → Redis (ioredis) → File 
 ### Request Context & Observability
 
 - **AsyncLocalStorage** propagates correlation IDs across async boundaries without explicit parameter passing. `CorrelatedLogger` auto-includes correlation IDs in all log output.
-- **Middleware order**: Graceful shutdown check (503 if shutting down) → Correlation ID → Timing headers (`x-response-time`) → Metrics collection
+- **Middleware order**: Graceful shutdown check (503 if shutting down) → Correlation ID (`x-correlation-id`) → Timing headers (`x-response-time`, `x-request-start`, `x-request-end`) → Metrics collection
 - **Route normalization** in metrics: `/123` → `/:id`, UUID patterns → `/:uuid`, ObjectId → `/:objectId` to prevent cardinality explosion
 - **Global exception filter**: All errors enriched with correlationId, consistent JSON structure with timestamp/path/method/context
 - **Performance tracking**: `@PerformanceTracker.measureMethod()` decorator for automatic method timing, slow operation warnings (>1000ms)
 
 ### Graceful Shutdown
 
-Two-tier timeout: soft (30s) waits for active requests, force (60s) calls `process.exit(1)`. New requests get 503 during shutdown. Active request tracking via middleware counter.
+Two-tier timeout: soft (30s) waits for active requests, force (60s) calls `process.exit(1)`. New requests get 503 during shutdown. Active request tracking via WeakSet to prevent double-counting. Signal handlers for SIGTERM and SIGINT.
 
 ### Storage Eviction & Optimization
 
-Five eviction strategies: LRU, LFU, size-based, age-based, and **intelligent** (combines access patterns, preserves files with 5+ accesses). Access-weighted cache TTL: `baseTtl × (1 + min(accessCount/10, 5))` — popular files get up to 6x longer lifetime. Storage optimization (compression, deduplication via MD5 hard-linking) runs every 6 hours.
+Five eviction strategies: LRU, LFU, size-based, age-based, and **intelligent** (combines access patterns, preserves files with 5+ accesses). Configurable aggressiveness: conservative (0.8x), moderate (1.0x), aggressive (1.5x). Access-weighted cache TTL: `baseTtl × (1 + min(accessCount/10, 5))` — popular files get up to 6x longer lifetime. Default retention policies: old cache files (30d), large images (7d, 100MB max), temp files (1d). Storage optimization (compression, deduplication via MD5 hard-linking) runs every 6 hours. `StorageCleanupService` runs daily at 2 AM with dry-run support.
 
 ### Utility Scripts
 
 - `scripts/analyze-imports.cjs` — Detects internal imports using `#microservice` alias that should use relative paths
 - `scripts/fix-imports.cjs` — Auto-converts internal imports to relative paths
-- `scripts/clear-cache.cjs` — Clears Redis + file system cache
+- `scripts/clear-cache.cjs` — Clears Redis + file system cache (supports `--redis-only`, `--files-only`, custom host/port)
+- `scripts/inject-version.cjs` — Injects `package.json` version into `public/index.html` (runs as `prebuild`)
 
 ### Key Environment Variables
 
-Copy `.env.example` to `.env`. Critical ones: `PORT` (default 3003), `BACKEND_URL` (upstream image server), `REDIS_HOST`/`REDIS_PORT` (required for queue and cache).
+Copy `.env.example` to `.env`. Critical ones: `PORT` (default 3003), `BACKEND_URL` (upstream image server), `REDIS_HOST`/`REDIS_PORT` (required for queue and cache). See `.env.example` for full list including memory cache, file cache, processing, monitoring, and rate limit configuration.
 
 ## Code Style
 
