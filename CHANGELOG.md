@@ -1,3 +1,25 @@
+# [2.36.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.35.0...v2.36.0) (2026-02-25)
+
+
+### Bug Fixes
+
+* **ci:** Bump Versions ([29c32c6](https://github.com/vasilistotskas/grooveshop-media-stream/commit/29c32c6a04728d3a1952b2b328eeb592292a3ffe))
+* **ci:** remove always-auth to prevent 403 on npm registry ([d29bcfe](https://github.com/vasilistotskas/grooveshop-media-stream/commit/d29bcfe20bf794ce397bda16fd099adf3d2c2eb8))
+* **config:** harden transforms and fix nested validation errors ([6edcc94](https://github.com/vasilistotskas/grooveshop-media-stream/commit/6edcc941192ad74a3a917581eb3e50748032017e))
+* harden cache, security, and reliability across modules ([06cd02b](https://github.com/vasilistotskas/grooveshop-media-stream/commit/06cd02bd32713b72e7e03c29b45fb17cf954273b))
+* Packages ([7cba643](https://github.com/vasilistotskas/grooveshop-media-stream/commit/7cba643e62f570762109f84debb480c6f556be58))
+
+
+### Features
+
+* Bump Versions ([604a59d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/604a59d42d18914123b5c632d3773757cfdca9bb))
+* Claude ([23d2fd4](https://github.com/vasilistotskas/grooveshop-media-stream/commit/23d2fd4a9f4f5f0807cec1e81ee32cdfd86dbb6b))
+
+
+### Performance Improvements
+
+* optimize cache and image processing pipeline ([50719b6](https://github.com/vasilistotskas/grooveshop-media-stream/commit/50719b6da174275695edbec3384eb8781336854e))
+
 # [2.35.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.34.0...v2.35.0) (2026-02-24)
 
 
