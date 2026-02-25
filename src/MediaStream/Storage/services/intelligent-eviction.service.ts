@@ -62,7 +62,6 @@ export class IntelligentEvictionService {
 				IntelligentEvictionService.name,
 			)
 
-			await this.storageMonitoring.getStorageStats()
 			const candidates = await this.storageMonitoring.getEvictionCandidates(targetSize)
 
 			if (candidates.length === 0) {

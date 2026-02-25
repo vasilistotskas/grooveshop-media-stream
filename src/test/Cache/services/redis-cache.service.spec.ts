@@ -23,6 +23,7 @@ vi.mock('ioredis', () => {
 			flushall: vi.fn().mockResolvedValue('OK'),
 			exists: vi.fn(),
 			keys: vi.fn().mockResolvedValue(['key1', 'key2']),
+			scan: vi.fn().mockResolvedValue(['0', []]),
 			ping: vi.fn().mockResolvedValue('PONG'),
 			ttl: vi.fn().mockResolvedValue(3600),
 			expire: vi.fn().mockResolvedValue(1),
@@ -357,15 +358,33 @@ describe('redisCacheService', () => {
 		})
 
 		describe('clear', () => {
-			it('should flush current database', async () => {
+			it('should delete image keys using SCAN + DEL', async () => {
+				// Simulate SCAN returning some image keys, then cursor '0' to end
+				mockRedis.scan
+					.mockResolvedValueOnce(['42', ['image:key1', 'image:key2']])
+					.mockResolvedValueOnce(['0', ['image:key3']])
+
 				await service.clear()
 
-				expect(mockRedis.flushdb).toHaveBeenCalled()
+				expect(mockRedis.scan).toHaveBeenCalledWith('0', 'MATCH', 'image:*', 'COUNT', 100)
+				expect(mockRedis.scan).toHaveBeenCalledWith('42', 'MATCH', 'image:*', 'COUNT', 100)
+				expect(mockRedis.del).toHaveBeenCalledWith('image:key1', 'image:key2')
+				expect(mockRedis.del).toHaveBeenCalledWith('image:key3')
+				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('clear', 'redis', 'success')
+			})
+
+			it('should handle empty SCAN result', async () => {
+				mockRedis.scan.mockResolvedValueOnce(['0', []])
+
+				await service.clear()
+
+				expect(mockRedis.scan).toHaveBeenCalledWith('0', 'MATCH', 'image:*', 'COUNT', 100)
+				expect(mockRedis.del).not.toHaveBeenCalled()
 				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('clear', 'redis', 'success')
 			})
 
 			it('should handle Redis errors', async () => {
-				mockRedis.flushdb.mockRejectedValue(new Error('Redis connection failed'))
+				mockRedis.scan.mockRejectedValue(new Error('Redis connection failed'))
 
 				await expect(service.clear()).rejects.toThrow('Redis connection failed')
 				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('clear', 'redis', 'error')
@@ -400,18 +419,20 @@ describe('redisCacheService', () => {
 		})
 
 		describe('keys', () => {
-			it('should return all keys', async () => {
-				const mockKeys = ['key1', 'key2', 'key3']
-				mockRedis.keys.mockResolvedValue(mockKeys)
+			it('should return all keys using SCAN iteration', async () => {
+				mockRedis.scan
+					.mockResolvedValueOnce(['42', ['key1', 'key2']])
+					.mockResolvedValueOnce(['0', ['key3']])
 
 				const result = await service.keys()
 
-				expect(result).toEqual(mockKeys)
-				expect(mockRedis.keys).toHaveBeenCalledWith('*')
+				expect(result).toEqual(['key1', 'key2', 'key3'])
+				expect(mockRedis.scan).toHaveBeenCalledWith('0', 'COUNT', 100)
+				expect(mockRedis.scan).toHaveBeenCalledWith('42', 'COUNT', 100)
 			})
 
 			it('should return empty array on Redis errors', async () => {
-				mockRedis.keys.mockRejectedValue(new Error('Redis connection failed'))
+				mockRedis.scan.mockRejectedValue(new Error('Redis connection failed'))
 
 				const result = await service.keys()
 

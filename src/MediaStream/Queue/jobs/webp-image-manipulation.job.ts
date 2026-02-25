@@ -94,9 +94,8 @@ export default class WebpImageManipulationJob {
 				return result
 			}
 
-			// SVG that needs resizing → convert to PNG
+			// SVG that needs resizing → resize first, then convert to PNG
 			const manipulation = sharp(filePathFrom)
-			manipulation.png({ quality: options.quality })
 
 			const resizeScales: { width?: number, height?: number } = {}
 			if (options.width !== null && !Number.isNaN(options.width) && options.width > 0) {
@@ -115,6 +114,9 @@ export default class WebpImageManipulationJob {
 				})
 			}
 
+			// Format conversion last
+			manipulation.png({ quality: options.quality })
+
 			const { data, info } = await manipulation.toBuffer({ resolveWithObject: true })
 			const result = new ManipulationJobResult({
 				size: String(info.size),
@@ -128,7 +130,6 @@ export default class WebpImageManipulationJob {
 		// Non-SVG source with SVG output requested → convert to PNG
 		this.logger.debug('Non-SVG source with SVG output requested, converting to PNG')
 		const manipulation = sharp(filePathFrom)
-		manipulation.png({ quality: options.quality })
 
 		const resizeScales: { width?: number, height?: number } = {}
 		if (options.width !== null && !Number.isNaN(options.width) && options.width > 0) {
@@ -156,6 +157,9 @@ export default class WebpImageManipulationJob {
 			})
 		}
 
+		// Format conversion last
+		manipulation.png({ quality: options.quality })
+
 		const { data, info } = await manipulation.toBuffer({ resolveWithObject: true })
 		this.logger.debug(`Manipulation complete. Result format: png, size: ${info.size}`)
 
@@ -170,6 +174,21 @@ export default class WebpImageManipulationJob {
 		input: string | Buffer,
 		options: ResizeOptions,
 	): Promise<ManipulationJobResult> {
+		// For AVIF, get metadata upfront to decide fallback before building the pipeline
+		let avifFallbackToWebp = false
+		if (options.format === 'avif') {
+			const metaPipeline = Buffer.isBuffer(input)
+				? sharp(input, { limitInputPixels: 268402689, sequentialRead: true })
+				: sharp(input)
+			const metadata = await metaPipeline.metadata()
+			metaPipeline.destroy()
+			const totalPixels = (metadata.width || 0) * (metadata.height || 0)
+			if (totalPixels > 2073600) {
+				this.logger.warn(`Image too large for AVIF (${totalPixels}px), using WebP fallback`)
+				avifFallbackToWebp = true
+			}
+		}
+
 		let manipulation = Buffer.isBuffer(input)
 			? sharp(input, { limitInputPixels: 268402689, sequentialRead: true })
 			: sharp(input)
@@ -236,14 +255,7 @@ export default class WebpImageManipulationJob {
 				})
 				break
 			case 'avif': {
-				// Check pixel count to decide AVIF vs WebP fallback
-				const metadata = Buffer.isBuffer(input)
-					? await sharp(input, { limitInputPixels: 268402689, sequentialRead: true }).metadata()
-					: await sharp(input).metadata()
-				const totalPixels = (metadata.width || 0) * (metadata.height || 0)
-
-				if (totalPixels > 2073600) {
-					this.logger.warn(`Image too large for AVIF (${totalPixels}px), using WebP fallback`)
+				if (avifFallbackToWebp) {
 					manipulation = manipulation.webp({
 						quality: options.quality,
 						smartSubsample: true,

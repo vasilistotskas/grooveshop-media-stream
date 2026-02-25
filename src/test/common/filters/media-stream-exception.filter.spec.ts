@@ -85,7 +85,7 @@ describe('mediaStreamExceptionFilter', () => {
 			expect(typedErrorResponse.message).toBe('Test error')
 			expect(typedErrorResponse.code).toBe('TEST_ERROR')
 			expect(typedErrorResponse.status).toBe(HttpStatus.BAD_REQUEST)
-			expect(typedErrorResponse.context).toEqual({ test: 'value' })
+			expect(typedErrorResponse.context).toBeUndefined()
 			expect(typedErrorResponse.path).toBe('/test/url')
 			expect(typedErrorResponse.method).toBe('GET')
 			expect(typedErrorResponse.timestamp).toBeDefined()
@@ -108,7 +108,7 @@ describe('mediaStreamExceptionFilter', () => {
 			expect(typedErrorResponse.name).toBe('ResourceNotFoundError')
 			expect(typedErrorResponse.message).toBe('Resource not found')
 			expect(typedErrorResponse.code).toBe('RESOURCE_NOT_FOUND')
-			expect(typedErrorResponse.context).toEqual({ resourceId: '123' })
+			expect(typedErrorResponse.context).toBeUndefined()
 		})
 
 		it('should handle HttpException', () => {

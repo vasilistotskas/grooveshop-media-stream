@@ -96,9 +96,11 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 		const correlationId = this._correlationService.getCorrelationId()
 
 		if (error instanceof MediaStreamError) {
-			const { stack, ...errorDetails } = error.toJSON()
 			return {
-				...errorDetails,
+				name: error.name,
+				message: error.message,
+				status: error.status,
+				code: error.code,
 				timestamp,
 				path,
 				method,
@@ -115,7 +117,6 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 			path,
 			method,
 			correlationId,
-			context: error.context || {},
 		}
 	}
 }

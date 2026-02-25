@@ -217,12 +217,16 @@ describe('adaptiveRateLimitGuard', () => {
 			expect(result).toBe(true) // Should allow request on error
 		})
 
-		it('should extract client IP from various headers', async () => {
+		it('should extract client IP from request.ip, socket, or connection', async () => {
 			const testCases = [
-				{ headers: { 'x-forwarded-for': '192.168.1.1,192.168.1.2' }, expectedIp: '192.168.1.1' },
-				{ headers: { 'x-real-ip': '192.168.1.3' }, expectedIp: '192.168.1.3' },
-				{ headers: {}, connection: { remoteAddress: '192.168.1.4' }, expectedIp: '192.168.1.4' },
-				{ headers: {}, ip: '192.168.1.5', expectedIp: '192.168.1.5' },
+				// request.ip takes priority
+				{ headers: {}, ip: '192.168.1.5', socket: { remoteAddress: '10.0.0.1' }, expectedIp: '192.168.1.5' },
+				// Falls back to socket.remoteAddress when ip is not set
+				{ headers: {}, ip: undefined, socket: { remoteAddress: '192.168.1.4' }, expectedIp: '192.168.1.4' },
+				// Falls back to connection.remoteAddress
+				{ headers: {}, ip: undefined, socket: undefined, connection: { remoteAddress: '192.168.1.6' }, expectedIp: '192.168.1.6' },
+				// Falls back to 'unknown' when nothing is available
+				{ headers: {}, ip: undefined, socket: undefined, connection: undefined, expectedIp: 'unknown' },
 			]
 
 			for (const testCase of testCases) {
@@ -251,6 +255,9 @@ describe('adaptiveRateLimitGuard', () => {
 				)
 
 				vi.clearAllMocks()
+				rateLimitService.getWhitelistedDomains.mockReturnValue([])
+				rateLimitService.getBypassBotsConfig.mockReturnValue(true)
+				rateLimitService.isBot.mockReturnValue(false)
 			}
 		})
 

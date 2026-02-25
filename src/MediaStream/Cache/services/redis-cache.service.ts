@@ -179,10 +179,19 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 
 		try {
 			this.stats.operations++
-			const db = this._configService.get('cache.redis.db')
-			await this.redis.flushdb()
+			// Use SCAN + DEL instead of FLUSHDB to preserve non-cache keys (rate limits, circuit breaker)
+			let deleted = 0
+			let cursor = '0'
+			do {
+				const [nextCursor, keys] = await this.redis.scan(cursor, 'MATCH', 'image:*', 'COUNT', 100)
+				cursor = nextCursor
+				if (keys.length > 0) {
+					await this.redis.del(...keys)
+					deleted += keys.length
+				}
+			} while (cursor !== '0')
 			this.metricsService.recordCacheOperation('clear', 'redis', 'success')
-			CorrelatedLogger.debug(`Redis cache CLEARED (DB: ${db})`, RedisCacheService.name)
+			CorrelatedLogger.debug(`Redis cache CLEARED: ${deleted} image keys deleted`, RedisCacheService.name)
 		}
 		catch (error: unknown) {
 			this.stats.errors++
@@ -220,7 +229,14 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 
 		try {
 			this.stats.operations++
-			return await this.redis.keys('*')
+			const allKeys: string[] = []
+			let cursor = '0'
+			do {
+				const [nextCursor, keys] = await this.redis.scan(cursor, 'COUNT', 100)
+				cursor = nextCursor
+				allKeys.push(...keys)
+			} while (cursor !== '0')
+			return allKeys
 		}
 		catch (error: unknown) {
 			this.stats.errors++
@@ -401,7 +417,7 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 	 * 2. Legacy JSON with base64-encoded Buffers — backward compatible
 	 * 3. Plain JSON for non-binary values
 	 */
-	private deserializeValue<T>(value: Buffer): T {
+	private deserializeValue<T>(value: Buffer): T | null {
 		// Check for binary format marker
 		if (value.length >= 5 && value[0] === RedisCacheService.BINARY_MARKER) {
 			const metaLength = value.readUInt32BE(1)
@@ -414,12 +430,18 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 		}
 
 		// Fall back to JSON parsing (handles legacy base64 format and plain objects)
-		const str = value.toString('utf8')
-		return JSON.parse(str, (_key, val) => {
-			if (val && typeof val === 'object' && val.type === 'Buffer' && typeof val.data === 'string') {
-				return Buffer.from(val.data, 'base64')
-			}
-			return val
-		})
+		try {
+			const str = value.toString('utf8')
+			return JSON.parse(str, (_key, val) => {
+				if (val && typeof val === 'object' && val.type === 'Buffer' && typeof val.data === 'string') {
+					return Buffer.from(val.data, 'base64')
+				}
+				return val
+			})
+		}
+		catch {
+			CorrelatedLogger.warn('Failed to deserialize Redis value, returning null', RedisCacheService.name)
+			return null
+		}
 	}
 }

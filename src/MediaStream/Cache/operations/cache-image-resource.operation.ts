@@ -4,7 +4,7 @@ import type {
 import type { ResourceIdentifierKP } from '#microservice/common/constants/key-properties.constant'
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
-import { access, readFile, unlink, writeFile } from 'node:fs/promises'
+import { access, open as fsOpen, readFile, unlink, writeFile } from 'node:fs/promises'
 import * as path from 'node:path'
 import { cwd } from 'node:process'
 import CacheImageRequest, {
@@ -269,13 +269,6 @@ export default class CacheImageResourceOperation {
 		try {
 			CorrelatedLogger.debug('Executing cache image resource operation', CacheImageResourceOperation.name)
 
-			if (await this.checkResourceExists(ctx)) {
-				CorrelatedLogger.log('Resource already exists in cache', CacheImageResourceOperation.name)
-				const duration = PerformanceTracker.endPhase('execute')
-				this.metricsService.recordImageProcessing('cache_check', 'cached', 'success', duration || 0)
-				return
-			}
-
 			await this.processImageSynchronously(ctx)
 		}
 		catch (error: unknown) {
@@ -330,13 +323,21 @@ export default class CacheImageResourceOperation {
 
 			let isSourceSvg = false
 			try {
-				const fileContent = await readFile(resourceTempPath, 'utf8')
-				isSourceSvg = fileContent.trim().startsWith('<svg') || fileContent.includes('xmlns="http://www.w3.org/2000/svg"')
+				const fh = await fsOpen(resourceTempPath, 'r')
+				try {
+					const headerBuf = Buffer.alloc(512)
+					const { bytesRead } = await fh.read(headerBuf, 0, 512, 0)
+					const header = headerBuf.toString('utf8', 0, bytesRead)
+					isSourceSvg = header.trim().startsWith('<svg') || header.includes('xmlns="http://www.w3.org/2000/svg"')
+				}
+				finally {
+					await fh.close()
+				}
 				CorrelatedLogger.debug(`Source file SVG detection: ${isSourceSvg}`, CacheImageResourceOperation.name)
 			}
 			catch {
 				isSourceSvg = false
-				CorrelatedLogger.debug('Could not read file as text, assuming not SVG', CacheImageResourceOperation.name)
+				CorrelatedLogger.debug('Could not read file header, assuming not SVG', CacheImageResourceOperation.name)
 			}
 
 			if (isSourceSvg) {
@@ -353,13 +354,14 @@ export default class CacheImageResourceOperation {
 			const resourcePath = this.getResourcePath(ctx)
 			const resourceMetaPath = this.getResourceMetaPath(ctx)
 
-			await this.cacheManager.set('image', ctx.id, {
-				data: processedData,
-				metadata,
-			}, this.privateTtl)
-
-			await writeFile(resourcePath, processedData)
-			await writeFile(resourceMetaPath, JSON.stringify(metadata), 'utf8')
+			await Promise.all([
+				this.cacheManager.set('image', ctx.id, {
+					data: processedData,
+					metadata,
+				}, this.privateTtl),
+				writeFile(resourcePath, processedData),
+				writeFile(resourceMetaPath, JSON.stringify(metadata), 'utf8'),
+			])
 
 			try {
 				await unlink(resourceTempPath)
@@ -537,25 +539,6 @@ export default class CacheImageResourceOperation {
 				CorrelatedLogger.warn(`Corrupted cache data found in getCachedResource, deleting: ${ctx.id}`, CacheImageResourceOperation.name)
 				await this.cacheManager.delete('image', ctx.id)
 				cachedResource = null
-			}
-
-			if (!cachedResource) {
-				const cachedData = await this.cacheManager.get<string>('image', ctx.id)
-				if (cachedData) {
-					const metadata = new ResourceMetaData({
-						version: 1,
-						size: Buffer.from(cachedData, 'base64').length.toString(),
-						format: ctx.request.resizeOptions?.format || 'webp',
-						dateCreated: Date.now(),
-						publicTTL: this.publicTtl * 1000,
-						privateTTL: this.privateTtl * 1000,
-					})
-
-					cachedResource = {
-						data: Buffer.from(cachedData, 'base64'),
-						metadata,
-					}
-				}
 			}
 
 			if (cachedResource) {

@@ -263,8 +263,10 @@ export class MemoryCacheService implements ICacheManager {
 		}
 
 		// Sort by TTL ascending (soonest to expire first)
+		// getTtl() returns absolute expiry timestamp in ms, or undefined for no-expiry keys
+		// No-expiry keys should be evicted LAST, so use Infinity
 		const keysByTtl = allKeys
-			.map(key => ({ key, ttl: this.cache.getTtl(key) ?? 0 }))
+			.map(key => ({ key, ttl: this.cache.getTtl(key) ?? Infinity }))
 			.sort((a, b) => a.ttl - b.ttl)
 
 		let evicted = 0

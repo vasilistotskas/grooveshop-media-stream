@@ -1,4 +1,5 @@
 import type { INestApplication } from '@nestjs/common'
+import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { ConfigModule } from '#microservice/Config/config.module'
 import { ConfigService } from '#microservice/Config/config.service'
 import { MetricsModule } from '#microservice/Metrics/metrics.module'
@@ -39,6 +40,7 @@ describe('rate Limiting Integration', () => {
 	let rateLimitService: RateLimitService
 	let configService: ConfigService
 	let metricsService: MetricsService
+	let redisCacheService: RedisCacheService
 
 	beforeEach(async () => {
 		const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -58,6 +60,7 @@ describe('rate Limiting Integration', () => {
 		rateLimitService = moduleFixture.get<RateLimitService>(RateLimitService)
 		configService = moduleFixture.get<ConfigService>(ConfigService)
 		metricsService = moduleFixture.get<MetricsService>(MetricsService)
+		redisCacheService = moduleFixture.get<RedisCacheService>(RedisCacheService)
 
 		// Clear any existing rate limit data before each test
 		if (rateLimitService && typeof rateLimitService.clearAllRateLimits === 'function') {
@@ -85,6 +88,15 @@ describe('rate Limiting Integration', () => {
 			rateLimitService.clearAllRateLimits()
 		}
 
+		// Flush Redis rate limit keys to ensure clean state between tests
+		// Since all requests now share the same socket IP, Redis counters must be reset
+		try {
+			await redisCacheService.flushAll()
+		}
+		catch {
+			// Ignore if Redis is not available
+		}
+
 		// Add small delay in CI to ensure clean state
 		if (process.env.CI) {
 			await new Promise(resolve => setTimeout(resolve, 150))
@@ -94,6 +106,14 @@ describe('rate Limiting Integration', () => {
 		// Clear rate limit data after each test
 		if (rateLimitService && typeof rateLimitService.clearAllRateLimits === 'function') {
 			rateLimitService.clearAllRateLimits()
+		}
+
+		// Flush Redis rate limit keys
+		try {
+			await redisCacheService.flushAll()
+		}
+		catch {
+			// Ignore if Redis is not available
 		}
 
 		// Stop metrics collection to prevent open handles
@@ -137,10 +157,8 @@ describe('rate Limiting Integration', () => {
 
 	describe('basic Rate Limiting', () => {
 		it('should allow requests within rate limit', async () => {
-			const uniqueIP = '192.168.100.1'
 			const response = await request(app.getHttpServer())
 				.get('/test/default')
-				.set('X-Forwarded-For', uniqueIP)
 				.expect(200)
 
 			expect(response.headers['x-ratelimit-limit']).toBeDefined()
@@ -149,14 +167,12 @@ describe('rate Limiting Integration', () => {
 		})
 
 		it('should block requests when rate limit is exceeded', async () => {
-			const uniqueIP = '192.168.100.2'
 			const limit = process.env.CI ? 30 : 12 // Use increased limits for better stability
 
 			// Make requests up to the limit
 			for (let i = 0; i < limit; i++) {
 				const response = await request(app.getHttpServer())
 					.get('/test/default')
-					.set('X-Forwarded-For', uniqueIP)
 
 				if (response.status !== 200) {
 					console.log(`Request ${i + 1}/${limit} failed with status ${response.status}`)
@@ -172,14 +188,11 @@ describe('rate Limiting Integration', () => {
 			// Next request should be blocked
 			await request(app.getHttpServer())
 				.get('/test/default')
-				.set('X-Forwarded-For', uniqueIP)
 				.expect(429) // Too Many Requests
 		})
 
 		// eslint-disable-next-line test/expect-expect
 		it('should reset rate limit after window expires', async () => {
-			const uniqueIP = '192.168.100.3'
-
 			// Clear any existing rate limits first
 
 			if (rateLimitService && typeof rateLimitService.clearAllRateLimits === 'function') {
@@ -223,15 +236,11 @@ describe('rate Limiting Integration', () => {
 
 					.get('/test/default')
 
-					.set('X-Forwarded-For', uniqueIP)
-
 					.expect(200)
 
 				await request(app.getHttpServer())
 
 					.get('/test/default')
-
-					.set('X-Forwarded-For', uniqueIP)
 
 					.expect(200)
 
@@ -240,8 +249,6 @@ describe('rate Limiting Integration', () => {
 				await request(app.getHttpServer())
 
 					.get('/test/default')
-
-					.set('X-Forwarded-For', uniqueIP)
 
 					.expect(429)
 
@@ -254,8 +261,6 @@ describe('rate Limiting Integration', () => {
 				await request(app.getHttpServer())
 
 					.get('/test/default')
-
-					.set('X-Forwarded-For', uniqueIP)
 
 					.expect(200)
 			}
@@ -270,8 +275,6 @@ describe('rate Limiting Integration', () => {
 
 	describe('request Type Specific Limits', () => {
 		it('should apply different limits for image processing requests', async () => {
-			const uniqueIP = '192.168.100.4'
-
 			const limit = process.env.CI ? 20 : 8 // Use increased limits for better stability
 
 			// Clear any existing rate limits first
@@ -292,8 +295,6 @@ describe('rate Limiting Integration', () => {
 				const response = await request(app.getHttpServer())
 
 					.get('/media_stream-image/test-image')
-
-					.set('X-Forwarded-For', uniqueIP)
 
 				if (response.status !== 200) {
 					console.log(`Request ${i + 1}/${limit} failed with status ${response.status}`)
@@ -316,14 +317,10 @@ describe('rate Limiting Integration', () => {
 
 				.get('/media_stream-image/test-image')
 
-				.set('X-Forwarded-For', uniqueIP)
-
 			expect(response.status).toBe(429)
 		})
 
 		it('should track different request types independently', async () => {
-			const uniqueIP = '192.168.100.5'
-
 			const imageLimit = process.env.CI ? 20 : 8 // Use increased limits for better stability
 
 			// Clear any existing rate limits first
@@ -344,8 +341,6 @@ describe('rate Limiting Integration', () => {
 				const response = await request(app.getHttpServer())
 
 					.get('/media_stream-image/test-image')
-
-					.set('X-Forwarded-For', uniqueIP)
 
 				if (response.status !== 200) {
 					console.log(`Image processing request ${i + 1}/${imageLimit} failed with status ${response.status}`)
@@ -374,8 +369,6 @@ describe('rate Limiting Integration', () => {
 
 				.get('/test/default')
 
-				.set('X-Forwarded-For', uniqueIP)
-
 			if (defaultResponse.status !== 200) {
 				console.log(`Default request failed with status ${defaultResponse.status}`)
 
@@ -394,8 +387,6 @@ describe('rate Limiting Integration', () => {
 
 	describe('health Check Bypass', () => {
 		it('should bypass rate limiting for health checks', async () => {
-			const uniqueIP = '192.168.100.6'
-
 			const limit = process.env.CI ? 30 : 12 // Use increased limits for better stability
 
 			// Add delay in CI for better isolation
@@ -410,8 +401,6 @@ describe('rate Limiting Integration', () => {
 				const response = await request(app.getHttpServer())
 
 					.get('/test/default')
-
-					.set('X-Forwarded-For', uniqueIP)
 
 				if (response.status !== 200) {
 					console.log(`Default request ${i + 1}/${limit} failed with status ${response.status}`)
@@ -434,8 +423,6 @@ describe('rate Limiting Integration', () => {
 
 				.get('/test/default')
 
-				.set('X-Forwarded-For', uniqueIP)
-
 				.expect(429)
 
 			// But health checks should still work (they bypass rate limiting)
@@ -444,18 +431,12 @@ describe('rate Limiting Integration', () => {
 
 				.get('/health')
 
-				.set('X-Forwarded-For', uniqueIP)
-
 				.expect(200)
 		})
 	})
 
 	describe('iP-based Rate Limiting', () => {
-		it('should track different IPs independently', async () => {
-			const firstIP = '192.168.100.7'
-
-			const secondIP = '192.168.100.8'
-
+		it('should use socket IP for rate limiting (X-Forwarded-For not trusted)', async () => {
 			const limit = process.env.CI ? 30 : 12 // Use increased limits for better stability
 
 			// Clear rate limits first
@@ -470,89 +451,73 @@ describe('rate Limiting Integration', () => {
 				await new Promise(resolve => setTimeout(resolve, 200))
 			}
 
-			// Add debugging
-
-			if (process.env.NODE_ENV === 'test') {
-				console.log(`Testing IP independence with limit: ${limit}, IPs: ${firstIP}, ${secondIP}`)
-
-				// Check what the actual configured limit is
-
-				const config = rateLimitService.getRateLimitConfig('get-default')
-
-				console.log(`Actual configured limit: ${config.max}`)
-			}
-
-			// Make requests from first IP
+			// All supertest requests come from the same socket IP regardless of X-Forwarded-For
+			// Verify that setting different X-Forwarded-For headers does NOT create independent counters
 
 			for (let i = 0; i < limit; i++) {
 				const response = await request(app.getHttpServer())
 
 					.get('/test/default')
 
-					.set('X-Forwarded-For', firstIP)
-
 				if (response.status !== 200) {
-					console.log(`First IP request ${i + 1}/${limit} failed with status ${response.status}`)
-
-					// Add debug info when request fails unexpectedly
+					console.log(`Request ${i + 1}/${limit} failed with status ${response.status}`)
 
 					const debugInfo = (rateLimitService as any).getDebugInfo?.()
 
 					if (debugInfo) {
 						console.log('Rate limit debug info:', debugInfo)
 					}
-
-					// Also check the configuration
-
-					const config = rateLimitService.getRateLimitConfig('get-default')
-
-					console.log(`Rate limit config at failure: max=${config.max}, windowMs=${config.windowMs}`)
 				}
 
 				expect(response.status).toBe(200)
 			}
 
-			// First IP should be blocked
+			// Should be blocked now (same socket IP for all requests)
 
 			await request(app.getHttpServer())
 
 				.get('/test/default')
-
-				.set('X-Forwarded-For', firstIP)
 
 				.expect(429)
 
-			// Second IP should still work
+			// Setting X-Forwarded-For should NOT bypass the rate limit
+			// because the guard uses request.ip / socket.remoteAddress, not headers
 
 			await request(app.getHttpServer())
 
 				.get('/test/default')
 
-				.set('X-Forwarded-For', secondIP)
+				.set('X-Forwarded-For', '192.168.100.99')
 
-				.expect(200)
+				.expect(429)
 		})
 
-		it('should extract IP from various headers', async () => {
-			const ipHeaders = [
+		it('should use socket IP and ignore X-Forwarded-For / X-Real-IP headers', async () => {
+			// All requests share the same socket IP, so rate limit headers should reflect shared counters
+			const response1 = await request(app.getHttpServer())
 
-				{ 'X-Forwarded-For': '192.168.100.9,192.168.100.10' },
+				.get('/test/default')
 
-				{ 'X-Real-IP': '192.168.100.11' },
+				.set('X-Forwarded-For', '192.168.100.9,192.168.100.10')
 
-			]
+				.expect(200)
 
-			for (const headers of ipHeaders) {
-				const response = await request(app.getHttpServer())
+			expect(response1.headers['x-ratelimit-remaining']).toBeDefined()
 
-					.get('/test/default')
+			const response2 = await request(app.getHttpServer())
 
-					.set(headers)
+				.get('/test/default')
 
-					.expect(200)
+				.set('X-Real-IP', '192.168.100.11')
 
-				expect(response.headers['x-ratelimit-remaining']).toBeDefined()
-			}
+				.expect(200)
+
+			expect(response2.headers['x-ratelimit-remaining']).toBeDefined()
+
+			// Both requests should share the same counter since X-Forwarded-For/X-Real-IP are ignored
+			const remaining1 = Number(response1.headers['x-ratelimit-remaining'])
+			const remaining2 = Number(response2.headers['x-ratelimit-remaining'])
+			expect(remaining2).toBeLessThan(remaining1)
 		})
 	})
 
@@ -569,8 +534,6 @@ describe('rate Limiting Integration', () => {
 			const response = await request(app.getHttpServer())
 
 				.get('/test/default')
-
-				.set('X-Forwarded-For', '192.168.1.200') // Use unique IP
 
 				.expect(200)
 
@@ -608,21 +571,17 @@ describe('rate Limiting Integration', () => {
 
 				.get('/test/default')
 
-				.set('X-Forwarded-For', '192.168.1.201') // Use unique IP
-
 				.expect(200)
 
 			const firstRemaining = Number(response.headers['x-ratelimit-remaining'])
 
 			const firstUsed = Number(response.headers['x-ratelimit-used'])
 
-			// Second request
+			// Second request (same socket IP)
 
 			response = await request(app.getHttpServer())
 
 				.get('/test/default')
-
-				.set('X-Forwarded-For', '192.168.1.201') // Same IP
 
 				.expect(200)
 
@@ -790,8 +749,6 @@ describe('rate Limiting Integration', () => {
 				return configs[key] || defaultValue
 			})
 
-			const testIP = '192.168.1.100'
-
 			const concurrentRequests = process.env.CI ? 4 : 6 // Reduced for CI stability
 
 			try {
@@ -809,8 +766,6 @@ describe('rate Limiting Integration', () => {
 						request(app.getHttpServer())
 
 							.get('/test/default')
-
-							.set('X-Forwarded-For', testIP)
 
 							.timeout(10000) // Increased timeout for CI
 

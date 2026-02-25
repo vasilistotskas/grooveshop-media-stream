@@ -49,6 +49,9 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	private requestsInFlightCount: number = 0
 	private systemMetricsInterval?: NodeJS.Timeout
 	private performanceMetricsInterval?: NodeJS.Timeout
+	private readonly dynamicCounters = new Map<string, promClient.Counter>()
+	private previousCpuUsage: { user: number, system: number } = { user: 0, system: 0 }
+	private previousCpuTime: number = Date.now()
 
 	// ✅ Load intervals from configuration
 	private readonly systemMetricsIntervalMs: number
@@ -400,9 +403,19 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	 * @param value - Value to increment by (default: 1)
 	 */
 	incrementCounter(name: string, value: number = 1): void {
-		// Use the generic http requests counter for now, or create dynamic counters
-		// For specific counters like 'image_requests_total', we track via existing metrics
-		this._logger.debug(`Counter incremented: ${name} by ${value}`)
+		const prefixedName = name.startsWith('mediastream_') ? name : `mediastream_${name}`
+
+		let counter = this.dynamicCounters.get(prefixedName)
+		if (!counter) {
+			counter = new promClient.Counter({
+				name: prefixedName,
+				help: `Dynamic counter: ${name}`,
+				registers: [this.register],
+			})
+			this.dynamicCounters.set(prefixedName, counter)
+		}
+
+		counter.inc(value)
 	}
 
 	/**
@@ -535,10 +548,18 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			})
 
 			const cpuUsage = process.cpuUsage()
-			const totalCpuTime = cpuUsage.user + cpuUsage.system
-			const userPercent = totalCpuTime > 0 ? (cpuUsage.user / totalCpuTime) * 100 : 0
-			const systemPercent = totalCpuTime > 0 ? (cpuUsage.system / totalCpuTime) * 100 : 0
-			this.updateCpuUsage(userPercent, systemPercent)
+			const now = Date.now()
+			const elapsedMs = now - this.previousCpuTime
+			if (elapsedMs > 0) {
+				// Delta-based: microseconds of CPU time per millisecond of wall time, as percentage
+				const userDelta = cpuUsage.user - this.previousCpuUsage.user
+				const systemDelta = cpuUsage.system - this.previousCpuUsage.system
+				const userPercent = (userDelta / 1000 / elapsedMs) * 100
+				const systemPercent = (systemDelta / 1000 / elapsedMs) * 100
+				this.updateCpuUsage(userPercent, systemPercent)
+			}
+			this.previousCpuUsage = { user: cpuUsage.user, system: cpuUsage.system }
+			this.previousCpuTime = now
 
 			const loadAvg = os.loadavg()
 			this.updateLoadAverage(loadAvg[0], loadAvg[1], loadAvg[2])

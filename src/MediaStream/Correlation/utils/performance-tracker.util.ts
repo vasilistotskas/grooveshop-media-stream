@@ -13,6 +13,7 @@ export interface PerformancePhase {
 }
 
 export class PerformanceTracker {
+	private static readonly MAX_TRACKED_REQUESTS = 1000
 	private static phases = new Map<string, PerformancePhase[]>()
 
 	private static getCorrelationId(): string | null {
@@ -35,6 +36,13 @@ export class PerformanceTracker {
 		}
 
 		if (!this.phases.has(correlationId)) {
+			// Evict oldest entries if map grows too large (queue workers without cleanup)
+			if (this.phases.size >= this.MAX_TRACKED_REQUESTS) {
+				const firstKey = this.phases.keys().next().value
+				if (firstKey) {
+					this.phases.delete(firstKey)
+				}
+			}
 			this.phases.set(correlationId, [])
 		}
 

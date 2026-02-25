@@ -50,6 +50,15 @@ export class MemoryCacheLayer implements CacheLayer {
 		}
 	}
 
+	async getTtl(key: string): Promise<number> {
+		const ttlMs = this.memoryCacheService.getTtl(key)
+		if (!ttlMs || ttlMs === 0) {
+			return -1
+		}
+		// getTtl returns absolute expiry timestamp in ms, convert to remaining seconds
+		return Math.max(0, Math.ceil((ttlMs - Date.now()) / 1000))
+	}
+
 	getLayerName(): string {
 		return this.layerName
 	}

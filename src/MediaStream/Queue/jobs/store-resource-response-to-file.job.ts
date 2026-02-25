@@ -1,6 +1,6 @@
 import type { AxiosResponse } from 'axios'
 import type { FileHandle } from 'node:fs/promises'
-import { open } from 'node:fs/promises'
+import { open, unlink } from 'node:fs/promises'
 import UnableToStoreFetchedResourceException from '#microservice/API/exceptions/unable-to-store-fetched-resource.exception'
 import { Injectable, Logger } from '@nestjs/common'
 
@@ -19,6 +19,7 @@ export default class StoreResourceResponseToFileJob {
 		}
 
 		let fd: FileHandle | null = null
+		let success = false
 
 		try {
 			fd = await open(path, 'w')
@@ -26,21 +27,26 @@ export default class StoreResourceResponseToFileJob {
 
 			response.data.pipe(fileStream)
 			await new Promise<void>((resolve, reject) => {
+				response.data.on('error', (error: Error) => reject(error))
 				fileStream
 					.on('finish', () => resolve())
 					.on('error', error => reject(error))
 			})
+			success = true
 		}
 		catch (e) {
 			this._logger.error(e)
 			throw new UnableToStoreFetchedResourceException(resourceName)
 		}
 		finally {
-			// Always close the file handle to prevent leaks
 			if (fd) {
 				await fd.close().catch((err: unknown) => {
 					this._logger.error('Error closing file descriptor', err, { path, resourceName })
 				})
+			}
+			// Clean up partial temp file on failure
+			if (!success) {
+				await unlink(path).catch(() => {})
 			}
 		}
 	}

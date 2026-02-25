@@ -47,14 +47,14 @@ export class CircuitBreaker {
 			loadState: options.loadState,
 		}
 
-		// Load persisted state on initialization
-		this.loadPersistedState()
-
-		// ✅ Setup periodic state persistence with configurable interval
-		if (this.options.persistState) {
-			const persistenceInterval = this.options.persistenceInterval || 10000
-			this.persistenceTimer = setInterval(() => this.persistCurrentState(), persistenceInterval)
-		}
+		// Load persisted state, then start persistence timer only after load completes
+		this.loadPersistedState().then(() => {
+			if (this.options.persistState) {
+				const persistenceInterval = this.options.persistenceInterval || 10000
+				this.persistenceTimer = setInterval(() => this.persistCurrentState(), persistenceInterval)
+				this.persistenceTimer.unref()
+			}
+		})
 	}
 
 	/**

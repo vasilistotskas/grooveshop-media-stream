@@ -8,12 +8,11 @@ import type { MemoryInfo } from '../indicators/memory-health.indicator.js'
 import * as process from 'node:process'
 import { CacheHealthIndicator } from '#microservice/Cache/indicators/cache-health.indicator'
 import { RedisHealthIndicator } from '#microservice/Cache/indicators/redis-health.indicator'
-import { ConfigService } from '#microservice/Config/config.service'
 import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 import { JobQueueHealthIndicator } from '#microservice/Queue/indicators/job-queue-health.indicator'
 import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
-import { Controller, Get, Post } from '@nestjs/common'
+import { Controller, Get } from '@nestjs/common'
 import { HealthCheck, HealthCheckService } from '@nestjs/terminus'
 import { DiskSpaceHealthIndicator } from '../indicators/disk-space-health.indicator.js'
 import { MemoryHealthIndicator } from '../indicators/memory-health.indicator.js'
@@ -31,7 +30,6 @@ export class HealthController {
 		private readonly jobQueueHealthIndicator: JobQueueHealthIndicator,
 		private readonly storageHealthIndicator: StorageHealthIndicator,
 		private readonly sharpHealthIndicator: SharpHealthIndicator,
-		private readonly _configService: ConfigService,
 		private readonly httpClientService: HttpClientService,
 	) {}
 
@@ -58,27 +56,10 @@ export class HealthController {
 		details: HealthIndicatorResult
 		timestamp: string
 		uptime: number
-		version: string
 		environment: string
-		systemInfo: {
-			platform: NodeJS.Platform
-			arch: NodeJS.Architecture
-			nodeVersion: string
-			pid: number
-		}
 		resources: {
 			disk: DiskSpaceInfo
 			memory: MemoryInfo
-		}
-		configuration: {
-			monitoring: {
-				enabled: boolean
-				metricsPort: number
-			}
-			cache: {
-				fileDirectory: string
-				memoryMaxSize: number
-			}
 		}
 	}> {
 		const healthResults = await this.health.check([
@@ -102,27 +83,10 @@ export class HealthController {
 			details: healthResults.details,
 			timestamp: new Date().toISOString(),
 			uptime: process.uptime(),
-			version: process.version,
 			environment: process.env.NODE_ENV || 'development',
-			systemInfo: {
-				platform: process.platform,
-				arch: process.arch,
-				nodeVersion: process.version,
-				pid: process.pid,
-			},
 			resources: {
 				disk: diskInfo,
 				memory: memoryInfo,
-			},
-			configuration: {
-				monitoring: {
-					enabled: this._configService.get('monitoring.enabled'),
-					metricsPort: this._configService.get('monitoring.metricsPort'),
-				},
-				cache: {
-					fileDirectory: this._configService.get('cache.file.directory'),
-					memoryMaxSize: this._configService.get('cache.memory.maxSize'),
-				},
 			},
 		}
 	}
@@ -154,12 +118,11 @@ export class HealthController {
 	}
 
 	@Get('live')
-	async liveness(): Promise<{ status: string, timestamp: string, uptime: number, pid: number }> {
+	async liveness(): Promise<{ status: string, timestamp: string, uptime: number }> {
 		return {
 			status: 'alive',
 			timestamp: new Date().toISOString(),
 			uptime: process.uptime(),
-			pid: process.pid,
 		}
 	}
 
@@ -168,42 +131,15 @@ export class HealthController {
 		timestamp: string
 		circuitBreaker: {
 			isOpen: boolean
-			stats: any
-		}
-		httpClient: {
-			stats: any
 		}
 	}> {
 		const isOpen = this.httpClientService.isCircuitOpen()
-		const httpStats = this.httpClientService.getStats()
 
 		return {
 			timestamp: new Date().toISOString(),
 			circuitBreaker: {
 				isOpen,
-				stats: httpStats,
 			},
-			httpClient: {
-				stats: httpStats,
-			},
-		}
-	}
-
-	@Post('circuit-breaker/reset')
-	async resetCircuitBreaker(): Promise<{
-		timestamp: string
-		message: string
-		previousState: any
-	}> {
-		const previousStats = this.httpClientService.getStats()
-
-		this.httpClientService.resetCircuitBreaker()
-		this.httpClientService.resetStats()
-
-		return {
-			timestamp: new Date().toISOString(),
-			message: 'Circuit breaker has been reset successfully',
-			previousState: previousStats,
 		}
 	}
 }

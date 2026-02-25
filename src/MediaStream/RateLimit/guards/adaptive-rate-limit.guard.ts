@@ -208,15 +208,15 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 	}
 
 	/**
-	 * Extract client IP address from request
+	 * Extract client IP address from request.
+	 * Uses req.ip which respects NestJS/Express trust proxy setting.
+	 * Falls back to socket address — never trusts X-Forwarded-For directly.
 	 */
 	private getClientIp(request: any): string {
 		return (
-			request.headers['x-forwarded-for']?.split(',')[0]
-			|| request.headers['x-real-ip']
-			|| request.connection?.remoteAddress
+			request.ip
 			|| request.socket?.remoteAddress
-			|| request.ip
+			|| request.connection?.remoteAddress
 			|| 'unknown'
 		)
 	}

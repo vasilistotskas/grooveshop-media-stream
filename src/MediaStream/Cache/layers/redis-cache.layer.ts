@@ -99,6 +99,15 @@ export class RedisCacheLayer implements CacheLayer {
 		}
 	}
 
+	async getTtl(key: string): Promise<number> {
+		try {
+			return await this.redisCacheService.getTtl(key)
+		}
+		catch {
+			return -1
+		}
+	}
+
 	getLayerName(): string {
 		return this.layerName
 	}

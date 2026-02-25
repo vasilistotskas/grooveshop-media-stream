@@ -326,11 +326,23 @@ export class MultiLayerCacheManager implements OnModuleInit, OnModuleDestroy {
 			return
 		}
 
+		// Get remaining TTL from source so backfilled layers don't outlive the source
+		let remainingTtl: number | undefined
+		try {
+			const ttl = await sourceLayer.getTtl(key)
+			if (ttl > 0) {
+				remainingTtl = ttl
+			}
+		}
+		catch {
+			// If TTL lookup fails, backfill without TTL (uses layer default)
+		}
+
 		const backfillPromises = this.layers.slice(0, sourceIndex).map(async (layer) => {
 			try {
-				await layer.set(key, value, undefined)
+				await layer.set(key, value, remainingTtl)
 				CorrelatedLogger.debug(
-					`Backfilled ${layer.getLayerName()} layer with key: ${key}`,
+					`Backfilled ${layer.getLayerName()} layer with key: ${key} (TTL: ${remainingTtl ?? 'default'}s)`,
 					MultiLayerCacheManager.name,
 				)
 			}

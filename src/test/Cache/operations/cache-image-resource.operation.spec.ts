@@ -326,25 +326,19 @@ describe('cacheImageResourceOperation', () => {
 			opCtx = await operation.setup(mockRequest)
 		})
 
-		it('should return early if resource already exists', async () => {
-			const mockCachedResource = {
-				data: Buffer.from('cached-data'),
-				metadata: new ResourceMetaData({
-					version: 1,
-					size: '1000',
-					format: 'webp',
-					dateCreated: Date.now(),
-					publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
-					privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
-				}),
-			}
-
-			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(mockCachedResource)
+		it('should always proceed to process image synchronously', async () => {
+			// execute() now directly calls processImageSynchronously without checking cache first
+			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
+			const mockedFs = vi.mocked(fs)
+			mockedFs.access.mockRejectedValue(new Error('File not found'))
+			mockedFs.readFile.mockResolvedValue(Buffer.from('processed-image-data'))
+			mockedFs.writeFile.mockResolvedValue()
+			mockedFs.unlink.mockResolvedValue()
 
 			await operation.execute(opCtx)
 
-			expect(mockFetchResourceResponseJob.handle).not.toHaveBeenCalled()
-			expect(mockMetricsService.recordImageProcessing).toHaveBeenCalledWith('cache_check', 'cached', 'success', expect.any(Number))
+			expect(mockFetchResourceResponseJob.handle).toHaveBeenCalled()
+			expect(mockWebpImageManipulationJob.handle).toHaveBeenCalled()
 		})
 
 		it('should process images synchronously', async () => {

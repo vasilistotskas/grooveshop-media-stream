@@ -70,11 +70,15 @@ export class ImageStreamService {
 				return
 			}
 
-			// Only deduplicate for non-cached images
+			// Deduplicate only the processing phase (fetch + Sharp + cache write)
+			// Each request must stream independently from cache after processing completes
 			const resourcePath = this.cacheImageResourceOperation.getResourcePath(opCtx)
 			await this.requestDeduplicator.execute(resourcePath, async () => {
-				await this.fetchAndWaitForResource(opCtx, request, res, correlationId)
+				await this.cacheImageResourceOperation.execute(opCtx)
 			})
+
+			// Stream from cache — runs independently per request
+			await this.streamResource(opCtx, request, res, correlationId)
 		}
 		catch (error: unknown) {
 			await this.handleStreamError(error, request, res, correlationId)
@@ -118,32 +122,6 @@ export class ImageStreamService {
 			.end()
 
 		this._logger.debug('Sent 304 Not Modified response', { correlationId })
-	}
-
-	/**
-	 * Fetch resource and wait for processing to complete
-	 */
-	private async fetchAndWaitForResource(
-		opCtx: OperationContext,
-		request: CacheImageRequest,
-		res: Response,
-		correlationId: string,
-	): Promise<void> {
-		this._logger.debug('Resource does not exist, processing image', { correlationId })
-
-		try {
-			// Process image and wait for completion (fast: 50-200ms)
-			await this.cacheImageResourceOperation.execute(opCtx)
-
-			// Image processed successfully, stream it
-			await this.streamResource(opCtx, request, res, correlationId)
-		}
-		catch (error) {
-			// Processing failed, serve fallback
-			this._logger.warn('Image processing failed, serving fallback', { error, correlationId })
-			this.metricsService.recordError('image_processing', 'processing_failed')
-			await this.serveFallbackImage(request, res, correlationId)
-		}
 	}
 
 	/**

@@ -34,6 +34,7 @@ export class RateLimitService {
 	private readonly _logger = new Logger(RateLimitService.name)
 	/** In-memory fallback when Redis is unavailable */
 	private readonly localRequestCounts = new Map<string, { count: number, resetTime: number }>()
+	private readonly MAX_LOCAL_ENTRIES = 10000
 	private readonly systemLoadThresholds = {
 		cpu: 80,
 		memory: 85,
@@ -198,7 +199,8 @@ export class RateLimitService {
 	}
 
 	/**
-	 * Redis-based distributed rate limiting using atomic INCR + EXPIRE pipeline
+	 * Redis-based distributed rate limiting using atomic Lua script.
+	 * INCR + EXPIRE are executed atomically to prevent orphaned keys on crash.
 	 */
 	private async checkRateLimitRedis(
 		redisKey: string,
@@ -213,13 +215,15 @@ export class RateLimitService {
 
 		const ttlSeconds = Math.ceil(config.windowMs / 1000)
 
-		// Atomic increment — INCR creates the key with value 1 if it doesn't exist
-		const currentCount = await client.incr(redisKey)
-
-		// Set TTL only on the first request in the window (count === 1)
-		if (currentCount === 1) {
-			await client.expire(redisKey, ttlSeconds)
-		}
+		// Atomic INCR + EXPIRE via Lua to prevent orphaned keys
+		const luaScript = `
+			local current = redis.call('INCR', KEYS[1])
+			if current == 1 then
+				redis.call('EXPIRE', KEYS[1], ARGV[1])
+			end
+			return current
+		`
+		const currentCount = await client.eval(luaScript, 1, redisKey, ttlSeconds) as number
 
 		const allowed = currentCount <= config.max
 
@@ -353,6 +357,16 @@ export class RateLimitService {
 		for (const [key, entry] of this.localRequestCounts.entries()) {
 			if (entry.resetTime <= windowStart) {
 				this.localRequestCounts.delete(key)
+			}
+		}
+		// Cap the map size to prevent unbounded growth under DDoS with rotating IPs
+		if (this.localRequestCounts.size > this.MAX_LOCAL_ENTRIES) {
+			const excess = this.localRequestCounts.size - this.MAX_LOCAL_ENTRIES
+			const iter = this.localRequestCounts.keys()
+			for (let i = 0; i < excess; i++) {
+				const { value } = iter.next()
+				if (value)
+					this.localRequestCounts.delete(value)
 			}
 		}
 	}

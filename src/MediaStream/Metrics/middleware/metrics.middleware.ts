@@ -85,9 +85,13 @@ export class MetricsMiddleware implements NestMiddleware {
 
 		const pathname = req.url.split('?')[0]
 
-		return pathname
-			.replace(/\/\d+/g, '/:id')
+		const normalized = pathname
 			.replace(/\/[a-f0-9-]{36}/g, '/:uuid')
 			.replace(/\/[a-f0-9]{24}/g, '/:objectId')
+			.replace(/\/\d+/g, '/:id')
+
+		// Cap depth and collapse unmatched paths to prevent cardinality explosion on 404s
+		const segments = normalized.split('/').slice(0, 5)
+		return segments.join('/') || '/'
 	}
 }

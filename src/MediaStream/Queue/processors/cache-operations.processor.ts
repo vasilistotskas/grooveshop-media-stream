@@ -166,7 +166,7 @@ export class CacheOperationsProcessor {
 			})
 
 			const buffer = Buffer.from(response.data)
-			await this.cacheManager.set('image', cacheKey, buffer.toString('base64'), 3600)
+			await this.cacheManager.set('image', cacheKey, { data: buffer }, 3600)
 
 			this._logger.debug(`Cached image: ${imageUrl}`)
 		}
@@ -198,27 +198,41 @@ export class CacheOperationsProcessor {
 			try {
 				const files = await fs.readdir(cacheDir)
 				const now = Date.now()
+				const BATCH_SIZE = 50
 
-				for (const file of files) {
-					const filePath = path.join(cacheDir, file)
+				for (let i = 0; i < files.length; i += BATCH_SIZE) {
+					const batch = files.slice(i, i + BATCH_SIZE)
 
-					try {
-						const stats = await fs.stat(filePath)
+					const results = await Promise.allSettled(
+						batch.map(async (file) => {
+							const filePath = path.join(cacheDir, file)
+							const stats = await fs.stat(filePath)
+							return { filePath, stats }
+						}),
+					)
 
-						const age = now - stats.mtime.getTime()
-						if (age > maxAge) {
-							await fs.unlink(filePath)
-							cleaned++
+					const toDelete: string[] = []
+					for (const result of results) {
+						if (result.status !== 'fulfilled')
 							continue
-						}
-
-						if (stats.size > maxSize) {
-							await fs.unlink(filePath)
-							cleaned++
+						const { filePath, stats } = result.value
+						const age = now - stats.mtime.getTime()
+						if (age > maxAge || stats.size > maxSize) {
+							toDelete.push(filePath)
 						}
 					}
-					catch (fileError) {
-						this._logger.warn(`Failed to process file ${file}:`, fileError)
+
+					const deleteResults = await Promise.allSettled(
+						toDelete.map(filePath => fs.unlink(filePath)),
+					)
+
+					for (const result of deleteResults) {
+						if (result.status === 'fulfilled') {
+							cleaned++
+						}
+						else {
+							this._logger.warn(`Failed to delete file:`, result.reason)
+						}
 					}
 				}
 			}

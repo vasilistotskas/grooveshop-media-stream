@@ -43,6 +43,11 @@ export interface CacheLayer {
 	 * Get the layer priority (lower number = higher priority)
 	 */
 	getPriority: () => number
+
+	/**
+	 * Get the remaining TTL for a key in seconds. Returns -1 if unknown.
+	 */
+	getTtl: (key: string) => Promise<number>
 }
 
 export interface CacheLayerStats {
