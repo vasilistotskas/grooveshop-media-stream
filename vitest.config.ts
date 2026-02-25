@@ -8,7 +8,7 @@ export default defineConfig({
 			enabled: true,
 			provider: 'v8',
 			reportsDirectory: fileURLToPath(new URL('./coverage', import.meta.url)),
-			reporter: ['text', 'html', 'clover', 'lcov', 'json'],
+			reporter: ['text', 'html', 'clover', 'lcov', 'json', 'json-summary'],
 			include: ['**/*.ts', '**/*.vue'],
 			exclude: [
 				'**/build/**/*',

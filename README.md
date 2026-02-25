@@ -1,4 +1,4 @@
-[![Coverage Status](https://coveralls.io/repos/github/vasilistotskas/grooveshop-media-stream/badge.svg?branch=main)](https://coveralls.io/github/vasilistotskas/grooveshop-media-stream?branch=main)
+[![CI](https://github.com/vasilistotskas/grooveshop-media-stream/actions/workflows/ci.yml/badge.svg)](https://github.com/vasilistotskas/grooveshop-media-stream/actions/workflows/ci.yml)
 
 # Grooveshop Media Stream
 
