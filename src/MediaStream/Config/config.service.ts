@@ -103,9 +103,20 @@ export class ConfigService implements OnModuleInit {
 		})
 
 		if (errors.length > 0) {
-			const errorMessages = errors.map(error =>
-				Object.values(error.constraints || {}).join(', '),
-			).join('; ')
+			const extractMessages = (errs: typeof errors, prefix = ''): string[] => {
+				const messages: string[] = []
+				for (const error of errs) {
+					const prop = prefix ? `${prefix}.${error.property}` : error.property
+					if (error.constraints) {
+						messages.push(...Object.values(error.constraints).map(msg => `${prop}: ${msg}`))
+					}
+					if (error.children?.length) {
+						messages.push(...extractMessages(error.children, prop))
+					}
+				}
+				return messages
+			}
+			const errorMessages = extractMessages(errors).join('; ')
 			throw new Error(`Configuration validation failed: ${errorMessages}`)
 		}
 

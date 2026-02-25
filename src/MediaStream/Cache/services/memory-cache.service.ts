@@ -227,11 +227,10 @@ export class MemoryCacheService implements ICacheManager {
 		}
 
 		if (typeof value === 'object' && value !== null) {
-			const obj = value as Record<string, unknown>
-
 			// Image cache entries: { data: Buffer, metadata: {...} }
-			if ('data' in obj && Buffer.isBuffer(obj.data)) {
-				return (obj.data as Buffer).length + 512 // Buffer + estimated metadata overhead
+			const maybeImage = value as { data?: unknown }
+			if (maybeImage.data !== undefined && Buffer.isBuffer(maybeImage.data)) {
+				return maybeImage.data.length + 512 // Buffer + estimated metadata overhead
 			}
 
 			// For other objects, rough estimate via JSON serialization

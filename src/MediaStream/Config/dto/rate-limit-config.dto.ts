@@ -4,12 +4,12 @@ import { IsBoolean, IsNumber, IsOptional, IsString, Min, ValidateNested } from '
 export class RateLimitThrottlerConfigDto {
 	@IsNumber()
 	@Min(1000)
-	@Transform(({ value }) => Number.parseInt(value, 10))
+	@Transform(({ value }) => Number.parseInt(value, 10) || 60000)
 	windowMs: number = 60000
 
 	@IsNumber()
 	@Min(1)
-	@Transform(({ value }) => Number.parseInt(value, 10))
+	@Transform(({ value }) => Number.parseInt(value, 10) || 100)
 	max: number = 100
 
 	@IsBoolean()
@@ -32,23 +32,23 @@ export class RateLimitThrottlerConfigDto {
 export class SystemLoadThresholdsDto {
 	@IsNumber()
 	@Min(0)
-	@Transform(({ value }) => Number.parseFloat(value))
+	@Transform(({ value }) => Number.parseFloat(value) || 80)
 	cpu: number = 80
 
 	@IsNumber()
 	@Min(0)
-	@Transform(({ value }) => Number.parseFloat(value))
+	@Transform(({ value }) => Number.parseFloat(value) || 85)
 	memory: number = 85
 
 	@IsNumber()
 	@Min(0)
-	@Transform(({ value }) => Number.parseInt(value, 10))
+	@Transform(({ value }) => Number.parseInt(value, 10) || 1000)
 	connections: number = 1000
 }
 
 export class AdaptiveConfigDto {
 	@IsBoolean()
-	@Transform(({ value }) => value === 'true')
+	@Transform(({ value }) => value === 'true' || value === true)
 	enabled: boolean = true
 
 	@ValidateNested()
@@ -57,30 +57,33 @@ export class AdaptiveConfigDto {
 
 	@IsNumber()
 	@Min(0)
-	@Transform(({ value }) => Number.parseFloat(value))
+	@Transform(({ value }) => {
+		const parsed = Number.parseFloat(value)
+		return Number.isNaN(parsed) ? 0.5 : parsed
+	})
 	maxReduction: number = 0.5
 
 	@IsNumber()
 	@Min(1)
-	@Transform(({ value }) => Number.parseInt(value, 10))
+	@Transform(({ value }) => Number.parseInt(value, 10) || 1)
 	minLimit: number = 1
 }
 
 export class BypassConfigDto {
 	@IsBoolean()
-	@Transform(({ value }) => value === 'true')
+	@Transform(({ value }) => value === 'true' || value === true)
 	healthChecks: boolean = true
 
 	@IsBoolean()
-	@Transform(({ value }) => value === 'true')
+	@Transform(({ value }) => value === 'true' || value === true)
 	metricsEndpoint: boolean = true
 
 	@IsBoolean()
-	@Transform(({ value }) => value === 'true')
+	@Transform(({ value }) => value === 'true' || value === true)
 	staticAssets: boolean = true
 
 	@IsBoolean()
-	@Transform(({ value }) => value === 'true')
+	@Transform(({ value }) => value === 'true' || value === true)
 	bots: boolean = true
 
 	@IsString({ each: true })
@@ -124,10 +127,10 @@ export class RateLimitConfigDto {
 	bypass: BypassConfigDto = new BypassConfigDto()
 
 	@IsBoolean()
-	@Transform(({ value }) => value === 'true')
+	@Transform(({ value }) => value === 'true' || value === true)
 	enabled: boolean = true
 
 	@IsBoolean()
-	@Transform(({ value }) => value === 'true')
+	@Transform(({ value }) => value === 'true' || value === true)
 	logBlocked: boolean = true
 }
