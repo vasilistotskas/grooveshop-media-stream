@@ -43,7 +43,7 @@ coverage
 /notes.md
 
 # AI
-.claude
+.claude/settings.local.json
 .cursor
 .cursorrules
 .windsurfrules
