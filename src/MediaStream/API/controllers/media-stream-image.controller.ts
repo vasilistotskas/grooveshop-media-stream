@@ -115,6 +115,7 @@ export default class MediaStreamImageController {
 		// :imagePath+ captures nested paths like blog/post/main/image.jpg
 		// :quality.:format becomes ([^/.]+)\.([^/]+) to match "90.webp"
 		const regexPattern = pattern
+			.replace(/\\/g, '\\\\') // Escape backslashes first
 			.replace(/:([^/.]+)\+/g, '(.+?)') // Handle :param+ (one or more segments, non-greedy)
 			.replace(/:([^/.]+)\.([^/.]+)/g, '([^/.]+)\\.([^/]+)') // Handle :param1.:param2
 			.replace(/:([^/]+)/g, '([^/]+)') // Handle remaining :param

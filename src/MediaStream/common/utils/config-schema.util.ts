@@ -58,8 +58,11 @@ export function buildConfigFromSchema<T>(
 	return result as T
 }
 
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+
 /**
- * Set a nested value in an object using dot notation path
+ * Set a nested value in an object using dot notation path.
+ * Guards against prototype pollution by rejecting unsafe keys.
  */
 export function setNestedValue(obj: Record<string, any>, path: string, value: any): void {
 	const keys = path.split('.')
@@ -67,13 +70,20 @@ export function setNestedValue(obj: Record<string, any>, path: string, value: an
 
 	for (let i = 0; i < keys.length - 1; i++) {
 		const key = keys[i]
+		if (UNSAFE_KEYS.has(key)) {
+			throw new Error(`Unsafe key "${key}" in config path: ${path}`)
+		}
 		if (!(key in current)) {
 			current[key] = {}
 		}
 		current = current[key]
 	}
 
-	current[keys[keys.length - 1]] = value
+	const finalKey = keys[keys.length - 1]
+	if (UNSAFE_KEYS.has(finalKey)) {
+		throw new Error(`Unsafe key "${finalKey}" in config path: ${path}`)
+	}
+	current[finalKey] = value
 }
 
 /**

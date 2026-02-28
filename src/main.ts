@@ -37,7 +37,16 @@ export async function bootstrap(options: BootstrapOptions | boolean = true): Pro
 
 		// Security headers with Helmet
 		app.use(helmet({
-			contentSecurityPolicy: false, // Allow images from any source
+			contentSecurityPolicy: {
+				directives: {
+					defaultSrc: ['\'none\''],
+					imgSrc: ['\'self\'', 'data:'],
+					styleSrc: ['\'self\''],
+					scriptSrc: ['\'none\''],
+					objectSrc: ['\'none\''],
+					frameAncestors: ['\'none\''],
+				},
+			},
 			crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow cross-origin resource sharing
 			// Prevent MIME type sniffing
 			noSniff: true,
