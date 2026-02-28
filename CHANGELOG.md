@@ -1,3 +1,10 @@
+## [2.37.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.37.0...v2.37.1) (2026-02-28)
+
+
+### Bug Fixes
+
+* security minor issues ([e6f8b1f](https://github.com/vasilistotskas/grooveshop-media-stream/commit/e6f8b1fdbf746707618409b455d389e9e92a23da))
+
 # [2.37.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.36.0...v2.37.0) (2026-02-28)
 
 
