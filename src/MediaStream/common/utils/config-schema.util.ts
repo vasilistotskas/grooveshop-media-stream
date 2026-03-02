@@ -170,6 +170,9 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	'rateLimit.bypass.whitelistedDomains': { env: 'RATE_LIMIT_BYPASS_WHITELISTED_DOMAINS', default: '', type: 'string' },
 	'rateLimit.bypass.bots': { env: 'RATE_LIMIT_BYPASS_BOTS', default: true, type: 'boolean' },
 
+	// Validation configuration
+	'validation.allowedDomains': { env: 'VALIDATION_ALLOWED_DOMAINS', default: 'localhost,127.0.0.1,backend-service,static-svc,frontend-nuxt-service,media-stream-service', type: 'string' },
+
 	// Graceful shutdown configuration
 	'shutdown.timeout': { env: 'SHUTDOWN_TIMEOUT', default: 30000, type: 'number' },
 	'shutdown.forceTimeout': { env: 'SHUTDOWN_FORCE_TIMEOUT', default: 60000, type: 'number' },

@@ -8,17 +8,25 @@ import type { ImageSourceConfig } from '../types/image-source.types.js'
  * If not specified, it falls back to the default backend URL from configuration
  */
 export const IMAGE_SOURCES = {
+	// Tenant-scoped media: /media/{tenantSchema}/uploads/...
 	UPLOADED_MEDIA: {
 		name: 'uploaded_media',
-		baseUrl: 'BACKEND_URL', // Environment variable key
+		baseUrl: 'BACKEND_URL',
+		urlPattern: '{baseUrl}/media/{tenantSchema}/uploads/{imagePath}',
+		routePattern: 'media/:tenantSchema/uploads/:imagePath+/:width/:height/:fit/:position/:background/:trimThreshold/:quality.:format',
+		routeParams: ['tenantSchema', 'imagePath', 'width', 'height', 'fit', 'position', 'background', 'trimThreshold', 'quality', 'format'],
+	},
+	// Legacy route (pre-multi-tenancy) for backward compatibility during migration
+	UPLOADED_MEDIA_LEGACY: {
+		name: 'uploaded_media_legacy',
+		baseUrl: 'BACKEND_URL',
 		urlPattern: '{baseUrl}/media/uploads/{imagePath}',
-		// Use wildcard to capture full nested path (e.g., blog/post/main/image.jpg)
 		routePattern: 'media/uploads/:imagePath+/:width/:height/:fit/:position/:background/:trimThreshold/:quality.:format',
 		routeParams: ['imagePath', 'width', 'height', 'fit', 'position', 'background', 'trimThreshold', 'quality', 'format'],
 	},
 	STATIC_IMAGES: {
 		name: 'static_images',
-		baseUrl: 'BACKEND_URL', // Environment variable key
+		baseUrl: 'BACKEND_URL',
 		urlPattern: '{baseUrl}/static/images/{image}',
 		routePattern: 'static/images/:image/:width/:height/:fit/:position/:background/:trimThreshold/:quality.:format',
 		routeParams: ['image', 'width', 'height', 'fit', 'position', 'background', 'trimThreshold', 'quality', 'format'],

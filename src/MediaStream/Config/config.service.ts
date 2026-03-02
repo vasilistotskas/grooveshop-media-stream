@@ -221,6 +221,9 @@ export class ConfigService implements OnModuleInit {
 					bots: this.nestConfigService.get('RATE_LIMIT_BYPASS_BOTS'),
 				},
 			},
+			validation: {
+				allowedDomains: this.nestConfigService.get('VALIDATION_ALLOWED_DOMAINS'),
+			},
 		}
 	}
 
@@ -361,6 +364,10 @@ export class ConfigService implements OnModuleInit {
 					whitelistedDomains: config.rateLimit?.bypass?.whitelistedDomains ?? '',
 					bots: config.rateLimit?.bypass?.bots ?? true,
 				},
+			},
+			validation: {
+				allowedDomains: config.validation?.allowedDomains
+					?? 'localhost,127.0.0.1,backend-service,static-svc,frontend-nuxt-service,media-stream-service',
 			},
 			shutdown: {
 				timeout: config.shutdown?.timeout ?? 30000,

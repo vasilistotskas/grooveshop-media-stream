@@ -26,7 +26,7 @@ describe('inputSanitizationService', () => {
 		// Setup default config responses
 		configService.getOptional.mockImplementation((key, defaultValue) => {
 			const configs: Record<string, any> = {
-				'validation.allowedDomains': ['localhost', '127.0.0.1', 'example.com', 'test.com', 'grooveshop.com'],
+				'validation.allowedDomains': 'localhost,127.0.0.1,example.com,test.com,grooveshop.com',
 				'validation.maxFileSizes': {
 					default: 10 * 1024 * 1024,
 					jpeg: 5 * 1024 * 1024,

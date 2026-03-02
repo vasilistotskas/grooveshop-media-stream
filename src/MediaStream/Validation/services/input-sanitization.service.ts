@@ -19,18 +19,13 @@ export class InputSanitizationService implements ISanitizer<any> {
 
 	private getAllowedDomains(): string[] {
 		if (this.allowedDomains === null) {
-			this.allowedDomains = this._configService.getOptional<string[]>('validation.allowedDomains', [
-				'localhost',
-				'127.0.0.1',
-				'backend-service',
-				'webside.gr',
-				'assets.webside.gr',
-				'api.webside.gr',
-				'static.webside.gr',
-				'static-svc',
-				'frontend-nuxt-service',
-				'media-stream-service',
-			])
+			const domainsStr = this._configService.getOptional<string>(
+				'validation.allowedDomains',
+				'localhost,127.0.0.1,backend-service,static-svc,frontend-nuxt-service,media-stream-service',
+			)
+			this.allowedDomains = typeof domainsStr === 'string'
+				? domainsStr.split(',').map(d => d.trim()).filter(Boolean)
+				: domainsStr
 		}
 		return this.allowedDomains
 	}
