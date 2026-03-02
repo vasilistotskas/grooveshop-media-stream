@@ -32,6 +32,13 @@ const VALIDATION_RULES: Record<string, ValidationRule> = {
 	trimThreshold: { min: MIN_TRIM_THRESHOLD, max: MAX_TRIM_THRESHOLD },
 }
 
+/** PostgreSQL schema name: lowercase letter/underscore start, alphanumeric + underscore, 1-63 chars */
+const TENANT_SCHEMA_PATTERN = /^[a-z_][a-z0-9_]{0,62}$/
+
+const STRING_VALIDATION_RULES: Record<string, { pattern: RegExp }> = {
+	tenantSchema: { pattern: TENANT_SCHEMA_PATTERN },
+}
+
 /**
  * Service responsible for validating image processing requests
  */
@@ -51,7 +58,7 @@ export class RequestValidatorService {
 		const { params, correlationId } = context
 
 		await this.validateSecurityThreats(params, correlationId)
-
+		this.validateStringParameters(params, correlationId)
 		this.validateNumericParameters(params, correlationId)
 
 		this._logger.debug('Request validation passed', {
@@ -70,6 +77,26 @@ export class RequestValidatorService {
 				correlationId,
 				url,
 			})
+		}
+	}
+
+	/**
+	 * Validate string parameters against format patterns
+	 */
+	private validateStringParameters(
+		params: Record<string, unknown>,
+		correlationId: string,
+	): void {
+		for (const [key, rule] of Object.entries(STRING_VALIDATION_RULES)) {
+			const value = params[key]
+			if (value === null || value === undefined)
+				continue
+			if (!rule.pattern.test(String(value))) {
+				throw new InvalidRequestError(
+					`Invalid ${key} parameter: format not allowed`,
+					{ correlationId, [key]: value },
+				)
+			}
 		}
 	}
 
