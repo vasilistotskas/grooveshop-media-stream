@@ -1,3 +1,10 @@
+# [2.38.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.37.1...v2.38.0) (2026-03-17)
+
+
+### Features
+
+* bump dependencies and refactor patterns to constants ([c52cb84](https://github.com/vasilistotskas/grooveshop-media-stream/commit/c52cb849a7a5cfe40df2ae32819e8c2a70e65bda))
+
 ## [2.37.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.37.0...v2.37.1) (2026-02-28)
 
 
