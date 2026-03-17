@@ -16,6 +16,9 @@ import { lastValueFrom, throwError, timer } from 'rxjs'
 import { retry, tap } from 'rxjs/operators'
 import { CircuitBreaker } from '../utils/circuit-breaker.js'
 
+// eslint-disable-next-line no-control-regex
+const NON_ASCII_RE = /[^\u0000-\u007F]/
+
 @Injectable()
 export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDestroy {
 	private readonly circuitBreaker: CircuitBreaker
@@ -365,8 +368,7 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 			const urlObj = new URL(url)
 
 			const pathSegments = urlObj.pathname.split('/').map((segment) => {
-				// eslint-disable-next-line no-control-regex
-				if (/[^\u0000-\u007F]/.test(segment)) {
+				if (NON_ASCII_RE.test(segment)) {
 					return encodeURIComponent(segment)
 				}
 				return segment

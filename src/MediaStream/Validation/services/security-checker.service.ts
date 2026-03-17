@@ -2,6 +2,43 @@ import type { ISecurityChecker, SecurityEvent } from '../interfaces/validator.in
 import { ConfigService } from '#microservice/Config/config.service'
 import { Injectable, Logger } from '@nestjs/common'
 
+const SUSPICIOUS_PATTERNS: RegExp[] = [
+	/<script\b[^>]{0,100}>/i,
+	/javascript:/i,
+	/vbscript:/i,
+	/data:text\/html/i,
+	/\bon\w{1,20}\s*=/i,
+
+	/union\s{1,5}select/i,
+	/drop\s{1,5}table/i,
+	/insert\s{1,5}into/i,
+	/delete\s{1,5}from/i,
+
+	/\.\.\//,
+	/\.\.\\/,
+	/\.\.\\\\/,
+	/%2e%2e%2f/i,
+	/%2e%2e%5c/i,
+
+	/;\s{0,5}rm\s{1,5}-rf/i,
+	/;\s{0,5}cat\s{1,5}/i,
+	/;\s{0,5}ls\s{1,5}/i,
+	/\|\s{0,5}nc\s{1,5}/i,
+
+	/<!entity\b/i,
+	/<!doctype[^>]{0,100}\[/i,
+
+	/\(\|\(/,
+	/\)\(\|/,
+
+	/\$where\b/i,
+	/\$ne\b/i,
+	/\$gt\b/i,
+	/\$lt\b/i,
+]
+
+const IMAGE_EXTENSION_RE = /\.(?:jpe?g|png|gif|webp|svg|bmp|tiff?|ico|avif)$/i
+
 @Injectable()
 export class SecurityCheckerService implements ISecurityChecker {
 	private readonly _logger = new Logger(SecurityCheckerService.name)
@@ -9,40 +46,7 @@ export class SecurityCheckerService implements ISecurityChecker {
 	private readonly securityEvents: SecurityEvent[] = []
 
 	constructor(private readonly _configService: ConfigService) {
-		this.suspiciousPatterns = [
-			/<script\b[^>]{0,100}>/i,
-			/javascript:/i,
-			/vbscript:/i,
-			/data:text\/html/i,
-			/\bon\w{1,20}\s*=/i,
-
-			/union\s{1,5}select/i,
-			/drop\s{1,5}table/i,
-			/insert\s{1,5}into/i,
-			/delete\s{1,5}from/i,
-
-			/\.\.\//,
-			/\.\.\\/,
-			/\.\.\\\\/,
-			/%2e%2e%2f/i,
-			/%2e%2e%5c/i,
-
-			/;\s{0,5}rm\s{1,5}-rf/i,
-			/;\s{0,5}cat\s{1,5}/i,
-			/;\s{0,5}ls\s{1,5}/i,
-			/\|\s{0,5}nc\s{1,5}/i,
-
-			/<!entity\b/i,
-			/<!doctype[^>]{0,100}\[/i,
-
-			/\(\|\(/,
-			/\)\(\|/,
-
-			/\$where\b/i,
-			/\$ne\b/i,
-			/\$gt\b/i,
-			/\$lt\b/i,
-		]
+		this.suspiciousPatterns = SUSPICIOUS_PATTERNS
 	}
 
 	async checkForMaliciousContent(input: any): Promise<boolean> {
@@ -132,8 +136,7 @@ export class SecurityCheckerService implements ISecurityChecker {
 
 		// Skip entropy check for filenames with common image extensions
 		// file upload system could adds random suffixes like __ytXSDgf which have high entropy
-		const imageExtensionPattern = /\.(?:jpe?g|png|gif|webp|svg|bmp|tiff?|ico|avif)$/i
-		if (imageExtensionPattern.test(str)) {
+		if (IMAGE_EXTENSION_RE.test(str)) {
 			return false
 		}
 

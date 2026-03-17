@@ -91,7 +91,7 @@ describe('redisCacheService', () => {
 		// Redis is the mocked constructor, we can get its instances
 		const RedisMock = Redis as any
 		if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
-			mockRedis = RedisMock.mock.instances[RedisMock.mock.instances.length - 1]
+			mockRedis = RedisMock.mock.instances.at(-1)
 		}
 	})
 
@@ -110,7 +110,7 @@ describe('redisCacheService', () => {
 			// Update mockRedis to the latest instance
 			const RedisMock = Redis as any
 			if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
-				mockRedis = RedisMock.mock.instances[RedisMock.mock.instances.length - 1]
+				mockRedis = RedisMock.mock.instances.at(-1)
 			}
 
 			expect(Redis).toHaveBeenCalledWith({
@@ -134,7 +134,7 @@ describe('redisCacheService', () => {
 			// Update mockRedis to the latest instance
 			const RedisMock = Redis as any
 			if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
-				mockRedis = RedisMock.mock.instances[RedisMock.mock.instances.length - 1]
+				mockRedis = RedisMock.mock.instances.at(-1)
 			}
 
 			expect(mockRedis.on).toHaveBeenCalledWith('connect', expect.any(Function))
@@ -150,7 +150,7 @@ describe('redisCacheService', () => {
 			// Update mockRedis to the latest instance
 			const RedisMock = Redis as any
 			if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
-				mockRedis = RedisMock.mock.instances[RedisMock.mock.instances.length - 1]
+				mockRedis = RedisMock.mock.instances.at(-1)
 			}
 
 			await service.onModuleDestroy()
@@ -166,7 +166,7 @@ describe('redisCacheService', () => {
 			// Update mockRedis to the latest instance after onModuleInit
 			const RedisMock = Redis as any
 			if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
-				mockRedis = RedisMock.mock.instances[RedisMock.mock.instances.length - 1]
+				mockRedis = RedisMock.mock.instances.at(-1)
 			}
 
 			// Simulate ready event
@@ -506,7 +506,7 @@ describe('redisCacheService', () => {
 			// Update mockRedis to the latest instance after onModuleInit
 			const RedisMock = Redis as any
 			if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
-				mockRedis = RedisMock.mock.instances[RedisMock.mock.instances.length - 1]
+				mockRedis = RedisMock.mock.instances.at(-1)
 			}
 
 			// Simulate ready event

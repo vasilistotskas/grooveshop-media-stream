@@ -9,6 +9,8 @@ import { CorrelationService } from '#microservice/Correlation/services/correlati
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 import { Injectable, Logger } from '@nestjs/common'
 
+const BASE64_SPECIAL_RE = /[/+=]/g
+
 @Injectable()
 export class CacheOperationsProcessor {
 	private readonly _logger = new Logger(CacheOperationsProcessor.name)
@@ -252,7 +254,7 @@ export class CacheOperationsProcessor {
 
 	private generateCacheKey(imageUrl: string): string {
 		// Simple cache key generation - in real implementation this would be more sophisticated
-		const hash = Buffer.from(imageUrl).toString('base64').replace(/[/+=]/g, '')
+		const hash = Buffer.from(imageUrl).toString('base64').replace(BASE64_SPECIAL_RE, '')
 		return `image:${hash}`
 	}
 }

@@ -10,6 +10,8 @@ import { Injectable } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { MultiLayerCacheManager } from './multi-layer-cache.manager.js'
 
+const FILE_EXTENSION_RE = /\.[^/.]+$/
+
 interface CacheWarmingConfig {
 	enabled: boolean
 	warmupOnStart: boolean
@@ -182,7 +184,7 @@ export class CacheWarmingService implements OnModuleInit {
 
 	private extractResourceId(filePath: string): string {
 		const filename = filePath.split('/').pop() || filePath.split('\\').pop()
-		return filename?.replace(/\.[^/.]+$/, '') || ''
+		return filename?.replace(FILE_EXTENSION_RE, '') || ''
 	}
 
 	async warmupSpecificFile(resourceId: string, content: Buffer, ttl?: number): Promise<void> {

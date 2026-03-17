@@ -5,6 +5,8 @@ import { Test, TestingModule } from '@nestjs/testing'
 import request from 'supertest'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+const TEXT_PLAIN_RE = /text\/plain/
+
 describe('MediaStreamModule (e2e)', () => {
 	let app: INestApplication
 	let moduleFixture: TestingModule
@@ -61,7 +63,7 @@ describe('MediaStreamModule (e2e)', () => {
 
 			.expect(200)
 
-			.expect('Content-Type', /text\/plain/)
+			.expect('Content-Type', TEXT_PLAIN_RE)
 	})
 
 	it('/metrics/health (GET)', () => {

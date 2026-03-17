@@ -7,6 +7,9 @@ import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Injectable } from '@nestjs/common'
 import { Redis } from 'ioredis'
 
+const DB_KEYS_RE = /db\d+:keys=(\d+)/
+const USED_MEMORY_RE = /used_memory:(\d+)/
+
 @Injectable()
 export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleDestroy {
 	private redis!: Redis
@@ -279,11 +282,11 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			if (this.isConnected) {
 				try {
 					const info = await this.redis.info('keyspace')
-					const dbInfo = info.match(/db\d+:keys=(\d+)/)
+					const dbInfo = info.match(DB_KEYS_RE)
 					keys = dbInfo ? Number.parseInt(dbInfo[1]) : 0
 
 					const memInfo = await this.redis.info('memory')
-					const memMatch = memInfo.match(/used_memory:(\d+)/)
+					const memMatch = memInfo.match(USED_MEMORY_RE)
 					memoryUsage = memMatch ? Number.parseInt(memMatch[1]) : 0
 				}
 				catch (error: unknown) {

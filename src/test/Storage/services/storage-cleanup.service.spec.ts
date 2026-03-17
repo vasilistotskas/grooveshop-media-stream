@@ -103,7 +103,7 @@ describe('storageCleanupService', () => {
 			else if (fileName.includes('temp') || fileName.endsWith('.tmp')) {
 				ageInDays = 2 // Older than 1 day for temp-files policy
 			}
-			else if (fileName.includes('old') || fileName.match(/\.(jpg|jpeg|png|webp|gif)$/)) {
+			else if (fileName.includes('old') || /\.(?:jpg|jpeg|png|webp|gif)$/.test(fileName)) {
 				ageInDays = 10 // Older than 7 days for large-images policy
 			}
 

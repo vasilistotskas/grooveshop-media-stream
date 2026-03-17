@@ -8,6 +8,10 @@ import { Cron } from '@nestjs/schedule'
 import { IntelligentEvictionService } from './intelligent-eviction.service.js'
 import { StorageMonitoringService } from './storage-monitoring.service.js'
 
+const CACHE_FILE_RE = /\.(json|cache|rsc|rsm)$/
+const IMAGE_FILE_RE = /\.(jpg|jpeg|png|webp|gif|rsc)$/
+const TEMP_FILE_RE = /\.(tmp|temp|rst)$/
+
 export interface RetentionPolicy {
 	name: string
 	description: string
@@ -305,7 +309,7 @@ export class StorageCleanupService implements OnModuleInit {
 				description: 'Remove cache files older than 30 days',
 				maxAge: 30,
 				maxSize: 0,
-				filePattern: /\.(json|cache|rsc|rsm)$/,
+				filePattern: CACHE_FILE_RE,
 				enabled: true,
 			},
 			{
@@ -313,7 +317,7 @@ export class StorageCleanupService implements OnModuleInit {
 				description: 'Remove large image files older than 7 days',
 				maxAge: 7,
 				maxSize: 100 * 1024 * 1024,
-				filePattern: /\.(jpg|jpeg|png|webp|gif|rsc)$/,
+				filePattern: IMAGE_FILE_RE,
 				enabled: true,
 			},
 			{
@@ -321,7 +325,7 @@ export class StorageCleanupService implements OnModuleInit {
 				description: 'Remove temporary files older than 1 day',
 				maxAge: 1,
 				maxSize: 0,
-				filePattern: /\.(tmp|temp|rst)$/,
+				filePattern: TEMP_FILE_RE,
 				enabled: true,
 			},
 			{

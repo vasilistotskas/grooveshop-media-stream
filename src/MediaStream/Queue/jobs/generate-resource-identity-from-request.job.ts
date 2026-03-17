@@ -6,8 +6,10 @@ import { Injectable } from '@nestjs/common'
 
 const NAMESPACE_URL = '6ba7b811-9dad-11d1-80b4-00c04fd430c8'
 
+const DASH_RE = /-/g
+
 function generateUUIDv5(name: string, namespace: string = NAMESPACE_URL): string {
-	const ns = Buffer.from(namespace.replace(/-/g, ''), 'hex')
+	const ns = Buffer.from(namespace.replace(DASH_RE, ''), 'hex')
 	const hash = createHash('sha1').update(Buffer.concat([ns, Buffer.from(name)])).digest()
 
 	hash[6] = (hash[6] & 0x0F) | 0x50

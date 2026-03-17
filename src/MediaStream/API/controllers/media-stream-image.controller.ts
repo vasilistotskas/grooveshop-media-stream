@@ -18,6 +18,12 @@ import { ImageStreamService } from '../services/image-stream.service.js'
 import { RequestValidatorService } from '../services/request-validator.service.js'
 import { UrlBuilderService } from '../services/url-builder.service.js'
 
+const BACKSLASH_RE = /\\/g
+const PARAM_PLUS_RE = /:([^/.]+)\+/g
+const PARAM_DOT_PARAM_RE = /:([^/.]+)\.([^/.]+)/g
+const PARAM_RE = /:([^/]+)/g
+const SLASH_RE = /\//g
+
 /**
  * Controller for image streaming with dynamic route matching
  *
@@ -115,11 +121,11 @@ export default class MediaStreamImageController {
 		// :imagePath+ captures nested paths like blog/post/main/image.jpg
 		// :quality.:format becomes ([^/.]+)\.([^/]+) to match "90.webp"
 		const regexPattern = pattern
-			.replace(/\\/g, '\\\\') // Escape backslashes first
-			.replace(/:([^/.]+)\+/g, '(.+?)') // Handle :param+ (one or more segments, non-greedy)
-			.replace(/:([^/.]+)\.([^/.]+)/g, '([^/.]+)\\.([^/]+)') // Handle :param1.:param2
-			.replace(/:([^/]+)/g, '([^/]+)') // Handle remaining :param
-			.replace(/\//g, '\\/') // Escape slashes
+			.replace(BACKSLASH_RE, '\\\\') // Escape backslashes first
+			.replace(PARAM_PLUS_RE, '(.+?)') // Handle :param+ (one or more segments, non-greedy)
+			.replace(PARAM_DOT_PARAM_RE, '([^/.]+)\\.([^/]+)') // Handle :param1.:param2
+			.replace(PARAM_RE, '([^/]+)') // Handle remaining :param
+			.replace(SLASH_RE, '\\/') // Escape slashes
 
 		return new RegExp(`^${regexPattern}$`)
 	}

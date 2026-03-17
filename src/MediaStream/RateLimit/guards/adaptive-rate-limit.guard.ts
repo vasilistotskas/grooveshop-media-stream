@@ -5,6 +5,8 @@ import { Injectable, Logger } from '@nestjs/common'
 import { ThrottlerException } from '@nestjs/throttler'
 import { RateLimitService } from '../services/rate-limit.service.js'
 
+const STATIC_ASSET_RE = /\.(?:css|js|png|jpg|jpeg|gif|ico|svg)$/
+
 @Injectable()
 export class AdaptiveRateLimitGuard implements CanActivate {
 	private readonly _logger = new Logger(AdaptiveRateLimitGuard.name)
@@ -106,7 +108,7 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 			return true
 		}
 
-		if (url.match(/\.(css|js|png|jpg|jpeg|gif|ico|svg)$/)) {
+		if (STATIC_ASSET_RE.test(url)) {
 			return true
 		}
 

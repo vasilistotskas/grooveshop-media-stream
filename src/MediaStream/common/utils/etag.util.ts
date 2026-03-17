@@ -60,8 +60,11 @@ export function checkETagMatch(
 /**
  * Normalize ETag by removing weak prefix
  */
+const WEAK_PREFIX_RE = /^W\//
+const QUOTE_RE = /^"|"$/g
+
 function normalizeETag(etag: string): string {
-	return etag.replace(/^W\//, '').replace(/^"|"$/g, '')
+	return etag.replace(WEAK_PREFIX_RE, '').replace(QUOTE_RE, '')
 }
 
 /**

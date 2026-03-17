@@ -254,7 +254,7 @@ describe('httpHealthIndicator', () => {
 
 			mockHttpClientService.get.mockImplementation(() => {
 				return new Promise((resolve) => {
-					setTimeout(() => resolve(mockResponse), 50)
+					setTimeout(resolve, 50, mockResponse)
 				})
 			})
 

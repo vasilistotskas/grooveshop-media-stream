@@ -4,6 +4,53 @@ import { ConfigService } from '#microservice/Config/config.service'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Injectable, Logger } from '@nestjs/common'
 
+const UA_WHITESPACE_RE = /\s+/g
+const VERSION_NUMBER_RE = /\/[\d.]+/g
+
+const BOT_PATTERNS: RegExp[] = [
+	// Social Media Crawlers
+	/facebook/i,
+	/facebookexternalhit/i,
+	/facebookcatalog/i,
+	/Facebot/i,
+	/Twitterbot/i,
+	/LinkedInBot/i,
+	/WhatsApp/i,
+	/TelegramBot/i,
+	/Slackbot/i,
+	/DiscordBot/i,
+	/Discordbot/i,
+	/Slack-ImgProxy/i,
+
+	// Search Engine Crawlers
+	/Googlebot/i,
+	/bingbot/i,
+	/Baiduspider/i,
+	/YandexBot/i,
+	/DuckDuckBot/i,
+	/Slurp/i, // Yahoo
+	/Applebot/i,
+
+	// SEO & Analytics Tools
+	/AhrefsBot/i,
+	/SemrushBot/i,
+	/MJ12bot/i,
+	/DotBot/i,
+	/Screaming Frog/i,
+	/SEOkicks/i,
+
+	// Other Common Bots
+	/PingdomBot/i,
+	/UptimeRobot/i,
+	/StatusCake/i,
+	/Lighthouse/i,
+	/PageSpeed/i,
+	/GTmetrix/i,
+	/HeadlessChrome/i,
+	/PhantomJS/i,
+	/Prerender/i,
+]
+
 export interface RateLimitConfig {
 	windowMs: number
 	max: number
@@ -81,10 +128,10 @@ export class RateLimitService {
 		// Normalize user agent to reduce variations
 		const normalized = userAgent
 			.toLowerCase()
-			.replace(/\s+/g, ' ')
+			.replace(UA_WHITESPACE_RE, ' ')
 			.trim()
 			// Remove version numbers to group similar browsers
-			.replace(/\/[\d.]+/g, '')
+			.replace(VERSION_NUMBER_RE, '')
 			.substring(0, 100) // Limit length
 
 		return this.simpleHash(normalized)
@@ -127,51 +174,7 @@ export class RateLimitService {
 			return false
 		}
 
-		const botPatterns = [
-			// Social Media Crawlers
-			/facebook/i,
-			/facebookexternalhit/i,
-			/facebookcatalog/i,
-			/Facebot/i,
-			/Twitterbot/i,
-			/LinkedInBot/i,
-			/WhatsApp/i,
-			/TelegramBot/i,
-			/Slackbot/i,
-			/DiscordBot/i,
-			/Discordbot/i,
-			/Slack-ImgProxy/i,
-
-			// Search Engine Crawlers
-			/Googlebot/i,
-			/bingbot/i,
-			/Baiduspider/i,
-			/YandexBot/i,
-			/DuckDuckBot/i,
-			/Slurp/i, // Yahoo
-			/Applebot/i,
-
-			// SEO & Analytics Tools
-			/AhrefsBot/i,
-			/SemrushBot/i,
-			/MJ12bot/i,
-			/DotBot/i,
-			/Screaming Frog/i,
-			/SEOkicks/i,
-
-			// Other Common Bots
-			/PingdomBot/i,
-			/UptimeRobot/i,
-			/StatusCake/i,
-			/Lighthouse/i,
-			/PageSpeed/i,
-			/GTmetrix/i,
-			/HeadlessChrome/i,
-			/PhantomJS/i,
-			/Prerender/i,
-		]
-
-		return botPatterns.some(pattern => pattern.test(userAgent))
+		return BOT_PATTERNS.some(pattern => pattern.test(userAgent))
 	}
 
 	/**
