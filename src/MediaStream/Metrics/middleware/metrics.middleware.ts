@@ -66,20 +66,13 @@ export class MetricsMiddleware implements NestMiddleware {
 	}
 
 	private getRequestSize(req: Request): number {
-		const contentLength = req.get('content-length')
+		const contentLength = req.headers['content-length']
 		if (contentLength) {
 			return Number.parseInt(contentLength, 10) || 0
 		}
 
-		let size = 0
-
-		for (const [key, value] of Object.entries(req.headers)) {
-			size += key.length + (Array.isArray(value) ? value.join('').length : String(value).length)
-		}
-
-		size += req.url.length
-
-		return size
+		// For requests without content-length (e.g. GET), use URL length as rough estimate
+		return req.url.length
 	}
 
 	private getRoute(req: Request): string {

@@ -169,11 +169,10 @@ export default class MediaStreamImageController {
 		PerformanceTracker.startPhase(phaseKey)
 
 		try {
-			const decodedParams = this.decodeParams(params)
-
+			// Params are already decoded — fullPath was decoded at line 78 before regex matching
 			const context: ImageProcessingContext = {
 				source,
-				params: decodedParams,
+				params,
 				correlationId,
 			}
 
@@ -182,7 +181,7 @@ export default class MediaStreamImageController {
 			const resourceUrl = this.urlBuilderService.buildResourceUrl(context)
 			await this.requestValidatorService.validateUrl(resourceUrl, correlationId)
 
-			const resizeOptions = this.buildResizeOptions(decodedParams)
+			const resizeOptions = this.buildResizeOptions(params)
 
 			const request = new CacheImageRequest({
 				resourceTarget: resourceUrl,
@@ -191,7 +190,7 @@ export default class MediaStreamImageController {
 
 			this._logger.debug('Processing image request', {
 				source: source.name,
-				params: decodedParams,
+				params,
 				resourceUrl,
 				correlationId,
 			})
@@ -210,24 +209,6 @@ export default class MediaStreamImageController {
 		finally {
 			PerformanceTracker.endPhase(phaseKey)
 		}
-	}
-
-	private decodeParams(params: Record<string, any>): Record<string, any> {
-		const decoded: Record<string, any> = {}
-		for (const [key, value] of Object.entries(params)) {
-			if (typeof value === 'string') {
-				try {
-					decoded[key] = decodeURIComponent(value)
-				}
-				catch {
-					decoded[key] = value
-				}
-			}
-			else {
-				decoded[key] = value
-			}
-		}
-		return decoded
 	}
 
 	private buildResizeOptions(params: ImageProcessingParams): ResizeOptions {

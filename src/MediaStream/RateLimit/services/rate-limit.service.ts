@@ -7,49 +7,9 @@ import { Injectable, Logger } from '@nestjs/common'
 const UA_WHITESPACE_RE = /\s+/g
 const VERSION_NUMBER_RE = /\/[\d.]+/g
 
-const BOT_PATTERNS: RegExp[] = [
-	// Social Media Crawlers
-	/facebook/i,
-	/facebookexternalhit/i,
-	/facebookcatalog/i,
-	/Facebot/i,
-	/Twitterbot/i,
-	/LinkedInBot/i,
-	/WhatsApp/i,
-	/TelegramBot/i,
-	/Slackbot/i,
-	/DiscordBot/i,
-	/Discordbot/i,
-	/Slack-ImgProxy/i,
-
-	// Search Engine Crawlers
-	/Googlebot/i,
-	/bingbot/i,
-	/Baiduspider/i,
-	/YandexBot/i,
-	/DuckDuckBot/i,
-	/Slurp/i, // Yahoo
-	/Applebot/i,
-
-	// SEO & Analytics Tools
-	/AhrefsBot/i,
-	/SemrushBot/i,
-	/MJ12bot/i,
-	/DotBot/i,
-	/Screaming Frog/i,
-	/SEOkicks/i,
-
-	// Other Common Bots
-	/PingdomBot/i,
-	/UptimeRobot/i,
-	/StatusCake/i,
-	/Lighthouse/i,
-	/PageSpeed/i,
-	/GTmetrix/i,
-	/HeadlessChrome/i,
-	/PhantomJS/i,
-	/Prerender/i,
-]
+// Single combined regex for bot detection — avoids testing 42 individual patterns per request
+// Single combined regex for bot detection — avoids testing many individual patterns per request
+const BOT_PATTERN_RE = /facebook|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|slackbot|discordbot|slack-imgproxy|googlebot|bingbot|baiduspider|yandexbot|duckduckbot|slurp|applebot|ahrefsbot|semrushbot|mj12bot|dotbot|screaming frog|seokicks|pingdombot|uptimerobot|statuscake|lighthouse|pagespeed|gtmetrix|headlesschrome|phantomjs|prerender/i
 
 export interface RateLimitConfig {
 	windowMs: number
@@ -174,7 +134,7 @@ export class RateLimitService {
 			return false
 		}
 
-		return BOT_PATTERNS.some(pattern => pattern.test(userAgent))
+		return BOT_PATTERN_RE.test(userAgent)
 	}
 
 	/**

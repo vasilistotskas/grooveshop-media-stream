@@ -36,7 +36,7 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 		queueSize: 0,
 	}
 
-	private totalResponseTime = 0
+	private readonly EMA_ALPHA = 0.1 // Exponential moving average smoothing factor
 	private readonly maxRetries: number
 	private readonly retryDelay: number
 	private readonly maxRetryDelay: number
@@ -211,7 +211,6 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 		this.stats.failedRequests = 0
 		this.stats.retriedRequests = 0
 		this.stats.averageResponseTime = 0
-		this.totalResponseTime = 0
 		CorrelatedLogger.debug('HTTP client statistics reset', HttpClientService.name)
 	}
 
@@ -310,16 +309,11 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 			)
 
 			const responseTime = performance.now() - startTime
-			this.totalResponseTime += responseTime
-			this.stats.averageResponseTime = this.totalResponseTime / this.stats.successfulRequests
+			this.stats.averageResponseTime = this.stats.averageResponseTime === 0
+				? responseTime
+				: this.stats.averageResponseTime * (1 - this.EMA_ALPHA) + responseTime * this.EMA_ALPHA
 
 			return response
-		}
-		catch (error: unknown) {
-			const responseTime = performance.now() - startTime
-			this.totalResponseTime += responseTime
-
-			throw error
 		}
 		finally {
 			this.stats.activeRequests--

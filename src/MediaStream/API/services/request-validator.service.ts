@@ -81,8 +81,15 @@ export class RequestValidatorService {
 			typeof value === 'string',
 		)
 
-		for (const [key, value] of stringParams) {
-			const isMalicious = await this.securityCheckerService.checkForMaliciousContent(value as string)
+		const results = await Promise.all(
+			stringParams.map(async ([key, value]) => ({
+				key,
+				value,
+				isMalicious: await this.securityCheckerService.checkForMaliciousContent(value as string),
+			})),
+		)
+
+		for (const { key, value, isMalicious } of results) {
 			if (isMalicious) {
 				throw new InvalidRequestError(`Invalid ${key} parameter`, {
 					correlationId,

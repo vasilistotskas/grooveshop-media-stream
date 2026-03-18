@@ -225,21 +225,36 @@ export class StorageCleanupService implements OnModuleInit {
 		sizeFreed: number
 		errors: string[]
 	}> {
-		const files = await fs.readdir(this.storageDirectory)
+		const allFiles = await fs.readdir(this.storageDirectory)
+		const files = allFiles.filter(f => f !== '.gitkeep')
+
+		// Batch stat calls in parallel
+		const statResults = await Promise.all(
+			files.map(async (file) => {
+				try {
+					const stats = await fs.stat(join(this.storageDirectory, file))
+					return { file, stats }
+				}
+				catch {
+					return null
+				}
+			}),
+		)
+
+		const now = Date.now()
 		const candidates: Array<{ file: string, stats: Stats }> = []
 
-		for (const file of files) {
-			if (file === '.gitkeep')
+		for (const result of statResults) {
+			if (!result)
 				continue
 
-			const filePath = join(this.storageDirectory, file)
-			const stats = await fs.stat(filePath)
+			const { file, stats } = result
 
 			if (policy.filePattern && !policy.filePattern.test(file)) {
 				continue
 			}
 
-			const ageInDays = (Date.now() - stats.mtime.getTime()) / (1000 * 60 * 60 * 24)
+			const ageInDays = (now - stats.mtime.getTime()) / (1000 * 60 * 60 * 24)
 			if (ageInDays < policy.maxAge) {
 				continue
 			}
@@ -268,27 +283,32 @@ export class StorageCleanupService implements OnModuleInit {
 			totalSize += candidate.stats.size
 		}
 
-		let filesRemoved = 0
-		let sizeFreed = 0
 		const errors: string[] = []
 
-		for (const { file, stats } of finalCandidates) {
-			try {
+		// Batch unlink in parallel
+		const unlinkResults = await Promise.allSettled(
+			finalCandidates.map(async ({ file, stats }) => {
 				if (!dryRun) {
-					const filePath = join(this.storageDirectory, file)
-					await fs.unlink(filePath)
+					await fs.unlink(join(this.storageDirectory, file))
 				}
-
-				filesRemoved++
-				sizeFreed += stats.size
-
 				CorrelatedLogger.debug(
 					`${dryRun ? '[DRY RUN] ' : ''}Removed file: ${file} (${this.formatBytes(stats.size)})`,
 					StorageCleanupService.name,
 				)
+				return stats.size
+			}),
+		)
+
+		let filesRemoved = 0
+		let sizeFreed = 0
+
+		for (const result of unlinkResults) {
+			if (result.status === 'fulfilled') {
+				filesRemoved++
+				sizeFreed += result.value
 			}
-			catch (error: unknown) {
-				const errorMsg = `Failed to remove ${file}: ${(error as Error).message}`
+			else {
+				const errorMsg = `Failed to remove file: ${result.reason}`
 				errors.push(errorMsg)
 				CorrelatedLogger.warn(errorMsg, StorageCleanupService.name)
 			}

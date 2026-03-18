@@ -55,18 +55,17 @@ export class ImageStreamService {
 
 			// Fast path for cached images (no deduplication overhead)
 			if (await this.cacheImageResourceOperation.checkResourceExists(opCtx)) {
+				// fetchHeaders reuses cached metaData from checkResourceExists via opCtx
+				const headers = await this.cacheImageResourceOperation.fetchHeaders(opCtx)
 				// Check for conditional request (ETag/If-Modified-Since)
-				if (req) {
-					const headers = await this.cacheImageResourceOperation.fetchHeaders(opCtx)
-					if (headers) {
-						const notModified = this.checkConditionalRequest(req, headers)
-						if (notModified) {
-							this.send304Response(res, headers, correlationId)
-							return
-						}
+				if (req && headers) {
+					const notModified = this.checkConditionalRequest(req, headers)
+					if (notModified) {
+						this.send304Response(res, headers, correlationId)
+						return
 					}
 				}
-				await this.streamResource(opCtx, request, res, correlationId)
+				await this.streamResource(opCtx, request, res, correlationId, headers)
 				return
 			}
 
@@ -78,7 +77,7 @@ export class ImageStreamService {
 			})
 
 			// Stream from cache — runs independently per request
-			await this.streamResource(opCtx, request, res, correlationId)
+			await this.streamResource(opCtx, request, res, correlationId, undefined)
 		}
 		catch (error: unknown) {
 			await this.handleStreamError(error, request, res, correlationId)
@@ -132,8 +131,9 @@ export class ImageStreamService {
 		request: CacheImageRequest,
 		res: Response,
 		correlationId: string,
+		cachedHeaders?: ResourceMetaData | null,
 	): Promise<void> {
-		const headers = await this.cacheImageResourceOperation.fetchHeaders(opCtx)
+		const headers = cachedHeaders ?? await this.cacheImageResourceOperation.fetchHeaders(opCtx)
 
 		if (!headers) {
 			this._logger.warn('Resource metadata missing', { correlationId })

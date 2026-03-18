@@ -331,12 +331,16 @@ describe('storage Management Integration', () => {
 		})
 
 		it('should provide meaningful error reporting', async () => {
-			// Simulate various error conditions
+			// Simulate various error conditions — individual stat failures are caught per-file
 			mockFs.stat.mockRejectedValue(new Error('Disk full'))
 
-			await expect(storageMonitoring.getStorageStats()).rejects.toThrow('Disk full')
+			// getStorageStats now handles per-file errors gracefully and returns empty results
+			const stats = await storageMonitoring.getStorageStats()
+			expect(stats.totalFiles).toBe(0)
+			expect(stats.totalSize).toBe(0)
 
-			// Health check should reflect the error
+			// Simulate readdir failure for health check
+			mockFs.readdir.mockRejectedValue(new Error('Disk full'))
 			const healthResult = await storageHealth.isHealthy()
 			expect(healthResult.storage.status).toBe('down')
 			expect(healthResult.storage.message).toContain('Disk full')

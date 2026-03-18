@@ -358,7 +358,9 @@ export class MultiLayerCacheManager implements OnModuleInit, OnModuleDestroy {
 	}
 
 	/**
-	 * Track key access frequency for preloading
+	 * Track key access frequency for preloading.
+	 * Uses a simple size cap with FIFO eviction of single-access entries
+	 * to avoid O(n log n) sort on every prune.
 	 */
 	private trackKeyAccess(key: string): void {
 		if (!this.preloadingEnabled) {
@@ -368,13 +370,26 @@ export class MultiLayerCacheManager implements OnModuleInit, OnModuleDestroy {
 		const currentCount = this.popularKeys.get(key) || 0
 		this.popularKeys.set(key, currentCount + 1)
 
-		if (this.popularKeys.size > 10000) {
-			const entries = Array.from(this.popularKeys.entries())
-				.sort(([, a], [, b]) => b - a)
-				.slice(0, 5000)
-
-			this.popularKeys.clear()
-			entries.forEach(([k, v]) => this.popularKeys.set(k, v))
+		if (this.popularKeys.size > 5000) {
+			// Evict entries with lowest access count (single-access keys first)
+			for (const [k, v] of this.popularKeys) {
+				if (this.popularKeys.size <= 2500)
+					break
+				if (v <= 1) {
+					this.popularKeys.delete(k)
+				}
+			}
+			// If still over limit, FIFO evict oldest entries
+			if (this.popularKeys.size > 2500) {
+				const iter = this.popularKeys.keys()
+				while (this.popularKeys.size > 2500) {
+					const { value } = iter.next()
+					if (value)
+						this.popularKeys.delete(value)
+					else
+						break
+				}
+			}
 		}
 	}
 

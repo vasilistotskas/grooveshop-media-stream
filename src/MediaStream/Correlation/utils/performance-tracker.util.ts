@@ -66,10 +66,14 @@ export class PerformanceTracker {
 		if (!phases)
 			return null
 
-		const phase = phases
-			.slice()
-			.reverse()
-			.find(p => p.name === phaseName && !p.endTime)
+		// Find last uncompleted phase with this name — backward loop avoids array copy
+		let phase: PerformancePhase | undefined
+		for (let i = phases.length - 1; i >= 0; i--) {
+			if (phases[i].name === phaseName && !phases[i].endTime) {
+				phase = phases[i]
+				break
+			}
+		}
 
 		if (!phase) {
 			CorrelatedLogger.warn(

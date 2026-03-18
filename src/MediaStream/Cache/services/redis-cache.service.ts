@@ -427,7 +427,8 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			if (metaLength > 0 && 5 + metaLength <= value.length) {
 				const metaJson = value.toString('utf8', 5, 5 + metaLength)
 				const rest = JSON.parse(metaJson)
-				const data = Buffer.from(value.subarray(5 + metaLength))
+				// Use subarray view directly — avoids copying the entire image buffer
+				const data = value.subarray(5 + metaLength)
 				return { ...rest, data } as T
 			}
 		}

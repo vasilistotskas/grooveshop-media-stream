@@ -104,7 +104,10 @@ describe('storageMonitoringService', () => {
 		it('should handle file stat errors gracefully', async () => {
 			mockFs.stat.mockRejectedValue(new Error('File not found'))
 
-			await expect(service.getStorageStats()).rejects.toThrow('File not found')
+			// Individual stat failures are caught per-file; getStorageStats returns empty results
+			const result = await service.getStorageStats()
+			expect(result.totalFiles).toBe(0)
+			expect(result.totalSize).toBe(0)
 		})
 	})
 

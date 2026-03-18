@@ -10,6 +10,8 @@ const STATIC_ASSET_RE = /\.(?:css|js|png|jpg|jpeg|gif|ico|svg)$/
 @Injectable()
 export class AdaptiveRateLimitGuard implements CanActivate {
 	private readonly _logger = new Logger(AdaptiveRateLimitGuard.name)
+	private cachedWhitelistedDomains: string[] | null = null
+	private cachedBypassBots: boolean | null = null
 
 	constructor(
 		private readonly rateLimitService: RateLimitService,
@@ -92,23 +94,21 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 	private shouldSkipRateLimit(request: any): boolean {
 		const url = request.url || ''
 
+		// Cheapest checks first (string startsWith)
+		if (url.startsWith('/health') || url.startsWith('/metrics')) {
+			return true
+		}
+
+		if (STATIC_ASSET_RE.test(url)) {
+			return true
+		}
+
+		// Most expensive check last (URL parsing + domain matching)
 		if (this.isDomainWhitelisted(request)) {
 			this._logger.debug('Skipping rate limiting for whitelisted domain', {
 				referer: request.headers.referer,
 				origin: request.headers.origin,
 			})
-			return true
-		}
-
-		if (url.startsWith('/health')) {
-			return true
-		}
-
-		if (url.startsWith('/metrics')) {
-			return true
-		}
-
-		if (STATIC_ASSET_RE.test(url)) {
 			return true
 		}
 
@@ -119,8 +119,10 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 	 * Check if bot bypass is enabled and user agent is a bot
 	 */
 	private shouldBypassBot(userAgent: string): boolean {
-		const bypassBots = this.rateLimitService.getBypassBotsConfig()
-		if (!bypassBots) {
+		if (this.cachedBypassBots === null) {
+			this.cachedBypassBots = this.rateLimitService.getBypassBotsConfig()
+		}
+		if (!this.cachedBypassBots) {
 			return false
 		}
 
@@ -132,7 +134,10 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 	 */
 	private isDomainWhitelisted(request: any): boolean {
 		try {
-			const whitelistedDomains = this.rateLimitService.getWhitelistedDomains()
+			if (this.cachedWhitelistedDomains === null) {
+				this.cachedWhitelistedDomains = this.rateLimitService.getWhitelistedDomains()
+			}
+			const whitelistedDomains = this.cachedWhitelistedDomains
 
 			if (!whitelistedDomains || whitelistedDomains.length === 0) {
 				return false

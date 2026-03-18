@@ -128,27 +128,39 @@ export default class CacheImageResourceOperation {
 				}
 			}
 
+			// Check filesystem: try reading metadata directly (1 syscall instead of access+access+readFile)
+			const resourceMetaPath = this.getResourceMetaPath(ctx)
+			let metadataContent: string | null = null
+			try {
+				metadataContent = await readFile(resourceMetaPath, 'utf8')
+			}
+			catch {
+				// Metadata file doesn't exist — resource not cached on disk
+			}
+
+			if (!metadataContent) {
+				CorrelatedLogger.debug(`Metadata not found in filesystem: ${resourceMetaPath}`, CacheImageResourceOperation.name)
+				const duration = PerformanceTracker.endPhase('resource_exists_check')
+				this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
+				return false
+			}
+
+			// Verify the resource data file exists
 			const resourcePath = this.getResourcePath(ctx)
 			const resourcePathExists = await access(resourcePath).then(() => true).catch(() => false)
 			if (!resourcePathExists) {
-				CorrelatedLogger.debug(`Resource not found in filesystem: ${resourcePath}`, CacheImageResourceOperation.name)
+				CorrelatedLogger.debug(`Resource data not found in filesystem: ${resourcePath}`, CacheImageResourceOperation.name)
 				const duration = PerformanceTracker.endPhase('resource_exists_check')
 				this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
 				return false
 			}
 
-			const resourceMetaPath = this.getResourceMetaPath(ctx)
-			const resourceMetaPathExists = await access(resourceMetaPath).then(() => true).catch(() => false)
-			if (!resourceMetaPathExists) {
-				CorrelatedLogger.warn(`Metadata path does not exist: ${resourceMetaPath}`, CacheImageResourceOperation.name)
-				const duration = PerformanceTracker.endPhase('resource_exists_check')
-				this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
-				return false
+			let headers: ResourceMetaData
+			try {
+				headers = new ResourceMetaData(JSON.parse(metadataContent))
+				ctx.metaData = headers
 			}
-
-			const headers = await this.fetchHeaders(ctx)
-
-			if (!headers) {
+			catch {
 				CorrelatedLogger.warn('Metadata headers are missing or invalid', CacheImageResourceOperation.name)
 				const duration = PerformanceTracker.endPhase('resource_exists_check')
 				this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
@@ -191,12 +203,11 @@ export default class CacheImageResourceOperation {
 				}
 
 				const resourceMetaPath = this.getResourceMetaPath(ctx)
-				const exists = await access(resourceMetaPath).then(() => true).catch(() => false)
-				if (exists) {
+				try {
 					const content = await readFile(resourceMetaPath, 'utf8')
 					ctx.metaData = new ResourceMetaData(JSON.parse(content))
 				}
-				else {
+				catch {
 					CorrelatedLogger.warn('Metadata file does not exist.', CacheImageResourceOperation.name)
 					return new ResourceMetaData()
 				}
@@ -551,13 +562,15 @@ export default class CacheImageResourceOperation {
 			const resourcePath = this.getResourcePath(ctx)
 			const resourceMetaPath = this.getResourceMetaPath(ctx)
 
-			const resourceExists = await access(resourcePath).then(() => true).catch(() => false)
-			const metadataExists = await access(resourceMetaPath).then(() => true).catch(() => false)
+			// Read both files in parallel — no separate access() checks needed
+			const [dataResult, metaResult] = await Promise.allSettled([
+				readFile(resourcePath),
+				readFile(resourceMetaPath, 'utf8'),
+			])
 
-			if (resourceExists && metadataExists) {
-				const data = await readFile(resourcePath)
-				const metadataContent = await readFile(resourceMetaPath, 'utf8')
-				const metadata = new ResourceMetaData(JSON.parse(metadataContent))
+			if (dataResult.status === 'fulfilled' && metaResult.status === 'fulfilled') {
+				const data = dataResult.value
+				const metadata = new ResourceMetaData(JSON.parse(metaResult.value))
 
 				await this.cacheManager.set('image', ctx.id, { data, metadata }, this.privateTtl)
 

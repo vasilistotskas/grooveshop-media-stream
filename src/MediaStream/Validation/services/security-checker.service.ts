@@ -38,15 +38,18 @@ const SUSPICIOUS_PATTERNS: RegExp[] = [
 ]
 
 const IMAGE_EXTENSION_RE = /\.(?:jpe?g|png|gif|webp|svg|bmp|tiff?|ico|avif)$/i
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
 
 @Injectable()
 export class SecurityCheckerService implements ISecurityChecker {
 	private readonly _logger = new Logger(SecurityCheckerService.name)
 	private readonly suspiciousPatterns: RegExp[]
 	private readonly securityEvents: SecurityEvent[] = []
+	private readonly maxStringLength: number
 
 	constructor(private readonly _configService: ConfigService) {
 		this.suspiciousPatterns = SUSPICIOUS_PATTERNS
+		this.maxStringLength = this._configService.getOptional('validation.maxStringLength', 10000)
 	}
 
 	async checkForMaliciousContent(input: any): Promise<boolean> {
@@ -75,11 +78,10 @@ export class SecurityCheckerService implements ISecurityChecker {
 	}
 
 	private checkString(str: string): boolean {
-		const maxLength = this._configService.getOptional('validation.maxStringLength', 10000)
 		if (str.length === 0) {
 			return false
 		}
-		if (str.length > maxLength) {
+		if (str.length > this.maxStringLength) {
 			this._logger.warn(`Excessively long string detected: ${str.length} characters`)
 			return true
 		}
@@ -109,9 +111,8 @@ export class SecurityCheckerService implements ISecurityChecker {
 	}
 
 	private async checkObject(obj: any): Promise<boolean> {
-		const dangerousKeys = ['__proto__', 'constructor', 'prototype']
 		for (const key of Object.keys(obj)) {
-			if (dangerousKeys.includes(key)) {
+			if (DANGEROUS_KEYS.has(key)) {
 				this._logger.warn(`Dangerous object key detected: ${key}`)
 				return true
 			}

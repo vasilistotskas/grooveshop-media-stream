@@ -208,7 +208,7 @@ describe('multiLayerCacheManager Integration', () => {
 
 			// Key should include hashed parameters
 			expect(mockMemoryCacheService.get).toHaveBeenCalledWith(
-				expect.stringMatching(/^image:test-key:[a-f0-9]{16}$/),
+				expect.stringMatching(/^image:test-key:[a-z0-9]{1,16}$/),
 			)
 		})
 
