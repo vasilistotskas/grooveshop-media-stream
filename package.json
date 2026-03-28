@@ -50,7 +50,7 @@
     "@nestjs/serve-static": "5.0.4",
     "@nestjs/terminus": "11.1.1",
     "@nestjs/throttler": "6.5.0",
-    "axios": "1.13.6",
+    "axios": "1.14.0",
     "bull": "4.16.5",
     "class-transformer": "0.5.1",
     "class-validator": "0.15.1",
@@ -76,9 +76,9 @@
     "@semantic-release/github": "12.0.6",
     "@semantic-release/npm": "13.1.5",
     "@semantic-release/release-notes-generator": "14.1.0",
-    "@vitest/coverage-v8": "4.1.0",
+    "@vitest/coverage-v8": "4.1.2",
     "@swc/cli": "0.8.0",
-    "@swc/core": "1.15.18",
+    "@swc/core": "1.15.21",
     "@types/compression": "1.8.1",
     "@types/express": "5.0.6",
     "@types/node": "25.5.0",
@@ -91,8 +91,8 @@
     "ts-loader": "9.5.4",
     "ts-node": "10.9.2",
     "tsconfig-paths": "4.2.0",
-    "typescript": "5.9.3",
-    "vitest": "4.1.0",
+    "typescript": "6.0.2",
+    "vitest": "4.1.2",
     "unplugin-swc": "1.5.9"
   },
   "publishConfig": {
@@ -137,7 +137,7 @@
       ]
     ]
   },
-  "packageManager": "pnpm@10.32.1",
+  "packageManager": "pnpm@10.33.0",
   "engines": {
     "node": ">=24.12.0"
   }
