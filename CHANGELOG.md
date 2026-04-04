@@ -1,3 +1,10 @@
+# [2.42.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.41.0...v2.42.0) (2026-04-04)
+
+
+### Features
+
+* harden rate limiter, add Redis security log ([ed1a1f6](https://github.com/vasilistotskas/grooveshop-media-stream/commit/ed1a1f664cdf34942aaf7cf461450c68932f2465))
+
 # [2.41.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.40.0...v2.41.0) (2026-03-31)
 
 
