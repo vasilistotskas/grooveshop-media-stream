@@ -1,6 +1,7 @@
 import type { RequestContext } from '#microservice/Correlation/interfaces/correlation.interface'
 import { requestContextStorage } from '#microservice/Correlation/async-local-storage'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
+import { Logger } from '@nestjs/common'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 function createRequestContext(correlationId: string): RequestContext {
@@ -15,24 +16,26 @@ function createRequestContext(correlationId: string): RequestContext {
 }
 
 describe('correlatedLogger', () => {
-	let consoleSpy: {
+	let loggerSpy: {
 		log: ReturnType<typeof vi.spyOn>
 		error: ReturnType<typeof vi.spyOn>
 		warn: ReturnType<typeof vi.spyOn>
 		debug: ReturnType<typeof vi.spyOn>
+		verbose: ReturnType<typeof vi.spyOn>
 	}
 
 	beforeEach(() => {
-		consoleSpy = {
-			log: vi.spyOn(console, 'log').mockImplementation(() => {}),
-			error: vi.spyOn(console, 'error').mockImplementation(() => {}),
-			warn: vi.spyOn(console, 'warn').mockImplementation(() => {}),
-			debug: vi.spyOn(console, 'debug').mockImplementation(() => {}),
+		loggerSpy = {
+			log: vi.spyOn(Logger.prototype, 'log').mockImplementation(() => {}),
+			error: vi.spyOn(Logger.prototype, 'error').mockImplementation(() => {}),
+			warn: vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => {}),
+			debug: vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => {}),
+			verbose: vi.spyOn(Logger.prototype, 'verbose').mockImplementation(() => {}),
 		}
 	})
 
 	afterEach(() => {
-		Object.values(consoleSpy).forEach(spy => spy.mockRestore())
+		Object.values(loggerSpy).forEach(spy => spy.mockRestore())
 	})
 
 	describe('log', () => {
@@ -40,28 +43,28 @@ describe('correlatedLogger', () => {
 			requestContextStorage.run(createRequestContext('test-correlation-id'), () => {
 				CorrelatedLogger.log('Test message')
 
-				expect(consoleSpy.log).toHaveBeenCalledWith('[test-correlation-id] Test message')
+				expect(loggerSpy.log).toHaveBeenCalledWith('[test-correlation-id] Test message', undefined)
 			})
 		})
 
 		it('should log without correlation ID when not available', () => {
 			CorrelatedLogger.log('Test message')
 
-			expect(consoleSpy.log).toHaveBeenCalledWith(' Test message')
+			expect(loggerSpy.log).toHaveBeenCalledWith('Test message', undefined)
 		})
 
 		it('should include context when provided', () => {
 			requestContextStorage.run(createRequestContext('test-correlation-id'), () => {
 				CorrelatedLogger.log('Test message', 'TestContext')
 
-				expect(consoleSpy.log).toHaveBeenCalledWith('[test-correlation-id] [TestContext] Test message')
+				expect(loggerSpy.log).toHaveBeenCalledWith('[test-correlation-id] Test message', 'TestContext')
 			})
 		})
 
 		it('should handle missing correlation ID and context', () => {
 			CorrelatedLogger.log('Test message', 'TestContext')
 
-			expect(consoleSpy.log).toHaveBeenCalledWith(' [TestContext] Test message')
+			expect(loggerSpy.log).toHaveBeenCalledWith('Test message', 'TestContext')
 		})
 	})
 
@@ -70,7 +73,7 @@ describe('correlatedLogger', () => {
 			requestContextStorage.run(createRequestContext('test-correlation-id'), () => {
 				CorrelatedLogger.error('Error message')
 
-				expect(consoleSpy.error).toHaveBeenCalledWith('[test-correlation-id] ERROR: Error message')
+				expect(loggerSpy.error).toHaveBeenCalledWith('[test-correlation-id] Error message', undefined, undefined)
 			})
 		})
 
@@ -78,15 +81,14 @@ describe('correlatedLogger', () => {
 			requestContextStorage.run(createRequestContext('test-correlation-id'), () => {
 				CorrelatedLogger.error('Error message', 'Stack trace here', 'ErrorContext')
 
-				expect(consoleSpy.error).toHaveBeenCalledWith('[test-correlation-id] [ErrorContext] ERROR: Error message')
-				expect(consoleSpy.error).toHaveBeenCalledWith('[test-correlation-id] [ErrorContext] TRACE: Stack trace here')
+				expect(loggerSpy.error).toHaveBeenCalledWith('[test-correlation-id] Error message', 'Stack trace here', 'ErrorContext')
 			})
 		})
 
 		it('should handle missing correlation ID', () => {
 			CorrelatedLogger.error('Error message')
 
-			expect(consoleSpy.error).toHaveBeenCalledWith(' ERROR: Error message')
+			expect(loggerSpy.error).toHaveBeenCalledWith('Error message', undefined, undefined)
 		})
 	})
 
@@ -95,7 +97,7 @@ describe('correlatedLogger', () => {
 			requestContextStorage.run(createRequestContext('test-correlation-id'), () => {
 				CorrelatedLogger.warn('Warning message')
 
-				expect(consoleSpy.warn).toHaveBeenCalledWith('[test-correlation-id] WARN: Warning message')
+				expect(loggerSpy.warn).toHaveBeenCalledWith('[test-correlation-id] Warning message', undefined)
 			})
 		})
 
@@ -103,7 +105,7 @@ describe('correlatedLogger', () => {
 			requestContextStorage.run(createRequestContext('test-correlation-id'), () => {
 				CorrelatedLogger.warn('Warning message', 'WarnContext')
 
-				expect(consoleSpy.warn).toHaveBeenCalledWith('[test-correlation-id] [WarnContext] WARN: Warning message')
+				expect(loggerSpy.warn).toHaveBeenCalledWith('[test-correlation-id] Warning message', 'WarnContext')
 			})
 		})
 	})
@@ -113,7 +115,7 @@ describe('correlatedLogger', () => {
 			requestContextStorage.run(createRequestContext('test-correlation-id'), () => {
 				CorrelatedLogger.debug('Debug message')
 
-				expect(consoleSpy.debug).toHaveBeenCalledWith('[test-correlation-id] DEBUG: Debug message')
+				expect(loggerSpy.debug).toHaveBeenCalledWith('[test-correlation-id] Debug message', undefined)
 			})
 		})
 
@@ -121,7 +123,7 @@ describe('correlatedLogger', () => {
 			requestContextStorage.run(createRequestContext('test-correlation-id'), () => {
 				CorrelatedLogger.debug('Debug message', 'DebugContext')
 
-				expect(consoleSpy.debug).toHaveBeenCalledWith('[test-correlation-id] [DebugContext] DEBUG: Debug message')
+				expect(loggerSpy.debug).toHaveBeenCalledWith('[test-correlation-id] Debug message', 'DebugContext')
 			})
 		})
 	})
@@ -131,7 +133,7 @@ describe('correlatedLogger', () => {
 			requestContextStorage.run(createRequestContext('test-correlation-id'), () => {
 				CorrelatedLogger.verbose('Verbose message')
 
-				expect(consoleSpy.log).toHaveBeenCalledWith('[test-correlation-id] VERBOSE: Verbose message')
+				expect(loggerSpy.verbose).toHaveBeenCalledWith('[test-correlation-id] Verbose message', undefined)
 			})
 		})
 
@@ -139,7 +141,7 @@ describe('correlatedLogger', () => {
 			requestContextStorage.run(createRequestContext('test-correlation-id'), () => {
 				CorrelatedLogger.verbose('Verbose message', 'VerboseContext')
 
-				expect(consoleSpy.log).toHaveBeenCalledWith('[test-correlation-id] [VerboseContext] VERBOSE: Verbose message')
+				expect(loggerSpy.verbose).toHaveBeenCalledWith('[test-correlation-id] Verbose message', 'VerboseContext')
 			})
 		})
 	})

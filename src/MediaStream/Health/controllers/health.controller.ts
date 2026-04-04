@@ -12,8 +12,8 @@ import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.i
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 import { JobQueueHealthIndicator } from '#microservice/Queue/indicators/job-queue-health.indicator'
 import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
-import { Controller, Get } from '@nestjs/common'
-import { HealthCheck, HealthCheckService } from '@nestjs/terminus'
+import { Controller, Get, ServiceUnavailableException } from '@nestjs/common'
+import { HealthCheck, HealthCheckError, HealthCheckService } from '@nestjs/terminus'
 import { DiskSpaceHealthIndicator } from '../indicators/disk-space-health.indicator.js'
 import { MemoryHealthIndicator } from '../indicators/memory-health.indicator.js'
 import { SharpHealthIndicator } from '../indicators/sharp-health.indicator.js'
@@ -92,7 +92,7 @@ export class HealthController {
 	}
 
 	@Get('ready')
-	async readiness(): Promise<{ status: string, timestamp: string, checks?: any, error?: string }> {
+	async readiness(): Promise<{ status: string, timestamp: string, checks?: any }> {
 		try {
 			// Lightweight readiness check - only critical dependencies
 			// Full health check is available at /health for detailed diagnostics
@@ -109,11 +109,11 @@ export class HealthController {
 			}
 		}
 		catch (error: unknown) {
-			return {
+			throw new ServiceUnavailableException({
 				status: 'not ready',
 				timestamp: new Date().toISOString(),
-				error: error instanceof Error ? (error as Error).message : 'Unknown error',
-			}
+				checks: error instanceof HealthCheckError ? error.causes : undefined,
+			})
 		}
 	}
 

@@ -1,6 +1,6 @@
 import type { OnModuleInit } from '@nestjs/common'
 import { Buffer } from 'node:buffer'
-import { readdir, readFile, stat } from 'node:fs/promises'
+import { access, readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { cwd } from 'node:process'
 import { ConfigService } from '#microservice/Config/config.service'
@@ -32,6 +32,8 @@ export class CacheWarmingService implements OnModuleInit {
 	private readonly config: CacheWarmingConfig
 	private readonly storagePath: string
 	private readonly baseCacheTtl: number
+	private lastWarmup: Date | null = null
+	private lastFilesWarmed = 0
 
 	constructor(
 		private readonly cacheManager: MultiLayerCacheManager,
@@ -92,6 +94,8 @@ export class CacheWarmingService implements OnModuleInit {
 			}
 
 			const duration = Date.now() - startTime
+			this.lastWarmup = new Date()
+			this.lastFilesWarmed = warmedCount
 			CorrelatedLogger.log(`Cache warmup completed: ${warmedCount} files warmed in ${duration}ms`, CacheWarmingService.name)
 
 			this.metricsService.recordCacheOperation('warmup', 'memory', 'success')
@@ -103,49 +107,75 @@ export class CacheWarmingService implements OnModuleInit {
 	}
 
 	private async getPopularFiles(): Promise<FileAccessInfo[]> {
-		const files: FileAccessInfo[] = []
+		const BATCH_SIZE = 50
 
 		try {
-			const entries = await readdir(this.storagePath)
+			const dirEntries = await readdir(this.storagePath, { withFileTypes: true })
 
-			for (const entry of entries) {
-				if (entry.endsWith('.rsc')) {
-					const filePath = join(this.storagePath, entry)
-					const metaPath = filePath.replace('.rsc', '.rsm')
+			// Filter to plain .rsc files only — no syscalls yet
+			const rscEntries = dirEntries.filter(
+				e => e.isFile() && e.name.endsWith('.rsc'),
+			)
 
-					try {
-						const [fileStat, metaContent] = await Promise.all([
-							stat(filePath),
-							readFile(metaPath, 'utf8').catch(() => null),
-						])
+			const results: FileAccessInfo[] = []
 
-						let accessCount = 1
-						if (metaContent) {
-							try {
-								const metadata = JSON.parse(metaContent)
-								accessCount = metadata.accessCount || 1
+			// Process in batches of BATCH_SIZE to bound peak concurrency
+			for (let i = 0; i < rscEntries.length; i += BATCH_SIZE) {
+				const batch = rscEntries.slice(i, i + BATCH_SIZE)
+
+				const batchResults = await Promise.all(
+					batch.map(async (entry) => {
+						const filePath = join(this.storagePath, entry.name)
+						const metaPath = filePath.replace('.rsc', '.rsm')
+
+						try {
+							// Pre-filter: skip files with no metadata — they have accessCount = 1
+							// which is always below threshold, so stat() would be wasted I/O
+							const metaAccessible = await access(metaPath).then(() => true, () => false)
+							if (!metaAccessible) {
+								return null
 							}
-							catch {
-								// Ignore metadata parsing errors
+
+							const [fileStat, metaContent] = await Promise.all([
+								stat(filePath),
+								readFile(metaPath, 'utf8').catch(() => null),
+							])
+
+							let accessCount = 1
+							if (metaContent) {
+								try {
+									const metadata = JSON.parse(metaContent)
+									accessCount = metadata.accessCount || 1
+								}
+								catch {
+									// Ignore metadata parsing errors
+								}
 							}
+
+							return {
+								path: filePath,
+								lastAccessed: fileStat.atime,
+								accessCount,
+								size: fileStat.size,
+							} satisfies FileAccessInfo
 						}
+						catch (error: unknown) {
+							CorrelatedLogger.debug(`Skipping file ${entry.name}: ${(error as Error).message}`, CacheWarmingService.name)
+							return null
+						}
+					}),
+				)
 
-						files.push({
-							path: filePath,
-							lastAccessed: fileStat.atime,
-							accessCount,
-							size: fileStat.size,
-						})
-					}
-					catch (error: unknown) {
-						CorrelatedLogger.debug(`Skipping file ${entry}: ${(error as Error).message}`, CacheWarmingService.name)
+				for (const item of batchResults) {
+					if (item !== null) {
+						results.push(item)
 					}
 				}
 			}
 
-			return files
+			return results
 				.filter(f => f.accessCount >= this.config.popularImageThreshold)
-				.sort((a: any, b: any) => {
+				.sort((a, b) => {
 					if (a.accessCount !== b.accessCount) {
 						return b.accessCount - a.accessCount
 					}
@@ -205,8 +235,8 @@ export class CacheWarmingService implements OnModuleInit {
 	}> {
 		return {
 			enabled: this.config.enabled,
-			lastWarmup: null,
-			filesWarmed: 0,
+			lastWarmup: this.lastWarmup,
+			filesWarmed: this.lastFilesWarmed,
 		}
 	}
 }

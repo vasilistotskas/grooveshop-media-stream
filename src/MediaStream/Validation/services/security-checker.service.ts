@@ -1,6 +1,7 @@
 import type { ISecurityChecker, SecurityEvent } from '../interfaces/validator.interface.js'
+import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { ConfigService } from '#microservice/Config/config.service'
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, Optional } from '@nestjs/common'
 
 const SUSPICIOUS_PATTERNS: RegExp[] = [
 	/<script\b[^>]{0,100}>/i,
@@ -40,6 +41,9 @@ const SUSPICIOUS_PATTERNS: RegExp[] = [
 const IMAGE_EXTENSION_RE = /\.(?:jpe?g|png|gif|webp|svg|bmp|tiff?|ico|avif)$/i
 const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
 
+const REDIS_SECURITY_EVENTS_KEY = 'security:events'
+const REDIS_SECURITY_EVENTS_MAX = 10000
+
 @Injectable()
 export class SecurityCheckerService implements ISecurityChecker {
 	private readonly _logger = new Logger(SecurityCheckerService.name)
@@ -47,7 +51,10 @@ export class SecurityCheckerService implements ISecurityChecker {
 	private readonly securityEvents: SecurityEvent[] = []
 	private readonly maxStringLength: number
 
-	constructor(private readonly _configService: ConfigService) {
+	constructor(
+		private readonly _configService: ConfigService,
+		@Optional() private readonly _redisCacheService: RedisCacheService | null,
+	) {
 		this.suspiciousPatterns = SUSPICIOUS_PATTERNS
 		this.maxStringLength = this._configService.getOptional('validation.maxStringLength', 10000)
 	}
@@ -186,7 +193,11 @@ export class SecurityCheckerService implements ISecurityChecker {
 			event.timestamp = new Date()
 		}
 
+		// Fast in-memory store for health/stats endpoints (capped at 1000)
 		this.securityEvents.push(event)
+		if (this.securityEvents.length > 1000) {
+			this.securityEvents.shift()
+		}
 
 		this._logger.warn(`Security event: ${event.type}`, {
 			source: event.source,
@@ -196,14 +207,43 @@ export class SecurityCheckerService implements ISecurityChecker {
 			timestamp: event.timestamp,
 		})
 
-		// In production, you might want to:
-		// - Send to SIEM system
-		// - Trigger alerts for critical events
-		// - Update threat intelligence feeds
-		// - Block suspicious IPs temporarily
+		// Persist to Redis for cross-replica visibility and crash durability (fire-and-forget)
+		this.persistEventToRedis(event)
+	}
 
-		if (this.securityEvents.length > 1000) {
-			this.securityEvents.shift()
+	private persistEventToRedis(event: SecurityEvent): void {
+		const redisClient = this._redisCacheService?.getClient()
+		if (!redisClient) {
+			return
+		}
+
+		const serialized = JSON.stringify(event)
+		redisClient.lpush(REDIS_SECURITY_EVENTS_KEY, serialized)
+			.then(() => redisClient.ltrim(REDIS_SECURITY_EVENTS_KEY, 0, REDIS_SECURITY_EVENTS_MAX - 1))
+			.catch((error: unknown) => {
+				this._logger.warn(`Failed to persist security event to Redis: ${(error as Error).message}`)
+			})
+	}
+
+	async getRecentEventsFromRedis(limit = 100): Promise<SecurityEvent[]> {
+		const redisClient = this._redisCacheService?.getClient()
+		if (!redisClient) {
+			return []
+		}
+
+		try {
+			const raw = await redisClient.lrange(REDIS_SECURITY_EVENTS_KEY, 0, limit - 1)
+			return raw.map((entry) => {
+				const parsed = JSON.parse(entry) as SecurityEvent
+				if (parsed.timestamp) {
+					parsed.timestamp = new Date(parsed.timestamp)
+				}
+				return parsed
+			})
+		}
+		catch (error: unknown) {
+			this._logger.warn(`Failed to read security events from Redis: ${(error as Error).message}`)
+			return []
 		}
 	}
 

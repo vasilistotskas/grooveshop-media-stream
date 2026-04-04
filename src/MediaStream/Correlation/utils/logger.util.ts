@@ -1,6 +1,9 @@
+import { Logger } from '@nestjs/common'
 import { requestContextStorage } from '../async-local-storage.js'
 
 export class CorrelatedLogger {
+	private static readonly nestLogger = new Logger('CorrelatedLogger')
+
 	private static getCorrelationId(): string | null {
 		const store = requestContextStorage.getStore()
 		return store?.correlationId || null
@@ -8,39 +11,31 @@ export class CorrelatedLogger {
 
 	static log(message: string, context?: string): void {
 		const correlationId = this.getCorrelationId()
-		const prefix = correlationId ? `[${correlationId}]` : ''
-		const contextStr = context ? ` [${context}]` : ''
-		console.log(`${prefix}${contextStr} ${message}`)
+		const prefix = correlationId ? `[${correlationId}] ` : ''
+		CorrelatedLogger.nestLogger.log(`${prefix}${message}`, context)
 	}
 
 	static error(message: string, trace?: string, context?: string): void {
 		const correlationId = this.getCorrelationId()
-		const prefix = correlationId ? `[${correlationId}]` : ''
-		const contextStr = context ? ` [${context}]` : ''
-		console.error(`${prefix}${contextStr} ERROR: ${message}`)
-		if (trace) {
-			console.error(`${prefix}${contextStr} TRACE: ${trace}`)
-		}
+		const prefix = correlationId ? `[${correlationId}] ` : ''
+		CorrelatedLogger.nestLogger.error(`${prefix}${message}`, trace, context)
 	}
 
 	static warn(message: string, context?: string): void {
 		const correlationId = this.getCorrelationId()
-		const prefix = correlationId ? `[${correlationId}]` : ''
-		const contextStr = context ? ` [${context}]` : ''
-		console.warn(`${prefix}${contextStr} WARN: ${message}`)
+		const prefix = correlationId ? `[${correlationId}] ` : ''
+		CorrelatedLogger.nestLogger.warn(`${prefix}${message}`, context)
 	}
 
 	static debug(message: string, context?: string): void {
 		const correlationId = this.getCorrelationId()
-		const prefix = correlationId ? `[${correlationId}]` : ''
-		const contextStr = context ? ` [${context}]` : ''
-		console.debug(`${prefix}${contextStr} DEBUG: ${message}`)
+		const prefix = correlationId ? `[${correlationId}] ` : ''
+		CorrelatedLogger.nestLogger.debug(`${prefix}${message}`, context)
 	}
 
 	static verbose(message: string, context?: string): void {
 		const correlationId = this.getCorrelationId()
-		const prefix = correlationId ? `[${correlationId}]` : ''
-		const contextStr = context ? ` [${context}]` : ''
-		console.log(`${prefix}${contextStr} VERBOSE: ${message}`)
+		const prefix = correlationId ? `[${correlationId}] ` : ''
+		CorrelatedLogger.nestLogger.verbose(`${prefix}${message}`, context)
 	}
 }

@@ -1,6 +1,7 @@
+import type { Dirent } from 'node:fs'
 import type { MockedFunction, MockedObject } from 'vitest'
 import { Buffer } from 'node:buffer'
-import { readdir, readFile, stat } from 'node:fs/promises'
+import { access, readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { CacheWarmingService } from '#microservice/Cache/services/cache-warming.service'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
@@ -17,6 +18,12 @@ const mockReaddir = readdir as unknown as MockedFunction<typeof readdir>
 const mockStat = stat as unknown as MockedFunction<typeof stat>
 const mockReadFile = readFile as unknown as MockedFunction<typeof readFile>
 const mockJoin = join as unknown as MockedFunction<typeof join>
+const mockAccess = access as unknown as MockedFunction<typeof access>
+
+/** Create a mock Dirent for readdir({ withFileTypes: true }) */
+function mockDirent(name: string, isFile = true): Dirent {
+	return { name, isFile: () => isFile, isDirectory: () => !isFile, isBlockDevice: () => false, isCharacterDevice: () => false, isFIFO: () => false, isSocket: () => false, isSymbolicLink: () => false, path: '', parentPath: '' } as Dirent
+}
 
 describe('cacheWarmingService', () => {
 	let service: CacheWarmingService
@@ -105,7 +112,8 @@ describe('cacheWarmingService', () => {
 	describe('cache Warmup', () => {
 		it('should warm up popular files', async () => {
 			// Mock file system
-			mockReaddir.mockResolvedValue(['file1.rsc', 'file2.rsc', 'file3.rsc'] as any)
+			mockReaddir.mockResolvedValue([mockDirent('file1.rsc'), mockDirent('file2.rsc'), mockDirent('file3.rsc')] as any)
+			mockAccess.mockResolvedValue(undefined)
 			mockStat.mockResolvedValue({
 				atime: new Date(),
 				size: 1024,
@@ -127,7 +135,8 @@ describe('cacheWarmingService', () => {
 		})
 
 		it('should skip files already in cache', async () => {
-			mockReaddir.mockResolvedValue(['file1.rsc'] as any)
+			mockReaddir.mockResolvedValue([mockDirent('file1.rsc')] as any)
+			mockAccess.mockResolvedValue(undefined)
 			mockStat.mockResolvedValue({
 				atime: new Date(),
 				size: 1024,
@@ -178,7 +187,8 @@ describe('cacheWarmingService', () => {
 
 			const limitedService = module.get<CacheWarmingService>(CacheWarmingService)
 
-			mockReaddir.mockResolvedValue(['file1.rsc', 'file2.rsc', 'file3.rsc'] as any)
+			mockReaddir.mockResolvedValue([mockDirent('file1.rsc'), mockDirent('file2.rsc'), mockDirent('file3.rsc')] as any)
+			mockAccess.mockResolvedValue(undefined)
 			mockStat.mockResolvedValue({
 				atime: new Date(),
 				size: 1024,
@@ -198,7 +208,8 @@ describe('cacheWarmingService', () => {
 		})
 
 		it('should filter files by popularity threshold', async () => {
-			mockReaddir.mockResolvedValue(['file1.rsc', 'file2.rsc'] as any)
+			mockReaddir.mockResolvedValue([mockDirent('file1.rsc'), mockDirent('file2.rsc')] as any)
+			mockAccess.mockResolvedValue(undefined)
 			mockStat.mockResolvedValue({
 				atime: new Date(),
 				size: 1024,
@@ -225,7 +236,8 @@ describe('cacheWarmingService', () => {
 		})
 
 		it('should handle individual file errors gracefully', async () => {
-			mockReaddir.mockResolvedValue(['file1.rsc', 'file2.rsc'] as any)
+			mockReaddir.mockResolvedValue([mockDirent('file1.rsc'), mockDirent('file2.rsc')] as any)
+			mockAccess.mockResolvedValue(undefined)
 			mockStat.mockResolvedValue({
 				atime: new Date(),
 				size: 1024,
@@ -350,7 +362,8 @@ describe('cacheWarmingService', () => {
 
 	describe('tTL Calculation', () => {
 		it('should calculate TTL based on access patterns', async () => {
-			mockReaddir.mockResolvedValue(['file1.rsc'] as any)
+			mockReaddir.mockResolvedValue([mockDirent('file1.rsc')] as any)
+			mockAccess.mockResolvedValue(undefined)
 			mockStat.mockResolvedValue({
 				atime: new Date(),
 				size: 1024,

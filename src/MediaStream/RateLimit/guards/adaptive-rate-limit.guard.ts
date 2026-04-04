@@ -103,9 +103,10 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 			return true
 		}
 
-		// Most expensive check last (URL parsing + domain matching)
+		// Most expensive check last (IP check + URL parsing + domain matching)
 		if (this.isDomainWhitelisted(request)) {
-			this._logger.debug('Skipping rate limiting for whitelisted domain', {
+			this._logger.debug('Skipping rate limiting for internal whitelisted domain', {
+				ip: this.getClientIp(request),
 				referer: request.headers.referer,
 				origin: request.headers.origin,
 			})
@@ -130,10 +131,63 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 	}
 
 	/**
-	 * Check if the request comes from a whitelisted domain
+	 * Returns true only when the connecting IP is a private/loopback address.
+	 * Referer and Origin are attacker-controlled HTTP headers, so the domain
+	 * whitelist is only meaningful for requests that cannot be spoofed from the
+	 * public internet — i.e. requests arriving from within the cluster or from
+	 * localhost.
+	 */
+	private isInternalIp(request: any): boolean {
+		const ip: string = this.getClientIp(request)
+
+		// IPv4 loopback
+		if (ip === '127.0.0.1')
+			return true
+
+		// IPv6 loopback
+		if (ip === '::1' || ip === '::ffff:127.0.0.1')
+			return true
+
+		// Strip IPv4-mapped IPv6 prefix so the checks below work uniformly
+		const bare = ip.startsWith('::ffff:') ? ip.slice(7) : ip
+
+		const parts = bare.split('.').map(Number)
+		if (parts.length !== 4 || parts.some(n => Number.isNaN(n))) {
+			// Not a dotted-decimal IPv4 address — treat as external
+			return false
+		}
+
+		const [a, b] = parts
+
+		// 10.0.0.0/8
+		if (a === 10)
+			return true
+
+		// 172.16.0.0/12
+		if (a === 172 && b >= 16 && b <= 31)
+			return true
+
+		// 192.168.0.0/16
+		if (a === 192 && b === 168)
+			return true
+
+		return false
+	}
+
+	/**
+	 * Check if the request comes from a whitelisted domain.
+	 * Only trusted for requests arriving from internal/private IP ranges —
+	 * Referer and Origin are fully attacker-controlled HTTP headers and MUST NOT
+	 * be used to bypass rate limiting for requests from public IP addresses.
 	 */
 	private isDomainWhitelisted(request: any): boolean {
 		try {
+			// Guard: only apply the whitelist for internal-network callers.
+			// An external client can trivially forge Referer/Origin headers.
+			if (!this.isInternalIp(request)) {
+				return false
+			}
+
 			if (this.cachedWhitelistedDomains === null) {
 				this.cachedWhitelistedDomains = this.rateLimitService.getWhitelistedDomains()
 			}
@@ -147,9 +201,7 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 			if (referer) {
 				try {
 					const refererUrl = new URL(referer)
-					const refererDomain = refererUrl.hostname
-
-					if (this.matchesDomain(refererDomain, whitelistedDomains)) {
+					if (this.matchesDomain(refererUrl.hostname, whitelistedDomains)) {
 						return true
 					}
 				}
@@ -162,22 +214,12 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 			if (origin) {
 				try {
 					const originUrl = new URL(origin)
-					const originDomain = originUrl.hostname
-
-					if (this.matchesDomain(originDomain, whitelistedDomains)) {
+					if (this.matchesDomain(originUrl.hostname, whitelistedDomains)) {
 						return true
 					}
 				}
 				catch {
 					// Invalid origin URL, continue
-				}
-			}
-
-			const host = request.headers.host
-			if (host) {
-				const hostDomain = host.split(':')[0]
-				if (this.matchesDomain(hostDomain, whitelistedDomains)) {
-					return true
 				}
 			}
 
