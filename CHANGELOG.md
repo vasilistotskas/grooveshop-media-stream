@@ -1,3 +1,10 @@
+## [2.42.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.42.0...v2.42.1) (2026-04-06)
+
+
+### Bug Fixes
+
+* **logger:** respect LOG_LEVEL env var to filter NestJS log output ([3af0a03](https://github.com/vasilistotskas/grooveshop-media-stream/commit/3af0a03f1e8decf1b70d679c508f09212a56df43))
+
 # [2.42.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.41.0...v2.42.0) (2026-04-04)
 
 
