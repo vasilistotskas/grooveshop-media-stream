@@ -49,7 +49,7 @@ All source code lives under `src/MediaStream/`. Each domain is a NestJS module:
 - **Queue** — Bull/Redis job queue for background image processing
 - **RateLimit** — Adaptive rate limiting guard
 - **Storage** — File storage management, cleanup, intelligent eviction
-- **Tasks** — Scheduled tasks via `@nestjs/schedule` (storage cleanup runs daily at 2 AM)
+- **Tasks** — Scheduled tasks via `@nestjs/schedule` using `SchedulerRegistry.addCronJob()` (dynamic cron from config, not hardcoded `@Cron` decorators). `CACHE_WARMING_CRON` and `storage.cleanup.cronSchedule` env vars take effect at runtime
 - **Validation** — Request validation rules, input sanitization, security threat detection
 
 ### Path Aliases
@@ -63,7 +63,7 @@ Defined in `src/MediaStream/API/config/image-sources.config.ts`. Each source map
 
 ### Multi-Layer Cache
 
-Cache layers checked in parallel: Memory (node-cache, priority 1) → Redis (ioredis, priority 2) → File system (`./storage`, priority 3). Returns first hit from highest-priority layer. Automatic backfill to higher-priority layers on cache hits (fire-and-forget). Cache warming runs every 6 hours for popular images (5+ accesses). Storage files use extensions: `.rsc` (resource data), `.rst` (temp during write), `.rsm` (metadata JSON). Cache TTLs: public 360 days, private 180 days, negative cache 5 min for failed fetches.
+Cache layers checked in parallel: Memory (node-cache, priority 1) → Redis (ioredis, priority 2) → File system (`./storage`, priority 3). Returns first hit from highest-priority layer. Automatic backfill to higher-priority layers on cache hits (fire-and-forget). Cache warming runs every 6 hours for popular images (5+ accesses). Storage files use extensions: `.rsc` (resource data), `.rst` (temp during write), `.rsm` (metadata JSON). Cache TTLs: public 360 days, private 180 days, negative cache 5 min for failed fetches. `RedisCacheService.flushAll()` executes `FLUSHDB` (current database only), not `FLUSHALL` — Redis is shared with Django, Nuxt, and Celery. `ResourceMetaData` includes an `accessCount` field incremented on every cache hit; cache warming uses this for the 5-access threshold and stores `{ data: Buffer, metadata: ResourceMetaData }` shape in both `warmupFile` and `warmupSpecificFile`.
 
 ### Processing Pipeline
 
@@ -71,7 +71,7 @@ Cache layers checked in parallel: Memory (node-cache, priority 1) → Redis (ior
 - **Sync vs background**: Images >1MP (1,000,000 pixels) are processed in background queue; quality >=90 with >500K pixels also goes to background. Smaller images are processed synchronously.
 - **Content negotiation**: Format priority from Accept header: AVIF > WebP > JPEG > PNG. Explicit URL format param overrides.
 - **Sharp config**: Concurrency based on CPU cores, 100MB memory cache, SIMD enabled. AVIF falls back to WebP for images >1920x1080.
-- **Image limits**: Max 8192x8192, max 7680×4320 total pixels. File sizes: JPEG 5MB, PNG 8MB, WebP 3MB, GIF 2MB, SVG 1MB, default 10MB.
+- **Image limits**: Max 8192x8192, max 7680×4320 total pixels. File sizes: JPEG 5MB, PNG 8MB, WebP 3MB, GIF 2MB, SVG 1MB, default 10MB. `limitInputPixels: 268402689` is applied to ALL Sharp pipeline inputs (both Buffer and file path inputs) to prevent oversized-image DoS.
 
 ### Additional Endpoints
 
@@ -86,7 +86,8 @@ Cache layers checked in parallel: Memory (node-cache, priority 1) → Redis (ior
 
 - `InputSanitizationService`: URL domain whitelist (configurable via `validation.allowedDomains`), XSS/HTML sanitization with multi-pass stripping
 - `SecurityCheckerService`: Detects XSS, SQL injection, path traversal, command injection, XXE, NoSQL injection patterns; entropy-based payload detection
-- `AdaptiveRateLimitGuard`: Skips in dev mode, bypasses health/metrics/static/whitelisted domains/bots. Keys on IP + user-agent + request type
+- `AdaptiveRateLimitGuard`: Skips in dev mode, bypasses health/metrics/static/whitelisted domains. Bot User-Agent bypass requires `isInternalIp()` — external clients cannot bypass rate limiting by spoofing bot headers. Keys on IP + user-agent + request type
+- `SecurityCheckerService` path traversal detection uses multi-decode: single decode, double decode, and malformed encoding rejection
 - `HttpClientService`: Circuit breaker pattern with state persisted to Redis, retry with exponential backoff
 
 ### Request Context & Observability
@@ -114,7 +115,7 @@ Five eviction strategies: LRU, LFU, size-based, age-based, and **intelligent** (
 
 ### Key Environment Variables
 
-Copy `.env.example` to `.env`. Critical ones: `PORT` (default 3003), `BACKEND_URL` (upstream image server), `REDIS_HOST`/`REDIS_PORT` (required for queue and cache). See `.env.example` for full list including memory cache, file cache, processing, monitoring, and rate limit configuration.
+Copy `.env.example` to `.env`. Critical ones: `PORT` (default 3003), `BACKEND_URL` (upstream image server), `REDIS_HOST`/`REDIS_PORT` (required for queue and cache), `CACHE_WARMING_CRON` (cron expression for cache warming schedule), `storage.cleanup.cronSchedule` (cron expression for storage cleanup). `cron` is a direct dependency (not just transitive via `@nestjs/schedule`) because `SchedulerRegistry.addCronJob()` uses `CronJob` from it directly. See `.env.example` for full list including memory cache, file cache, processing, monitoring, and rate limit configuration.
 
 ## Code Style
 
