@@ -1,3 +1,10 @@
+## [2.43.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.43.0...v2.43.1) (2026-04-13)
+
+
+### Bug Fixes
+
+* **security:** resolve rate limit bypass, validation gaps, cache incompatibilities, and resilience issues ([a862fb3](https://github.com/vasilistotskas/grooveshop-media-stream/commit/a862fb3be5bdaa4fa8c91bb22b01b25e9ec9e217))
+
 # [2.43.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.42.1...v2.43.0) (2026-04-10)
 
 
