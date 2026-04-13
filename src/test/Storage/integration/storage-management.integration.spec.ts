@@ -8,6 +8,7 @@ import { StorageCleanupService } from '#microservice/Storage/services/storage-cl
 import { StorageMonitoringService } from '#microservice/Storage/services/storage-monitoring.service'
 import { StorageOptimizationService } from '#microservice/Storage/services/storage-optimization.service'
 import { StorageModule } from '#microservice/Storage/storage.module'
+import { ScheduleModule } from '@nestjs/schedule'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -87,7 +88,7 @@ describe('storage Management Integration', () => {
 		}
 
 		module = await Test.createTestingModule({
-			imports: [StorageModule],
+			imports: [StorageModule, ScheduleModule.forRoot()],
 		})
 			.overrideProvider(ConfigService)
 			.useValue(mockConfigService)

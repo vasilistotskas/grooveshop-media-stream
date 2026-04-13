@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { cwd } from 'node:process'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
+import ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Injectable } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
@@ -197,12 +198,29 @@ export class CacheWarmingService implements OnModuleInit {
 		}
 
 		try {
-			const content = await readFile(fileInfo.path)
+			const metadataPath = fileInfo.path.replace(/\.rsc$/, '.rsm')
+			const [content, metaRaw] = await Promise.all([
+				readFile(fileInfo.path),
+				readFile(metadataPath, 'utf8').catch(() => null),
+			])
+
+			let metadata: ResourceMetaData
+			if (metaRaw) {
+				try {
+					metadata = new ResourceMetaData(JSON.parse(metaRaw))
+				}
+				catch {
+					metadata = new ResourceMetaData()
+				}
+			}
+			else {
+				metadata = new ResourceMetaData()
+			}
 
 			const accessMultiplier = Math.min(fileInfo.accessCount / 10, 5)
 			const ttl = Math.floor(this.baseCacheTtl * (1 + accessMultiplier))
 
-			await this.cacheManager.set('image', resourceId, content, ttl)
+			await this.cacheManager.set('image', resourceId, { data: content, metadata }, ttl)
 
 			CorrelatedLogger.debug(`Warmed up file: ${fileInfo.path} (TTL: ${ttl}s)`, CacheWarmingService.name)
 		}
@@ -219,7 +237,11 @@ export class CacheWarmingService implements OnModuleInit {
 
 	async warmupSpecificFile(resourceId: string, content: Buffer, ttl?: number): Promise<void> {
 		try {
-			await this.cacheManager.set('image', resourceId, content, ttl)
+			const metadata = new ResourceMetaData({
+				size: content.length.toString(),
+				dateCreated: Date.now(),
+			})
+			await this.cacheManager.set('image', resourceId, { data: content, metadata }, ttl)
 			CorrelatedLogger.debug(`Manually warmed up resource: ${resourceId}`, CacheWarmingService.name)
 		}
 		catch (error: unknown) {

@@ -109,8 +109,51 @@ export class SecurityCheckerService implements ISecurityChecker {
 			}
 		}
 
+		// Check decoded variants to catch mixed-case encoding (%2E%2E/),
+		// partial encoding (..%2f), and overlong UTF-8 sequences (%c0%ae...)
+		if (this.containsPathTraversal(str)) {
+			this._logger.warn('Path traversal detected in decoded input')
+			return true
+		}
+
 		if (this.hasHighEntropy(str)) {
 			this._logger.warn('High entropy string detected (potential encoded payload)')
+			return true
+		}
+
+		return false
+	}
+
+	private containsPathTraversal(path: string): boolean {
+		// Raw string already checked by suspiciousPatterns above — only need decoded variants
+		try {
+			const decoded = decodeURIComponent(path)
+			if (decoded !== path && this.suspiciousPatterns.some((p) => {
+				try {
+					return p.test(decoded)
+				}
+				catch {
+					return true
+				}
+			})) {
+				return true
+			}
+
+			// Double-decode catches sequences encoded twice (%252e%252e%252f → ../)
+			const doubleDecoded = decodeURIComponent(decoded)
+			if (doubleDecoded !== decoded && this.suspiciousPatterns.some((p) => {
+				try {
+					return p.test(doubleDecoded)
+				}
+				catch {
+					return true
+				}
+			})) {
+				return true
+			}
+		}
+		catch {
+			// Malformed percent-encoding is inherently suspicious — reject it
 			return true
 		}
 

@@ -38,56 +38,76 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 	}
 
 	private async initializeRedis(): Promise<void> {
+		const config = this._configService.get('cache.redis')
+
+		this.redis = new Redis({
+			host: config.host,
+			port: config.port,
+			password: config.password,
+			db: config.db,
+			maxRetriesPerRequest: config.maxRetries,
+			enableReadyCheck: true,
+			lazyConnect: true,
+			keepAlive: 30000,
+			connectTimeout: 10000,
+			commandTimeout: 5000,
+		})
+
+		this.redis.on('connect', () => {
+			CorrelatedLogger.log('Redis connecting...', RedisCacheService.name)
+		})
+
+		this.redis.on('ready', () => {
+			this.isConnected = true
+			CorrelatedLogger.log('Redis connection ready', RedisCacheService.name)
+			this.metricsService.updateActiveConnections('redis', 1)
+		})
+
+		this.redis.on('error', (error: unknown) => {
+			this.isConnected = false
+			this.stats.errors++
+			CorrelatedLogger.error(`Redis connection error: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
+			this.metricsService.updateActiveConnections('redis', 0)
+		})
+
+		this.redis.on('close', () => {
+			this.isConnected = false
+			CorrelatedLogger.warn('Redis connection closed', RedisCacheService.name)
+			this.metricsService.updateActiveConnections('redis', 0)
+		})
+
+		this.redis.on('reconnecting', () => {
+			CorrelatedLogger.log('Redis reconnecting...', RedisCacheService.name)
+		})
+
 		try {
-			const config = this._configService.get('cache.redis')
-
-			this.redis = new Redis({
-				host: config.host,
-				port: config.port,
-				password: config.password,
-				db: config.db,
-				maxRetriesPerRequest: config.maxRetries,
-				enableReadyCheck: true,
-				lazyConnect: true,
-				keepAlive: 30000,
-				connectTimeout: 10000,
-				commandTimeout: 5000,
-			})
-
-			this.redis.on('connect', () => {
-				CorrelatedLogger.log('Redis connecting...', RedisCacheService.name)
-			})
-
-			this.redis.on('ready', () => {
-				this.isConnected = true
-				CorrelatedLogger.log('Redis connection ready', RedisCacheService.name)
-				this.metricsService.updateActiveConnections('redis', 1)
-			})
-
-			this.redis.on('error', (error: unknown) => {
-				this.isConnected = false
-				this.stats.errors++
-				CorrelatedLogger.error(`Redis connection error: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
-				this.metricsService.updateActiveConnections('redis', 0)
-			})
-
-			this.redis.on('close', () => {
-				this.isConnected = false
-				CorrelatedLogger.warn('Redis connection closed', RedisCacheService.name)
-				this.metricsService.updateActiveConnections('redis', 0)
-			})
-
-			this.redis.on('reconnecting', () => {
-				CorrelatedLogger.log('Redis reconnecting...', RedisCacheService.name)
-			})
-
 			await this.redis.connect()
 		}
 		catch (error: unknown) {
 			this.isConnected = false
-			CorrelatedLogger.error(`Failed to initialize Redis: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
-			throw error
+			CorrelatedLogger.warn(
+				`Redis unavailable at startup, will retry in background: ${(error as Error).message}`,
+				RedisCacheService.name,
+			)
+			this.scheduleReconnect(1)
 		}
+	}
+
+	private scheduleReconnect(attempt: number): void {
+		const delay = Math.min(1000 * 2 ** attempt, 30000)
+		setTimeout(async () => {
+			if (this.isConnected) {
+				return
+			}
+			try {
+				await this.redis.connect()
+				CorrelatedLogger.log('Redis reconnected successfully', RedisCacheService.name)
+			}
+			catch {
+				CorrelatedLogger.warn(`Redis reconnect attempt ${attempt} failed, retrying...`, RedisCacheService.name)
+				this.scheduleReconnect(attempt + 1)
+			}
+		}, delay)
 	}
 
 	async get<T>(key: string): Promise<T | null> {

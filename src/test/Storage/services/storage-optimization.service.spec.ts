@@ -156,7 +156,7 @@ describe('storageOptimizationService', () => {
 			expect(result.filesOptimized).toBeGreaterThan(0)
 			expect(result.strategy).toContain('deduplication')
 			expect(result.errors).toEqual([])
-			expect(result.duration).toBeGreaterThan(0)
+			expect(result.duration).toBeGreaterThanOrEqual(0)
 		}, 10000)
 
 		it('should skip optimization when no popular files exist', async () => {

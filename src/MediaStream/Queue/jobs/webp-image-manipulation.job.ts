@@ -95,7 +95,7 @@ export default class WebpImageManipulationJob {
 			}
 
 			// SVG that needs resizing → resize first, then convert to PNG
-			const manipulation = sharp(filePathFrom)
+			const manipulation = sharp(filePathFrom, { limitInputPixels: 268402689 })
 
 			const resizeScales: { width?: number, height?: number } = {}
 			if (options.width !== null && !Number.isNaN(options.width) && options.width > 0) {
@@ -129,7 +129,7 @@ export default class WebpImageManipulationJob {
 
 		// Non-SVG source with SVG output requested → convert to PNG
 		this.logger.debug('Non-SVG source with SVG output requested, converting to PNG')
-		const manipulation = sharp(filePathFrom)
+		const manipulation = sharp(filePathFrom, { limitInputPixels: 268402689 })
 
 		const resizeScales: { width?: number, height?: number } = {}
 		if (options.width !== null && !Number.isNaN(options.width) && options.width > 0) {
@@ -174,12 +174,12 @@ export default class WebpImageManipulationJob {
 		input: string | Buffer,
 		options: ResizeOptions,
 	): Promise<ManipulationJobResult> {
+		const sharpOptions = { limitInputPixels: 268402689, sequentialRead: true }
+
 		// For AVIF, get metadata upfront to decide fallback before building the pipeline
 		let avifFallbackToWebp = false
 		if (options.format === 'avif') {
-			const metaPipeline = Buffer.isBuffer(input)
-				? sharp(input, { limitInputPixels: 268402689, sequentialRead: true })
-				: sharp(input)
+			const metaPipeline = sharp(input as any, sharpOptions)
 			const metadata = await metaPipeline.metadata()
 			metaPipeline.destroy()
 			const totalPixels = (metadata.width || 0) * (metadata.height || 0)
@@ -189,9 +189,7 @@ export default class WebpImageManipulationJob {
 			}
 		}
 
-		let manipulation = Buffer.isBuffer(input)
-			? sharp(input, { limitInputPixels: 268402689, sequentialRead: true })
-			: sharp(input)
+		let manipulation = sharp(input as any, sharpOptions)
 
 		const resizeScales: { width?: number, height?: number } = {};
 

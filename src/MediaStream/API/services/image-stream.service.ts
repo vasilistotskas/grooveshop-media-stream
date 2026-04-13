@@ -262,8 +262,10 @@ export class ImageStreamService {
 			const imageBuffer = await this.cacheImageResourceOperation.optimizeAndServeDefaultImage(
 				request.resizeOptions,
 			)
+			const fmt = request.resizeOptions.format || 'webp'
+			const mimeType = fmt === 'svg' ? 'image/svg+xml' : `image/${fmt}`
 			res.header('X-Correlation-ID', correlationId)
-			res.header('Content-Type', `image/${request.resizeOptions.format || 'webp'}`)
+			res.header('Content-Type', mimeType)
 			res.send(imageBuffer)
 		}
 		catch (error: unknown) {

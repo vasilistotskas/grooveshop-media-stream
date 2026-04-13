@@ -32,8 +32,8 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 		}
 
 		const userAgent = request.headers['user-agent'] || ''
-		if (this.shouldBypassBot(userAgent)) {
-			this._logger.debug('Skipping rate limiting for bot', { userAgent })
+		if (this.shouldBypassBot(userAgent) && this.isInternalIp(request)) {
+			this._logger.debug('Skipping rate limiting for bot from internal IP', { userAgent })
 			return true
 		}
 

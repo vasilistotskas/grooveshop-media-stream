@@ -5,7 +5,7 @@ import { IMAGE } from '#microservice/common/constants/route-prefixes.constant'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-import { Controller, Get, Logger, NotFoundException, Req, Res } from '@nestjs/common'
+import { BadRequestException, Controller, Get, Logger, NotFoundException, Req, Res } from '@nestjs/common'
 import { IMAGE_SOURCES } from '../config/image-sources.config.js'
 import CacheImageRequest, {
 	BackgroundOptions,
@@ -77,8 +77,8 @@ export default class MediaStreamImageController {
 			try {
 				fullPath = decodeURIComponent(fullPath)
 			}
-			catch (error) {
-				this._logger.warn('Failed to decode URL path', { fullPath, error, correlationId })
+			catch {
+				throw new BadRequestException('Invalid URL encoding in image path')
 			}
 		}
 

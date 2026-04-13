@@ -242,11 +242,16 @@ describe('cacheWarmingService', () => {
 				atime: new Date(),
 				size: 1024,
 			} as any)
+			// Call order:
+			//   getPopularFiles: file1.rsm (mock 1), file2.rsm (mock 2)
+			//   warmupFile(file1): file1.rsc (mock 3), file1.rsm (mock 4, caught internally)
+			//   warmupFile(file2): file2.rsc (mock 5 — rejected, not caught → file2 fails), file2.rsm (mock 6, may not run)
 			mockReadFile
-				.mockResolvedValueOnce('{"accessCount": 10}')
-				.mockResolvedValueOnce('{"accessCount": 8}')
-				.mockResolvedValueOnce(Buffer.from('file content')) // First file succeeds
-				.mockRejectedValueOnce(new Error('File read error')) // Second file fails
+				.mockResolvedValueOnce('{"accessCount": 10}') // getPopularFiles file1 meta
+				.mockResolvedValueOnce('{"accessCount": 8}') // getPopularFiles file2 meta
+				.mockResolvedValueOnce(Buffer.from('file content')) // warmupFile file1 content (success)
+				.mockResolvedValueOnce(null) // warmupFile file1 meta (caught internally)
+				.mockRejectedValueOnce(new Error('File read error')) // warmupFile file2 content (fails)
 
 			cacheManager.exists.mockResolvedValue(false)
 			cacheManager.set.mockResolvedValue()
@@ -268,7 +273,7 @@ describe('cacheWarmingService', () => {
 
 			await service.warmupSpecificFile(resourceId, content, ttl)
 
-			expect(cacheManager.set).toHaveBeenCalledWith('image', resourceId, content, ttl)
+			expect(cacheManager.set).toHaveBeenCalledWith('image', resourceId, expect.objectContaining({ data: content, metadata: expect.any(Object) }), ttl)
 		})
 
 		it('should handle manual warmup errors', async () => {
@@ -368,20 +373,24 @@ describe('cacheWarmingService', () => {
 				atime: new Date(),
 				size: 1024,
 			} as any)
+			// Call order:
+			//   getPopularFiles: file1.rsm (mock 1)
+			//   warmupFile(file1): file1.rsc (mock 2), file1.rsm (mock 3, caught internally)
 			mockReadFile
-				.mockResolvedValueOnce('{"accessCount": 20}') // High access count
-				.mockResolvedValueOnce(Buffer.from('file content'))
+				.mockResolvedValueOnce('{"accessCount": 20}') // getPopularFiles file1 meta
+				.mockResolvedValueOnce(Buffer.from('file content')) // warmupFile file1 content
+				.mockResolvedValueOnce('{"accessCount": 20}') // warmupFile file1 meta (re-read)
 
 			cacheManager.exists.mockResolvedValue(false)
 			cacheManager.set.mockResolvedValue()
 
 			await service.warmupCache()
 
-			// Should set with higher TTL due to high access count
+			// Service sets { data: content, metadata } as the value, not a raw Buffer
 			expect(cacheManager.set).toHaveBeenCalledWith(
 				'image',
 				expect.any(String),
-				expect.any(Buffer),
+				expect.any(Object),
 				expect.any(Number),
 			)
 

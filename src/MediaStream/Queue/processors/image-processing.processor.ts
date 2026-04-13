@@ -161,9 +161,13 @@ export class ImageProcessingProcessor {
 	 */
 	private async downloadImage(url: string): Promise<Buffer> {
 		try {
-			// Skip HEAD request for localhost/Django (returns malformed HTTP response)
+			// Skip HEAD request for localhost/internal services (returns malformed HTTP response)
 			// Go straight to GET with size limits
-			const skipHead = url.includes('localhost') || url.includes('127.0.0.1')
+			const backendUrl = this.configService.getOptional('BACKEND_URL', '')
+			const isInternalUrl = url.includes('localhost')
+				|| url.includes('127.0.0.1')
+				|| (backendUrl !== '' && url.startsWith(backendUrl))
+			const skipHead = isInternalUrl
 
 			if (!skipHead) {
 				// For external URLs, try HEAD request for size validation

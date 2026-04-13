@@ -94,14 +94,20 @@ export class RequestDeduplicator<T = void> implements OnModuleDestroy {
 
 	private async executeWithCleanup(key: string, fn: () => Promise<T>): Promise<T> {
 		try {
-			return await fn()
-		}
-		finally {
-			// Small delay before cleanup to allow late joiners
+			const result = await fn()
+			// Success: keep in map briefly to allow late joiners to share the result
 			setTimeout(() => {
 				this.pendingRequests.delete(key)
 				this._logger.debug(`Request completed and removed for key: ${key}`)
 			}, 100)
+			return result
+		}
+		catch (error: unknown) {
+			// Failure: remove immediately so the next request retries rather than
+			// receiving the cached rejection
+			this.pendingRequests.delete(key)
+			this._logger.debug(`Request failed and removed for key: ${key}`)
+			throw error
 		}
 	}
 

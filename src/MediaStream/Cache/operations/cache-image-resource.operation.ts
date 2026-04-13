@@ -276,6 +276,7 @@ export default class CacheImageResourceOperation {
 	 */
 	public async execute(ctx: OperationContext): Promise<void> {
 		PerformanceTracker.startPhase('execute')
+		let phaseEnded = false
 
 		try {
 			CorrelatedLogger.debug('Executing cache image resource operation', CacheImageResourceOperation.name)
@@ -286,11 +287,14 @@ export default class CacheImageResourceOperation {
 			CorrelatedLogger.error(`Failed to execute CacheImageResourceOperation: ${(error as Error).message}`, (error as Error).stack, CacheImageResourceOperation.name)
 			this.metricsService.recordError('image_processing', 'execute')
 			const duration = PerformanceTracker.endPhase('execute')
+			phaseEnded = true
 			this.metricsService.recordImageProcessing('execute', 'unknown', 'error', duration || 0)
 			throw new InternalServerErrorException('Error fetching or processing image.')
 		}
 		finally {
-			PerformanceTracker.endPhase('execute')
+			if (!phaseEnded) {
+				PerformanceTracker.endPhase('execute')
+			}
 		}
 	}
 
@@ -553,6 +557,10 @@ export default class CacheImageResourceOperation {
 			}
 
 			if (cachedResource) {
+				// Increment access count and backfill updated metadata into cache (fire-and-forget)
+				cachedResource.metadata.accessCount = (cachedResource.metadata.accessCount || 0) + 1
+				this.cacheManager.set('image', ctx.id, cachedResource, this.privateTtl).catch(() => {})
+
 				CorrelatedLogger.debug(`Resource retrieved from cache: ${ctx.id}`, CacheImageResourceOperation.name)
 				const duration = PerformanceTracker.endPhase('get_cached_resource')
 				this.metricsService.recordCacheOperation('get', 'multi-layer', 'hit', duration || 0)
@@ -571,6 +579,10 @@ export default class CacheImageResourceOperation {
 			if (dataResult.status === 'fulfilled' && metaResult.status === 'fulfilled') {
 				const data = dataResult.value
 				const metadata = new ResourceMetaData(JSON.parse(metaResult.value))
+
+				// Increment access count and persist back to the .rsm file (fire-and-forget)
+				metadata.accessCount = (metadata.accessCount || 0) + 1
+				writeFile(resourceMetaPath, JSON.stringify(metadata), 'utf8').catch(() => {})
 
 				await this.cacheManager.set('image', ctx.id, { data, metadata }, this.privateTtl)
 

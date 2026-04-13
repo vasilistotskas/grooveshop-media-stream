@@ -7,6 +7,7 @@ import { MemoryHealthIndicator } from '#microservice/Health/indicators/memory-he
 import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
 import { JobQueueHealthIndicator } from '#microservice/Queue/indicators/job-queue-health.indicator'
 import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
+import { ScheduleModule } from '@nestjs/schedule'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -16,7 +17,7 @@ describe('health Indicators Integration', () => {
 
 	beforeAll(async () => {
 		module = await Test.createTestingModule({
-			imports: [HealthModule],
+			imports: [HealthModule, ScheduleModule.forRoot()],
 		}).compile()
 
 		healthController = module.get<HealthController>(HealthController)

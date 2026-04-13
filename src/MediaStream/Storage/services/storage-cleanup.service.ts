@@ -4,7 +4,8 @@ import { join } from 'node:path'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { Injectable, Logger } from '@nestjs/common'
-import { Cron } from '@nestjs/schedule'
+import { SchedulerRegistry } from '@nestjs/schedule'
+import { CronJob } from 'cron'
 import { IntelligentEvictionService } from './intelligent-eviction.service.js'
 import { StorageMonitoringService } from './storage-monitoring.service.js'
 
@@ -51,6 +52,7 @@ export class StorageCleanupService implements OnModuleInit {
 		private readonly _configService: ConfigService,
 		private readonly storageMonitoring: StorageMonitoringService,
 		private readonly intelligentEviction: IntelligentEvictionService,
+		private readonly schedulerRegistry: SchedulerRegistry,
 	) {
 		this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage')
 		this.config = this.loadCleanupConfig()
@@ -59,10 +61,39 @@ export class StorageCleanupService implements OnModuleInit {
 	async onModuleInit(): Promise<void> {
 		if (this.config.enabled) {
 			this._logger.log('Storage cleanup service initialized with policies:', this.config.policies.map(p => p.name))
+			this.registerCleanupCron()
 		}
 		else {
 			this._logger.log('Storage cleanup service disabled')
 		}
+	}
+
+	private registerCleanupCron(): void {
+		const cronName = 'storage-cleanup'
+		const schedule = this.config.cronSchedule
+
+		const job = new CronJob(schedule, async () => {
+			const currentlyEnabled = this._configService.getOptional('storage.cleanup.enabled', true)
+			if (!currentlyEnabled || this.isCleanupRunning) {
+				return
+			}
+
+			try {
+				await this.performCleanup()
+			}
+			catch (error: unknown) {
+				CorrelatedLogger.error(
+					`Scheduled cleanup failed: ${(error as Error).message}`,
+					(error as Error).stack,
+					StorageCleanupService.name,
+				)
+			}
+		})
+
+		this.schedulerRegistry.addCronJob(cronName, job)
+		job.start()
+
+		this._logger.log(`Storage cleanup cron registered with schedule: ${schedule}`)
 	}
 
 	/**
@@ -149,9 +180,9 @@ export class StorageCleanupService implements OnModuleInit {
 	}
 
 	/**
-	 * Scheduled cleanup based on cron configuration
+	 * Scheduled cleanup — invoked by the dynamically registered cron job
+	 * (schedule comes from config.cronSchedule, registered in onModuleInit).
 	 */
-	@Cron('0 2 * * *')
 	async scheduledCleanup(): Promise<void> {
 		const currentlyEnabled = this._configService.getOptional('storage.cleanup.enabled', true)
 		if (!currentlyEnabled || this.isCleanupRunning) {

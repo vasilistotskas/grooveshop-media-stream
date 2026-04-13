@@ -16,6 +16,8 @@ import { BullQueueService } from './bull-queue.service.js'
 @Injectable()
 export class JobQueueManager implements OnModuleInit {
 	private readonly _logger = new Logger(JobQueueManager.name)
+	private readonly MAX_PROCESSING_TIMES = 1000
+
 	private readonly metrics = {
 		totalJobs: 0,
 		completedJobs: 0,
@@ -229,10 +231,9 @@ export class JobQueueManager implements OnModuleInit {
 			this.metrics.failedJobs++
 		}
 
-		this.metrics.processingTimes.push(processingTime)
-
-		if (this.metrics.processingTimes.length > 1000) {
-			this.metrics.processingTimes = this.metrics.processingTimes.slice(-1000)
+		if (this.metrics.processingTimes.length >= this.MAX_PROCESSING_TIMES) {
+			this.metrics.processingTimes.shift()
 		}
+		this.metrics.processingTimes.push(processingTime)
 	}
 }
