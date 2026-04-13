@@ -8,6 +8,7 @@ import { AdaptiveRateLimitGuard } from '#microservice/RateLimit/guards/adaptive-
 import { RateLimitModule } from '#microservice/RateLimit/rate-limit.module'
 import { RateLimitService } from '#microservice/RateLimit/services/rate-limit.service'
 import { Controller, Get, UseGuards } from '@nestjs/common'
+import { ScheduleModule } from '@nestjs/schedule'
 
 import { Test, TestingModule } from '@nestjs/testing'
 import request from 'supertest'
@@ -47,6 +48,7 @@ describe('rate Limiting Integration', () => {
 			imports: [
 				ConfigModule,
 				MetricsModule,
+				ScheduleModule.forRoot(),
 				// Remove ThrottlerModule to avoid conflicts with our custom rate limiting
 				RateLimitModule,
 			],

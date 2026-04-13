@@ -8,7 +8,8 @@ import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Injectable } from '@nestjs/common'
-import { Cron, CronExpression } from '@nestjs/schedule'
+import { SchedulerRegistry } from '@nestjs/schedule'
+import { CronJob } from 'cron'
 import { MultiLayerCacheManager } from './multi-layer-cache.manager.js'
 
 const FILE_EXTENSION_RE = /\.[^/.]+$/
@@ -40,6 +41,7 @@ export class CacheWarmingService implements OnModuleInit {
 		private readonly cacheManager: MultiLayerCacheManager,
 		private readonly _configService: ConfigService,
 		private readonly metricsService: MetricsService,
+		private readonly schedulerRegistry: SchedulerRegistry,
 	) {
 		this.config = this._configService.get('cache.warming') || {
 			enabled: true,
@@ -51,23 +53,49 @@ export class CacheWarmingService implements OnModuleInit {
 
 		this.storagePath = join(cwd(), 'storage')
 
-		// ✅ Load base cache TTL from configuration (default: 3600 seconds = 1 hour)
+		// Load base cache TTL from configuration (default: 3600 seconds = 1 hour)
 		this.baseCacheTtl = this._configService.getOptional('cache.warming.baseTtl', 3600)
 	}
 
 	async onModuleInit(): Promise<void> {
-		if (this.config.enabled && this.config.warmupOnStart) {
-			CorrelatedLogger.log('Starting cache warming on module initialization', CacheWarmingService.name)
-			setImmediate(() => this.warmupCache())
+		if (this.config.enabled) {
+			this.registerWarmupCron()
+			if (this.config.warmupOnStart) {
+				CorrelatedLogger.log('Starting cache warming on module initialization', CacheWarmingService.name)
+				setImmediate(() => this.warmupCache())
+			}
 		}
 	}
 
-	@Cron(CronExpression.EVERY_6_HOURS)
-	async scheduledWarmup(): Promise<void> {
-		if (this.config.enabled) {
+	/**
+	 * Register the warmup cron job dynamically so it respects the configured schedule
+	 * (CACHE_WARMING_CRON env var) instead of a hardcoded decorator value.
+	 */
+	private registerWarmupCron(): void {
+		const schedule = this.config.warmupCron
+		const cronName = 'cache-warming'
+
+		const job = new CronJob(schedule, async () => {
 			CorrelatedLogger.log('Starting scheduled cache warmup', CacheWarmingService.name)
-			await this.warmupCache()
-		}
+			try {
+				await this.warmupCache()
+			}
+			catch (error: unknown) {
+				CorrelatedLogger.error(
+					`Scheduled cache warmup failed: ${(error as Error).message}`,
+					(error as Error).stack,
+					CacheWarmingService.name,
+				)
+			}
+		})
+
+		this.schedulerRegistry.addCronJob(cronName, job)
+		job.start()
+
+		CorrelatedLogger.log(
+			`Cache warming cron registered with schedule: ${schedule}`,
+			CacheWarmingService.name,
+		)
 	}
 
 	async warmupCache(): Promise<void> {

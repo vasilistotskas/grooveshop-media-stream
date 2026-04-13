@@ -5,6 +5,7 @@ import { InputSanitizationService } from '#microservice/Validation/services/inpu
 import { SecurityCheckerService } from '#microservice/Validation/services/security-checker.service'
 import { SimpleValidationService } from '#microservice/Validation/services/simple-validation.service'
 import { ValidationModule } from '#microservice/Validation/validation.module'
+import { ScheduleModule } from '@nestjs/schedule'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
@@ -19,6 +20,7 @@ describe('validation Integration', () => {
 			imports: [
 				ConfigModule,
 				CorrelationModule,
+				ScheduleModule.forRoot(),
 				ValidationModule,
 			],
 		}).compile()

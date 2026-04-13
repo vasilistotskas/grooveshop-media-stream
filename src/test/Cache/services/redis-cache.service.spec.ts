@@ -441,15 +441,16 @@ describe('redisCacheService', () => {
 		})
 
 		describe('flushAll', () => {
-			it('should flush all databases', async () => {
+			it('should flush current database only', async () => {
 				await service.flushAll()
 
-				expect(mockRedis.flushall).toHaveBeenCalled()
+				expect(mockRedis.flushdb).toHaveBeenCalled()
+				expect(mockRedis.flushall).not.toHaveBeenCalled()
 				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('flush', 'redis', 'success')
 			})
 
 			it('should handle Redis errors', async () => {
-				mockRedis.flushall.mockRejectedValue(new Error('Redis connection failed'))
+				mockRedis.flushdb.mockRejectedValue(new Error('Redis connection failed'))
 
 				await expect(service.flushAll()).rejects.toThrow('Redis connection failed')
 				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('flush', 'redis', 'error')

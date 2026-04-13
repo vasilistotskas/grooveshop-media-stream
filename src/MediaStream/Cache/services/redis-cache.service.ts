@@ -276,9 +276,12 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 
 		try {
 			this.stats.operations++
-			await this.redis.flushall()
+			// Use FLUSHDB (current database only), NOT FLUSHALL (all databases).
+			// Redis is shared with Django cache, Nuxt SSR cache, Celery, and
+			// Django Channels — FLUSHALL would destroy all their data.
+			await this.redis.flushdb()
 			this.metricsService.recordCacheOperation('flush', 'redis', 'success')
-			CorrelatedLogger.debug('Redis cache FLUSHED ALL', RedisCacheService.name)
+			CorrelatedLogger.debug('Redis cache FLUSHED (current DB)', RedisCacheService.name)
 		}
 		catch (error: unknown) {
 			this.stats.errors++

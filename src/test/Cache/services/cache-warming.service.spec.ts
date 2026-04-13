@@ -7,6 +7,7 @@ import { CacheWarmingService } from '#microservice/Cache/services/cache-warming.
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
 import { ConfigService } from '#microservice/Config/config.service'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
+import { SchedulerRegistry } from '@nestjs/schedule'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -54,6 +55,10 @@ describe('cacheWarmingService', () => {
 			recordCacheOperation: vi.fn(),
 		}
 
+		const mockSchedulerRegistry = {
+			addCronJob: vi.fn(),
+		}
+
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [
 				CacheWarmingService,
@@ -68,6 +73,10 @@ describe('cacheWarmingService', () => {
 				{
 					provide: MetricsService,
 					useValue: mockMetricsService,
+				},
+				{
+					provide: SchedulerRegistry,
+					useValue: mockSchedulerRegistry,
 				},
 			],
 		}).compile()
@@ -181,6 +190,10 @@ describe('cacheWarmingService', () => {
 					{
 						provide: MetricsService,
 						useValue: metricsService,
+					},
+					{
+						provide: SchedulerRegistry,
+						useValue: { addCronJob: vi.fn() },
 					},
 				],
 			}).compile()
@@ -329,6 +342,10 @@ describe('cacheWarmingService', () => {
 						provide: MetricsService,
 						useValue: metricsService,
 					},
+					{
+						provide: SchedulerRegistry,
+						useValue: { addCronJob: vi.fn() },
+					},
 				],
 			}).compile()
 
@@ -357,6 +374,10 @@ describe('cacheWarmingService', () => {
 					{
 						provide: MetricsService,
 						useValue: metricsService,
+					},
+					{
+						provide: SchedulerRegistry,
+						useValue: { addCronJob: vi.fn() },
 					},
 				],
 			})
