@@ -1,3 +1,10 @@
+## [2.43.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.43.1...v2.43.2) (2026-04-13)
+
+
+### Bug Fixes
+
+* **cache:** replace FLUSHALL with FLUSHDB, fix warming cron, update tests ([b343a3d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/b343a3d27586887b5b61305c56bfaf92613d842f))
+
 ## [2.43.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.43.0...v2.43.1) (2026-04-13)
 
 
