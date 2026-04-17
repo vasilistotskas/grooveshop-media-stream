@@ -1,3 +1,10 @@
+## [2.43.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.43.2...v2.43.3) (2026-04-17)
+
+
+### Bug Fixes
+
+* **image:** Sharp autoOrient, atomic cache writes, SVG sanitization ([b95ef41](https://github.com/vasilistotskas/grooveshop-media-stream/commit/b95ef41b2b803e621bda8de49373a243368f3d9f))
+
 ## [2.43.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.43.1...v2.43.2) (2026-04-13)
 
 
