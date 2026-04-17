@@ -189,7 +189,11 @@ export default class WebpImageManipulationJob {
 			}
 		}
 
-		let manipulation = sharp(input as any, sharpOptions)
+		// autoOrient() applies any EXIF orientation tag and strips it so
+		// downstream operations (trim/resize) work on pixels in display
+		// orientation. Phone cameras commonly set orientation=6 (rotate
+		// 90° CW); without this, portrait photos arrive rotated.
+		let manipulation = sharp(input as any, sharpOptions).autoOrient()
 
 		const resizeScales: { width?: number, height?: number } = {};
 

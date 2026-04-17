@@ -21,6 +21,7 @@ describe('webpImageManipulationJob', () => {
 		avif: vi.fn().mockReturnThis(),
 		resize: vi.fn().mockReturnThis(),
 		trim: vi.fn().mockReturnThis(),
+		autoOrient: vi.fn().mockReturnThis(),
 		toBuffer: vi.fn().mockResolvedValue({ data: testBuffer, info: { size: 1000, format: 'webp' } }),
 		metadata: vi.fn().mockResolvedValue({ width: 800, height: 600, format: 'avif' }),
 		destroy: vi.fn(),
