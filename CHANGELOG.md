@@ -1,3 +1,10 @@
+# [2.45.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.44.0...v2.45.0) (2026-04-19)
+
+
+### Features
+
+* **http:** add cdn cache + retry-after headers, decouple readiness from redis ([06c39d4](https://github.com/vasilistotskas/grooveshop-media-stream/commit/06c39d4c36884ef68a8eb1a6453d0d43753924e8))
+
 # [2.44.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.43.3...v2.44.0) (2026-04-19)
 
 
