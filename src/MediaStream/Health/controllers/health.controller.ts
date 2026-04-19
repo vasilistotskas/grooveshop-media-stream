@@ -94,11 +94,17 @@ export class HealthController {
 	@Get('ready')
 	async readiness(): Promise<{ status: string, timestamp: string, checks?: any }> {
 		try {
-			// Lightweight readiness check - only critical dependencies
-			// Full health check is available at /health for detailed diagnostics
+			// Readiness probe: checks ONLY in-process state required to serve
+			// traffic. Do NOT include external dependencies (Redis, upstream HTTP)
+			// here — a transient Redis blip would otherwise mark every pod
+			// NotReady simultaneously, triggering a cascading K8s restart storm.
+			// The service degrades gracefully without Redis (multi-layer cache
+			// falls through to memory + file system), so Redis health is
+			// diagnostic, not gating.
+			// Use GET /health for full diagnostics including external deps,
+			// or GET /health/dependencies for an external-dep-only snapshot.
 			const result = await this.health.check([
 				() => this.memoryIndicator.isHealthy(),
-				() => this.redisHealthIndicator.isHealthy(),
 				() => this.sharpHealthIndicator.isHealthy(),
 			])
 
@@ -115,6 +121,20 @@ export class HealthController {
 				checks: error instanceof HealthCheckError ? error.causes : undefined,
 			})
 		}
+	}
+
+	@Get('dependencies')
+	async dependencies(): Promise<HealthCheckResult> {
+		// External-dependency diagnostic endpoint. Separate from /health/ready
+		// so ops can observe Redis/upstream HTTP state without coupling it to
+		// K8s readiness gating.
+		return this.health.check([
+			() => this.redisHealthIndicator.isHealthy(),
+			() => this.httpHealthIndicator.isHealthy(),
+			() => this.cacheHealthIndicator.isHealthy(),
+			() => this.jobQueueHealthIndicator.isHealthy(),
+			() => this.storageHealthIndicator.isHealthy(),
+		])
 	}
 
 	@Get('live')

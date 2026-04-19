@@ -54,7 +54,7 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 			this.rateLimitService.recordRateLimitMetrics(requestType, allowed, info)
 			this.metricsService.recordRateLimitAttempt(requestType, allowed)
 
-			this.addRateLimitHeaders(response, info)
+			this.addRateLimitHeaders(response, info, allowed)
 
 			if (!allowed) {
 				this._logger.warn(`Rate limit exceeded for ${clientIp} on ${requestType}`, {
@@ -289,12 +289,20 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 	}
 
 	/**
-	 * Add rate limit headers to response
+	 * Add rate limit headers to response.
+	 * Emits RFC 6585 `Retry-After` alongside the X-RateLimit-* family only
+	 * when the request was throttled — per the spec the header is intended
+	 * for 429 responses. Value is seconds until reset (non-negative integer).
 	 */
-	private addRateLimitHeaders(response: any, info: any): void {
+	private addRateLimitHeaders(response: any, info: any, allowed: boolean): void {
 		response.setHeader('X-RateLimit-Limit', info.limit.toString())
 		response.setHeader('X-RateLimit-Remaining', info.remaining.toString())
 		response.setHeader('X-RateLimit-Reset', Math.ceil(info.resetTime.getTime() / 1000).toString())
 		response.setHeader('X-RateLimit-Used', info.current.toString())
+
+		if (!allowed) {
+			const retryAfterSeconds = Math.max(1, Math.ceil((info.resetTime.getTime() - Date.now()) / 1000))
+			response.setHeader('Retry-After', retryAfterSeconds.toString())
+		}
 	}
 }

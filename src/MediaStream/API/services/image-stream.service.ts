@@ -15,6 +15,29 @@ import { Injectable, Logger } from '@nestjs/common'
 import CacheImageRequest from '../dto/cache-image-request.dto.js'
 
 /**
+ * Build a Cache-Control header value for image responses.
+ *
+ * Directives:
+ *  - `max-age`: browser cache lifetime (seconds).
+ *  - `s-maxage`: shared-cache (CDN) lifetime; set equal to max-age because
+ *    all responses are content-addressed and `immutable`.
+ *  - `public`: explicitly allow shared caches.
+ *  - `immutable`: tell the client not to revalidate within the fresh window
+ *    (saves a 304 roundtrip — responses won't change for this URL).
+ *  - `stale-while-revalidate` (7d): allow caches to serve stale content while
+ *    refreshing in the background. Safe because content is immutable.
+ *  - `stale-if-error` (30d): serve stale content during origin outages. Buys
+ *    the service a long availability tail in front of CDNs.
+ *
+ * Spec refs: RFC 9111 (Cache-Control), RFC 5861 (stale-while-revalidate,
+ * stale-if-error). `immutable` defined in RFC 8246.
+ */
+function buildCacheControl(publicTTLms: number): string {
+	const maxAge = Math.floor((publicTTLms || 0) / 1000)
+	return `max-age=${maxAge}, s-maxage=${maxAge}, public, immutable, stale-while-revalidate=604800, stale-if-error=2592000`
+}
+
+/**
  * Service responsible for streaming images and handling fallbacks
  */
 @Injectable()
@@ -115,7 +138,7 @@ export class ImageStreamService {
 		res
 			.status(304)
 			.header('ETag', etag)
-			.header('Cache-Control', `max-age=${(headers.publicTTL || 0) / 1000}, public, immutable`)
+			.header('Cache-Control', buildCacheControl(headers.publicTTL || 0))
 			.header('X-Correlation-ID', correlationId)
 			.header('Vary', getVaryHeader())
 			.end()
@@ -322,7 +345,7 @@ export class ImageStreamService {
 
 		res
 			.header('Content-Length', size)
-			.header('Cache-Control', `max-age=${publicTTL / 1000}, public, immutable`)
+			.header('Cache-Control', buildCacheControl(publicTTL))
 			.header('Expires', new Date(expiresAt).toUTCString())
 			.header('X-Correlation-ID', correlationId)
 			// ETag for conditional requests (304 Not Modified)
