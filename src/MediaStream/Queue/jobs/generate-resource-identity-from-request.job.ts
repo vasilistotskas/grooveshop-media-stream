@@ -28,6 +28,12 @@ function generateUUIDv5(name: string, namespace: string = NAMESPACE_URL): string
 /**
  * Generates unique resource identifiers from cache image requests.
  * Stateless service - all request data is passed via method parameters.
+ *
+ * Multi-tenant isolation: the CacheImageRequest carries a `tenantSchema`
+ * field which is serialized into the JSON input of the hash. That means
+ * two tenants requesting the same source URL (e.g. via the legacy
+ * `media/uploads/...` route that has no tenant in the URL) produce
+ * different UUIDs and cannot collide in cache or on disk.
  */
 @Injectable()
 export default class GenerateResourceIdentityFromRequestJob {

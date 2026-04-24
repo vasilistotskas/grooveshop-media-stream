@@ -115,6 +115,14 @@ export default class CacheImageRequest {
 	resourceTarget: string = ''
 	ttl?: number
 	resizeOptions: ResizeOptions = new ResizeOptions()
+	/**
+	 * Tenant schema the image belongs to. Used as part of the cache
+	 * namespace so Redis keys are tenant-prefixed (`image:{schema}:{id}`),
+	 * which enables per-tenant cache invalidation and avoids cross-tenant
+	 * collisions on the legacy media route where the tenant is not part
+	 * of the URL. Defaults to "public" for shared static images.
+	 */
+	tenantSchema: string = 'public'
 
 	constructor(data?: Partial<CacheImageRequest>) {
 		Object.assign(this, data)

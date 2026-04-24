@@ -183,9 +183,18 @@ export default class MediaStreamImageController {
 
 			const resizeOptions = this.buildResizeOptions(params)
 
+			// tenantSchema is extracted from route params when the URL pattern
+			// includes it (UPLOADED_MEDIA). For the legacy route and shared
+			// sources (STATIC_IMAGES), fall back to "public" so keys remain
+			// stable. Used downstream as part of the cache namespace.
+			const tenantSchema = typeof (params as Record<string, unknown>).tenantSchema === 'string'
+				? (params as Record<string, string>).tenantSchema
+				: 'public'
+
 			const request = new CacheImageRequest({
 				resourceTarget: resourceUrl,
 				resizeOptions,
+				tenantSchema,
 			})
 
 			this._logger.debug('Processing image request', {
