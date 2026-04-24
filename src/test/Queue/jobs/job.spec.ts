@@ -41,4 +41,46 @@ describe('generateResourceIdentityFromRequestJob', () => {
 			/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
 		)
 	})
+
+	it('produces different UUIDs for the same URL on different tenants', async () => {
+		// The legacy `/media/uploads/...` route has no tenant segment in
+		// the URL; without `tenantSchema` in the DTO, two tenants
+		// requesting the same path would collide in cache + on disk.
+		// The field goes through JSON.stringify so the hash diverges.
+		const resizeOptions = {
+			width: 400,
+			height: 300,
+			fit: FitOptions.cover,
+			position: PositionOptions.center,
+			format: SupportedResizeFormats.webp,
+			background: BackgroundOptions.transparent,
+			trimThreshold: null,
+			quality: 90,
+		}
+		const requestA = new CacheImageRequest({
+			resourceTarget: 'http://backend-service/media/uploads/logo.png',
+			resizeOptions,
+			tenantSchema: 'tenant_a',
+		})
+		const requestB = new CacheImageRequest({
+			resourceTarget: 'http://backend-service/media/uploads/logo.png',
+			resizeOptions,
+			tenantSchema: 'tenant_b',
+		})
+
+		const idA = await job.handle(requestA)
+		const idB = await job.handle(requestB)
+
+		expect(idA).not.toEqual(idB)
+	})
+
+	it('defaults tenantSchema to "public" for backward compatibility', async () => {
+		// Pre-multi-tenant code still constructs CacheImageRequest
+		// without passing tenantSchema — default keeps those hashes
+		// stable rather than re-bucketing every existing cache entry.
+		const request = new CacheImageRequest({
+			resourceTarget: 'http://localhost/resource',
+		})
+		expect(request.tenantSchema).toBe('public')
+	})
 })
