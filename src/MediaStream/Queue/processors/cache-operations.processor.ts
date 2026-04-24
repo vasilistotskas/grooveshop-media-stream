@@ -154,9 +154,31 @@ export class CacheOperationsProcessor {
 		)
 	}
 
+	/**
+	 * Extract the tenant schema from a resource URL.
+	 *
+	 * ``UPLOADED_MEDIA`` URLs look like
+	 * ``{backend}/media/{tenantSchema}/uploads/{path}``; we pull the
+	 * segment after ``/media/`` when it is not the word ``uploads``
+	 * (which is the legacy, pre-multi-tenant path). Static images and
+	 * legacy paths return ``"public"`` so their cache keys remain
+	 * stable and shared across tenants.
+	 */
+	private extractTenantSchemaFromUrl(url: string): string {
+		const match = url.match(/\/media\/([^/]+)\/uploads\//)
+		if (match && match[1] !== 'uploads') {
+			return match[1]
+		}
+		return 'public'
+	}
+
 	private async warmCacheForImage(imageUrl: string): Promise<void> {
 		try {
-			const request = new CacheImageRequest({ resourceTarget: imageUrl })
+			const tenantSchema = this.extractTenantSchemaFromUrl(imageUrl)
+			const request = new CacheImageRequest({
+				resourceTarget: imageUrl,
+				tenantSchema,
+			})
 			const cacheKey = this.generateCacheKey(request)
 
 			const cached = await this.cacheManager.get('image', cacheKey)
