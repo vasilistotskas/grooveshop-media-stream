@@ -258,14 +258,12 @@ export class StorageOptimizationService implements OnModuleInit {
 
 		this.strategies.set('prefetch', {
 			name: 'Prefetch',
-			description: 'Move frequently accessed files to faster storage tier',
-			execute: async (files: AccessPattern[]) => {
-				// This would move files to SSD or memory-mapped storage
-				// For now, we'll just mark them as optimized
+			description: 'Not implemented — returns zero counts',
+			execute: async (_files: AccessPattern[]) => {
 				return {
-					filesOptimized: files.length,
+					filesOptimized: 0,
 					sizeReduced: 0,
-					errors: [],
+					errors: ['prefetch strategy is not implemented'],
 					strategy: 'prefetch',
 					duration: 0,
 				}

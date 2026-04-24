@@ -96,12 +96,15 @@ export function negotiateImageFormat(
 	}
 }
 
+const AVIF_RE = /image\/avif/i
+const WEBP_RE = /image\/webp/i
+
 /**
  * Check if client supports AVIF format
  */
 export function supportsAvif(req: Request): boolean {
 	const acceptHeader = req.headers.accept || ''
-	return /image\/avif/i.test(acceptHeader)
+	return AVIF_RE.test(acceptHeader)
 }
 
 /**
@@ -109,7 +112,7 @@ export function supportsAvif(req: Request): boolean {
  */
 export function supportsWebp(req: Request): boolean {
 	const acceptHeader = req.headers.accept || ''
-	return /image\/webp/i.test(acceptHeader)
+	return WEBP_RE.test(acceptHeader)
 }
 
 /**

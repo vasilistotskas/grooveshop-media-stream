@@ -28,21 +28,12 @@
     "removeComments": true,
     "sourceMap": true,
     "esModuleInterop": true,
-    "baseUrl": "./",
     "types": [
       "node",
       "express",
       "compression",
       "supertest"
     ],
-    "paths": {
-      "#microservice/*": [
-        "./src/MediaStream/*.ts"
-      ],
-      "#storage/*": [
-        "./var/*"
-      ]
-    },
     "typeRoots": [
       "node_modules/@types"
     ]

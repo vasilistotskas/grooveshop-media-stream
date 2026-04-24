@@ -1,3 +1,4 @@
+import type { LogLevel } from '@nestjs/common'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import * as process from 'node:process'
 import * as zlib from 'node:zlib'
@@ -16,6 +17,39 @@ interface BootstrapOptions {
 }
 
 /**
+ * Resolve the NestJS log levels enabled at runtime from `LOG_LEVEL`.
+ *
+ * Supported values (case-insensitive):
+ *   - `error`           → ['error']
+ *   - `warn`            → ['error', 'warn']
+ *   - `info` / `log`    → ['error', 'warn', 'log']  (default in production)
+ *   - `debug`           → ['error', 'warn', 'log', 'debug']
+ *   - `verbose`         → ['error', 'warn', 'log', 'debug', 'verbose']
+ *
+ * Without filtering, NestJS emits every level including `debug`, which
+ * floods the logs with one entry per Redis cache hit, health probe,
+ * metrics tick, etc.
+ */
+function resolveLogLevels(): LogLevel[] {
+	const { LOG_LEVEL = 'info' } = process.env
+	const raw = LOG_LEVEL.toLowerCase()
+	switch (raw) {
+		case 'error':
+			return ['error']
+		case 'warn':
+			return ['error', 'warn']
+		case 'debug':
+			return ['error', 'warn', 'log', 'debug']
+		case 'verbose':
+			return ['error', 'warn', 'log', 'debug', 'verbose']
+		case 'info':
+		case 'log':
+		default:
+			return ['error', 'warn', 'log']
+	}
+}
+
+/**
  * Bootstrap the NestJS application
  * @param options Bootstrap configuration options
  * @returns A promise that resolves when the application is started
@@ -27,7 +61,9 @@ export async function bootstrap(options: BootstrapOptions | boolean = true): Pro
 		: { exitProcess: true, enableGracefulShutdown: true, ...options }
 
 	try {
-		const app = await NestFactory.create<NestExpressApplication>(MediaStreamModule)
+		const app = await NestFactory.create<NestExpressApplication>(MediaStreamModule, {
+			logger: resolveLogLevels(),
+		})
 		const configService = app.get(ConfigService)
 
 		// Graceful shutdown middleware (must be first, only if enabled)

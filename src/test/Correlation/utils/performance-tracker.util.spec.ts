@@ -1,10 +1,10 @@
 import type { RequestContext } from '#microservice/Correlation/interfaces/correlation.interface'
 import { requestContextStorage } from '#microservice/Correlation/async-local-storage'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-// NO mock of CorrelatedLogger — we use the real logger and spy on console methods
-// to catch integration issues like detached method references losing `this` binding.
+// Spy on CorrelatedLogger static methods which delegate to NestJS Logger.
 
 const TEST_CORRELATION_ID = 'test-correlation-id'
 
@@ -40,13 +40,12 @@ describe('performanceTracker', () => {
 		// Clear any existing phases by directly accessing the private phases map
 		;(PerformanceTracker as any).phases = new Map()
 
-		// Spy on console methods (NOT mock CorrelatedLogger)
-		// This ensures the real CorrelatedLogger is exercised end-to-end
+		// Spy on CorrelatedLogger static methods (they delegate to NestJS Logger)
 		consoleSpy = {
-			log: vi.spyOn(console, 'log').mockImplementation(() => {}),
-			error: vi.spyOn(console, 'error').mockImplementation(() => {}),
-			warn: vi.spyOn(console, 'warn').mockImplementation(() => {}),
-			debug: vi.spyOn(console, 'debug').mockImplementation(() => {}),
+			log: vi.spyOn(CorrelatedLogger, 'log').mockImplementation(() => {}),
+			error: vi.spyOn(CorrelatedLogger, 'error').mockImplementation(() => {}),
+			warn: vi.spyOn(CorrelatedLogger, 'warn').mockImplementation(() => {}),
+			debug: vi.spyOn(CorrelatedLogger, 'debug').mockImplementation(() => {}),
 		}
 	})
 
@@ -83,6 +82,7 @@ describe('performanceTracker', () => {
 				// Real CorrelatedLogger.debug was called (not a mock)
 				expect(consoleSpy.debug).toHaveBeenCalledWith(
 					expect.stringContaining('Performance phase started: test-phase'),
+					'PerformanceTracker',
 				)
 
 				PerformanceTracker.endPhase('test-phase')
@@ -90,6 +90,7 @@ describe('performanceTracker', () => {
 				// endPhase also calls real CorrelatedLogger.debug for fast operations
 				expect(consoleSpy.debug).toHaveBeenCalledWith(
 					expect.stringContaining('Performance phase completed: test-phase'),
+					'PerformanceTracker',
 				)
 			})
 		})
@@ -156,6 +157,7 @@ describe('performanceTracker', () => {
 				// Should use warn (not debug) for operations >1000ms
 				expect(consoleSpy.warn).toHaveBeenCalledWith(
 					expect.stringContaining('Performance phase completed: slow-phase'),
+					'PerformanceTracker',
 				)
 				// debug should NOT have been called for the completion log
 				const debugCalls = consoleSpy.debug.mock.calls.filter(
@@ -173,6 +175,7 @@ describe('performanceTracker', () => {
 				// Should use debug (not warn)
 				expect(consoleSpy.debug).toHaveBeenCalledWith(
 					expect.stringContaining('Performance phase completed: fast-phase'),
+					'PerformanceTracker',
 				)
 				// warn should NOT have been called for completion
 				const warnCalls = consoleSpy.warn.mock.calls.filter(
@@ -182,12 +185,13 @@ describe('performanceTracker', () => {
 			})
 		})
 
-		it('should include correlation ID prefix in log output', () => {
+		it('should include phase name in log output', () => {
 			runWithContext(() => {
 				PerformanceTracker.startPhase('prefixed-phase')
 
 				expect(consoleSpy.debug).toHaveBeenCalledWith(
-					expect.stringContaining(`[${TEST_CORRELATION_ID}]`),
+					expect.stringContaining('Performance phase started: prefixed-phase'),
+					'PerformanceTracker',
 				)
 			})
 		})
@@ -230,6 +234,7 @@ describe('performanceTracker', () => {
 
 				expect(consoleSpy.log).toHaveBeenCalledWith(
 					expect.stringContaining('Performance Summary:'),
+					'PerformanceTracker',
 				)
 			})
 		})
@@ -416,6 +421,7 @@ describe('performanceTracker', () => {
 				// Now the warn is triggered because phases exist but the name wasn't found
 				expect(consoleSpy.warn).toHaveBeenCalledWith(
 					expect.stringContaining('Performance phase not found or already ended: non-existent-phase'),
+					'PerformanceTracker',
 				)
 			})
 		})

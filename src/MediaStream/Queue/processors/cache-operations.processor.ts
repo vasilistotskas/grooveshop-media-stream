@@ -1,13 +1,18 @@
 import type { Job } from '../interfaces/job-queue.interface.js'
 import type { CacheCleanupJobData, CacheWarmingJobData, JobResult } from '../types/job.types.js'
 import { Buffer } from 'node:buffer'
+import { createHash } from 'node:crypto'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import * as process from 'node:process'
+import CacheImageRequest from '#microservice/API/dto/cache-image-request.dto'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 import { Injectable, Logger } from '@nestjs/common'
+
+const NAMESPACE_URL = '6ba7b811-9dad-11d1-80b4-00c04fd430c8'
+const DASH_RE = /-/g
 
 @Injectable()
 export class CacheOperationsProcessor {
@@ -104,7 +109,6 @@ export class CacheOperationsProcessor {
 					this._logger.debug(`Starting cache cleanup job ${job.id}`)
 
 					const cleanupResults = await Promise.allSettled([
-						this.cleanupMemoryCache(),
 						this.cleanupFileCache(maxAge, maxSize),
 					])
 
@@ -116,7 +120,7 @@ export class CacheOperationsProcessor {
 							totalCleaned += result.value.cleaned
 						}
 						else {
-							const operation = index === 0 ? 'memory cache' : 'file cache'
+							const operation = index === 0 ? 'file cache' : 'unknown'
 							errors.push(`${operation}: ${result.reason.message}`)
 						}
 					})
@@ -152,7 +156,8 @@ export class CacheOperationsProcessor {
 
 	private async warmCacheForImage(imageUrl: string): Promise<void> {
 		try {
-			const cacheKey = this.generateCacheKey(imageUrl)
+			const request = new CacheImageRequest({ resourceTarget: imageUrl })
+			const cacheKey = this.generateCacheKey(request)
 
 			const cached = await this.cacheManager.get('image', cacheKey)
 			if (cached) {
@@ -172,21 +177,6 @@ export class CacheOperationsProcessor {
 		}
 		catch (error: unknown) {
 			throw new Error(`Failed to warm cache for ${imageUrl}: ${(error as Error).message}`)
-		}
-	}
-
-	private async cleanupMemoryCache(): Promise<{ cleaned: number }> {
-		try {
-			await this.cacheManager.getStats()
-
-			// In a real implementation, this would be more sophisticated
-			const cleaned = 0
-
-			this._logger.debug(`Memory cache cleanup completed: ${cleaned} items cleaned`)
-			return { cleaned }
-		}
-		catch (error: unknown) {
-			throw new Error(`Memory cache cleanup failed: ${(error as Error).message}`)
 		}
 	}
 
@@ -250,9 +240,25 @@ export class CacheOperationsProcessor {
 		}
 	}
 
-	private generateCacheKey(imageUrl: string): string {
-		// Simple cache key generation - in real implementation this would be more sophisticated
-		const hash = Buffer.from(imageUrl).toString('base64').replace(/[/+=]/g, '')
-		return `image:${hash}`
+	/**
+	 * Generates a UUID-v5 cache key from a CacheImageRequest, matching the
+	 * identity produced by GenerateResourceIdentityFromRequestJob on the sync path.
+	 */
+	private generateCacheKey(request: CacheImageRequest): string {
+		const requestStr = JSON.stringify(JSON.parse(JSON.stringify(request)))
+		const ns = Buffer.from(NAMESPACE_URL.replace(DASH_RE, ''), 'hex')
+		const hash = createHash('sha1').update(Buffer.concat([ns, Buffer.from(requestStr)])).digest()
+
+		hash[6] = (hash[6] & 0x0F) | 0x50
+		hash[8] = (hash[8] & 0x3F) | 0x80
+
+		const hex = hash.subarray(0, 16).toString('hex')
+		return (
+			`${hex.substring(0, 8)}-`
+			+ `${hex.substring(8, 12)}-`
+			+ `${hex.substring(12, 16)}-`
+			+ `${hex.substring(16, 20)}-`
+			+ `${hex.substring(20)}`
+		)
 	}
 }

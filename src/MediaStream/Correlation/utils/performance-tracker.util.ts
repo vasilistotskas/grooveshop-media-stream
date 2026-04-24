@@ -14,7 +14,9 @@ export interface PerformancePhase {
 
 export class PerformanceTracker {
 	private static readonly MAX_TRACKED_REQUESTS = 1000
+	private static readonly MAX_AGE_MS = 5 * 60 * 1000 // 5 minutes
 	private static phases = new Map<string, PerformancePhase[]>()
+	private static timestamps = new Map<string, number>()
 
 	private static getCorrelationId(): string | null {
 		const store = requestContextStorage.getStore()
@@ -36,14 +38,26 @@ export class PerformanceTracker {
 		}
 
 		if (!this.phases.has(correlationId)) {
-			// Evict oldest entries if map grows too large (queue workers without cleanup)
+			// Evict stale entries (older than MAX_AGE_MS) and oldest if map is too large
+			const now = Date.now()
 			if (this.phases.size >= this.MAX_TRACKED_REQUESTS) {
-				const firstKey = this.phases.keys().next().value
-				if (firstKey) {
-					this.phases.delete(firstKey)
+				for (const [key, ts] of this.timestamps) {
+					if (now - ts > this.MAX_AGE_MS) {
+						this.phases.delete(key)
+						this.timestamps.delete(key)
+					}
+				}
+				// If still too large after TTL eviction, drop oldest
+				if (this.phases.size >= this.MAX_TRACKED_REQUESTS) {
+					const firstKey = this.phases.keys().next().value
+					if (firstKey) {
+						this.phases.delete(firstKey)
+						this.timestamps.delete(firstKey)
+					}
 				}
 			}
 			this.phases.set(correlationId, [])
+			this.timestamps.set(correlationId, now)
 		}
 
 		this.phases.get(correlationId)!.push(phase)
@@ -66,10 +80,14 @@ export class PerformanceTracker {
 		if (!phases)
 			return null
 
-		const phase = phases
-			.slice()
-			.reverse()
-			.find(p => p.name === phaseName && !p.endTime)
+		// Find last uncompleted phase with this name — backward loop avoids array copy
+		let phase: PerformancePhase | undefined
+		for (let i = phases.length - 1; i >= 0; i--) {
+			if (phases[i].name === phaseName && !phases[i].endTime) {
+				phase = phases[i]
+				break
+			}
+		}
 
 		if (!phase) {
 			CorrelatedLogger.warn(
@@ -140,8 +158,9 @@ export class PerformanceTracker {
 	 */
 	static cleanup(correlationId?: string): void {
 		const id = correlationId || this.getCorrelationId()
-		if (id && this.phases.has(id)) {
+		if (id) {
 			this.phases.delete(id)
+			this.timestamps.delete(id)
 		}
 	}
 

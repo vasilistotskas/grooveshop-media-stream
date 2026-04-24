@@ -1,3 +1,101 @@
+# [2.47.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.46.0...v2.47.0) (2026-04-23)
+
+
+### Features
+
+* Bump Versions ([2178d0c](https://github.com/vasilistotskas/grooveshop-media-stream/commit/2178d0ceecd63ecd2cb1b18b67dfc0f70df76eed))
+
+# [2.46.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.45.0...v2.46.0) (2026-04-20)
+
+
+### Features
+
+* Bump Versions ([4649811](https://github.com/vasilistotskas/grooveshop-media-stream/commit/464981146f789d1c0d162625c67dcd1f443975f7))
+
+# [2.45.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.44.0...v2.45.0) (2026-04-19)
+
+
+### Features
+
+* **http:** add cdn cache + retry-after headers, decouple readiness from redis ([06c39d4](https://github.com/vasilistotskas/grooveshop-media-stream/commit/06c39d4c36884ef68a8eb1a6453d0d43753924e8))
+
+# [2.44.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.43.3...v2.44.0) (2026-04-19)
+
+
+### Features
+
+* Bump Versions ([52ef301](https://github.com/vasilistotskas/grooveshop-media-stream/commit/52ef301f432e7ea5984cde9437347568d13e2963))
+
+## [2.43.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.43.2...v2.43.3) (2026-04-17)
+
+
+### Bug Fixes
+
+* **image:** Sharp autoOrient, atomic cache writes, SVG sanitization ([b95ef41](https://github.com/vasilistotskas/grooveshop-media-stream/commit/b95ef41b2b803e621bda8de49373a243368f3d9f))
+
+## [2.43.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.43.1...v2.43.2) (2026-04-13)
+
+
+### Bug Fixes
+
+* **cache:** replace FLUSHALL with FLUSHDB, fix warming cron, update tests ([b343a3d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/b343a3d27586887b5b61305c56bfaf92613d842f))
+
+## [2.43.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.43.0...v2.43.1) (2026-04-13)
+
+
+### Bug Fixes
+
+* **security:** resolve rate limit bypass, validation gaps, cache incompatibilities, and resilience issues ([a862fb3](https://github.com/vasilistotskas/grooveshop-media-stream/commit/a862fb3be5bdaa4fa8c91bb22b01b25e9ec9e217))
+
+# [2.43.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.42.1...v2.43.0) (2026-04-10)
+
+
+### Features
+
+* Bump Versions ([2d6cd50](https://github.com/vasilistotskas/grooveshop-media-stream/commit/2d6cd50157fe593847ad4a03fc11dd2f8b6c5028))
+
+## [2.42.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.42.0...v2.42.1) (2026-04-06)
+
+
+### Bug Fixes
+
+* **logger:** respect LOG_LEVEL env var to filter NestJS log output ([3af0a03](https://github.com/vasilistotskas/grooveshop-media-stream/commit/3af0a03f1e8decf1b70d679c508f09212a56df43))
+
+# [2.42.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.41.0...v2.42.0) (2026-04-04)
+
+
+### Features
+
+* harden rate limiter, add Redis security log ([ed1a1f6](https://github.com/vasilistotskas/grooveshop-media-stream/commit/ed1a1f664cdf34942aaf7cf461450c68932f2465))
+
+# [2.41.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.40.0...v2.41.0) (2026-03-31)
+
+
+### Features
+
+* Bump Versions ([2057d95](https://github.com/vasilistotskas/grooveshop-media-stream/commit/2057d958aa3626374c3ba90708ca19195643b8f4))
+
+# [2.40.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.39.0...v2.40.0) (2026-03-28)
+
+
+### Features
+
+* Bump Versions ([38c6479](https://github.com/vasilistotskas/grooveshop-media-stream/commit/38c6479c128e37a04f679fde3e92dd9c6fc1f2e4))
+
+# [2.39.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.38.0...v2.39.0) (2026-03-22)
+
+
+### Features
+
+* Bump Versions ([cd42896](https://github.com/vasilistotskas/grooveshop-media-stream/commit/cd428964349b38e3143817f77b35f8124202bc44))
+
+# [2.38.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.37.1...v2.38.0) (2026-03-17)
+
+
+### Features
+
+* bump dependencies and refactor patterns to constants ([c52cb84](https://github.com/vasilistotskas/grooveshop-media-stream/commit/c52cb849a7a5cfe40df2ae32819e8c2a70e65bda))
+
 ## [2.37.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.37.0...v2.37.1) (2026-02-28)
 
 

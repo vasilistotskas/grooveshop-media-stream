@@ -9,6 +9,25 @@ import {
 import { ConfigService } from '#microservice/Config/config.service'
 import { Injectable, Logger } from '@nestjs/common'
 
+const EMPTY_STRING_PATTERNS: RegExp[] = [
+	/^\s*on\w+\s*=.*$/i,
+	/^\s*javascript\s*:.*$/i,
+	/^\s*vbscript\s*:.*$/i,
+	/^\s*data\s*:.*$/i,
+]
+
+const DANGEROUS_PROTOCOL_URL_RE = /(?:javascript|vbscript|data|file|ftp|about)\s*:\S*/gi
+const DANGEROUS_PROTOCOL_RE = /(?:javascript|vbscript|data|file|ftp|about)\s*:/gi
+const DANGEROUS_PROTOCOL_WORD_RE = /\b(?:javascript|vbscript|data|file|ftp|about)\b/gi
+
+const DANGEROUS_JS_CALL_RE = /(?:expression|eval)\s*\([^)]*\)/gi
+const DANGEROUS_JS_OPEN_RE = /(?:expression|eval)\s*\(/gi
+const DANGEROUS_JS_WORD_RE = /\b(?:expression|eval)\b/gi
+
+const WORD_CHAR_RE = /\w/
+const WHITESPACE_CHAR_RE = /\s/
+const HTML_ENTITY_CHAR_RE = /[#\w]/
+
 @Injectable()
 export class InputSanitizationService implements ISanitizer<any> {
 	private readonly _logger = new Logger(InputSanitizationService.name)
@@ -63,14 +82,7 @@ export class InputSanitizationService implements ISanitizer<any> {
 			}
 		}
 
-		const emptyStringPatterns = [
-			/^\s*on\w+\s*=.*$/i,
-			/^\s*javascript\s*:.*$/i,
-			/^\s*vbscript\s*:.*$/i,
-			/^\s*data\s*:.*$/i,
-		]
-
-		for (const pattern of emptyStringPatterns) {
+		for (const pattern of EMPTY_STRING_PATTERNS) {
 			if (pattern.test(str)) {
 				this._logger.warn(`Standalone dangerous pattern detected, returning empty string`)
 				return ''
@@ -270,11 +282,11 @@ export class InputSanitizationService implements ISanitizer<any> {
 		while (result !== previousResult) {
 			previousResult = result
 
-			result = result.replace(/(?:javascript|vbscript|data|file|ftp|about)\s*:\S*/gi, '')
+			result = result.replace(DANGEROUS_PROTOCOL_URL_RE, '')
 
-			result = result.replace(/(?:javascript|vbscript|data|file|ftp|about)\s*:/gi, '')
+			result = result.replace(DANGEROUS_PROTOCOL_RE, '')
 
-			result = result.replace(/\b(?:javascript|vbscript|data|file|ftp|about)\b/gi, '')
+			result = result.replace(DANGEROUS_PROTOCOL_WORD_RE, '')
 		}
 
 		return result
@@ -286,9 +298,9 @@ export class InputSanitizationService implements ISanitizer<any> {
 
 		while (result !== previousResult) {
 			previousResult = result
-			result = result.replace(/(?:expression|eval)\s*\([^)]*\)/gi, '')
-			result = result.replace(/(?:expression|eval)\s*\(/gi, '')
-			result = result.replace(/\b(?:expression|eval)\b/gi, '')
+			result = result.replace(DANGEROUS_JS_CALL_RE, '')
+			result = result.replace(DANGEROUS_JS_OPEN_RE, '')
+			result = result.replace(DANGEROUS_JS_WORD_RE, '')
 		}
 
 		return result
@@ -315,24 +327,24 @@ export class InputSanitizationService implements ISanitizer<any> {
 		if (index === 0)
 			return true
 		const prevChar = input[index - 1]
-		return !(/\w/.test(prevChar))
+		return !(WORD_CHAR_RE.test(prevChar))
 	}
 
 	private skipEventHandler(input: string, startIndex: number): number {
 		let i = startIndex
 
-		while (i < input.length && /\w/.test(input[i])) {
+		while (i < input.length && WORD_CHAR_RE.test(input[i])) {
 			i++
 		}
 
-		while (i < input.length && /\s/.test(input[i])) {
+		while (i < input.length && WHITESPACE_CHAR_RE.test(input[i])) {
 			i++
 		}
 
 		if (i < input.length && input[i] === '=') {
 			i++
 
-			while (i < input.length && /\s/.test(input[i])) {
+			while (i < input.length && WHITESPACE_CHAR_RE.test(input[i])) {
 				i++
 			}
 
@@ -346,7 +358,7 @@ export class InputSanitizationService implements ISanitizer<any> {
 					i++
 			}
 			else {
-				while (i < input.length && !/\s/.test(input[i]) && input[i] !== '>' && input[i] !== '<') {
+				while (i < input.length && !WHITESPACE_CHAR_RE.test(input[i]) && input[i] !== '>' && input[i] !== '<') {
 					i++
 				}
 			}
@@ -358,14 +370,14 @@ export class InputSanitizationService implements ISanitizer<any> {
 	private skipStyleAttribute(input: string, startIndex: number): number {
 		let i = startIndex + 5
 
-		while (i < input.length && /\s/.test(input[i])) {
+		while (i < input.length && WHITESPACE_CHAR_RE.test(input[i])) {
 			i++
 		}
 
 		if (i < input.length && input[i] === '=') {
 			i++
 
-			while (i < input.length && /\s/.test(input[i])) {
+			while (i < input.length && WHITESPACE_CHAR_RE.test(input[i])) {
 				i++
 			}
 
@@ -379,7 +391,7 @@ export class InputSanitizationService implements ISanitizer<any> {
 					i++
 			}
 			else {
-				while (i < input.length && !/\s/.test(input[i]) && input[i] !== '>' && input[i] !== '<') {
+				while (i < input.length && !WHITESPACE_CHAR_RE.test(input[i]) && input[i] !== '>' && input[i] !== '<') {
 					i++
 				}
 			}
@@ -391,7 +403,7 @@ export class InputSanitizationService implements ISanitizer<any> {
 	private skipHtmlEntity(input: string, startIndex: number): number {
 		let i = startIndex + 1
 
-		while (i < input.length && input[i] !== ';' && /[#\w]/.test(input[i])) {
+		while (i < input.length && input[i] !== ';' && HTML_ENTITY_CHAR_RE.test(input[i])) {
 			i++
 		}
 

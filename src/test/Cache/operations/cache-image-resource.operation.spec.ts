@@ -449,7 +449,7 @@ describe('cacheImageResourceOperation', () => {
 		it('should return null when resource not found', async () => {
 			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
 			const mockedFs = vi.mocked(fs)
-			mockedFs.access.mockRejectedValue(new Error('File not found'))
+			mockedFs.readFile.mockRejectedValue(new Error('File not found'))
 
 			const result = await operation.getCachedResource(opCtx)
 

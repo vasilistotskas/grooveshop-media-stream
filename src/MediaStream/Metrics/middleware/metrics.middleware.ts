@@ -4,6 +4,10 @@ import { Buffer } from 'node:buffer'
 import { Injectable, Logger } from '@nestjs/common'
 import { MetricsService } from '../services/metrics.service.js'
 
+const UUID_RE = /\/[a-f0-9-]{36}/g
+const OBJECT_ID_RE = /\/[a-f0-9]{24}/g
+const NUMERIC_ID_RE = /\/\d+/g
+
 @Injectable()
 export class MetricsMiddleware implements NestMiddleware {
 	private readonly _logger = new Logger(MetricsMiddleware.name)
@@ -62,20 +66,13 @@ export class MetricsMiddleware implements NestMiddleware {
 	}
 
 	private getRequestSize(req: Request): number {
-		const contentLength = req.get('content-length')
+		const contentLength = req.headers['content-length']
 		if (contentLength) {
 			return Number.parseInt(contentLength, 10) || 0
 		}
 
-		let size = 0
-
-		for (const [key, value] of Object.entries(req.headers)) {
-			size += key.length + (Array.isArray(value) ? value.join('').length : String(value).length)
-		}
-
-		size += req.url.length
-
-		return size
+		// For requests without content-length (e.g. GET), use URL length as rough estimate
+		return req.url.length
 	}
 
 	private getRoute(req: Request): string {
@@ -86,9 +83,9 @@ export class MetricsMiddleware implements NestMiddleware {
 		const pathname = req.url.split('?')[0]
 
 		const normalized = pathname
-			.replace(/\/[a-f0-9-]{36}/g, '/:uuid')
-			.replace(/\/[a-f0-9]{24}/g, '/:objectId')
-			.replace(/\/\d+/g, '/:id')
+			.replace(UUID_RE, '/:uuid')
+			.replace(OBJECT_ID_RE, '/:objectId')
+			.replace(NUMERIC_ID_RE, '/:id')
 
 		// Cap depth and collapse unmatched paths to prevent cardinality explosion on 404s
 		const segments = normalized.split('/').slice(0, 5)

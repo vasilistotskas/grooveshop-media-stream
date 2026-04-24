@@ -1,48 +1,62 @@
 import type { ISecurityChecker, SecurityEvent } from '../interfaces/validator.interface.js'
+import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { ConfigService } from '#microservice/Config/config.service'
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, Optional } from '@nestjs/common'
+
+const SUSPICIOUS_PATTERNS: RegExp[] = [
+	/<script\b[^>]{0,100}>/i,
+	/javascript:/i,
+	/vbscript:/i,
+	/data:text\/html/i,
+	/\bon\w{1,20}\s*=/i,
+
+	/union\s{1,5}select/i,
+	/drop\s{1,5}table/i,
+	/insert\s{1,5}into/i,
+	/delete\s{1,5}from/i,
+
+	/\.\.\//,
+	/\.\.\\/,
+	/\.\.\\\\/,
+	/%2e%2e%2f/i,
+	/%2e%2e%5c/i,
+
+	/;\s{0,5}rm\s{1,5}-rf/i,
+	/;\s{0,5}cat\s{1,5}/i,
+	/;\s{0,5}ls\s{1,5}/i,
+	/\|\s{0,5}nc\s{1,5}/i,
+
+	/<!entity\b/i,
+	/<!doctype[^>]{0,100}\[/i,
+
+	/\(\|\(/,
+	/\)\(\|/,
+
+	/\$where\b/i,
+	/\$ne\b/i,
+	/\$gt\b/i,
+	/\$lt\b/i,
+]
+
+const IMAGE_EXTENSION_RE = /\.(?:jpe?g|png|gif|webp|svg|bmp|tiff?|ico|avif)$/i
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+
+const REDIS_SECURITY_EVENTS_KEY = 'security:events'
+const REDIS_SECURITY_EVENTS_MAX = 10000
 
 @Injectable()
 export class SecurityCheckerService implements ISecurityChecker {
 	private readonly _logger = new Logger(SecurityCheckerService.name)
 	private readonly suspiciousPatterns: RegExp[]
 	private readonly securityEvents: SecurityEvent[] = []
+	private readonly maxStringLength: number
 
-	constructor(private readonly _configService: ConfigService) {
-		this.suspiciousPatterns = [
-			/<script\b[^>]{0,100}>/i,
-			/javascript:/i,
-			/vbscript:/i,
-			/data:text\/html/i,
-			/\bon\w{1,20}\s*=/i,
-
-			/union\s{1,5}select/i,
-			/drop\s{1,5}table/i,
-			/insert\s{1,5}into/i,
-			/delete\s{1,5}from/i,
-
-			/\.\.\//,
-			/\.\.\\/,
-			/\.\.\\\\/,
-			/%2e%2e%2f/i,
-			/%2e%2e%5c/i,
-
-			/;\s{0,5}rm\s{1,5}-rf/i,
-			/;\s{0,5}cat\s{1,5}/i,
-			/;\s{0,5}ls\s{1,5}/i,
-			/\|\s{0,5}nc\s{1,5}/i,
-
-			/<!entity\b/i,
-			/<!doctype[^>]{0,100}\[/i,
-
-			/\(\|\(/,
-			/\)\(\|/,
-
-			/\$where\b/i,
-			/\$ne\b/i,
-			/\$gt\b/i,
-			/\$lt\b/i,
-		]
+	constructor(
+		private readonly _configService: ConfigService,
+		@Optional() private readonly _redisCacheService: RedisCacheService | null,
+	) {
+		this.suspiciousPatterns = SUSPICIOUS_PATTERNS
+		this.maxStringLength = this._configService.getOptional('validation.maxStringLength', 10000)
 	}
 
 	async checkForMaliciousContent(input: any): Promise<boolean> {
@@ -71,11 +85,10 @@ export class SecurityCheckerService implements ISecurityChecker {
 	}
 
 	private checkString(str: string): boolean {
-		const maxLength = this._configService.getOptional('validation.maxStringLength', 10000)
 		if (str.length === 0) {
 			return false
 		}
-		if (str.length > maxLength) {
+		if (str.length > this.maxStringLength) {
 			this._logger.warn(`Excessively long string detected: ${str.length} characters`)
 			return true
 		}
@@ -96,6 +109,13 @@ export class SecurityCheckerService implements ISecurityChecker {
 			}
 		}
 
+		// Check decoded variants to catch mixed-case encoding (%2E%2E/),
+		// partial encoding (..%2f), and overlong UTF-8 sequences (%c0%ae...)
+		if (this.containsPathTraversal(str)) {
+			this._logger.warn('Path traversal detected in decoded input')
+			return true
+		}
+
 		if (this.hasHighEntropy(str)) {
 			this._logger.warn('High entropy string detected (potential encoded payload)')
 			return true
@@ -104,10 +124,45 @@ export class SecurityCheckerService implements ISecurityChecker {
 		return false
 	}
 
+	private containsPathTraversal(path: string): boolean {
+		// Raw string already checked by suspiciousPatterns above — only need decoded variants
+		try {
+			const decoded = decodeURIComponent(path)
+			if (decoded !== path && this.suspiciousPatterns.some((p) => {
+				try {
+					return p.test(decoded)
+				}
+				catch {
+					return true
+				}
+			})) {
+				return true
+			}
+
+			// Double-decode catches sequences encoded twice (%252e%252e%252f → ../)
+			const doubleDecoded = decodeURIComponent(decoded)
+			if (doubleDecoded !== decoded && this.suspiciousPatterns.some((p) => {
+				try {
+					return p.test(doubleDecoded)
+				}
+				catch {
+					return true
+				}
+			})) {
+				return true
+			}
+		}
+		catch {
+			// Malformed percent-encoding is inherently suspicious — reject it
+			return true
+		}
+
+		return false
+	}
+
 	private async checkObject(obj: any): Promise<boolean> {
-		const dangerousKeys = ['__proto__', 'constructor', 'prototype']
 		for (const key of Object.keys(obj)) {
-			if (dangerousKeys.includes(key)) {
+			if (DANGEROUS_KEYS.has(key)) {
 				this._logger.warn(`Dangerous object key detected: ${key}`)
 				return true
 			}
@@ -132,8 +187,7 @@ export class SecurityCheckerService implements ISecurityChecker {
 
 		// Skip entropy check for filenames with common image extensions
 		// file upload system could adds random suffixes like __ytXSDgf which have high entropy
-		const imageExtensionPattern = /\.(?:jpe?g|png|gif|webp|svg|bmp|tiff?|ico|avif)$/i
-		if (imageExtensionPattern.test(str)) {
+		if (IMAGE_EXTENSION_RE.test(str)) {
 			return false
 		}
 
@@ -182,7 +236,11 @@ export class SecurityCheckerService implements ISecurityChecker {
 			event.timestamp = new Date()
 		}
 
+		// Fast in-memory store for health/stats endpoints (capped at 1000)
 		this.securityEvents.push(event)
+		if (this.securityEvents.length > 1000) {
+			this.securityEvents.shift()
+		}
 
 		this._logger.warn(`Security event: ${event.type}`, {
 			source: event.source,
@@ -192,14 +250,43 @@ export class SecurityCheckerService implements ISecurityChecker {
 			timestamp: event.timestamp,
 		})
 
-		// In production, you might want to:
-		// - Send to SIEM system
-		// - Trigger alerts for critical events
-		// - Update threat intelligence feeds
-		// - Block suspicious IPs temporarily
+		// Persist to Redis for cross-replica visibility and crash durability (fire-and-forget)
+		this.persistEventToRedis(event)
+	}
 
-		if (this.securityEvents.length > 1000) {
-			this.securityEvents.shift()
+	private persistEventToRedis(event: SecurityEvent): void {
+		const redisClient = this._redisCacheService?.getClient()
+		if (!redisClient) {
+			return
+		}
+
+		const serialized = JSON.stringify(event)
+		redisClient.lpush(REDIS_SECURITY_EVENTS_KEY, serialized)
+			.then(() => redisClient.ltrim(REDIS_SECURITY_EVENTS_KEY, 0, REDIS_SECURITY_EVENTS_MAX - 1))
+			.catch((error: unknown) => {
+				this._logger.warn(`Failed to persist security event to Redis: ${(error as Error).message}`)
+			})
+	}
+
+	async getRecentEventsFromRedis(limit = 100): Promise<SecurityEvent[]> {
+		const redisClient = this._redisCacheService?.getClient()
+		if (!redisClient) {
+			return []
+		}
+
+		try {
+			const raw = await redisClient.lrange(REDIS_SECURITY_EVENTS_KEY, 0, limit - 1)
+			return raw.map((entry) => {
+				const parsed = JSON.parse(entry) as SecurityEvent
+				if (parsed.timestamp) {
+					parsed.timestamp = new Date(parsed.timestamp)
+				}
+				return parsed
+			})
+		}
+		catch (error: unknown) {
+			this._logger.warn(`Failed to read security events from Redis: ${(error as Error).message}`)
+			return []
 		}
 	}
 

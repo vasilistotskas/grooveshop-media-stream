@@ -3,31 +3,60 @@ name: CI
 on:
   push:
     branches: ['main']
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.editorconfig'
   pull_request:
     branches: ['main']
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.editorconfig'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 env:
   SYSTEM_ENV: ci
-  NODE_ENV: test
-  REDIS_HOST: localhost
-  REDIS_PORT: 6379
-  REDIS_PASSWORD: ''
 
 jobs:
-  quality:
-    name: Code Quality
+  ci:
+    name: Quality, Test & Build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      redis:
+        image: redis:8-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    env:
+      NODE_ENV: test
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ''
+      BULL_REDIS_HOST: localhost
+      BULL_REDIS_PORT: 6379
+      CI: true
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
         with:
           run_install: false
 
@@ -52,76 +81,28 @@ jobs:
         run: npx tsc --noEmit
         continue-on-error: true
 
-  testing:
-    name: Testing
-    needs: quality
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: ['24.x']
-        redis-version: ['8']
-        include:
-          - node-version: '24.x'
-            redis-version: '8'
-            coverage: true
-
-    services:
-      redis:
-        image: redis:${{ matrix.redis-version }}-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v6
-        with:
-          node-version: ${{ matrix.node-version }}
-          registry-url: 'https://npm.pkg.github.com'
-          scope: '@vasilistotskas'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
       - name: Run unit tests with coverage
-        if: matrix.coverage
-        env:
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379
-          BULL_REDIS_HOST: localhost
-          BULL_REDIS_PORT: 6379
-          NODE_ENV: test
-          CI: true
         run: pnpm run test:coverage
         timeout-minutes: 10
 
-      - name: Run unit tests without coverage
-        if: '!matrix.coverage'
+      - name: Run E2E tests
+        run: pnpm run test:e2e
+        timeout-minutes: 15
+
+      - name: Test production build
         env:
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379
-          BULL_REDIS_HOST: localhost
-          BULL_REDIS_PORT: 6379
-          NODE_ENV: test
-          CI: true
-        run: pnpm run test:watch -- --watchAll=false
-        timeout-minutes: 10
+          NODE_ENV: production
+        run: |
+          timeout 10s pnpm run prod || exit_code=$?
+          if [ $exit_code -eq 124 ]; then
+            echo "Production build starts successfully"
+          else
+            echo "Production build failed with exit code $exit_code"
+            exit $exit_code
+          fi
 
       - name: Coverage summary
-        if: matrix.coverage
+        if: always()
         run: |
           if [ -f coverage/coverage-summary.json ]; then
             echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
@@ -138,144 +119,15 @@ jobs:
           fi
 
       - name: Upload coverage artifacts
-        if: matrix.coverage
-        uses: actions/upload-artifact@v6
+        if: always()
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: coverage/
           retention-days: 7
 
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: test-results-node-${{ matrix.node-version }}-redis-${{ matrix.redis-version }}
-          path: |
-            coverage/
-            test-results/
-            junit.xml
-          retention-days: 7
-
-  e2e-testing:
-    name: E2E Testing
-    needs: quality
-    runs-on: ubuntu-latest
-    services:
-      redis:
-        image: redis:8-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '24.x'
-          registry-url: 'https://npm.pkg.github.com'
-          scope: '@vasilistotskas'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build application
-        run: pnpm run build
-
-      - name: Run E2E tests
-        env:
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379
-          BULL_REDIS_HOST: localhost
-          BULL_REDIS_PORT: 6379
-          NODE_ENV: test
-          PORT: 3000
-        run: pnpm run test:e2e
-        timeout-minutes: 15
-
-      - name: Upload E2E test results
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: e2e-test-results
-          path: |
-            test-results/
-            screenshots/
-          retention-days: 7
-
-  build:
-    name: Build Production
-    needs: [testing, e2e-testing]
-    runs-on: ubuntu-latest
-    services:
-      redis:
-        image: redis:8-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '24.x'
-          registry-url: 'https://npm.pkg.github.com'
-          scope: '@vasilistotskas'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Clean previous build
-        run: pnpm run prebuild
-
-      - name: Build application
-        run: pnpm run build
-        env:
-          NODE_ENV: production
-
-      - name: Test production build
-        env:
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379
-          BULL_REDIS_HOST: localhost
-          BULL_REDIS_PORT: 6379
-          NODE_ENV: production
-        run: |
-          timeout 10s pnpm run prod || exit_code=$?
-          if [ $exit_code -eq 124 ]; then
-            echo "Production build starts successfully"
-          else
-            echo "Production build failed with exit code $exit_code"
-            exit $exit_code
-          fi
-
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: build-artifacts
           path: |
@@ -286,9 +138,10 @@ jobs:
 
   release:
     name: Release
-    needs: [build]
+    needs: ci
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     concurrency: release
     environment: release
     permissions:
@@ -306,7 +159,7 @@ jobs:
           token: ${{ secrets.MEDIA_STREAM_GITHUB_TOKEN }}
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
         with:
           run_install: false
 
@@ -322,7 +175,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Download build artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: build-artifacts
           path: ./
@@ -337,7 +190,7 @@ jobs:
 
       - name: Upload release artifacts
         if: steps.release.outputs.new_release_published == 'true'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: release-${{ steps.release.outputs.new_release_version }}
           path: |

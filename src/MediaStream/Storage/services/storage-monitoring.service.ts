@@ -63,20 +63,33 @@ export class StorageMonitoringService implements OnModuleInit {
 	 */
 	async getStorageStats(): Promise<StorageStats> {
 		try {
-			const files = await fs.readdir(this.storageDirectory)
+			const allFiles = await fs.readdir(this.storageDirectory)
+			const files = allFiles.filter(f => f !== '.gitkeep')
+
+			// Batch stat calls in parallel for performance
+			const statResults = await Promise.all(
+				files.map(async (file) => {
+					try {
+						const stats = await fs.stat(join(this.storageDirectory, file))
+						return { file, stats }
+					}
+					catch {
+						return null
+					}
+				}),
+			)
+
 			let totalSize = 0
 			let processedFileCount = 0
 			let oldestFile: Date | null = null as any
 			let newestFile: Date | null = null as any
 			const fileTypes: FileTypeMap = {}
 
-			for (const file of files) {
-				if (file === '.gitkeep')
+			for (const result of statResults) {
+				if (!result)
 					continue
 
-				const filePath = join(this.storageDirectory, file)
-				const stats = await fs.stat(filePath)
-
+				const { file, stats } = result
 				totalSize += stats.size
 				processedFileCount++
 
@@ -211,18 +224,27 @@ export class StorageMonitoringService implements OnModuleInit {
 		try {
 			CorrelatedLogger.debug('Starting storage directory scan', StorageMonitoringService.name)
 
-			const files = await fs.readdir(this.storageDirectory)
-			const currentFiles = new Set<string>()
+			const allFiles = await fs.readdir(this.storageDirectory)
+			const files = allFiles.filter(f => f !== '.gitkeep')
+			const currentFiles = new Set<string>(files)
 
-			for (const file of files) {
-				if (file === '.gitkeep')
-					continue
+			// Batch stat calls in parallel
+			const statResults = await Promise.all(
+				files.map(async (file) => {
+					try {
+						const stats = await fs.stat(join(this.storageDirectory, file))
+						return { file, stats }
+					}
+					catch {
+						return null
+					}
+				}),
+			)
 
-				currentFiles.add(file)
-				const filePath = join(this.storageDirectory, file)
-				const stats = await fs.stat(filePath)
-
-				this.updateAccessPattern(file, stats)
+			for (const result of statResults) {
+				if (result) {
+					this.updateAccessPattern(result.file, result.stats)
+				}
 			}
 
 			for (const [filename] of this.accessPatterns) {

@@ -79,7 +79,7 @@ export function setNestedValue(obj: Record<string, any>, path: string, value: an
 		current = current[key]
 	}
 
-	const finalKey = keys[keys.length - 1]
+	const finalKey = keys.at(-1)!
 	if (UNSAFE_KEYS.has(finalKey)) {
 		throw new Error(`Unsafe key "${finalKey}" in config path: ${path}`)
 	}

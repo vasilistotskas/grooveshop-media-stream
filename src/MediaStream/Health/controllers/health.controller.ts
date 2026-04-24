@@ -12,8 +12,8 @@ import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.i
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 import { JobQueueHealthIndicator } from '#microservice/Queue/indicators/job-queue-health.indicator'
 import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
-import { Controller, Get } from '@nestjs/common'
-import { HealthCheck, HealthCheckService } from '@nestjs/terminus'
+import { Controller, Get, ServiceUnavailableException } from '@nestjs/common'
+import { HealthCheck, HealthCheckError, HealthCheckService } from '@nestjs/terminus'
 import { DiskSpaceHealthIndicator } from '../indicators/disk-space-health.indicator.js'
 import { MemoryHealthIndicator } from '../indicators/memory-health.indicator.js'
 import { SharpHealthIndicator } from '../indicators/sharp-health.indicator.js'
@@ -92,13 +92,19 @@ export class HealthController {
 	}
 
 	@Get('ready')
-	async readiness(): Promise<{ status: string, timestamp: string, checks?: any, error?: string }> {
+	async readiness(): Promise<{ status: string, timestamp: string, checks?: any }> {
 		try {
-			// Lightweight readiness check - only critical dependencies
-			// Full health check is available at /health for detailed diagnostics
+			// Readiness probe: checks ONLY in-process state required to serve
+			// traffic. Do NOT include external dependencies (Redis, upstream HTTP)
+			// here — a transient Redis blip would otherwise mark every pod
+			// NotReady simultaneously, triggering a cascading K8s restart storm.
+			// The service degrades gracefully without Redis (multi-layer cache
+			// falls through to memory + file system), so Redis health is
+			// diagnostic, not gating.
+			// Use GET /health for full diagnostics including external deps,
+			// or GET /health/dependencies for an external-dep-only snapshot.
 			const result = await this.health.check([
 				() => this.memoryIndicator.isHealthy(),
-				() => this.redisHealthIndicator.isHealthy(),
 				() => this.sharpHealthIndicator.isHealthy(),
 			])
 
@@ -109,12 +115,26 @@ export class HealthController {
 			}
 		}
 		catch (error: unknown) {
-			return {
+			throw new ServiceUnavailableException({
 				status: 'not ready',
 				timestamp: new Date().toISOString(),
-				error: error instanceof Error ? (error as Error).message : 'Unknown error',
-			}
+				checks: error instanceof HealthCheckError ? error.causes : undefined,
+			})
 		}
+	}
+
+	@Get('dependencies')
+	async dependencies(): Promise<HealthCheckResult> {
+		// External-dependency diagnostic endpoint. Separate from /health/ready
+		// so ops can observe Redis/upstream HTTP state without coupling it to
+		// K8s readiness gating.
+		return this.health.check([
+			() => this.redisHealthIndicator.isHealthy(),
+			() => this.httpHealthIndicator.isHealthy(),
+			() => this.cacheHealthIndicator.isHealthy(),
+			() => this.jobQueueHealthIndicator.isHealthy(),
+			() => this.storageHealthIndicator.isHealthy(),
+		])
 	}
 
 	@Get('live')

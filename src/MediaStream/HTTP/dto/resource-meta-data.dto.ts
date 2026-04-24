@@ -9,6 +9,7 @@ export default class ResourceMetaData {
 	dateCreated: number = Date.now()
 	privateTTL: number
 	publicTTL: number
+	accessCount: number = 0
 
 	constructor(data?: Partial<ResourceMetaData>) {
 		this.version = data?.version ?? resourceMetaVersion

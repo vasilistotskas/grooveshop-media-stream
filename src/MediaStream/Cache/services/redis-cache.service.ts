@@ -7,6 +7,9 @@ import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Injectable } from '@nestjs/common'
 import { Redis } from 'ioredis'
 
+const DB_KEYS_RE = /db\d+:keys=(\d+)/
+const USED_MEMORY_RE = /used_memory:(\d+)/
+
 @Injectable()
 export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleDestroy {
 	private redis!: Redis
@@ -35,56 +38,76 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 	}
 
 	private async initializeRedis(): Promise<void> {
+		const config = this._configService.get('cache.redis')
+
+		this.redis = new Redis({
+			host: config.host,
+			port: config.port,
+			password: config.password,
+			db: config.db,
+			maxRetriesPerRequest: config.maxRetries,
+			enableReadyCheck: true,
+			lazyConnect: true,
+			keepAlive: 30000,
+			connectTimeout: 10000,
+			commandTimeout: 5000,
+		})
+
+		this.redis.on('connect', () => {
+			CorrelatedLogger.log('Redis connecting...', RedisCacheService.name)
+		})
+
+		this.redis.on('ready', () => {
+			this.isConnected = true
+			CorrelatedLogger.log('Redis connection ready', RedisCacheService.name)
+			this.metricsService.updateActiveConnections('redis', 1)
+		})
+
+		this.redis.on('error', (error: unknown) => {
+			this.isConnected = false
+			this.stats.errors++
+			CorrelatedLogger.error(`Redis connection error: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
+			this.metricsService.updateActiveConnections('redis', 0)
+		})
+
+		this.redis.on('close', () => {
+			this.isConnected = false
+			CorrelatedLogger.warn('Redis connection closed', RedisCacheService.name)
+			this.metricsService.updateActiveConnections('redis', 0)
+		})
+
+		this.redis.on('reconnecting', () => {
+			CorrelatedLogger.log('Redis reconnecting...', RedisCacheService.name)
+		})
+
 		try {
-			const config = this._configService.get('cache.redis')
-
-			this.redis = new Redis({
-				host: config.host,
-				port: config.port,
-				password: config.password,
-				db: config.db,
-				maxRetriesPerRequest: config.maxRetries,
-				enableReadyCheck: true,
-				lazyConnect: true,
-				keepAlive: 30000,
-				connectTimeout: 10000,
-				commandTimeout: 5000,
-			})
-
-			this.redis.on('connect', () => {
-				CorrelatedLogger.log('Redis connecting...', RedisCacheService.name)
-			})
-
-			this.redis.on('ready', () => {
-				this.isConnected = true
-				CorrelatedLogger.log('Redis connection ready', RedisCacheService.name)
-				this.metricsService.updateActiveConnections('redis', 1)
-			})
-
-			this.redis.on('error', (error: unknown) => {
-				this.isConnected = false
-				this.stats.errors++
-				CorrelatedLogger.error(`Redis connection error: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
-				this.metricsService.updateActiveConnections('redis', 0)
-			})
-
-			this.redis.on('close', () => {
-				this.isConnected = false
-				CorrelatedLogger.warn('Redis connection closed', RedisCacheService.name)
-				this.metricsService.updateActiveConnections('redis', 0)
-			})
-
-			this.redis.on('reconnecting', () => {
-				CorrelatedLogger.log('Redis reconnecting...', RedisCacheService.name)
-			})
-
 			await this.redis.connect()
 		}
 		catch (error: unknown) {
 			this.isConnected = false
-			CorrelatedLogger.error(`Failed to initialize Redis: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
-			throw error
+			CorrelatedLogger.warn(
+				`Redis unavailable at startup, will retry in background: ${(error as Error).message}`,
+				RedisCacheService.name,
+			)
+			this.scheduleReconnect(1)
 		}
+	}
+
+	private scheduleReconnect(attempt: number): void {
+		const delay = Math.min(1000 * 2 ** attempt, 30000)
+		setTimeout(async () => {
+			if (this.isConnected) {
+				return
+			}
+			try {
+				await this.redis.connect()
+				CorrelatedLogger.log('Redis reconnected successfully', RedisCacheService.name)
+			}
+			catch {
+				CorrelatedLogger.warn(`Redis reconnect attempt ${attempt} failed, retrying...`, RedisCacheService.name)
+				this.scheduleReconnect(attempt + 1)
+			}
+		}, delay)
 	}
 
 	async get<T>(key: string): Promise<T | null> {
@@ -253,9 +276,12 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 
 		try {
 			this.stats.operations++
-			await this.redis.flushall()
+			// Use FLUSHDB (current database only), NOT FLUSHALL (all databases).
+			// Redis is shared with Django cache, Nuxt SSR cache, Celery, and
+			// Django Channels — FLUSHALL would destroy all their data.
+			await this.redis.flushdb()
 			this.metricsService.recordCacheOperation('flush', 'redis', 'success')
-			CorrelatedLogger.debug('Redis cache FLUSHED ALL', RedisCacheService.name)
+			CorrelatedLogger.debug('Redis cache FLUSHED (current DB)', RedisCacheService.name)
 		}
 		catch (error: unknown) {
 			this.stats.errors++
@@ -279,11 +305,11 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			if (this.isConnected) {
 				try {
 					const info = await this.redis.info('keyspace')
-					const dbInfo = info.match(/db\d+:keys=(\d+)/)
+					const dbInfo = info.match(DB_KEYS_RE)
 					keys = dbInfo ? Number.parseInt(dbInfo[1]) : 0
 
 					const memInfo = await this.redis.info('memory')
-					const memMatch = memInfo.match(/used_memory:(\d+)/)
+					const memMatch = memInfo.match(USED_MEMORY_RE)
 					memoryUsage = memMatch ? Number.parseInt(memMatch[1]) : 0
 				}
 				catch (error: unknown) {
@@ -424,7 +450,8 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			if (metaLength > 0 && 5 + metaLength <= value.length) {
 				const metaJson = value.toString('utf8', 5, 5 + metaLength)
 				const rest = JSON.parse(metaJson)
-				const data = Buffer.from(value.subarray(5 + metaLength))
+				// Use subarray view directly — avoids copying the entire image buffer
+				const data = value.subarray(5 + metaLength)
 				return { ...rest, data } as T
 			}
 		}

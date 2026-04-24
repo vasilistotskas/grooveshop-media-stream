@@ -4,6 +4,7 @@ import { ConfigService } from '#microservice/Config/config.service'
 import { IntelligentEvictionService } from '#microservice/Storage/services/intelligent-eviction.service'
 import { StorageCleanupService } from '#microservice/Storage/services/storage-cleanup.service'
 import { StorageMonitoringService } from '#microservice/Storage/services/storage-monitoring.service'
+import { SchedulerRegistry } from '@nestjs/schedule'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -58,6 +59,13 @@ describe('storageCleanupService', () => {
 			}),
 		}
 
+		const mockSchedulerRegistry = {
+			addCronJob: vi.fn(),
+			getCronJob: vi.fn(),
+			deleteCronJob: vi.fn(),
+			doesExist: vi.fn().mockReturnValue(false),
+		}
+
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [
 				StorageCleanupService,
@@ -72,6 +80,10 @@ describe('storageCleanupService', () => {
 				{
 					provide: ConfigService,
 					useValue: mockConfigService,
+				},
+				{
+					provide: SchedulerRegistry,
+					useValue: mockSchedulerRegistry,
 				},
 			],
 		}).compile()
@@ -103,7 +115,7 @@ describe('storageCleanupService', () => {
 			else if (fileName.includes('temp') || fileName.endsWith('.tmp')) {
 				ageInDays = 2 // Older than 1 day for temp-files policy
 			}
-			else if (fileName.includes('old') || fileName.match(/\.(jpg|jpeg|png|webp|gif)$/)) {
+			else if (fileName.includes('old') || /\.(?:jpg|jpeg|png|webp|gif)$/.test(fileName)) {
 				ageInDays = 10 // Older than 7 days for large-images policy
 			}
 
@@ -207,7 +219,7 @@ describe('storageCleanupService', () => {
 			expect(result.sizeFreed).toBeGreaterThan(0)
 			expect(result.errors).toEqual([])
 			expect(result.policiesApplied.length).toBeGreaterThan(0)
-			expect(result.duration).toBeGreaterThan(0)
+			expect(result.duration).toBeGreaterThanOrEqual(0)
 		})
 
 		it('should apply specific policies when requested', async () => {

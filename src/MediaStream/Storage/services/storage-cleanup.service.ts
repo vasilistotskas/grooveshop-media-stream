@@ -4,9 +4,14 @@ import { join } from 'node:path'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { Injectable, Logger } from '@nestjs/common'
-import { Cron } from '@nestjs/schedule'
+import { SchedulerRegistry } from '@nestjs/schedule'
+import { CronJob } from 'cron'
 import { IntelligentEvictionService } from './intelligent-eviction.service.js'
 import { StorageMonitoringService } from './storage-monitoring.service.js'
+
+const CACHE_FILE_RE = /\.(json|cache|rsc|rsm)$/
+const IMAGE_FILE_RE = /\.(jpg|jpeg|png|webp|gif|rsc)$/
+const TEMP_FILE_RE = /\.(tmp|temp|rst)$/
 
 export interface RetentionPolicy {
 	name: string
@@ -47,6 +52,7 @@ export class StorageCleanupService implements OnModuleInit {
 		private readonly _configService: ConfigService,
 		private readonly storageMonitoring: StorageMonitoringService,
 		private readonly intelligentEviction: IntelligentEvictionService,
+		private readonly schedulerRegistry: SchedulerRegistry,
 	) {
 		this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage')
 		this.config = this.loadCleanupConfig()
@@ -55,10 +61,39 @@ export class StorageCleanupService implements OnModuleInit {
 	async onModuleInit(): Promise<void> {
 		if (this.config.enabled) {
 			this._logger.log('Storage cleanup service initialized with policies:', this.config.policies.map(p => p.name))
+			this.registerCleanupCron()
 		}
 		else {
 			this._logger.log('Storage cleanup service disabled')
 		}
+	}
+
+	private registerCleanupCron(): void {
+		const cronName = 'storage-cleanup'
+		const schedule = this.config.cronSchedule
+
+		const job = new CronJob(schedule, async () => {
+			const currentlyEnabled = this._configService.getOptional('storage.cleanup.enabled', true)
+			if (!currentlyEnabled || this.isCleanupRunning) {
+				return
+			}
+
+			try {
+				await this.performCleanup()
+			}
+			catch (error: unknown) {
+				CorrelatedLogger.error(
+					`Scheduled cleanup failed: ${(error as Error).message}`,
+					(error as Error).stack,
+					StorageCleanupService.name,
+				)
+			}
+		})
+
+		this.schedulerRegistry.addCronJob(cronName, job)
+		job.start()
+
+		this._logger.log(`Storage cleanup cron registered with schedule: ${schedule}`)
 	}
 
 	/**
@@ -145,9 +180,9 @@ export class StorageCleanupService implements OnModuleInit {
 	}
 
 	/**
-	 * Scheduled cleanup based on cron configuration
+	 * Scheduled cleanup — invoked by the dynamically registered cron job
+	 * (schedule comes from config.cronSchedule, registered in onModuleInit).
 	 */
-	@Cron('0 2 * * *')
 	async scheduledCleanup(): Promise<void> {
 		const currentlyEnabled = this._configService.getOptional('storage.cleanup.enabled', true)
 		if (!currentlyEnabled || this.isCleanupRunning) {
@@ -221,21 +256,36 @@ export class StorageCleanupService implements OnModuleInit {
 		sizeFreed: number
 		errors: string[]
 	}> {
-		const files = await fs.readdir(this.storageDirectory)
+		const allFiles = await fs.readdir(this.storageDirectory)
+		const files = allFiles.filter(f => f !== '.gitkeep')
+
+		// Batch stat calls in parallel
+		const statResults = await Promise.all(
+			files.map(async (file) => {
+				try {
+					const stats = await fs.stat(join(this.storageDirectory, file))
+					return { file, stats }
+				}
+				catch {
+					return null
+				}
+			}),
+		)
+
+		const now = Date.now()
 		const candidates: Array<{ file: string, stats: Stats }> = []
 
-		for (const file of files) {
-			if (file === '.gitkeep')
+		for (const result of statResults) {
+			if (!result)
 				continue
 
-			const filePath = join(this.storageDirectory, file)
-			const stats = await fs.stat(filePath)
+			const { file, stats } = result
 
 			if (policy.filePattern && !policy.filePattern.test(file)) {
 				continue
 			}
 
-			const ageInDays = (Date.now() - stats.mtime.getTime()) / (1000 * 60 * 60 * 24)
+			const ageInDays = (now - stats.mtime.getTime()) / (1000 * 60 * 60 * 24)
 			if (ageInDays < policy.maxAge) {
 				continue
 			}
@@ -264,27 +314,32 @@ export class StorageCleanupService implements OnModuleInit {
 			totalSize += candidate.stats.size
 		}
 
-		let filesRemoved = 0
-		let sizeFreed = 0
 		const errors: string[] = []
 
-		for (const { file, stats } of finalCandidates) {
-			try {
+		// Batch unlink in parallel
+		const unlinkResults = await Promise.allSettled(
+			finalCandidates.map(async ({ file, stats }) => {
 				if (!dryRun) {
-					const filePath = join(this.storageDirectory, file)
-					await fs.unlink(filePath)
+					await fs.unlink(join(this.storageDirectory, file))
 				}
-
-				filesRemoved++
-				sizeFreed += stats.size
-
 				CorrelatedLogger.debug(
 					`${dryRun ? '[DRY RUN] ' : ''}Removed file: ${file} (${this.formatBytes(stats.size)})`,
 					StorageCleanupService.name,
 				)
+				return stats.size
+			}),
+		)
+
+		let filesRemoved = 0
+		let sizeFreed = 0
+
+		for (const result of unlinkResults) {
+			if (result.status === 'fulfilled') {
+				filesRemoved++
+				sizeFreed += result.value
 			}
-			catch (error: unknown) {
-				const errorMsg = `Failed to remove ${file}: ${(error as Error).message}`
+			else {
+				const errorMsg = `Failed to remove file: ${result.reason}`
 				errors.push(errorMsg)
 				CorrelatedLogger.warn(errorMsg, StorageCleanupService.name)
 			}
@@ -305,7 +360,7 @@ export class StorageCleanupService implements OnModuleInit {
 				description: 'Remove cache files older than 30 days',
 				maxAge: 30,
 				maxSize: 0,
-				filePattern: /\.(json|cache|rsc|rsm)$/,
+				filePattern: CACHE_FILE_RE,
 				enabled: true,
 			},
 			{
@@ -313,7 +368,7 @@ export class StorageCleanupService implements OnModuleInit {
 				description: 'Remove large image files older than 7 days',
 				maxAge: 7,
 				maxSize: 100 * 1024 * 1024,
-				filePattern: /\.(jpg|jpeg|png|webp|gif|rsc)$/,
+				filePattern: IMAGE_FILE_RE,
 				enabled: true,
 			},
 			{
@@ -321,7 +376,7 @@ export class StorageCleanupService implements OnModuleInit {
 				description: 'Remove temporary files older than 1 day',
 				maxAge: 1,
 				maxSize: 0,
-				filePattern: /\.(tmp|temp|rst)$/,
+				filePattern: TEMP_FILE_RE,
 				enabled: true,
 			},
 			{

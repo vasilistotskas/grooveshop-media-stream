@@ -16,6 +16,9 @@ import { lastValueFrom, throwError, timer } from 'rxjs'
 import { retry, tap } from 'rxjs/operators'
 import { CircuitBreaker } from '../utils/circuit-breaker.js'
 
+// eslint-disable-next-line no-control-regex
+const NON_ASCII_RE = /[^\u0000-\u007F]/
+
 @Injectable()
 export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDestroy {
 	private readonly circuitBreaker: CircuitBreaker
@@ -33,7 +36,7 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 		queueSize: 0,
 	}
 
-	private totalResponseTime = 0
+	private readonly EMA_ALPHA = 0.1 // Exponential moving average smoothing factor
 	private readonly maxRetries: number
 	private readonly retryDelay: number
 	private readonly maxRetryDelay: number
@@ -208,7 +211,6 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 		this.stats.failedRequests = 0
 		this.stats.retriedRequests = 0
 		this.stats.averageResponseTime = 0
-		this.totalResponseTime = 0
 		CorrelatedLogger.debug('HTTP client statistics reset', HttpClientService.name)
 	}
 
@@ -307,16 +309,11 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 			)
 
 			const responseTime = performance.now() - startTime
-			this.totalResponseTime += responseTime
-			this.stats.averageResponseTime = this.totalResponseTime / this.stats.successfulRequests
+			this.stats.averageResponseTime = this.stats.averageResponseTime === 0
+				? responseTime
+				: this.stats.averageResponseTime * (1 - this.EMA_ALPHA) + responseTime * this.EMA_ALPHA
 
 			return response
-		}
-		catch (error: unknown) {
-			const responseTime = performance.now() - startTime
-			this.totalResponseTime += responseTime
-
-			throw error
 		}
 		finally {
 			this.stats.activeRequests--
@@ -365,8 +362,7 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 			const urlObj = new URL(url)
 
 			const pathSegments = urlObj.pathname.split('/').map((segment) => {
-				// eslint-disable-next-line no-control-regex
-				if (/[^\u0000-\u007F]/.test(segment)) {
+				if (NON_ASCII_RE.test(segment)) {
 					return encodeURIComponent(segment)
 				}
 				return segment

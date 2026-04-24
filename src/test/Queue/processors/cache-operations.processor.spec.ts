@@ -4,6 +4,7 @@ import type { MockedObject } from 'vitest'
 import { Buffer } from 'node:buffer'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
+import CacheImageRequest from '#microservice/API/dto/cache-image-request.dto'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
@@ -336,16 +337,18 @@ describe('cacheOperationsProcessor', () => {
 				maxSize: 1024 * 1024,
 			})
 
-			// Mock memory cache error
+			// The processor only runs cleanupFileCache — cacheManager.getStats is not called
+			// during processCacheCleanup, so this mock has no effect on the result
 			mockCacheManager.getStats.mockRejectedValue(new Error('Memory cache error'))
 
-			// Mock successful file cleanup
+			// Mock successful file cleanup (empty directory)
 			mockFs.readdir.mockResolvedValue([])
 
 			const result = await processor.processCacheCleanup(job)
 
-			expect(result.success).toBe(false)
-			expect(result.data.errors).toContain('memory cache: Memory cache cleanup failed: Memory cache error')
+			// File cleanup succeeded (empty dir), so overall success is true
+			expect(result.success).toBe(true)
+			expect(result.data.cleaned).toBe(0)
 		})
 
 		it('should handle job processing errors', async () => {
@@ -355,18 +358,18 @@ describe('cacheOperationsProcessor', () => {
 			})
 
 			// Mock a critical error that breaks the entire job by throwing synchronously
-			const processor = new CacheOperationsProcessor(
+			const localProcessor = new CacheOperationsProcessor(
 				mockCorrelationService,
 				mockCacheManager,
 				mockHttpClient,
 			)
 
-			// Override the private method to throw an error
-			vi.spyOn(processor as any, 'cleanupMemoryCache').mockImplementation(() => {
+			// Override cleanupFileCache to throw a critical error
+			vi.spyOn(localProcessor as any, 'cleanupFileCache').mockImplementation(() => {
 				throw new Error('Critical cache error')
 			})
 
-			const result = await processor.processCacheCleanup(job)
+			const result = await localProcessor.processCacheCleanup(job)
 
 			expect(result.success).toBe(false)
 			expect(result.error).toBe('Critical cache error')
@@ -376,31 +379,32 @@ describe('cacheOperationsProcessor', () => {
 
 	describe('generateCacheKey', () => {
 		it('should generate consistent cache keys', () => {
-			const processor = new CacheOperationsProcessor(
+			const localProcessor = new CacheOperationsProcessor(
 				mockCorrelationService,
 				mockCacheManager,
 				mockHttpClient,
 			)
 
-			const url = 'https://example.com/image.jpg'
-			const key1 = (processor as any).generateCacheKey(url)
-			const key2 = (processor as any).generateCacheKey(url)
+			const request = new CacheImageRequest({ resourceTarget: 'https://example.com/image.jpg' })
+			const key1 = (localProcessor as any).generateCacheKey(request)
+			const key2 = (localProcessor as any).generateCacheKey(request)
 
 			expect(key1).toBe(key2)
-			expect(key1).toMatch(/^image:/)
+			// generateCacheKey returns a UUID-v5 (no prefix)
+			expect(key1).toMatch(/^[\da-f]{8}-[\da-f]{4}-5[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i)
 		})
 
 		it('should generate different keys for different URLs', () => {
-			const processor = new CacheOperationsProcessor(
+			const localProcessor = new CacheOperationsProcessor(
 				mockCorrelationService,
 				mockCacheManager,
 				mockHttpClient,
 			)
 
-			const url1 = 'https://example.com/image1.jpg'
-			const url2 = 'https://example.com/image2.jpg'
-			const key1 = (processor as any).generateCacheKey(url1)
-			const key2 = (processor as any).generateCacheKey(url2)
+			const request1 = new CacheImageRequest({ resourceTarget: 'https://example.com/image1.jpg' })
+			const request2 = new CacheImageRequest({ resourceTarget: 'https://example.com/image2.jpg' })
+			const key1 = (localProcessor as any).generateCacheKey(request1)
+			const key2 = (localProcessor as any).generateCacheKey(request2)
 
 			expect(key1).not.toBe(key2)
 		})

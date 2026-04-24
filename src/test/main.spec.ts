@@ -65,6 +65,7 @@ describe('bootstrap', () => {
 
 		expect(NestFactory.create).toHaveBeenCalledWith(
 			MediaStreamModule,
+			expect.objectContaining({ logger: expect.any(Array) }),
 		)
 
 		expect(mockApp.useStaticAssets).toHaveBeenCalledWith('public')

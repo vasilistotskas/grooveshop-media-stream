@@ -91,7 +91,7 @@ describe('redisCacheService', () => {
 		// Redis is the mocked constructor, we can get its instances
 		const RedisMock = Redis as any
 		if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
-			mockRedis = RedisMock.mock.instances[RedisMock.mock.instances.length - 1]
+			mockRedis = RedisMock.mock.instances.at(-1)
 		}
 	})
 
@@ -110,7 +110,7 @@ describe('redisCacheService', () => {
 			// Update mockRedis to the latest instance
 			const RedisMock = Redis as any
 			if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
-				mockRedis = RedisMock.mock.instances[RedisMock.mock.instances.length - 1]
+				mockRedis = RedisMock.mock.instances.at(-1)
 			}
 
 			expect(Redis).toHaveBeenCalledWith({
@@ -134,7 +134,7 @@ describe('redisCacheService', () => {
 			// Update mockRedis to the latest instance
 			const RedisMock = Redis as any
 			if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
-				mockRedis = RedisMock.mock.instances[RedisMock.mock.instances.length - 1]
+				mockRedis = RedisMock.mock.instances.at(-1)
 			}
 
 			expect(mockRedis.on).toHaveBeenCalledWith('connect', expect.any(Function))
@@ -150,7 +150,7 @@ describe('redisCacheService', () => {
 			// Update mockRedis to the latest instance
 			const RedisMock = Redis as any
 			if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
-				mockRedis = RedisMock.mock.instances[RedisMock.mock.instances.length - 1]
+				mockRedis = RedisMock.mock.instances.at(-1)
 			}
 
 			await service.onModuleDestroy()
@@ -166,7 +166,7 @@ describe('redisCacheService', () => {
 			// Update mockRedis to the latest instance after onModuleInit
 			const RedisMock = Redis as any
 			if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
-				mockRedis = RedisMock.mock.instances[RedisMock.mock.instances.length - 1]
+				mockRedis = RedisMock.mock.instances.at(-1)
 			}
 
 			// Simulate ready event
@@ -441,15 +441,16 @@ describe('redisCacheService', () => {
 		})
 
 		describe('flushAll', () => {
-			it('should flush all databases', async () => {
+			it('should flush current database only', async () => {
 				await service.flushAll()
 
-				expect(mockRedis.flushall).toHaveBeenCalled()
+				expect(mockRedis.flushdb).toHaveBeenCalled()
+				expect(mockRedis.flushall).not.toHaveBeenCalled()
 				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('flush', 'redis', 'success')
 			})
 
 			it('should handle Redis errors', async () => {
-				mockRedis.flushall.mockRejectedValue(new Error('Redis connection failed'))
+				mockRedis.flushdb.mockRejectedValue(new Error('Redis connection failed'))
 
 				await expect(service.flushAll()).rejects.toThrow('Redis connection failed')
 				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('flush', 'redis', 'error')
@@ -506,7 +507,7 @@ describe('redisCacheService', () => {
 			// Update mockRedis to the latest instance after onModuleInit
 			const RedisMock = Redis as any
 			if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
-				mockRedis = RedisMock.mock.instances[RedisMock.mock.instances.length - 1]
+				mockRedis = RedisMock.mock.instances.at(-1)
 			}
 
 			// Simulate ready event

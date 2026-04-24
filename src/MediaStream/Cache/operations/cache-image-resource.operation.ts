@@ -4,7 +4,7 @@ import type {
 import type { ResourceIdentifierKP } from '#microservice/common/constants/key-properties.constant'
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
-import { access, open as fsOpen, readFile, unlink, writeFile } from 'node:fs/promises'
+import { access, open as fsOpen, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import * as path from 'node:path'
 import { cwd } from 'node:process'
 import CacheImageRequest, {
@@ -128,27 +128,39 @@ export default class CacheImageResourceOperation {
 				}
 			}
 
+			// Check filesystem: try reading metadata directly (1 syscall instead of access+access+readFile)
+			const resourceMetaPath = this.getResourceMetaPath(ctx)
+			let metadataContent: string | null = null
+			try {
+				metadataContent = await readFile(resourceMetaPath, 'utf8')
+			}
+			catch {
+				// Metadata file doesn't exist — resource not cached on disk
+			}
+
+			if (!metadataContent) {
+				CorrelatedLogger.debug(`Metadata not found in filesystem: ${resourceMetaPath}`, CacheImageResourceOperation.name)
+				const duration = PerformanceTracker.endPhase('resource_exists_check')
+				this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
+				return false
+			}
+
+			// Verify the resource data file exists
 			const resourcePath = this.getResourcePath(ctx)
 			const resourcePathExists = await access(resourcePath).then(() => true).catch(() => false)
 			if (!resourcePathExists) {
-				CorrelatedLogger.debug(`Resource not found in filesystem: ${resourcePath}`, CacheImageResourceOperation.name)
+				CorrelatedLogger.debug(`Resource data not found in filesystem: ${resourcePath}`, CacheImageResourceOperation.name)
 				const duration = PerformanceTracker.endPhase('resource_exists_check')
 				this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
 				return false
 			}
 
-			const resourceMetaPath = this.getResourceMetaPath(ctx)
-			const resourceMetaPathExists = await access(resourceMetaPath).then(() => true).catch(() => false)
-			if (!resourceMetaPathExists) {
-				CorrelatedLogger.warn(`Metadata path does not exist: ${resourceMetaPath}`, CacheImageResourceOperation.name)
-				const duration = PerformanceTracker.endPhase('resource_exists_check')
-				this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
-				return false
+			let headers: ResourceMetaData
+			try {
+				headers = new ResourceMetaData(JSON.parse(metadataContent))
+				ctx.metaData = headers
 			}
-
-			const headers = await this.fetchHeaders(ctx)
-
-			if (!headers) {
+			catch {
 				CorrelatedLogger.warn('Metadata headers are missing or invalid', CacheImageResourceOperation.name)
 				const duration = PerformanceTracker.endPhase('resource_exists_check')
 				this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
@@ -191,12 +203,11 @@ export default class CacheImageResourceOperation {
 				}
 
 				const resourceMetaPath = this.getResourceMetaPath(ctx)
-				const exists = await access(resourceMetaPath).then(() => true).catch(() => false)
-				if (exists) {
+				try {
 					const content = await readFile(resourceMetaPath, 'utf8')
 					ctx.metaData = new ResourceMetaData(JSON.parse(content))
 				}
-				else {
+				catch {
 					CorrelatedLogger.warn('Metadata file does not exist.', CacheImageResourceOperation.name)
 					return new ResourceMetaData()
 				}
@@ -265,6 +276,7 @@ export default class CacheImageResourceOperation {
 	 */
 	public async execute(ctx: OperationContext): Promise<void> {
 		PerformanceTracker.startPhase('execute')
+		let phaseEnded = false
 
 		try {
 			CorrelatedLogger.debug('Executing cache image resource operation', CacheImageResourceOperation.name)
@@ -275,11 +287,14 @@ export default class CacheImageResourceOperation {
 			CorrelatedLogger.error(`Failed to execute CacheImageResourceOperation: ${(error as Error).message}`, (error as Error).stack, CacheImageResourceOperation.name)
 			this.metricsService.recordError('image_processing', 'execute')
 			const duration = PerformanceTracker.endPhase('execute')
+			phaseEnded = true
 			this.metricsService.recordImageProcessing('execute', 'unknown', 'error', duration || 0)
 			throw new InternalServerErrorException('Error fetching or processing image.')
 		}
 		finally {
-			PerformanceTracker.endPhase('execute')
+			if (!phaseEnded) {
+				PerformanceTracker.endPhase('execute')
+			}
 		}
 	}
 
@@ -353,14 +368,25 @@ export default class CacheImageResourceOperation {
 
 			const resourcePath = this.getResourcePath(ctx)
 			const resourceMetaPath = this.getResourceMetaPath(ctx)
+			// Write to sibling .tmp paths first, then rename() — rename is
+			// atomic on POSIX within the same filesystem, so concurrent
+			// readers either see the old file or the complete new file.
+			// Direct writeFile() was visible while still being written,
+			// returning partial buffers to concurrent requests.
+			const resourceTmpPath = `${resourcePath}.tmp`
+			const resourceMetaTmpPath = `${resourceMetaPath}.tmp`
 
 			await Promise.all([
 				this.cacheManager.set('image', ctx.id, {
 					data: processedData,
 					metadata,
 				}, this.privateTtl),
-				writeFile(resourcePath, processedData),
-				writeFile(resourceMetaPath, JSON.stringify(metadata), 'utf8'),
+				writeFile(resourceTmpPath, processedData),
+				writeFile(resourceMetaTmpPath, JSON.stringify(metadata), 'utf8'),
+			])
+			await Promise.all([
+				rename(resourceTmpPath, resourcePath),
+				rename(resourceMetaTmpPath, resourceMetaPath),
 			])
 
 			try {
@@ -382,6 +408,29 @@ export default class CacheImageResourceOperation {
 		}
 	}
 
+	/**
+	 * Strip script-like content from an SVG payload. SVG served with
+	 * Content-Type: image/svg+xml can execute JavaScript in some contexts
+	 * (e.g. opened as a top-level document), so raw passthrough is an
+	 * XSS vector. This is a conservative regex-based strip — for a
+	 * hardened pipeline, swap in DOMPurify or svgo with the
+	 * `removeScripts` + event-attribute-removal plugins.
+	 */
+	private sanitizeSvg(svg: string): string {
+		return svg
+			// Drop <script>…</script> blocks (including CDATA content).
+			.replace(/<script\b[\s\S]*?<\/script\s*>/gi, '')
+			// Drop self-closing <script/> tags.
+			.replace(/<script\b[^>]*\/>/gi, '')
+			// Drop inline event handlers (onclick, onload, etc.).
+			.replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, '')
+			.replace(/\son[a-z]+\s*=\s*'[^']*'/gi, '')
+			.replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, '')
+			// Neutralize javascript:/vbscript: URIs in href/xlink:href.
+			.replace(/(xlink:href|href)\s*=\s*"\s*(?:javascript|vbscript|data):[^"]*"/gi, '$1="#"')
+			.replace(/(xlink:href|href)\s*=\s*'\s*(?:javascript|vbscript|data):[^']*'/gi, '$1=\'#\'')
+	}
+
 	private async processSvgImage(ctx: OperationContext): Promise<{ data: Buffer, metadata: ResourceMetaData }> {
 		CorrelatedLogger.debug('Processing SVG format', CacheImageResourceOperation.name)
 
@@ -398,7 +447,8 @@ export default class CacheImageResourceOperation {
 			|| (resizeOptions?.height !== null && !Number.isNaN(resizeOptions?.height))
 
 		if (!needsResizing) {
-			const data = Buffer.from(svgContent, 'utf8')
+			const sanitized = this.sanitizeSvg(svgContent)
+			const data = Buffer.from(sanitized, 'utf8')
 			const metadata = new ResourceMetaData({
 				version: 1,
 				size: data.length.toString(),
@@ -542,6 +592,10 @@ export default class CacheImageResourceOperation {
 			}
 
 			if (cachedResource) {
+				// Increment access count and backfill updated metadata into cache (fire-and-forget)
+				cachedResource.metadata.accessCount = (cachedResource.metadata.accessCount || 0) + 1
+				this.cacheManager.set('image', ctx.id, cachedResource, this.privateTtl).catch(() => {})
+
 				CorrelatedLogger.debug(`Resource retrieved from cache: ${ctx.id}`, CacheImageResourceOperation.name)
 				const duration = PerformanceTracker.endPhase('get_cached_resource')
 				this.metricsService.recordCacheOperation('get', 'multi-layer', 'hit', duration || 0)
@@ -551,13 +605,19 @@ export default class CacheImageResourceOperation {
 			const resourcePath = this.getResourcePath(ctx)
 			const resourceMetaPath = this.getResourceMetaPath(ctx)
 
-			const resourceExists = await access(resourcePath).then(() => true).catch(() => false)
-			const metadataExists = await access(resourceMetaPath).then(() => true).catch(() => false)
+			// Read both files in parallel — no separate access() checks needed
+			const [dataResult, metaResult] = await Promise.allSettled([
+				readFile(resourcePath),
+				readFile(resourceMetaPath, 'utf8'),
+			])
 
-			if (resourceExists && metadataExists) {
-				const data = await readFile(resourcePath)
-				const metadataContent = await readFile(resourceMetaPath, 'utf8')
-				const metadata = new ResourceMetaData(JSON.parse(metadataContent))
+			if (dataResult.status === 'fulfilled' && metaResult.status === 'fulfilled') {
+				const data = dataResult.value
+				const metadata = new ResourceMetaData(JSON.parse(metaResult.value))
+
+				// Increment access count and persist back to the .rsm file (fire-and-forget)
+				metadata.accessCount = (metadata.accessCount || 0) + 1
+				writeFile(resourceMetaPath, JSON.stringify(metadata), 'utf8').catch(() => {})
 
 				await this.cacheManager.set('image', ctx.id, { data, metadata }, this.privateTtl)
 

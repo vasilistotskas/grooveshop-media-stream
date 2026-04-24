@@ -156,7 +156,7 @@ describe('redisHealthIndicator', () => {
 
 			// Mock slow operations
 			redisCacheService.ping.mockImplementation(() =>
-				new Promise(resolve => setTimeout(() => resolve('PONG'), 250)),
+				new Promise(resolve => setTimeout(resolve, 250, 'PONG')),
 			)
 			redisCacheService.set.mockResolvedValue(undefined)
 			redisCacheService.get.mockResolvedValue(testValue)

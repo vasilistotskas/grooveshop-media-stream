@@ -21,6 +21,7 @@ describe('webpImageManipulationJob', () => {
 		avif: vi.fn().mockReturnThis(),
 		resize: vi.fn().mockReturnThis(),
 		trim: vi.fn().mockReturnThis(),
+		autoOrient: vi.fn().mockReturnThis(),
 		toBuffer: vi.fn().mockResolvedValue({ data: testBuffer, info: { size: 1000, format: 'webp' } }),
 		metadata: vi.fn().mockResolvedValue({ width: 800, height: 600, format: 'avif' }),
 		destroy: vi.fn(),
@@ -48,7 +49,7 @@ describe('webpImageManipulationJob', () => {
 
 			const result = await job.handle(filePathFrom, options)
 
-			expect(sharp).toHaveBeenCalledWith(filePathFrom)
+			expect(sharp).toHaveBeenCalledWith(filePathFrom, { limitInputPixels: 268402689, sequentialRead: true })
 			expect(mockManipulation.resize).toHaveBeenCalledWith({
 				width: 800,
 				height: 600,
@@ -83,7 +84,7 @@ describe('webpImageManipulationJob', () => {
 
 			const result = await job.handle(filePathFrom, options)
 
-			expect(sharp).toHaveBeenCalledWith(filePathFrom)
+			expect(sharp).toHaveBeenCalledWith(filePathFrom, { limitInputPixels: 268402689, sequentialRead: true })
 			expect(mockManipulation.jpeg).toHaveBeenCalledWith({
 				quality: 80,
 				progressive: true,
@@ -113,7 +114,7 @@ describe('webpImageManipulationJob', () => {
 
 			const result = await job.handle(filePathFrom, options)
 
-			expect(sharp).toHaveBeenCalledWith(filePathFrom)
+			expect(sharp).toHaveBeenCalledWith(filePathFrom, { limitInputPixels: 268402689, sequentialRead: true })
 			expect(mockManipulation.png).toHaveBeenCalledWith({
 				quality: 80,
 				adaptiveFiltering: true,
@@ -142,7 +143,7 @@ describe('webpImageManipulationJob', () => {
 
 			const result = await job.handle(filePathFrom, options)
 
-			expect(sharp).toHaveBeenCalledWith(filePathFrom)
+			expect(sharp).toHaveBeenCalledWith(filePathFrom, { limitInputPixels: 268402689, sequentialRead: true })
 			expect(mockManipulation.gif).toHaveBeenCalled()
 			expect(mockManipulation.toBuffer).toHaveBeenCalledWith({ resolveWithObject: true })
 			expect(result).toBeInstanceOf(ManipulationJobResult)
@@ -166,7 +167,7 @@ describe('webpImageManipulationJob', () => {
 
 			const result = await job.handle(filePathFrom, options)
 
-			expect(sharp).toHaveBeenCalledWith(filePathFrom)
+			expect(sharp).toHaveBeenCalledWith(filePathFrom, { limitInputPixels: 268402689, sequentialRead: true })
 			expect(mockManipulation.tiff).toHaveBeenCalled()
 			expect(mockManipulation.toBuffer).toHaveBeenCalledWith({ resolveWithObject: true })
 			expect(result).toBeInstanceOf(ManipulationJobResult)
@@ -190,7 +191,7 @@ describe('webpImageManipulationJob', () => {
 
 			const result = await job.handle(filePathFrom, options)
 
-			expect(sharp).toHaveBeenCalledWith(filePathFrom)
+			expect(sharp).toHaveBeenCalledWith(filePathFrom, { limitInputPixels: 268402689, sequentialRead: true })
 			expect(mockManipulation.avif).toHaveBeenCalledWith({
 				quality: 60,
 				effort: 2,
@@ -242,7 +243,7 @@ describe('webpImageManipulationJob', () => {
 
 			const result = await job.handle(filePathFrom, options)
 
-			expect(sharp).toHaveBeenCalledWith(filePathFrom)
+			expect(sharp).toHaveBeenCalledWith(filePathFrom, { limitInputPixels: 268402689, sequentialRead: true })
 			expect(mockManipulation.webp).toHaveBeenCalledWith({ quality: 80, smartSubsample: true, effort: 4 })
 			expect(mockManipulation.toBuffer).toHaveBeenCalledWith({ resolveWithObject: true })
 			expect(result).toBeInstanceOf(ManipulationJobResult)

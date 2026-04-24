@@ -19,7 +19,7 @@ export default class ValidateCacheImageRequestResizeTargetRule {
 	public async validate(request: CacheImageRequest): Promise<void> {
 		const { width, height } = request.resizeOptions
 
-		if (width === null || height === null) {
+		if (width == null || height == null) {
 			return
 		}
 

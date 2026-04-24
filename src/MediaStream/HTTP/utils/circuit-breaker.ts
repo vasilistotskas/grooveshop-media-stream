@@ -34,6 +34,7 @@ export class CircuitBreaker {
 	private totalRequests = 0
 	private readonly options: CircuitBreakerOptions
 	private readonly requestWindow: Array<{ timestamp: number, success: boolean }> = []
+	private windowFailureCount = 0
 	private persistenceTimer?: NodeJS.Timeout
 
 	constructor(options: CircuitBreakerOptions) {
@@ -175,6 +176,7 @@ export class CircuitBreaker {
 	recordFailure(): void {
 		this.failureCount++
 		this.totalRequests++
+		this.windowFailureCount++
 		this.requestWindow.push({ timestamp: Date.now(), success: false })
 		this.pruneWindow()
 
@@ -257,6 +259,7 @@ export class CircuitBreaker {
 		this.lastStateChange = Date.now()
 		this.nextAttempt = 0
 		this.requestWindow.length = 0
+		this.windowFailureCount = 0
 		CorrelatedLogger.log('Circuit breaker reset', 'CircuitBreaker')
 	}
 
@@ -270,21 +273,19 @@ export class CircuitBreaker {
 	}
 
 	/**
-	 * Calculate the failure percentage
+	 * Calculate the failure percentage using incremental failure counter (O(1))
 	 */
 	private calculateFailurePercentage(): number {
-		this.pruneWindow()
 		const windowSize = this.requestWindow.length
 		if (windowSize === 0) {
 			return 0
 		}
 
-		const failures = this.requestWindow.filter(r => !r.success).length
-		return (failures / windowSize) * 100
+		return (this.windowFailureCount / windowSize) * 100
 	}
 
 	/**
-	 * Remove old entries from the request window
+	 * Remove old entries from the request window, tracking removed failures
 	 */
 	private pruneWindow(): void {
 		const now = Date.now()
@@ -292,6 +293,9 @@ export class CircuitBreaker {
 
 		let i = 0
 		while (i < this.requestWindow.length && this.requestWindow[i].timestamp < cutoff) {
+			if (!this.requestWindow[i].success) {
+				this.windowFailureCount--
+			}
 			i++
 		}
 

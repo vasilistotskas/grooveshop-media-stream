@@ -39,6 +39,7 @@ describe('metricsMiddleware', () => {
 			url: '/test?param=value',
 			headers: {
 				'content-type': 'application/json',
+				'content-length': '100',
 				'user-agent': 'test-agent',
 			},
 			get: vi.fn((header: string) => {
