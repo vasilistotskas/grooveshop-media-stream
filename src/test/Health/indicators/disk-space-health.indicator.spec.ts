@@ -1,6 +1,7 @@
 import type { MockedObject } from 'vitest'
 import { ConfigService } from '#microservice/Config/config.service'
 import { DiskSpaceHealthIndicator } from '#microservice/Health/indicators/disk-space-health.indicator'
+import { HealthCheckError } from '@nestjs/terminus'
 import { Test, TestingModule } from '@nestjs/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import 'reflect-metadata'
@@ -91,11 +92,18 @@ describe('diskSpaceHealthIndicator', () => {
 		it('should handle errors gracefully', async () => {
 			vi.spyOn(indicator as any, 'getDiskSpaceInfo').mockRejectedValue(new Error('Disk access error'))
 
-			const result = await indicator.isHealthy()
-
-			expect(result).toHaveProperty('disk_space')
-			expect(result.disk_space.status).toBe('down')
-			expect(result.disk_space.message).toContain('Disk access error')
+			// BaseHealthIndicator.isHealthy() throws HealthCheckError when the check fails
+			try {
+				await indicator.isHealthy()
+				expect.fail('Expected HealthCheckError to be thrown')
+			}
+			catch (err: unknown) {
+				expect(err).toBeInstanceOf(HealthCheckError)
+				const hce = err as HealthCheckError
+				expect(hce.causes).toHaveProperty('disk_space')
+				expect((hce.causes as any).disk_space.status).toBe('down')
+				expect(hce.message).toContain('Disk access error')
+			}
 		})
 
 		it('should timeout if check takes too long', async () => {
@@ -103,11 +111,18 @@ describe('diskSpaceHealthIndicator', () => {
 				new Promise(resolve => setTimeout(resolve, 5000)), // 5 second delay
 			)
 
-			const result = await indicator.isHealthy()
-
-			expect(result).toHaveProperty('disk_space')
-			expect(result.disk_space.status).toBe('down')
-			expect(result.disk_space.message).toContain('timeout')
+			// BaseHealthIndicator.isHealthy() throws HealthCheckError on timeout
+			try {
+				await indicator.isHealthy()
+				expect.fail('Expected HealthCheckError to be thrown')
+			}
+			catch (err: unknown) {
+				expect(err).toBeInstanceOf(HealthCheckError)
+				const hce = err as HealthCheckError
+				expect(hce.causes).toHaveProperty('disk_space')
+				expect((hce.causes as any).disk_space.status).toBe('down')
+				expect(hce.message).toContain('timeout')
+			}
 		}, 10000)
 	})
 

@@ -137,7 +137,9 @@ describe('imageProcessingProcessor', () => {
 			const result = await processor.process(job)
 
 			expect(result.success).toBe(true)
-			expect(result.data).toBe(cachedData)
+			// Production code returns cacheKey reference, not the raw data buffer,
+			// to avoid double-serialising the image through Redis.
+			expect(result.cacheKey).toBe('image:test-cache-key')
 			expect(result.cacheHit).toBe(true)
 			expect(result.processingTime).toBeGreaterThanOrEqual(0)
 			expect(mockHttpClient.get).not.toHaveBeenCalled()
@@ -175,8 +177,9 @@ describe('imageProcessingProcessor', () => {
 			const result = await processor.process(job)
 
 			expect(result.success).toBe(true)
-			expect(result.data).toEqual(processedImageData)
-			expect(result.cacheHit).toBe(false)
+			// Production code returns cacheKey reference, not the raw buffer
+			expect(result.cacheKey).toBe('image:test-cache-key')
+			expect(result.cacheHit).toBeUndefined()
 			expect(result.processingTime).toBeGreaterThanOrEqual(0)
 
 			expect(mockHttpClient.get).toHaveBeenCalledWith('https://example.com/image.jpg', {
@@ -283,12 +286,10 @@ describe('imageProcessingProcessor', () => {
 			mockCacheManager.get.mockResolvedValue(null)
 			mockHttpClient.get.mockRejectedValue(new Error('Network error'))
 
-			const result = await processor.process(job)
-
-			expect(result.success).toBe(false)
-			expect(result.error).toBe('Failed to download image: Network error')
-			expect(result.cacheHit).toBe(false)
-			expect(result.processingTime).toBeGreaterThanOrEqual(0)
+			// Production code lets errors bubble up to Bull's retry machinery
+			// rather than swallowing them into { success: false } (which would
+			// mark the job as succeeded and skip configured retry attempts).
+			await expect(processor.process(job)).rejects.toThrow('Failed to download image: Network error')
 		})
 
 		it('should handle image processing errors', async () => {
@@ -310,11 +311,8 @@ describe('imageProcessingProcessor', () => {
 
 			mockImageManipulationJob.handleBuffer.mockRejectedValue(new Error('Invalid image format'))
 
-			const result = await processor.process(job)
-
-			expect(result.success).toBe(false)
-			expect(result.error).toBe('Invalid image format')
-			expect(result.cacheHit).toBe(false)
+			// Production code lets errors bubble up to Bull's retry machinery
+			await expect(processor.process(job)).rejects.toThrow('Invalid image format')
 		})
 
 		it('should handle cache errors gracefully', async () => {
@@ -322,11 +320,8 @@ describe('imageProcessingProcessor', () => {
 
 			mockCacheManager.get.mockRejectedValue(new Error('Cache connection error'))
 
-			const result = await processor.process(job)
-
-			expect(result.success).toBe(false)
-			expect(result.error).toBe('Cache connection error')
-			expect(result.cacheHit).toBe(false)
+			// Production code lets errors bubble up to Bull's retry machinery
+			await expect(processor.process(job)).rejects.toThrow('Cache connection error')
 		})
 
 		it('should handle cache set errors but still return error', async () => {
@@ -353,10 +348,8 @@ describe('imageProcessingProcessor', () => {
 				}),
 			)
 
-			const result = await processor.process(job)
-
-			expect(result.success).toBe(false)
-			expect(result.error).toBe('Cache write error')
+			// Production code lets errors bubble up to Bull's retry machinery
+			await expect(processor.process(job)).rejects.toThrow('Cache write error')
 		})
 	})
 

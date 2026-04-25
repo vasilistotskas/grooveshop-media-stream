@@ -8,12 +8,14 @@ import type { MemoryInfo } from '../indicators/memory-health.indicator.js'
 import * as process from 'node:process'
 import { CacheHealthIndicator } from '#microservice/Cache/indicators/cache-health.indicator'
 import { RedisHealthIndicator } from '#microservice/Cache/indicators/redis-health.indicator'
+import { isShuttingDown } from '#microservice/common/utils/graceful-shutdown.util'
 import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 import { JobQueueHealthIndicator } from '#microservice/Queue/indicators/job-queue-health.indicator'
 import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
-import { Controller, Get, ServiceUnavailableException } from '@nestjs/common'
+import { Controller, Get, ServiceUnavailableException, UseGuards } from '@nestjs/common'
 import { HealthCheck, HealthCheckError, HealthCheckService } from '@nestjs/terminus'
+import { HealthDetailGuard } from '../guards/health-detail.guard.js'
 import { DiskSpaceHealthIndicator } from '../indicators/disk-space-health.indicator.js'
 import { MemoryHealthIndicator } from '../indicators/memory-health.indicator.js'
 import { SharpHealthIndicator } from '../indicators/sharp-health.indicator.js'
@@ -49,6 +51,7 @@ export class HealthController {
 	}
 
 	@Get('detailed')
+	@UseGuards(HealthDetailGuard)
 	async getDetailedHealth(): Promise<{
 		status: HealthCheckStatus
 		info: HealthIndicatorResult
@@ -139,6 +142,21 @@ export class HealthController {
 
 	@Get('live')
 	async liveness(): Promise<{ status: string, timestamp: string, uptime: number }> {
+		if (isShuttingDown()) {
+			throw new ServiceUnavailableException({ status: 'shutting-down' })
+		}
+
+		const memUsage = process.memoryUsage()
+		const heapPercent = memUsage.heapUsed / memUsage.heapTotal
+		if (heapPercent > 0.95) {
+			throw new ServiceUnavailableException({
+				status: 'heap-pressure',
+				heapUsed: memUsage.heapUsed,
+				heapTotal: memUsage.heapTotal,
+				heapPercent: (heapPercent * 100).toFixed(1),
+			})
+		}
+
 		return {
 			status: 'alive',
 			timestamp: new Date().toISOString(),

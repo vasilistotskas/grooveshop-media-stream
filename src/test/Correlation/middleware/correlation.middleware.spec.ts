@@ -91,9 +91,13 @@ describe('correlationMiddleware', () => {
 		})
 
 		it('should extract client IP from x-forwarded-for header', () => {
+			// Middleware now reads req.ip (set by Express when trust proxy = 1),
+			// not the raw x-forwarded-for header.
+			// Simulate what Express sets on req.ip after trust-proxy processing.
 			mockRequest.headers = {
 				'x-forwarded-for': '192.168.1.1, 10.0.0.1',
 			}
+			;(mockRequest as any).ip = '192.168.1.1'
 
 			let capturedContext: any = null
 			vi.spyOn(correlationService, 'runWithContext').mockImplementation((context, fn) => {
@@ -107,9 +111,12 @@ describe('correlationMiddleware', () => {
 		})
 
 		it('should extract client IP from x-real-ip header', () => {
+			// Middleware now reads req.ip (set by Express when trust proxy = 1).
+			// When x-real-ip is the source of truth, Express sets req.ip accordingly.
 			mockRequest.headers = {
 				'x-real-ip': '192.168.1.2',
 			}
+			;(mockRequest as any).ip = '192.168.1.2'
 
 			let capturedContext: any = null
 			vi.spyOn(correlationService, 'runWithContext').mockImplementation((context, fn) => {
@@ -122,8 +129,10 @@ describe('correlationMiddleware', () => {
 			expect(capturedContext.clientIp).toBe('192.168.1.2')
 		})
 
-		it('should fallback to connection.remoteAddress for client IP', () => {
-			mockRequest.connection = { remoteAddress: '192.168.1.3' } as any
+		it('should fallback to socket.remoteAddress for client IP', () => {
+			// req.ip is not set; middleware falls back to socket.remoteAddress
+			;(mockRequest as any).ip = undefined
+			mockRequest.socket = { remoteAddress: '192.168.1.3' } as any
 
 			let capturedContext: any = null
 			vi.spyOn(correlationService, 'runWithContext').mockImplementation((context, fn) => {

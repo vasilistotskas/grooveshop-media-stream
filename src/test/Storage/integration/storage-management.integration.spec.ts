@@ -9,6 +9,7 @@ import { StorageMonitoringService } from '#microservice/Storage/services/storage
 import { StorageOptimizationService } from '#microservice/Storage/services/storage-optimization.service'
 import { StorageModule } from '#microservice/Storage/storage.module'
 import { ScheduleModule } from '@nestjs/schedule'
+import { HealthCheckError } from '@nestjs/terminus'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -340,11 +341,20 @@ describe('storage Management Integration', () => {
 			expect(stats.totalFiles).toBe(0)
 			expect(stats.totalSize).toBe(0)
 
-			// Simulate readdir failure for health check
+			// Simulate readdir failure for health check.
+			// BaseHealthIndicator.isHealthy() throws HealthCheckError when the check fails.
 			mockFs.readdir.mockRejectedValue(new Error('Disk full'))
-			const healthResult = await storageHealth.isHealthy()
-			expect(healthResult.storage.status).toBe('down')
-			expect(healthResult.storage.message).toContain('Disk full')
+			try {
+				await storageHealth.isHealthy()
+				expect.fail('Expected HealthCheckError to be thrown')
+			}
+			catch (err: unknown) {
+				expect(err).toBeInstanceOf(HealthCheckError)
+				const hce = err as HealthCheckError
+				expect(hce.causes).toHaveProperty('storage')
+				expect((hce.causes as any).storage.status).toBe('down')
+				expect(hce.message).toContain('Disk full')
+			}
 		})
 	})
 

@@ -371,24 +371,35 @@ export class MultiLayerCacheManager implements OnModuleInit, OnModuleDestroy {
 		this.popularKeys.set(key, currentCount + 1)
 
 		if (this.popularKeys.size > 5000) {
-			// Evict entries with lowest access count (single-access keys first)
+			// Collect candidates in a single O(n) pass rather than deleting inside
+			// the live Map iterator, which can behave unpredictably. The actual
+			// deletes are deferred via setImmediate so the current request-handling
+			// tick is not blocked by a potentially large eviction loop.
+			const toDelete: string[] = []
 			for (const [k, v] of this.popularKeys) {
-				if (this.popularKeys.size <= 2500)
+				if (toDelete.length >= 2500)
 					break
-				if (v <= 1) {
-					this.popularKeys.delete(k)
-				}
+				if (v <= 1)
+					toDelete.push(k)
 			}
-			// If still over limit, FIFO evict oldest entries
-			if (this.popularKeys.size > 2500) {
-				const iter = this.popularKeys.keys()
-				while (this.popularKeys.size > 2500) {
-					const { value } = iter.next()
-					if (value)
-						this.popularKeys.delete(value)
-					else
-						break
-				}
+			setImmediate(() => {
+				for (const k of toDelete)
+					this.popularKeys.delete(k)
+			})
+
+			// If single-access eviction still won't bring us below the cap, schedule
+			// a FIFO pass in the same deferred tick.
+			if (this.popularKeys.size - toDelete.length > 2500) {
+				setImmediate(() => {
+					const iter = this.popularKeys.keys()
+					while (this.popularKeys.size > 2500) {
+						const { value } = iter.next()
+						if (value)
+							this.popularKeys.delete(value)
+						else
+							break
+					}
+				})
 			}
 		}
 	}

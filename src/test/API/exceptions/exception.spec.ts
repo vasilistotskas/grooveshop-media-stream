@@ -54,7 +54,8 @@ describe('requestedResizeTargetTooLargeException', () => {
 describe('unableToFetchResourceException', () => {
 	it('should create an error with the correct message', () => {
 		const resource = 'http://example.com/image.jpg'
-		const expectedMessage = `Requested resource: ${resource} couldn't be fetched`
+		// Production code uses a generic message; the resource URL is in context, not the message
+		const expectedMessage = 'Requested resource could not be fetched'
 
 		const exception = new UnableToFetchResourceException(resource)
 

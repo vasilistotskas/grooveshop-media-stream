@@ -269,6 +269,10 @@ export class CacheWarmingService implements OnModuleInit {
 				size: content.length.toString(),
 				dateCreated: Date.now(),
 			})
+			// `ttl` is intentionally optional: undefined and 0 both fall through to
+			// the configured default TTL inside RedisCacheService.set() (see fix #1
+			// in redis-cache.service.ts). Callers that want a specific lifetime pass
+			// an explicit positive value; callers that omit it rely on the config default.
 			await this.cacheManager.set('image', resourceId, { data: content, metadata }, ttl)
 			CorrelatedLogger.debug(`Manually warmed up resource: ${resourceId}`, CacheWarmingService.name)
 		}

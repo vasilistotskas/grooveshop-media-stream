@@ -336,10 +336,18 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	}
 
 	/**
-	 * Prepare request configuration
+	 * Prepare request configuration.
+	 *
+	 * maxRedirects is set to 0 by default.  Image URLs fetched from the upstream
+	 * Django media storage should never redirect — a redirect could be used to
+	 * pivot to an internal host that is not on the domain allowlist (SSRF).
+	 * Callers that genuinely need to follow a single hop should pass
+	 * `maxRedirects: 1` explicitly and ensure the Location is validated by
+	 * InputSanitizationService.validateUrl before the follow.
 	 */
 	private prepareConfig(config: AxiosRequestConfig = {}): AxiosRequestConfig {
 		return {
+			maxRedirects: 0,
 			...config,
 			timeout: config.timeout || this.timeout,
 			httpAgent: this.httpAgent,
@@ -352,6 +360,10 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	 */
 	private configureAxios(): void {
 		this._httpService.axiosRef.defaults.timeout = this.timeout
+		// Disable redirects globally.  prepareConfig() sets maxRedirects: 0 per
+		// request, but setting the default here ensures any ad-hoc axiosRef usage
+		// also opts in.
+		this._httpService.axiosRef.defaults.maxRedirects = 0
 	}
 
 	/**

@@ -23,6 +23,7 @@ describe('bootstrap', () => {
 
 		mockApp = {
 			use: vi.fn().mockReturnThis(),
+			set: vi.fn().mockReturnThis(),
 			useStaticAssets: vi.fn().mockReturnThis(),
 			enableCors: vi.fn().mockReturnThis(),
 			listen: vi.fn().mockImplementation(() => Promise.resolve()),

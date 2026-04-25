@@ -290,7 +290,9 @@ describe('redisCacheService', () => {
 
 				await service.set('test-key', testValue, 0)
 
-				expect(mockRedis.set).toHaveBeenCalledWith('test-key', expect.any(Buffer))
+				// TTL=0 is treated as "use default configured TTL" — never persists without expiry.
+				// The service falls back to cache.redis.ttl (7200 in mock config).
+				expect(mockRedis.set).toHaveBeenCalledWith('test-key', expect.any(Buffer), 'EX', mockConfig.ttl)
 				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('set', 'redis', 'success')
 			})
 

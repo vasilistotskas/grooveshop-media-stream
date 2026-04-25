@@ -5,6 +5,7 @@ import type { IJobQueue, Job, JobOptions, JobProcessor, JobStatus, QueueStats } 
 import { InjectQueue } from '@nestjs/bull'
 import { Injectable, Logger } from '@nestjs/common'
 import { JobType } from '../types/job.types.js'
+import { SharpConfigService } from './sharp-config.service.js'
 
 @Injectable()
 export class BullQueueService implements IJobQueue, OnModuleDestroy {
@@ -14,6 +15,7 @@ export class BullQueueService implements IJobQueue, OnModuleDestroy {
 	constructor(
 		@InjectQueue('image-processing') private readonly imageQueue: Queue,
 		@InjectQueue('cache-operations') private readonly cacheQueue: Queue,
+		private readonly sharpConfigService: SharpConfigService,
 	) {}
 
 	async add<T = any>(name: string, data: T, options: JobOptions = {}): Promise<Job<T>> {
@@ -38,7 +40,13 @@ export class BullQueueService implements IJobQueue, OnModuleDestroy {
 
 		const queue = this.getQueueForJobType(name)
 
-		queue.process(name, async (bullJob: BullJob<T>) => {
+		// Match Bull worker concurrency to Sharp's own concurrency so the number
+		// of in-flight jobs never exceeds what Sharp can handle in parallel without
+		// CPU contention. SharpConfigService.getConfiguration() reads the value
+		// that was already applied to Sharp during onModuleInit.
+		const sharpConcurrency = this.sharpConfigService.getConfiguration().concurrency
+
+		queue.process(name, sharpConcurrency, async (bullJob: BullJob<T>) => {
 			const job = this.convertFromBullJob(bullJob)
 
 			try {

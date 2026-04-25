@@ -2,6 +2,7 @@ import type { DetailsMap } from '#microservice/common/types/common.types'
 import type { HealthIndicatorResult } from '@nestjs/terminus'
 import type { HealthCheckOptions, HealthMetrics, IHealthIndicator } from '../interfaces/health-indicator.interface.js'
 import { Injectable, Logger } from '@nestjs/common'
+import { HealthCheckError } from '@nestjs/terminus'
 
 @Injectable()
 export abstract class BaseHealthIndicator implements IHealthIndicator {
@@ -44,24 +45,27 @@ export abstract class BaseHealthIndicator implements IHealthIndicator {
 		}
 		catch (error: unknown) {
 			const responseTime = Date.now() - startTime
+			const message = error instanceof Error ? (error as Error).message : 'Health check failed'
 
 			this.lastCheck = {
 				timestamp: Date.now(),
 				status: 'unhealthy',
 				responseTime,
-				details: { error: error instanceof Error ? (error as Error).message : 'Unknown error' },
+				details: { error: message },
 			}
 
-			this.logger.warn(`Health check failed for ${this.key}: ${error instanceof Error ? (error as Error).message : 'Unknown error'}`)
+			this.logger.warn(`Health check failed for ${this.key}: ${message}`)
 
-			return {
+			const downResult: HealthIndicatorResult = {
 				[this.key]: {
 					status: 'down',
-					message: error instanceof Error ? (error as Error).message : 'Health check failed',
+					message,
 					timestamp: new Date().toISOString(),
 					responseTime,
 				},
 			}
+
+			throw new HealthCheckError(message, downResult)
 		}
 	}
 

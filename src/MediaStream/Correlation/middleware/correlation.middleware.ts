@@ -32,13 +32,16 @@ export class CorrelationMiddleware implements NestMiddleware {
 		})
 	}
 
+	/**
+	 * Extract the real client IP.
+	 *
+	 * Now that `app.set('trust proxy', 1)` is configured in main.ts, Express
+	 * resolves `req.ip` to the real client IP from X-Forwarded-For (trusting
+	 * exactly 1 hop, i.e. Traefik).  Reading the raw XFF header directly would
+	 * allow an external client to prepend arbitrary IPs to the header and spoof
+	 * their apparent address.
+	 */
 	private getClientIp(req: Request): string {
-		return (
-			(req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
-			|| (req.headers['x-real-ip'] as string)
-			|| req.connection.remoteAddress
-			|| req.socket.remoteAddress
-			|| 'unknown'
-		)
+		return (req as any).ip || req.socket?.remoteAddress || 'unknown'
 	}
 }

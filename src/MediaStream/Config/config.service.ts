@@ -1,6 +1,7 @@
 import type { StringMap } from '#microservice/common/types/common.types'
 import type { OnModuleInit } from '@nestjs/common'
 import type { AppConfig } from './interfaces/app-config.interface.js'
+import * as process from 'node:process'
 import { APP_CONFIG_SCHEMA, buildConfigFromSchema } from '#microservice/common/utils/config-schema.util'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService as NestConfigService } from '@nestjs/config'
@@ -12,7 +13,7 @@ export class ConfigService implements OnModuleInit {
 	private readonly hotReloadableKeys = new Set([
 		'MONITORING_ENABLED',
 		'PROCESSING_MAX_CONCURRENT',
-		'CACHE_MEMORY_TTL',
+		'CACHE_MEMORY_DEFAULT_TTL',
 		'CACHE_FILE_CLEANUP_INTERVAL',
 	])
 
@@ -118,6 +119,19 @@ export class ConfigService implements OnModuleInit {
 			}
 			const errorMessages = extractMessages(errors).join('; ')
 			throw new Error(`Configuration validation failed: ${errorMessages}`)
+		}
+
+		// In production, an empty CORS origin is a misconfiguration — a wildcard
+		// origin was removed and must be replaced with an explicit allow-list.
+		// Fail fast at startup rather than silently serving with broken CORS.
+		if (process.env.NODE_ENV === 'production') {
+			const corsOrigin = this.nestConfigService.get<string>('CORS_ORIGIN') || ''
+			if (!corsOrigin.trim()) {
+				throw new Error(
+					'Configuration error: CORS_ORIGIN must be set in production. '
+					+ 'Set it to the allowed origin(s) for this service (e.g. https://webside.gr).',
+				)
+			}
 		}
 
 		this._logger.log('Configuration validation passed')
@@ -272,7 +286,7 @@ export class ConfigService implements OnModuleInit {
 				port: config.server?.port ?? 3003,
 				host: config.server?.host ?? '0.0.0.0',
 				cors: {
-					origin: config.server?.cors?.origin ?? '*',
+					origin: config.server?.cors?.origin ?? '',
 					methods: config.server?.cors?.methods ?? 'GET',
 					maxAge: config.server?.cors?.maxAge ?? 86400,
 				},
@@ -378,7 +392,7 @@ export class ConfigService implements OnModuleInit {
 			this.config.processing.maxConcurrent = newConfig.processing.maxConcurrent
 		}
 
-		if (this.isHotReloadable('CACHE_MEMORY_TTL')) {
+		if (this.isHotReloadable('CACHE_MEMORY_DEFAULT_TTL')) {
 			this.config.cache.memory.defaultTtl = newConfig.cache.memory.defaultTtl
 		}
 

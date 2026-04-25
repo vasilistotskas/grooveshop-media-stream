@@ -3,6 +3,7 @@ import type { AxiosResponse } from 'axios'
 import { Buffer } from 'node:buffer'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
+import { Readable } from 'node:stream'
 import CacheImageRequest, {
 	BackgroundOptions,
 	FitOptions,
@@ -80,11 +81,17 @@ describe('cacheImageResourceOperation', () => {
 		const axiosHeaders = new AxiosHeaders()
 		axiosHeaders.set('content-type', 'image/jpeg')
 
+		// Production code calls response.data.pipe() and response.data.on('error'),
+		// so data must be a Readable stream, not a plain Buffer.
+		const mockStream = new Readable({ read() {} })
+		mockStream.push(Buffer.from('mock-image-data'))
+		mockStream.push(null) // end of stream
+
 		const mockResponse = {
 			status: 200,
 			statusText: 'OK',
 			headers: { 'content-type': 'image/jpeg' },
-			data: Buffer.from('mock-image-data'),
+			data: mockStream,
 			config: {
 				headers: axiosHeaders,
 				url: 'https://example.com/image.jpg',
@@ -333,7 +340,14 @@ describe('cacheImageResourceOperation', () => {
 			mockedFs.access.mockRejectedValue(new Error('File not found'))
 			mockedFs.readFile.mockResolvedValue(Buffer.from('processed-image-data'))
 			mockedFs.writeFile.mockResolvedValue()
+			// Production code uses atomic rename (writeFile to .tmp then rename to final path)
+			mockedFs.rename.mockResolvedValue()
 			mockedFs.unlink.mockResolvedValue()
+			// Production code opens the temp file to detect SVG headers
+			mockedFs.open.mockResolvedValue({
+				read: vi.fn().mockResolvedValue({ bytesRead: 4, buffer: Buffer.alloc(512) }),
+				close: vi.fn().mockResolvedValue(undefined),
+			} as any)
 
 			await operation.execute(opCtx)
 
@@ -347,7 +361,14 @@ describe('cacheImageResourceOperation', () => {
 			mockedFs.access.mockRejectedValue(new Error('File not found'))
 			mockedFs.readFile.mockResolvedValue(Buffer.from('processed-image-data'))
 			mockedFs.writeFile.mockResolvedValue()
+			// Production code uses atomic rename (writeFile to .tmp then rename to final path)
+			mockedFs.rename.mockResolvedValue()
 			mockedFs.unlink.mockResolvedValue()
+			// Production code opens the temp file to detect SVG headers
+			mockedFs.open.mockResolvedValue({
+				read: vi.fn().mockResolvedValue({ bytesRead: 4, buffer: Buffer.alloc(512) }),
+				close: vi.fn().mockResolvedValue(undefined),
+			} as any)
 
 			await operation.execute(opCtx)
 
@@ -366,7 +387,14 @@ describe('cacheImageResourceOperation', () => {
 			mockedFs.access.mockRejectedValue(new Error('File not found'))
 			mockedFs.readFile.mockResolvedValue(Buffer.from('processed-image-data'))
 			mockedFs.writeFile.mockResolvedValue()
+			// Production code uses atomic rename (writeFile to .tmp then rename to final path)
+			mockedFs.rename.mockResolvedValue()
 			mockedFs.unlink.mockResolvedValue()
+			// Production code opens the temp file to detect SVG headers
+			mockedFs.open.mockResolvedValue({
+				read: vi.fn().mockResolvedValue({ bytesRead: 4, buffer: Buffer.alloc(512) }),
+				close: vi.fn().mockResolvedValue(undefined),
+			} as any)
 
 			await operation.execute(opCtx)
 

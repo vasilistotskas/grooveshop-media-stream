@@ -3,8 +3,9 @@ import type { MockedObject } from 'vitest'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { AdaptiveRateLimitGuard } from '#microservice/RateLimit/guards/adaptive-rate-limit.guard'
 import { RateLimitService } from '#microservice/RateLimit/services/rate-limit.service'
+import { Reflector } from '@nestjs/core'
 import { Test, TestingModule } from '@nestjs/testing'
-import { ThrottlerException } from '@nestjs/throttler'
+import { getOptionsToken, getStorageToken, ThrottlerException } from '@nestjs/throttler'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('adaptiveRateLimitGuard', () => {
@@ -24,6 +25,8 @@ describe('adaptiveRateLimitGuard', () => {
 
 	const mockResponse = {
 		setHeader: vi.fn(),
+		// ThrottlerGuard.handleRequest() calls res.header() for X-RateLimit-* headers
+		header: vi.fn(),
 	}
 
 	const mockExecutionContext = {
@@ -31,7 +34,10 @@ describe('adaptiveRateLimitGuard', () => {
 			getRequest: () => mockRequest,
 			getResponse: () => mockResponse,
 		}),
-	} as ExecutionContext
+		// ThrottlerGuard.canActivate() calls these via Reflector to check metadata
+		getHandler: () => ({}),
+		getClass: () => ({}),
+	} as unknown as ExecutionContext
 
 	beforeEach(async () => {
 		const mockRateLimitService = {
@@ -49,13 +55,28 @@ describe('adaptiveRateLimitGuard', () => {
 			recordRateLimitAttempt: vi.fn(),
 		}
 
+		// AdaptiveRateLimitGuard extends ThrottlerGuard which requires these tokens.
+		// The options must be in the format ThrottlerGuard expects: array of throttler configs
+		// with `ttl` (seconds) and `limit`. ThrottlerGuard.onModuleInit() sets this.throttlers.
+		const mockThrottlerStorage = {
+			increment: vi.fn().mockResolvedValue({ totalHits: 1, timeToExpire: 60000 }),
+			getRecord: vi.fn().mockResolvedValue([]),
+		}
+		const mockThrottlerOptions = [{ ttl: 60, limit: 100, name: 'default' }]
+
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [
 				AdaptiveRateLimitGuard,
 				{ provide: RateLimitService, useValue: mockRateLimitService },
 				{ provide: MetricsService, useValue: mockMetricsService },
+				{ provide: getOptionsToken(), useValue: mockThrottlerOptions },
+				{ provide: getStorageToken(), useValue: mockThrottlerStorage },
+				Reflector,
 			],
 		}).compile()
+
+		// ThrottlerGuard.onModuleInit() sets this.throttlers — must be called before canActivate()
+		await module.init()
 
 		guard = module.get<AdaptiveRateLimitGuard>(AdaptiveRateLimitGuard)
 		rateLimitService = module.get(RateLimitService)
@@ -109,7 +130,9 @@ describe('adaptiveRateLimitGuard', () => {
 					getRequest: () => ({ ...mockRequest, url: '/health' }),
 					getResponse: () => mockResponse,
 				}),
-			} as ExecutionContext
+				getHandler: () => ({}),
+				getClass: () => ({}),
+			} as unknown as ExecutionContext
 
 			const result = await guard.canActivate(healthCheckContext)
 
@@ -123,7 +146,9 @@ describe('adaptiveRateLimitGuard', () => {
 					getRequest: () => ({ ...mockRequest, url: '/metrics' }),
 					getResponse: () => mockResponse,
 				}),
-			} as ExecutionContext
+				getHandler: () => ({}),
+				getClass: () => ({}),
+			} as unknown as ExecutionContext
 
 			const result = await guard.canActivate(metricsContext)
 
@@ -137,7 +162,9 @@ describe('adaptiveRateLimitGuard', () => {
 					getRequest: () => ({ ...mockRequest, url: '/static/image.png' }),
 					getResponse: () => mockResponse,
 				}),
-			} as ExecutionContext
+				getHandler: () => ({}),
+				getClass: () => ({}),
+			} as unknown as ExecutionContext
 
 			const result = await guard.canActivate(staticAssetContext)
 
@@ -154,7 +181,9 @@ describe('adaptiveRateLimitGuard', () => {
 					getRequest: () => ({ ...mockRequest, headers: { 'user-agent': 'facebookexternalhit/1.1' } }),
 					getResponse: () => mockResponse,
 				}),
-			} as ExecutionContext
+				getHandler: () => ({}),
+				getClass: () => ({}),
+			} as unknown as ExecutionContext
 
 			const result = await guard.canActivate(botContext)
 
@@ -180,7 +209,9 @@ describe('adaptiveRateLimitGuard', () => {
 					getRequest: () => ({ ...mockRequest, headers: { 'user-agent': 'facebookexternalhit/1.1' } }),
 					getResponse: () => mockResponse,
 				}),
-			} as ExecutionContext
+				getHandler: () => ({}),
+				getClass: () => ({}),
+			} as unknown as ExecutionContext
 
 			const result = await guard.canActivate(botContext)
 
@@ -236,7 +267,9 @@ describe('adaptiveRateLimitGuard', () => {
 						getRequest: () => testRequest,
 						getResponse: () => mockResponse,
 					}),
-				} as ExecutionContext
+					getHandler: () => ({}),
+					getClass: () => ({}),
+				} as unknown as ExecutionContext
 
 				const mockConfig = { windowMs: 60000, max: 100, skipSuccessfulRequests: false, skipFailedRequests: false }
 				const mockInfo = { limit: 100, current: 1, remaining: 99, resetTime: new Date() }
@@ -276,7 +309,9 @@ describe('adaptiveRateLimitGuard', () => {
 						getRequest: () => testRequest,
 						getResponse: () => mockResponse,
 					}),
-				} as ExecutionContext
+					getHandler: () => ({}),
+					getClass: () => ({}),
+				} as unknown as ExecutionContext
 
 				// Skip health checks as they bypass rate limiting
 				if (testCase.expectedType === 'health-check') {

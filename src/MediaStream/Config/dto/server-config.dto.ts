@@ -3,8 +3,8 @@ import { IsNumber, IsString, Max, Min, ValidateNested } from 'class-validator'
 
 export class CorsConfigDto {
 	@IsString()
-	@Transform(({ value }) => value || '*')
-	origin: string = '*'
+	@Transform(({ value }) => value || '')
+	origin: string = ''
 
 	@IsString()
 	@Transform(({ value }) => value || 'GET')

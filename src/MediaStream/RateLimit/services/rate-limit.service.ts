@@ -103,7 +103,7 @@ export class RateLimitService {
 	getRateLimitConfig(requestType: string): RateLimitConfig {
 		const baseConfig = {
 			windowMs: this._configService.getOptional('rateLimit.default.windowMs', 60000),
-			max: this._configService.getOptional('rateLimit.default.max', 500),
+			max: this._configService.getOptional('rateLimit.default.max', 100),
 			skipSuccessfulRequests: false,
 			skipFailedRequests: false,
 		}
@@ -113,7 +113,7 @@ export class RateLimitService {
 				return {
 					...baseConfig,
 					windowMs: this._configService.getOptional('rateLimit.imageProcessing.windowMs', 60000),
-					max: this._configService.getOptional('rateLimit.imageProcessing.max', 300),
+					max: this._configService.getOptional('rateLimit.imageProcessing.max', 50),
 				}
 			case 'health-check':
 				return {

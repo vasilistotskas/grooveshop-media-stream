@@ -188,26 +188,51 @@ export class InputSanitizationService implements ISanitizer<any> {
 	}
 
 	/**
-	 * Validate image dimensions
-	 * @param width - Image width (0 = use original dimensions, skip resize)
-	 * @param height - Image height (0 = use original dimensions, skip resize)
-	 * @returns true if dimensions are valid
+	 * Validate image dimensions.
+	 *
+	 * Sharp supports aspect-ratio-preserving single-axis resize when exactly one
+	 * dimension is provided and the other is omitted (or 0).  Both of the
+	 * following are valid resize requests:
+	 *   - width=800, height=0  → scale to 800 px wide, preserve aspect ratio
+	 *   - width=0, height=600  → scale to 600 px tall, preserve aspect ratio
+	 *
+	 * Rules:
+	 *   - (0, 0) is valid: "use original dimensions, skip resize"
+	 *   - (w, 0) or (0, h) is valid when the non-zero side is within limits:
+	 *     aspect-ratio-preserving single-axis resize
+	 *   - Negative values are always invalid
+	 *   - Both non-zero: both must be within MAX_IMAGE_WIDTH / MAX_IMAGE_HEIGHT
+	 *     and their product must not exceed MAX_TOTAL_PIXELS
+	 *
+	 * Note: When both dimensions are 0 (pass-through), the actual pixel
+	 * count is unknown at validation time. This is intentional — the
+	 * Sharp pipeline enforces `limitInputPixels: 268402689` on every
+	 * input (Buffer or path), which is the authoritative DoS guard.
+	 * Validation only rejects requested *output* dimensions; oversized
+	 * source images are caught downstream regardless of whether the
+	 * caller asked for a resize.
 	 */
 	validateImageDimensions(width: number, height: number): boolean {
-		// Allow 0 as a special value meaning "use original dimensions"
-		// When both are 0, the image processor will skip resizing
-		if (width === 0 && height === 0)
-			return true
-
-		// If one is 0 and the other is not, that's invalid
-		// (we don't support scaling only one dimension with 0)
-		if (width === 0 || height === 0)
-			return false
-
-		// Reject negative dimensions
+		// Reject negative values unconditionally
 		if (width < 0 || height < 0)
 			return false
 
+		// (0, 0): pass-through — skip resize entirely
+		if (width === 0 && height === 0)
+			return true
+
+		// Single-axis resize: exactly one of width/height is 0
+		// Validate that the non-zero dimension is within its respective limit
+		if (width === 0) {
+			// height-only resize
+			return height <= MAX_IMAGE_HEIGHT
+		}
+		if (height === 0) {
+			// width-only resize
+			return width <= MAX_IMAGE_WIDTH
+		}
+
+		// Both non-zero: full two-axis resize
 		if (width > MAX_IMAGE_WIDTH || height > MAX_IMAGE_HEIGHT)
 			return false
 		if ((width * height) > MAX_TOTAL_PIXELS)

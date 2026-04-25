@@ -1,6 +1,7 @@
 import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import type { CacheStats, ICacheManager } from '../interfaces/cache-manager.interface.js'
 import { Buffer } from 'node:buffer'
+import { env } from 'node:process'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
@@ -39,6 +40,16 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 
 	private async initializeRedis(): Promise<void> {
 		const config = this._configService.get('cache.redis')
+
+		// Fail fast in production if Redis password is not set.
+		// Redis without a password in production is a security risk.
+		// Set REDIS_PASSWORD in your environment to resolve this.
+		if (env.NODE_ENV === 'production' && !config.password) {
+			throw new Error(
+				'[RedisCacheService] REDIS_PASSWORD is required in production. '
+				+ 'Set the REDIS_PASSWORD environment variable and restart.',
+			)
+		}
 
 		this.redis = new Redis({
 			host: config.host,
@@ -154,14 +165,20 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 		try {
 			this.stats.operations++
 			const serializedValue = this.serializeValue(value)
+			// Treat ttl === 0 or ttl === undefined as "use the configured default TTL".
+			// Callers that want a no-expiry key must go through a separate code path;
+			// a zero or absent TTL here always means "fall back to config" so that
+			// cache entries are never accidentally persisted without expiry.
 			const defaultTtl = this._configService.get('cache.redis.ttl')
-			const effectiveTtl = ttl !== undefined ? ttl : defaultTtl
+			const effectiveTtl = (ttl !== undefined && ttl > 0) ? ttl : defaultTtl
 
-			if (effectiveTtl > 0) {
+			if (effectiveTtl && effectiveTtl > 0) {
 				await this.redis.set(key, serializedValue, 'EX', effectiveTtl)
 			}
 			else {
-				await this.redis.set(key, serializedValue)
+				throw new Error(
+					`[RedisCacheService] Redis TTL must be > 0 — cache.redis.ttl is misconfigured (got ${effectiveTtl})`,
+				)
 			}
 
 			this.metricsService.recordCacheOperation('set', 'redis', 'success')
@@ -171,6 +188,49 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			this.stats.errors++
 			this.metricsService.recordCacheOperation('set', 'redis', 'error')
 			CorrelatedLogger.error(`Redis cache SET error for key ${key}: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
+		}
+	}
+
+	/**
+	 * Set a key only if it does not already exist (SET NX EX).
+	 * Used by the cache-fill pattern to prevent thundering-herd overwrites:
+	 * the first writer wins and subsequent workers skip the write.
+	 * Returns true if the key was set, false if it already existed.
+	 */
+	async setIfNotExists<T>(key: string, value: T, ttl?: number): Promise<boolean> {
+		if (!this.isConnected) {
+			CorrelatedLogger.warn('Redis not connected, skipping SET NX operation', RedisCacheService.name)
+			return false
+		}
+
+		try {
+			this.stats.operations++
+			const serializedValue = this.serializeValue(value)
+			const defaultTtl = this._configService.get('cache.redis.ttl')
+			const effectiveTtl = (ttl !== undefined && ttl > 0) ? ttl : defaultTtl
+
+			if (!effectiveTtl || effectiveTtl <= 0) {
+				throw new Error(
+					`[RedisCacheService] Redis TTL must be > 0 — cache.redis.ttl is misconfigured (got ${effectiveTtl})`,
+				)
+			}
+
+			// SET key value EX ttl NX — atomic: only sets if key does not exist
+			const result = await this.redis.set(key, serializedValue, 'EX', effectiveTtl, 'NX')
+			const wasSet = result === 'OK'
+
+			this.metricsService.recordCacheOperation('set', 'redis', wasSet ? 'success' : 'miss')
+			CorrelatedLogger.debug(
+				`Redis cache SET NX: ${key} (TTL: ${effectiveTtl}s) — ${wasSet ? 'written' : 'already exists'}`,
+				RedisCacheService.name,
+			)
+			return wasSet
+		}
+		catch (error: unknown) {
+			this.stats.errors++
+			this.metricsService.recordCacheOperation('set', 'redis', 'error')
+			CorrelatedLogger.error(`Redis cache SET NX error for key ${key}: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
+			return false
 		}
 	}
 

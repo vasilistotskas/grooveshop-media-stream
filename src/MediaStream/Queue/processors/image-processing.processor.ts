@@ -54,102 +54,101 @@ export class ImageProcessingProcessor {
 				startTime: hrtime.bigint(),
 			},
 			async () => {
-				try {
-					this._logger.debug(`Processing image job ${job.id} for URL: ${imageUrl} with options:`, {
-						width,
-						height,
-						quality,
-						format,
-						fit,
-						position,
-						background,
-						trimThreshold,
-					})
+				// No try/catch here — errors bubble up to Bull's processor wrapper,
+				// which handles retry scheduling and backoff. Catching here and
+				// returning { success: false } would mark the job as succeeded in
+				// Bull's eyes and skip all configured retry attempts.
+				this._logger.debug(`Processing image job ${job.id} for URL: ${imageUrl} with options:`, {
+					width,
+					height,
+					quality,
+					format,
+					fit,
+					position,
+					background,
+					trimThreshold,
+				})
 
-					const cached = await this.cacheManager.get('image', cacheKey)
-					if (cached) {
-						this._logger.debug(`Image already cached for job ${job.id}`)
-						return {
-							success: true,
-							data: cached,
-							processingTime: Date.now() - startTime,
-							cacheHit: true,
-						}
-					}
-
-					await this.updateProgress(job, 25, 'Downloading image')
-
-					const imageBuffer = await this.downloadImage(imageUrl)
-
-					await this.updateProgress(job, 50, 'Processing image')
-
-					const resizeOptions = new ResizeOptions({
-						width: width ? Number(width) : undefined,
-						height: height ? Number(height) : undefined,
-						quality: quality ? Number(quality) : undefined,
-						format: format as any,
-						fit: fit as any,
-						position: position as any,
-						background: background as any,
-						trimThreshold: trimThreshold ? Number(trimThreshold) : undefined,
-					})
-
-					const result = await this.imageManipulationJob.handleBuffer(imageBuffer, resizeOptions)
-					const processedBuffer = result.buffer
-
-					await this.updateProgress(job, 75, 'Caching result')
-
-					const metadata = new ResourceMetaData({
-						version: 1,
-						size: processedBuffer.length.toString(),
-						format: result.format || 'webp',
-						dateCreated: Date.now(),
-						publicTTL: this.publicTtl * 1000,
-						privateTTL: this.privateTtl * 1000,
-					})
-
-					await this.cacheManager.set('image', cacheKey, {
-						data: processedBuffer,
-						metadata,
-					}, this.privateTtl)
-
-					const basePath = cwd()
-					const resourcePath = join(basePath, 'storage', `${cacheKey}.rsc`)
-					const metadataPath = join(basePath, 'storage', `${cacheKey}.rsm`)
-
-					try {
-						await Promise.all([
-							writeFile(resourcePath, processedBuffer),
-							writeFile(metadataPath, JSON.stringify(metadata), 'utf8'),
-						])
-						this._logger.debug(`Saved processed image to filesystem: ${resourcePath}`)
-					}
-					catch (fsError) {
-						this._logger.warn(`Failed to save to filesystem: ${(fsError as Error).message}`)
-					}
-
-					await this.updateProgress(job, 100, 'Completed')
-
-					const processingTime = Date.now() - startTime
-					this._logger.debug(`Image processing completed for job ${job.id} in ${processingTime}ms`)
-
+				const cached = await this.cacheManager.get('image', cacheKey)
+				if (cached) {
+					this._logger.debug(`Image already cached for job ${job.id}`)
 					return {
 						success: true,
-						data: processedBuffer,
-						processingTime,
-						cacheHit: false,
+						cacheKey: `image:${cacheKey}`,
+						processingTime: Date.now() - startTime,
+						cacheHit: true,
 					}
 				}
-				catch (error: unknown) {
-					const processingTime = Date.now() - startTime
-					this._logger.error(`Image processing failed for job ${job.id}:`, error)
 
-					return {
-						success: false,
-						error: (error as Error).message,
-						processingTime,
-						cacheHit: false,
-					}
+				await this.updateProgress(job, 25, 'Downloading image')
+
+				const imageBuffer = await this.downloadImage(imageUrl)
+
+				await this.updateProgress(job, 50, 'Processing image')
+
+				const resizeOptions = new ResizeOptions({
+					width: width ? Number(width) : undefined,
+					height: height ? Number(height) : undefined,
+					quality: quality ? Number(quality) : undefined,
+					format: format as any,
+					fit: fit as any,
+					position: position as any,
+					background: background as any,
+					trimThreshold: trimThreshold ? Number(trimThreshold) : undefined,
+				})
+
+				const result = await this.imageManipulationJob.handleBuffer(imageBuffer, resizeOptions)
+				const processedBuffer = result.buffer
+
+				await this.updateProgress(job, 75, 'Caching result')
+
+				const metadata = new ResourceMetaData({
+					version: 1,
+					size: processedBuffer.length.toString(),
+					format: result.format || 'webp',
+					dateCreated: Date.now(),
+					publicTTL: this.publicTtl * 1000,
+					privateTTL: this.privateTtl * 1000,
+				})
+
+				await this.cacheManager.set('image', cacheKey, {
+					data: processedBuffer,
+					metadata,
+				}, this.privateTtl)
+
+				const basePath = cwd()
+				const resourcePath = join(basePath, 'storage', `${cacheKey}.rsc`)
+				const metadataPath = join(basePath, 'storage', `${cacheKey}.rsm`)
+
+				try {
+					await Promise.all([
+						writeFile(resourcePath, processedBuffer),
+						writeFile(metadataPath, JSON.stringify(metadata), 'utf8'),
+					])
+					this._logger.debug(`Saved processed image to filesystem: ${resourcePath}`)
+				}
+				catch (fsError) {
+					// Filesystem write is best-effort: the image is already in the
+					// multi-layer cache above. Log the failure but do not rethrow —
+					// a missing .rsc file is recoverable; a failed job that retries
+					// would re-download and re-process unnecessarily.
+					this._logger.warn(`Failed to save to filesystem: ${(fsError as Error).message}`)
+				}
+
+				await this.updateProgress(job, 100, 'Completed')
+
+				const processingTime = Date.now() - startTime
+				this._logger.debug(`Image processing completed for job ${job.id} in ${processingTime}ms`)
+
+				// Return a lightweight reference only — the processed buffer is
+				// already stored in the cache and on disk above. Consumers must
+				// read the result via MultiLayerCacheManager using `cacheKey`
+				// rather than reading it from the job's returnvalue, which would
+				// serialise the entire image buffer through Redis twice.
+				return {
+					success: true,
+					cacheKey: `image:${cacheKey}`,
+					processingTime,
 				}
 			},
 		)

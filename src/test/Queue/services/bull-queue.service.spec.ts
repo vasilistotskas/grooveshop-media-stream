@@ -2,6 +2,7 @@ import type { JobOptions, JobProcessor } from '#microservice/Queue/interfaces/jo
 import type { Job as BullJob, Queue } from 'bull'
 import type { MockedObject } from 'vitest'
 import { BullQueueService } from '#microservice/Queue/services/bull-queue.service'
+import { SharpConfigService } from '#microservice/Queue/services/sharp-config.service'
 import { JobType } from '#microservice/Queue/types/job.types'
 import { getQueueToken } from '@nestjs/bull'
 import { Logger } from '@nestjs/common'
@@ -30,6 +31,10 @@ describe('bullQueueService', () => {
 			close: vi.fn(),
 		})
 
+		const mockSharpConfigService = {
+			getConfiguration: vi.fn().mockReturnValue({ concurrency: 2 }),
+		}
+
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [
 				BullQueueService,
@@ -40,6 +45,10 @@ describe('bullQueueService', () => {
 				{
 					provide: getQueueToken('cache-operations'),
 					useFactory: mockQueueFactory,
+				},
+				{
+					provide: SharpConfigService,
+					useValue: mockSharpConfigService,
 				},
 			],
 		}).compile()
@@ -154,8 +163,10 @@ describe('bullQueueService', () => {
 
 			service.process(JobType.IMAGE_PROCESSING, mockProcessor)
 
+			// Production code passes concurrency as 2nd arg (from SharpConfigService)
 			expect(mockImageQueue.process).toHaveBeenCalledWith(
 				JobType.IMAGE_PROCESSING,
+				expect.any(Number),
 				expect.any(Function),
 			)
 		})
@@ -181,7 +192,8 @@ describe('bullQueueService', () => {
 
 			let processorCallback: (job: BullJob) => Promise<any>
 
-			mockImageQueue.process.mockImplementation((name, callback) => {
+			// Production code calls queue.process(name, concurrency, callback)
+			mockImageQueue.process.mockImplementation((name, _concurrency, callback) => {
 				processorCallback = callback as any
 				return Promise.resolve()
 			})
@@ -221,7 +233,8 @@ describe('bullQueueService', () => {
 
 			let processorCallback: (job: BullJob) => Promise<any>
 
-			mockImageQueue.process.mockImplementation((name, callback) => {
+			// Production code calls queue.process(name, concurrency, callback)
+			mockImageQueue.process.mockImplementation((name, _concurrency, callback) => {
 				processorCallback = callback as any
 				return Promise.resolve()
 			})
