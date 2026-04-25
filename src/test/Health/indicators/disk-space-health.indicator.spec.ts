@@ -93,17 +93,12 @@ describe('diskSpaceHealthIndicator', () => {
 			vi.spyOn(indicator as any, 'getDiskSpaceInfo').mockRejectedValue(new Error('Disk access error'))
 
 			// BaseHealthIndicator.isHealthy() throws HealthCheckError when the check fails
-			try {
-				await indicator.isHealthy()
-				expect.fail('Expected HealthCheckError to be thrown')
-			}
-			catch (err: unknown) {
-				expect(err).toBeInstanceOf(HealthCheckError)
-				const hce = err as HealthCheckError
-				expect(hce.causes).toHaveProperty('disk_space')
-				expect((hce.causes as any).disk_space.status).toBe('down')
-				expect(hce.message).toContain('Disk access error')
-			}
+			const err = await indicator.isHealthy().catch((e: unknown) => e)
+			expect(err).toBeInstanceOf(HealthCheckError)
+			const hce = err as HealthCheckError
+			expect(hce.causes).toHaveProperty('disk_space')
+			expect((hce.causes as any).disk_space.status).toBe('down')
+			expect(hce.message).toContain('Disk access error')
 		})
 
 		it('should timeout if check takes too long', async () => {
@@ -112,17 +107,12 @@ describe('diskSpaceHealthIndicator', () => {
 			)
 
 			// BaseHealthIndicator.isHealthy() throws HealthCheckError on timeout
-			try {
-				await indicator.isHealthy()
-				expect.fail('Expected HealthCheckError to be thrown')
-			}
-			catch (err: unknown) {
-				expect(err).toBeInstanceOf(HealthCheckError)
-				const hce = err as HealthCheckError
-				expect(hce.causes).toHaveProperty('disk_space')
-				expect((hce.causes as any).disk_space.status).toBe('down')
-				expect(hce.message).toContain('timeout')
-			}
+			const err = await indicator.isHealthy().catch((e: unknown) => e)
+			expect(err).toBeInstanceOf(HealthCheckError)
+			const hce = err as HealthCheckError
+			expect(hce.causes).toHaveProperty('disk_space')
+			expect((hce.causes as any).disk_space.status).toBe('down')
+			expect(hce.message).toContain('timeout')
 		}, 10000)
 	})
 

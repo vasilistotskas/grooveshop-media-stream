@@ -344,17 +344,12 @@ describe('storage Management Integration', () => {
 			// Simulate readdir failure for health check.
 			// BaseHealthIndicator.isHealthy() throws HealthCheckError when the check fails.
 			mockFs.readdir.mockRejectedValue(new Error('Disk full'))
-			try {
-				await storageHealth.isHealthy()
-				expect.fail('Expected HealthCheckError to be thrown')
-			}
-			catch (err: unknown) {
-				expect(err).toBeInstanceOf(HealthCheckError)
-				const hce = err as HealthCheckError
-				expect(hce.causes).toHaveProperty('storage')
-				expect((hce.causes as any).storage.status).toBe('down')
-				expect(hce.message).toContain('Disk full')
-			}
+			const err = await storageHealth.isHealthy().catch((e: unknown) => e)
+			expect(err).toBeInstanceOf(HealthCheckError)
+			const hce = err as HealthCheckError
+			expect(hce.causes).toHaveProperty('storage')
+			expect((hce.causes as any).storage.status).toBe('down')
+			expect(hce.message).toContain('Disk full')
 		})
 	})
 

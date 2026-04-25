@@ -181,17 +181,12 @@ describe('storageHealthIndicator', () => {
 			)
 
 			// BaseHealthIndicator.isHealthy() throws HealthCheckError when check fails
-			try {
-				await indicator.isHealthy()
-				expect.fail('Expected HealthCheckError to be thrown')
-			}
-			catch (err: unknown) {
-				expect(err).toBeInstanceOf(HealthCheckError)
-				const hce = err as HealthCheckError
-				expect(hce.causes).toHaveProperty('storage')
-				expect((hce.causes as any).storage.status).toBe('down')
-				expect(hce.message).toContain('Storage unavailable')
-			}
+			const err = await indicator.isHealthy().catch((e: unknown) => e)
+			expect(err).toBeInstanceOf(HealthCheckError)
+			const hce = err as HealthCheckError
+			expect(hce.causes).toHaveProperty('storage')
+			expect((hce.causes as any).storage.status).toBe('down')
+			expect(hce.message).toContain('Storage unavailable')
 		})
 	})
 
@@ -308,34 +303,24 @@ describe('storageHealthIndicator', () => {
 			storageMonitoring.checkThresholds.mockResolvedValue(mockThresholds)
 
 			// BaseHealthIndicator.isHealthy() throws HealthCheckError when check fails
-			try {
-				await indicator.isHealthy()
-				expect.fail('Expected HealthCheckError to be thrown')
-			}
-			catch (err: unknown) {
-				expect(err).toBeInstanceOf(HealthCheckError)
-				const hce = err as HealthCheckError
-				expect(hce.causes).toHaveProperty('storage')
-				expect((hce.causes as any).storage.status).toBe('down')
-				expect(hce.message).toContain('Cleanup service unavailable')
-			}
+			const err = await indicator.isHealthy().catch((e: unknown) => e)
+			expect(err).toBeInstanceOf(HealthCheckError)
+			const hce = err as HealthCheckError
+			expect(hce.causes).toHaveProperty('storage')
+			expect((hce.causes as any).storage.status).toBe('down')
+			expect(hce.message).toContain('Cleanup service unavailable')
 		})
 
 		it('should handle threshold check errors', async () => {
 			storageMonitoring.checkThresholds.mockRejectedValue(new Error('Storage unavailable'))
 
 			// BaseHealthIndicator.isHealthy() throws HealthCheckError when check fails
-			try {
-				await indicator.isHealthy()
-				expect.fail('Expected HealthCheckError to be thrown')
-			}
-			catch (err: unknown) {
-				expect(err).toBeInstanceOf(HealthCheckError)
-				const hce = err as HealthCheckError
-				expect(hce.causes).toHaveProperty('storage')
-				expect((hce.causes as any).storage.status).toBe('down')
-				expect(hce.message).toContain('Storage unavailable')
-			}
+			const err = await indicator.isHealthy().catch((e: unknown) => e)
+			expect(err).toBeInstanceOf(HealthCheckError)
+			const hce = err as HealthCheckError
+			expect(hce.causes).toHaveProperty('storage')
+			expect((hce.causes as any).storage.status).toBe('down')
+			expect(hce.message).toContain('Storage unavailable')
 		})
 	})
 })
