@@ -93,6 +93,7 @@ jobs:
         env:
           NODE_ENV: production
           CORS_ORIGIN: https://webside.gr
+          REDIS_PASSWORD: ci_smoke_test_password
         run: |
           timeout 10s pnpm run prod || exit_code=$?
           if [ $exit_code -eq 124 ]; then
