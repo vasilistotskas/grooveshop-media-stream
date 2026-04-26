@@ -73,12 +73,25 @@ export default class MediaStreamImageController {
 			? req.path.substring(basePath.length)
 			: req.path
 
+		// Some upstream content (notably TinyMCE-edited blog HTML) ends up
+		// with mixed or double-encoded image URLs — e.g. a slash stored as
+		// `%2F` and Greek bytes stored as `%25CF%2584`. A single decode
+		// pass leaves the inner layer intact, the URL builder re-encodes
+		// it again, and the upstream `static-svc` returns 404.
+		// Loop-decode until the result is stable, but cap iterations to
+		// prevent a pathological input from looping forever. Two passes
+		// covers every real case observed in production.
 		if (fullPath && fullPath.includes('%')) {
-			try {
-				fullPath = decodeURIComponent(fullPath)
-			}
-			catch {
-				throw new BadRequestException('Invalid URL encoding in image path')
+			for (let i = 0; i < 3; i++) {
+				try {
+					const decoded = decodeURIComponent(fullPath)
+					if (decoded === fullPath)
+						break
+					fullPath = decoded
+				}
+				catch {
+					throw new BadRequestException('Invalid URL encoding in image path')
+				}
 			}
 		}
 
