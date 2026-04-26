@@ -1,3 +1,12 @@
+## [2.48.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.48.0...v2.48.1) (2026-04-26)
+
+
+### Bug Fixes
+
+* **graceful-shutdown:** log unhandledRejection without tearing down the pod ([5843462](https://github.com/vasilistotskas/grooveshop-media-stream/commit/58434626e5fb6e17f314981718d42c21dc674935))
+* **health:** correct liveness probe and move shutdown drain to readiness ([606b3fe](https://github.com/vasilistotskas/grooveshop-media-stream/commit/606b3fe0489b8eb216ed0c11fffd901118099ae5))
+* **image-controller:** loop-decode image path to handle double-encoded URLs ([d5a5d2d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/d5a5d2d5463cff5f4e70a23ebc434e8c21d12667))
+
 # [2.48.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.47.0...v2.48.0) (2026-04-26)
 
 
