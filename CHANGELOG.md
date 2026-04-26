@@ -1,3 +1,17 @@
+# [2.48.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.47.0...v2.48.0) (2026-04-26)
+
+
+### Bug Fixes
+
+* ci ([4467351](https://github.com/vasilistotskas/grooveshop-media-stream/commit/4467351db8a56be04113f1bf11aaea4d473c8a7f))
+* cors ([30b1d50](https://github.com/vasilistotskas/grooveshop-media-stream/commit/30b1d50175bd436fa55982d750a6a8cb7bf39463))
+* lint ([f64d85e](https://github.com/vasilistotskas/grooveshop-media-stream/commit/f64d85ee394cc872ac9b0c89114a3192174b3399))
+
+
+### Features
+
+* hardening pass — test fixes, validation docs, image stream stability ([f60a94e](https://github.com/vasilistotskas/grooveshop-media-stream/commit/f60a94e1cf9adf00ba1973c902b3c34734ff8d8f))
+
 # [2.47.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.46.0...v2.47.0) (2026-04-23)
 
 
