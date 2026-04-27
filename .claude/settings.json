@@ -1,26 +1,30 @@
 {
-	"hooks": {
-		"PreToolUse": [
-			{
-				"matcher": "Edit|Write",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "bash -c 'for f in $CLAUDE_FILE_PATHS; do case \"$f\" in *.env|*.env.*|*/settings.local.json|pnpm-lock.yaml|*/pnpm-lock.yaml) echo \"BLOCK: Cannot modify protected file: $f\" >&2; exit 2;; esac; done'"
-					}
-				]
-			}
-		],
-		"PostToolUse": [
-			{
-				"matcher": "Edit|Write",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "bash -c 'TS_FILES=\"\"; for f in $CLAUDE_FILE_PATHS; do case \"$f\" in *.ts|*.mts) TS_FILES=\"$TS_FILES $f\";; esac; done; if [ -n \"$TS_FILES\" ]; then cd /c/Dev/grooveshop/grooveshop-media-stream && npx eslint --fix $TS_FILES 2>/dev/null; fi; exit 0'"
-					}
-				]
-			}
-		]
-	}
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/block-sensitive.mjs"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/auto-lint.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/type-check.mjs"
+          }
+        ]
+      }
+    ]
+  }
 }
