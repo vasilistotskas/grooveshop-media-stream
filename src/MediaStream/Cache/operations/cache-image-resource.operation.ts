@@ -332,7 +332,7 @@ export default class CacheImageResourceOperation {
 			const contentLength = response.headers['content-length']
 			const format = this.getFormatFromUrl(ctx.request.resourceTarget)
 			if (contentLength) {
-				const sizeBytes = Number.parseInt(contentLength, 10)
+				const sizeBytes = Number.parseInt(String(contentLength), 10)
 				if (!this.inputSanitizationService.validateFileSize(sizeBytes, format)) {
 					throw new Error(`File size ${sizeBytes} bytes exceeds limit for format ${format}`)
 				}

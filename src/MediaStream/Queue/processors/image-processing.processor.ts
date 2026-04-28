@@ -175,7 +175,7 @@ export class ImageProcessingProcessor {
 					const contentLength = headResponse.headers['content-length']
 
 					if (contentLength) {
-						const size = Number.parseInt(contentLength, 10)
+						const size = Number.parseInt(String(contentLength), 10)
 						if (size > ImageProcessingProcessor.MAX_FILE_SIZE) {
 							throw new Error(`Image too large: ${size} bytes exceeds maximum ${ImageProcessingProcessor.MAX_FILE_SIZE} bytes`)
 						}
@@ -197,7 +197,7 @@ export class ImageProcessingProcessor {
 			})
 
 			// Validate Content-Type
-			const contentType = response.headers['content-type'] || ''
+			const contentType = String(response.headers['content-type'] || '')
 			const allowedTypes = ['image/', 'application/octet-stream']
 			if (!allowedTypes.some(type => contentType.startsWith(type))) {
 				throw new Error(`Invalid content type: ${contentType}. Expected image/*`)
