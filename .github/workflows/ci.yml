@@ -64,8 +64,6 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '24.x'
-          registry-url: 'https://npm.pkg.github.com'
-          scope: '@vasilistotskas'
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -151,7 +149,6 @@ jobs:
       issues: write
       pull-requests: write
       id-token: write
-      packages: write
 
     steps:
       - name: Checkout code
@@ -169,8 +166,6 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '24.x'
-          registry-url: 'https://npm.pkg.github.com'
-          scope: '@vasilistotskas'
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -186,8 +181,6 @@ jobs:
         id: release
         env:
           GITHUB_TOKEN: ${{ secrets.MEDIA_STREAM_GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm run semantic-release
 
       - name: Upload release artifacts
