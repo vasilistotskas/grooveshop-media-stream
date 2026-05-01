@@ -1,7 +1,6 @@
 {
   "name": "grooveshop-media-stream",
   "version": "2.49.0",
-  "private": true,
   "type": "module",
   "description": "Grooveshop Media Stream",
   "repository": {
