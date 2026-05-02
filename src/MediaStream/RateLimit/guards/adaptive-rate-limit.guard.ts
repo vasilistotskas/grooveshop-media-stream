@@ -157,8 +157,15 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 	private shouldSkipRateLimit(request: any): boolean {
 		const url = request.url || ''
 
-		// Cheapest checks first (string startsWith)
-		if (url.startsWith('/health') || url.startsWith('/metrics')) {
+		// Cheapest checks first (string startsWith).
+		// /metrics and POST /health/circuit-breaker/reset are now auth-gated via
+		// InternalSecretGuard; they must NOT be rate-limit-exempt so that the
+		// guard acts as a defence-in-depth layer even with the secret present.
+		// K8s liveness/readiness probes (/health/live, /health/ready, /health)
+		// and the circuit-breaker status GET are exempt — they fire every few
+		// seconds and must never be throttled.
+		const method = request.method || 'GET'
+		if (url.startsWith('/health') && !(url === '/health/circuit-breaker/reset' && method === 'POST')) {
 			return true
 		}
 

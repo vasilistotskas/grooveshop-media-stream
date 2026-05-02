@@ -9,12 +9,13 @@ import * as process from 'node:process'
 import * as v8 from 'node:v8'
 import { CacheHealthIndicator } from '#microservice/Cache/indicators/cache-health.indicator'
 import { RedisHealthIndicator } from '#microservice/Cache/indicators/redis-health.indicator'
+import { InternalSecretGuard } from '#microservice/common/guards/internal-secret.guard'
 import { isShuttingDown } from '#microservice/common/utils/graceful-shutdown.util'
 import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 import { JobQueueHealthIndicator } from '#microservice/Queue/indicators/job-queue-health.indicator'
 import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
-import { Controller, Get, ServiceUnavailableException, UseGuards } from '@nestjs/common'
+import { Controller, Get, HttpCode, HttpStatus, Post, ServiceUnavailableException, UseGuards } from '@nestjs/common'
 import { HealthCheck, HealthCheckError, HealthCheckService } from '@nestjs/terminus'
 import { HealthDetailGuard } from '../guards/health-detail.guard.js'
 import { DiskSpaceHealthIndicator } from '../indicators/disk-space-health.indicator.js'
@@ -198,6 +199,22 @@ export class HealthController {
 			circuitBreaker: {
 				isOpen,
 			},
+		}
+	}
+
+	/**
+	 * Force-reset the HTTP circuit breaker to closed state.
+	 * Protected by InternalSecretGuard — requires x-internal-secret header.
+	 * Should only be called by ops/admin tooling after a confirmed upstream recovery.
+	 */
+	@Post('circuit-breaker/reset')
+	@UseGuards(InternalSecretGuard)
+	@HttpCode(HttpStatus.OK)
+	resetCircuitBreaker(): { timestamp: string, message: string } {
+		this.httpClientService.resetCircuitBreaker()
+		return {
+			timestamp: new Date().toISOString(),
+			message: 'Circuit breaker reset to closed state',
 		}
 	}
 }

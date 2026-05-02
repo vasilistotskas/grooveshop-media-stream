@@ -1,3 +1,4 @@
+import { InternalSecretGuard } from '#microservice/common/guards/internal-secret.guard'
 import { ConfigModule } from '#microservice/Config/config.module'
 import { Module } from '@nestjs/common'
 import { MetricsController } from './controllers/metrics.controller.js'
@@ -7,7 +8,7 @@ import { MetricsService } from './services/metrics.service.js'
 @Module({
 	imports: [ConfigModule],
 	controllers: [MetricsController],
-	providers: [MetricsService, MetricsMiddleware],
+	providers: [MetricsService, MetricsMiddleware, InternalSecretGuard],
 	exports: [MetricsService],
 })
 export class MetricsModule {}

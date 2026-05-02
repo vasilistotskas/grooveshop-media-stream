@@ -1,4 +1,5 @@
 import { CacheModule } from '#microservice/Cache/cache.module'
+import { InternalSecretGuard } from '#microservice/common/guards/internal-secret.guard'
 import { ConfigModule } from '#microservice/Config/config.module'
 import { HttpModule } from '#microservice/HTTP/http.module'
 import { QueueModule } from '#microservice/Queue/queue.module'
@@ -26,6 +27,7 @@ import { SharpHealthIndicator } from './indicators/sharp-health.indicator.js'
 		MemoryHealthIndicator,
 		SharpHealthIndicator,
 		HealthDetailGuard,
+		InternalSecretGuard,
 	],
 	exports: [
 		DiskSpaceHealthIndicator,

@@ -1,7 +1,7 @@
 import type { Job } from '../interfaces/job-queue.interface.js'
 import type { ImageProcessingJobData, JobResult } from '../types/job.types.js'
 import { Buffer } from 'node:buffer'
-import { writeFile } from 'node:fs/promises'
+import { rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { cwd, hrtime } from 'node:process'
 import { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
@@ -121,9 +121,19 @@ export class ImageProcessingProcessor {
 				const metadataPath = join(basePath, 'storage', `${cacheKey}.rsm`)
 
 				try {
+					// Write to temp files then rename() — POSIX rename is atomic within
+					// the same filesystem, so concurrent readers never see a partial write.
+					// Mirror the same pattern used by the synchronous pipeline in
+					// cache-image-resource.operation.ts.
+					const tmpResource = `${resourcePath}.tmp`
+					const tmpMetadata = `${metadataPath}.tmp`
 					await Promise.all([
-						writeFile(resourcePath, processedBuffer),
-						writeFile(metadataPath, JSON.stringify(metadata), 'utf8'),
+						writeFile(tmpResource, processedBuffer),
+						writeFile(tmpMetadata, JSON.stringify(metadata), 'utf8'),
+					])
+					await Promise.all([
+						rename(tmpResource, resourcePath),
+						rename(tmpMetadata, metadataPath),
 					])
 					this._logger.debug(`Saved processed image to filesystem: ${resourcePath}`)
 				}
