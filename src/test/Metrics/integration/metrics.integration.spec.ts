@@ -7,11 +7,20 @@ import request from 'supertest'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import 'reflect-metadata'
 
+// /metrics is now protected by InternalSecretGuard.  Tests load a known
+// secret via INTERNAL_ADMIN_SECRET env var and attach the matching
+// x-internal-secret header to every protected request.
+const TEST_INTERNAL_SECRET = 'test-internal-secret-for-metrics-spec'
+
 describe('metrics Integration', () => {
 	let app: INestApplication
 	let metricsService: MetricsService
 
 	beforeAll(async () => {
+		// Set the secret BEFORE creating the test module so the
+		// ConfigService picks it up at startup.
+		process.env.INTERNAL_ADMIN_SECRET = TEST_INTERNAL_SECRET
+
 		const moduleFixture: TestingModule = await Test.createTestingModule({
 			imports: [ConfigModule, MetricsModule],
 		}).compile()
@@ -36,11 +45,16 @@ describe('metrics Integration', () => {
 		}
 	})
 
+	// Helper: every /metrics{,/health} request must carry the internal
+	// secret header now that InternalSecretGuard protects the controller.
+	const metricsRequest = (path: string) =>
+		request(app.getHttpServer())
+			.get(path)
+			.set('x-internal-secret', TEST_INTERNAL_SECRET)
+
 	describe('metrics Endpoint', () => {
 		it('should expose metrics at /metrics endpoint', async () => {
-			const response = await request(app.getHttpServer())
-				.get('/metrics')
-				.expect(200)
+			const response = await metricsRequest('/metrics').expect(200)
 
 			expect(response.headers['content-type']).toContain('text/plain')
 			expect(response.text).toContain('# HELP')
@@ -49,9 +63,7 @@ describe('metrics Integration', () => {
 		})
 
 		it('should include default Node.js metrics', async () => {
-			const response = await request(app.getHttpServer())
-				.get('/metrics')
-				.expect(200)
+			const response = await metricsRequest('/metrics').expect(200)
 
 			expect(response.text).toContain('mediastream_nodejs_')
 			expect(response.text).toContain('process_')
@@ -62,9 +74,7 @@ describe('metrics Integration', () => {
 			metricsService.recordHttpRequest('GET', '/metrics/health', 200, 0.05)
 
 			// Check that the request was tracked
-			const response = await request(app.getHttpServer())
-				.get('/metrics')
-				.expect(200)
+			const response = await metricsRequest('/metrics').expect(200)
 
 			expect(response.text).toContain('mediastream_http_requests_total')
 			expect(response.text).toContain('method="GET"')
@@ -74,9 +84,7 @@ describe('metrics Integration', () => {
 
 	describe('metrics Health Endpoint', () => {
 		it('should provide health status at /metrics/health', async () => {
-			const response = await request(app.getHttpServer())
-				.get('/metrics/health')
-				.expect(200)
+			const response = await metricsRequest('/metrics/health').expect(200)
 
 			expect(response.body).toEqual({
 				status: 'healthy',
@@ -95,9 +103,7 @@ describe('metrics Integration', () => {
 			metricsService.recordHttpRequest('POST', '/api/test', 201, 0.5, 1024, 2048)
 			metricsService.recordHttpRequest('GET', '/api/test', 200, 0.2)
 
-			const response = await request(app.getHttpServer())
-				.get('/metrics')
-				.expect(200)
+			const response = await metricsRequest('/metrics').expect(200)
 
 			expect(response.text).toContain('mediastream_http_requests_total')
 			expect(response.text).toContain('mediastream_http_request_duration_seconds')
@@ -114,9 +120,7 @@ describe('metrics Integration', () => {
 			metricsService.updateCacheHitRatio('memory', 0.85)
 			metricsService.updateCacheSize('memory', 1024000)
 
-			const response = await request(app.getHttpServer())
-				.get('/metrics')
-				.expect(200)
+			const response = await metricsRequest('/metrics').expect(200)
 
 			expect(response.text).toContain('mediastream_cache_operations_total')
 			expect(response.text).toContain('mediastream_cache_operation_duration_seconds')
@@ -131,9 +135,7 @@ describe('metrics Integration', () => {
 			metricsService.recordImageProcessing('convert', 'jpg', 'error', 0.1)
 			metricsService.updateImageProcessingQueueSize(3)
 
-			const response = await request(app.getHttpServer())
-				.get('/metrics')
-				.expect(200)
+			const response = await metricsRequest('/metrics').expect(200)
 
 			expect(response.text).toContain('mediastream_image_processing_total')
 			expect(response.text).toContain('mediastream_image_processing_duration_seconds')
@@ -155,9 +157,7 @@ describe('metrics Integration', () => {
 			metricsService.updateCpuUsage(45.5, 12.3)
 			metricsService.updateLoadAverage(1.2, 1.5, 1.8)
 
-			const response = await request(app.getHttpServer())
-				.get('/metrics')
-				.expect(200)
+			const response = await metricsRequest('/metrics').expect(200)
 
 			expect(response.text).toContain('mediastream_memory_usage_bytes')
 			expect(response.text).toContain('mediastream_cpu_usage_percent')
@@ -171,9 +171,7 @@ describe('metrics Integration', () => {
 			metricsService.recordError('validation', 'image_processing')
 			metricsService.recordError('network', 'external_request')
 
-			const response = await request(app.getHttpServer())
-				.get('/metrics')
-				.expect(200)
+			const response = await metricsRequest('/metrics').expect(200)
 
 			expect(response.text).toContain('mediastream_errors_total')
 			expect(response.text).toContain('type="validation"')
@@ -191,8 +189,7 @@ describe('metrics Integration', () => {
 			try {
 				// Make sequential requests with small delays to avoid overwhelming the server
 				for (let i = 0; i < requestCount; i++) {
-					await request(app.getHttpServer())
-						.get('/metrics/health')
+					await metricsRequest('/metrics/health')
 						.timeout(5000)
 						.expect(200)
 
@@ -205,8 +202,7 @@ describe('metrics Integration', () => {
 				// Add delay before checking metrics
 				await new Promise(resolve => setTimeout(resolve, 100))
 
-				const response = await request(app.getHttpServer())
-					.get('/metrics')
+				const response = await metricsRequest('/metrics')
 					.timeout(5000)
 					.expect(200)
 
@@ -224,9 +220,7 @@ describe('metrics Integration', () => {
 			metricsService.recordGarbageCollection('major', 0.05)
 			metricsService.recordEventLoopLag(0.02)
 
-			const response = await request(app.getHttpServer())
-				.get('/metrics')
-				.expect(200)
+			const response = await metricsRequest('/metrics').expect(200)
 
 			expect(response.text).toContain('mediastream_gc_duration_seconds')
 			expect(response.text).toContain('mediastream_event_loop_lag_seconds')
@@ -239,9 +233,7 @@ describe('metrics Integration', () => {
 			metricsService.recordHttpRequest('GET', '/test', 200, 0.1)
 			metricsService.recordError('test', 'validation')
 
-			const response = await request(app.getHttpServer())
-				.get('/metrics')
-				.expect(200)
+			const response = await metricsRequest('/metrics').expect(200)
 
 			const lines = response.text.split('\n')
 

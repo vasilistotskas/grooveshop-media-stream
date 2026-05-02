@@ -173,4 +173,7 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	// Graceful shutdown configuration
 	'shutdown.timeout': { env: 'SHUTDOWN_TIMEOUT', default: 30000, type: 'number' },
 	'shutdown.forceTimeout': { env: 'SHUTDOWN_FORCE_TIMEOUT', default: 60000, type: 'number' },
+
+	// Internal admin secret for /metrics and /health/circuit-breaker/reset
+	'internal.adminSecret': { env: 'INTERNAL_ADMIN_SECRET', default: undefined, type: 'string' },
 }

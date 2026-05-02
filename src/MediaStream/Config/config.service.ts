@@ -380,6 +380,9 @@ export class ConfigService implements OnModuleInit {
 				timeout: config.shutdown?.timeout ?? 30000,
 				forceTimeout: config.shutdown?.forceTimeout ?? 60000,
 			},
+			internal: {
+				adminSecret: config.internal?.adminSecret,
+			},
 		}
 	}
 

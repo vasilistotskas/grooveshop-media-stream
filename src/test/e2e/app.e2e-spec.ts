@@ -7,6 +7,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 const TEXT_PLAIN_RE = /text\/plain/
 
+// /metrics{,/health} are protected by ``InternalSecretGuard`` since
+// the audit-hardening pass.  E2E tests load a known secret via
+// ``INTERNAL_ADMIN_SECRET`` env var and attach the matching header.
+const TEST_INTERNAL_SECRET = 'test-internal-secret-for-e2e-spec'
+
 describe('MediaStreamModule (e2e)', () => {
 	let app: INestApplication
 	let moduleFixture: TestingModule
@@ -14,6 +19,9 @@ describe('MediaStreamModule (e2e)', () => {
 	beforeAll(async () => {
 		// Disable scheduled tasks in e2e tests
 		process.env.DISABLE_CRON = 'true'
+		// Set the secret BEFORE module compilation so ConfigService
+		// picks it up at startup.
+		process.env.INTERNAL_ADMIN_SECRET = TEST_INTERNAL_SECRET
 
 		moduleFixture = await Test.createTestingModule({
 			imports: [MediaStreamModule],
@@ -61,6 +69,8 @@ describe('MediaStreamModule (e2e)', () => {
 
 			.get('/metrics')
 
+			.set('x-internal-secret', TEST_INTERNAL_SECRET)
+
 			.expect(200)
 
 			.expect('Content-Type', TEXT_PLAIN_RE)
@@ -70,6 +80,8 @@ describe('MediaStreamModule (e2e)', () => {
 		return request(app.getHttpServer())
 
 			.get('/metrics/health')
+
+			.set('x-internal-secret', TEST_INTERNAL_SECRET)
 
 			.expect(200)
 

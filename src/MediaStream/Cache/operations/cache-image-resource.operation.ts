@@ -235,7 +235,11 @@ export default class CacheImageResourceOperation {
 		try {
 			CorrelatedLogger.debug('Setting up cache image resource operation', CacheImageResourceOperation.name)
 
-			const sanitizedRequest = await this.inputSanitizationService.sanitize(cacheImageRequest) as CacheImageRequest
+			// sanitize() returns a plain object; reconstruct on the class prototype
+			// so that downstream code that checks instanceof CacheImageRequest works
+			// correctly and any class-level methods remain accessible.
+			const sanitizedPlain = await this.inputSanitizationService.sanitize(cacheImageRequest)
+			const sanitizedRequest = Object.assign(new CacheImageRequest(), sanitizedPlain)
 
 			if (sanitizedRequest.resourceTarget && !this.inputSanitizationService.validateUrl(sanitizedRequest.resourceTarget)) {
 				throw new Error(`Invalid or disallowed URL: ${sanitizedRequest.resourceTarget}`)
@@ -390,64 +394,70 @@ export default class CacheImageResourceOperation {
 			let processedData: Buffer
 			let metadata!: ResourceMetaData
 
-			let isSourceSvg = false
+			// Wrap the Sharp processing block so resourceTempPath (.rst) is always
+			// cleaned up — even on corrupt/unsupported image errors that Sharp throws
+			// mid-pipeline.  The finally guard is a no-op if the file was already
+			// removed on the success path.
 			try {
-				const fh = await fsOpen(resourceTempPath, 'r')
+				let isSourceSvg = false
 				try {
-					const headerBuf = Buffer.alloc(512)
-					const { bytesRead } = await fh.read(headerBuf, 0, 512, 0)
-					const header = headerBuf.toString('utf8', 0, bytesRead)
-					isSourceSvg = header.trim().startsWith('<svg') || header.includes('xmlns="http://www.w3.org/2000/svg"')
+					const fh = await fsOpen(resourceTempPath, 'r')
+					try {
+						const headerBuf = Buffer.alloc(512)
+						const { bytesRead } = await fh.read(headerBuf, 0, 512, 0)
+						const header = headerBuf.toString('utf8', 0, bytesRead)
+						isSourceSvg = header.trim().startsWith('<svg') || header.includes('xmlns="http://www.w3.org/2000/svg"')
+					}
+					finally {
+						await fh.close()
+					}
+					CorrelatedLogger.debug(`Source file SVG detection: ${isSourceSvg}`, CacheImageResourceOperation.name)
 				}
-				finally {
-					await fh.close()
+				catch {
+					isSourceSvg = false
+					CorrelatedLogger.debug('Could not read file header, assuming not SVG', CacheImageResourceOperation.name)
 				}
-				CorrelatedLogger.debug(`Source file SVG detection: ${isSourceSvg}`, CacheImageResourceOperation.name)
-			}
-			catch {
-				isSourceSvg = false
-				CorrelatedLogger.debug('Could not read file header, assuming not SVG', CacheImageResourceOperation.name)
-			}
 
-			if (isSourceSvg) {
-				const result = await this.processSvgImage(ctx)
-				processedData = result.data
-				metadata = result.metadata
-			}
-			else {
-				const result = await this.processRasterImage(ctx)
-				processedData = result.data
-				metadata = result.metadata
-			}
+				if (isSourceSvg) {
+					const result = await this.processSvgImage(ctx)
+					processedData = result.data
+					metadata = result.metadata
+				}
+				else {
+					const result = await this.processRasterImage(ctx)
+					processedData = result.data
+					metadata = result.metadata
+				}
 
-			const resourcePath = this.getResourcePath(ctx)
-			const resourceMetaPath = this.getResourceMetaPath(ctx)
-			// Write to sibling .tmp paths first, then rename() — rename is
-			// atomic on POSIX within the same filesystem, so concurrent
-			// readers either see the old file or the complete new file.
-			// Direct writeFile() was visible while still being written,
-			// returning partial buffers to concurrent requests.
-			const resourceTmpPath = `${resourcePath}.tmp`
-			const resourceMetaTmpPath = `${resourceMetaPath}.tmp`
+				const resourcePath = this.getResourcePath(ctx)
+				const resourceMetaPath = this.getResourceMetaPath(ctx)
+				// Write to sibling .tmp paths first, then rename() — rename is
+				// atomic on POSIX within the same filesystem, so concurrent
+				// readers either see the old file or the complete new file.
+				// Direct writeFile() was visible while still being written,
+				// returning partial buffers to concurrent requests.
+				const resourceTmpPath = `${resourcePath}.tmp`
+				const resourceMetaTmpPath = `${resourceMetaPath}.tmp`
 
-			await Promise.all([
-				this.cacheManager.set('image', ctx.id, {
-					data: processedData,
-					metadata,
-				}, this.privateTtl),
-				writeFile(resourceTmpPath, processedData),
-				writeFile(resourceMetaTmpPath, JSON.stringify(metadata), 'utf8'),
-			])
-			await Promise.all([
-				rename(resourceTmpPath, resourcePath),
-				rename(resourceMetaTmpPath, resourceMetaPath),
-			])
-
-			try {
-				await unlink(resourceTempPath)
+				await Promise.all([
+					this.cacheManager.set('image', ctx.id, {
+						data: processedData,
+						metadata,
+					}, this.privateTtl),
+					writeFile(resourceTmpPath, processedData),
+					writeFile(resourceMetaTmpPath, JSON.stringify(metadata), 'utf8'),
+				])
+				await Promise.all([
+					rename(resourceTmpPath, resourcePath),
+					rename(resourceMetaTmpPath, resourceMetaPath),
+				])
 			}
-			catch (error: unknown) {
-				CorrelatedLogger.warn(`Failed to delete temporary file: ${(error as Error).message}`, CacheImageResourceOperation.name)
+			finally {
+				// Always remove the .rst temp file: success path removes it here,
+				// error path also lands here so no orphan is left on disk.
+				await unlink(resourceTempPath).catch((error: unknown) => {
+					CorrelatedLogger.warn(`Failed to delete temporary file: ${(error as Error).message}`, CacheImageResourceOperation.name)
+				})
 			}
 
 			const processedFormat = metadata.format || 'unknown'

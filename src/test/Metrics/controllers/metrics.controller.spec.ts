@@ -1,4 +1,5 @@
 import type { MockedObject } from 'vitest'
+import { InternalSecretGuard } from '#microservice/common/guards/internal-secret.guard'
 import { MetricsController } from '#microservice/Metrics/controllers/metrics.controller'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Test, TestingModule } from '@nestjs/testing'
@@ -23,7 +24,15 @@ describe('metricsController', () => {
 					useValue: mockMetricsService,
 				},
 			],
-		}).compile()
+		})
+			// The controller is class-decorated with ``@UseGuards(InternalSecretGuard)``
+			// since the audit-hardening pass.  The guard depends on
+			// ``ConfigService`` which is NOT registered in this isolated unit
+			// module — overriding it avoids importing ConfigModule purely for
+			// the guard, while still exercising the controller's own logic.
+			.overrideGuard(InternalSecretGuard)
+			.useValue({ canActivate: () => true })
+			.compile()
 
 		controller = module.get<MetricsController>(MetricsController)
 		metricsService = module.get(MetricsService)
