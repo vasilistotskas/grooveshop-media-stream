@@ -1,3 +1,10 @@
+## [2.50.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.50.0...v2.50.1) (2026-05-02)
+
+
+### Bug Fixes
+
+* hardening pass — security, atomicity, resource cleanup ([#3](https://github.com/vasilistotskas/grooveshop-media-stream/issues/3)) ([e945b62](https://github.com/vasilistotskas/grooveshop-media-stream/commit/e945b6287cc78a4e427d2211ff2d9ad1365194e2))
+
 # [2.50.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.49.0...v2.50.0) (2026-05-01)
 
 
