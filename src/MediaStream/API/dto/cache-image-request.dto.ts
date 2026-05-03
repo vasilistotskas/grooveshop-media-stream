@@ -50,6 +50,15 @@ export enum FitOptions {
 	outside = 'outside',
 }
 
+// Accepted background formats (C18 fix — reject arbitrary CSS values like url(...)):
+//   transparent
+//   #RGB   (3 hex digits)
+//   #RRGGBB  (6 hex digits)
+//   #RRGGBBAA  (8 hex digits, with alpha)
+// Anything else silently falls back to white (opaque), matching the existing
+// default-to-white behaviour in the ResizeOptions constructor.
+const HEX_COLOR_RE = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i
+
 function parseColor(color: string): RGBA {
 	if (typeof color === 'string') {
 		if (color === 'transparent') {
@@ -60,21 +69,24 @@ function parseColor(color: string): RGBA {
 				alpha: 0,
 			}
 		}
-		if (color[0] === '#') {
-			color = color.slice(1)
+		if (!HEX_COLOR_RE.test(color)) {
+			// Reject non-hex values (e.g. url(...), red, inherit) — fall back to white
+			return { r: 255, g: 255, b: 255, alpha: 1 }
 		}
-		if (color.length === 3) {
-			color = color
+		let hex = color.slice(1) // strip '#'
+		if (hex.length === 3) {
+			hex = hex
 				.split('')
 				.map(char => char + char)
 				.join('')
 		}
-		const num = Number.parseInt(color, 16)
+		const num = Number.parseInt(hex.slice(0, 6), 16)
+		const alpha = hex.length === 8 ? Number.parseInt(hex.slice(6, 8), 16) / 255 : 1
 		return {
 			r: num >> 16,
 			g: (num >> 8) & 255,
 			b: num & 255,
-			alpha: 1,
+			alpha,
 		}
 	}
 	return color as RGBA

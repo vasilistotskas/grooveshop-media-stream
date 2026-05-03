@@ -67,8 +67,8 @@ Cache layers checked in parallel: Memory (node-cache, priority 1) → Redis (ior
 
 ### Processing Pipeline
 
-- **Two Bull queues**: `image-processing` (download → validate → Sharp → cache → filesystem) and `cache-operations` (warming, cleanup). Default: 3 attempts with exponential backoff.
-- **Sync vs background**: Images >1MP (1,000,000 pixels) are processed in background queue; quality >=90 with >500K pixels also goes to background. Smaller images are processed synchronously.
+- **One Bull queue**: `cache-operations` (warming, cleanup). Default: 3 attempts with exponential backoff.
+- **All images processed synchronously**: `ImageStreamService` calls `CacheImageResourceOperation.execute()` directly for every request. The old `image-processing` Bull queue, `ImageProcessingProcessor`, and `addImageProcessingJob` were removed because the async back-channel (polling / websocket) needed for HTTP responses was never implemented (C13 fix).
 - **Content negotiation**: Format priority from Accept header: AVIF > WebP > JPEG > PNG. Explicit URL format param overrides.
 - **Sharp config**: Concurrency based on CPU cores, 100MB memory cache, SIMD enabled. AVIF falls back to WebP for images >1920x1080.
 - **Image limits**: Max 8192x8192, max 7680×4320 total pixels. File sizes: JPEG 5MB, PNG 8MB, WebP 3MB, GIF 2MB, SVG 1MB, default 10MB. `limitInputPixels: 268402689` is applied to ALL Sharp pipeline inputs (both Buffer and file path inputs) to prevent oversized-image DoS.

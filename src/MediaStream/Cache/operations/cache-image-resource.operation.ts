@@ -74,7 +74,8 @@ export default class CacheImageResourceOperation {
 		// Load TTL values from configuration (in seconds — Redis/cache layers expect seconds)
 		this.publicTtl = this.configService.getOptional('cache.image.publicTtl', 12 * 30 * 24 * 3600)
 		this.privateTtl = this.configService.getOptional('cache.image.privateTtl', 6 * 30 * 24 * 3600)
-		// Negative cache TTL for failed fetches (default: 5 minutes in seconds)
+		// Negative-cache TTL in seconds. Stored timestamp is Date.now() (ms);
+		// comparison uses negativeCacheTtl * 1000 to convert to ms — do NOT pre-multiply here.
 		this.negativeCacheTtl = this.configService.getOptional('cache.image.negativeCacheTtl', 300)
 	}
 
@@ -403,10 +404,17 @@ export default class CacheImageResourceOperation {
 				try {
 					const fh = await fsOpen(resourceTempPath, 'r')
 					try {
-						const headerBuf = Buffer.alloc(512)
-						const { bytesRead } = await fh.read(headerBuf, 0, 512, 0)
+						// Read first 1024 bytes — enough to cover XML/DOCTYPE preamble (C14 fix)
+						const headerBuf = Buffer.alloc(1024)
+						const { bytesRead } = await fh.read(headerBuf, 0, 1024, 0)
 						const header = headerBuf.toString('utf8', 0, bytesRead)
-						isSourceSvg = header.trim().startsWith('<svg') || header.includes('xmlns="http://www.w3.org/2000/svg"')
+						// Strip leading whitespace, XML declaration, and DOCTYPE before checking for <svg
+						// so SVG files starting with <?xml ...?> are not misclassified as non-SVG.
+						const stripped = header
+							.trimStart()
+							.replace(/^<\?xml[^?]*\?>\s*/i, '')
+							.replace(/^<!DOCTYPE[^>]*>\s*/i, '')
+						isSourceSvg = stripped.trimStart().startsWith('<svg') || header.includes('xmlns="http://www.w3.org/2000/svg"')
 					}
 					finally {
 						await fh.close()

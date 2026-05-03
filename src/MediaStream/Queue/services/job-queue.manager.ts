@@ -3,13 +3,11 @@ import type { Job, JobOptions } from '../interfaces/job-queue.interface.js'
 import type {
 	CacheCleanupJobData,
 	CacheWarmingJobData,
-	ImageProcessingJobData,
 	JobMetrics,
 } from '../types/job.types.js'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { Injectable, Logger } from '@nestjs/common'
 import { CacheOperationsProcessor } from '../processors/cache-operations.processor.js'
-import { ImageProcessingProcessor } from '../processors/image-processing.processor.js'
 import { JobPriority, JobType } from '../types/job.types.js'
 import { BullQueueService } from './bull-queue.service.js'
 
@@ -27,7 +25,6 @@ export class JobQueueManager implements OnModuleInit {
 
 	constructor(
 		private readonly queueService: BullQueueService,
-		private readonly imageProcessor: ImageProcessingProcessor,
 		private readonly cacheProcessor: CacheOperationsProcessor,
 		private readonly _correlationService: CorrelationService,
 	) {}
@@ -35,33 +32,6 @@ export class JobQueueManager implements OnModuleInit {
 	async onModuleInit(): Promise<void> {
 		this.setupJobProcessors()
 		this._logger.log('Job queue manager initialized')
-	}
-
-	async addImageProcessingJob(
-		data: Omit<ImageProcessingJobData, 'correlationId'>,
-		options: Partial<JobOptions> = {},
-	): Promise<Job<ImageProcessingJobData>> {
-		const correlationId = this._correlationService.getCorrelationId() || this._correlationService.generateCorrelationId()
-
-		const jobData: ImageProcessingJobData = {
-			...data,
-			correlationId,
-		}
-
-		const jobOptions: JobOptions = {
-			priority: data.priority || JobPriority.NORMAL,
-			attempts: 3,
-			backoff: { type: 'exponential', delay: 2000 },
-			removeOnComplete: 10,
-			removeOnFail: 5,
-			...options,
-		}
-
-		this.metrics.totalJobs++
-
-		this._logger.debug(`Adding image processing job for URL: ${data.imageUrl}`)
-
-		return await this.queueService.add(JobType.IMAGE_PROCESSING, jobData, jobOptions)
 	}
 
 	async addCacheWarmingJob(
@@ -163,25 +133,6 @@ export class JobQueueManager implements OnModuleInit {
 	}
 
 	private setupJobProcessors(): void {
-		this.queueService.process(JobType.IMAGE_PROCESSING, async (job) => {
-			const startTime = Date.now()
-
-			try {
-				const result = await this.imageProcessor.process(job)
-
-				const processingTime = Date.now() - startTime
-				this.updateMetrics(true, processingTime)
-
-				return result
-			}
-			catch (error: unknown) {
-				const processingTime = Date.now() - startTime
-				this.updateMetrics(false, processingTime)
-
-				throw error
-			}
-		})
-
 		this.queueService.process(JobType.CACHE_WARMING, async (job) => {
 			const startTime = Date.now()
 

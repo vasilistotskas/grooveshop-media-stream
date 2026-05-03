@@ -4,7 +4,6 @@ import type { Job as BullJob, JobOptions as BullJobOptions, Queue } from 'bull'
 import type { IJobQueue, Job, JobOptions, JobProcessor, JobStatus, QueueStats } from '../interfaces/job-queue.interface.js'
 import { InjectQueue } from '@nestjs/bull'
 import { Injectable, Logger } from '@nestjs/common'
-import { JobType } from '../types/job.types.js'
 import { SharpConfigService } from './sharp-config.service.js'
 
 @Injectable()
@@ -13,17 +12,15 @@ export class BullQueueService implements IJobQueue, OnModuleDestroy {
 	private readonly processors = new Map<string, JobProcessor>()
 
 	constructor(
-		@InjectQueue('image-processing') private readonly imageQueue: Queue,
 		@InjectQueue('cache-operations') private readonly cacheQueue: Queue,
 		private readonly sharpConfigService: SharpConfigService,
 	) {}
 
 	async add<T = any>(name: string, data: T, options: JobOptions = {}): Promise<Job<T>> {
 		try {
-			const queue = this.getQueueForJobType(name)
 			const bullOptions: BullJobOptions = this.convertToBullOptions(options)
 
-			const bullJob = await queue.add(name, data, bullOptions)
+			const bullJob = await this.cacheQueue.add(name, data, bullOptions)
 
 			this._logger.debug(`Job ${name} added to queue with ID: ${bullJob.id}`)
 
@@ -38,15 +35,13 @@ export class BullQueueService implements IJobQueue, OnModuleDestroy {
 	process<T = any>(name: string, processor: JobProcessor<T>): void {
 		this.processors.set(name, processor)
 
-		const queue = this.getQueueForJobType(name)
-
 		// Match Bull worker concurrency to Sharp's own concurrency so the number
 		// of in-flight jobs never exceeds what Sharp can handle in parallel without
 		// CPU contention. SharpConfigService.getConfiguration() reads the value
 		// that was already applied to Sharp during onModuleInit.
 		const sharpConcurrency = this.sharpConfigService.getConfiguration().concurrency
 
-		queue.process(name, sharpConcurrency, async (bullJob: BullJob<T>) => {
+		this.cacheQueue.process(name, sharpConcurrency, async (bullJob: BullJob<T>) => {
 			const job = this.convertFromBullJob(bullJob)
 
 			try {
@@ -64,19 +59,7 @@ export class BullQueueService implements IJobQueue, OnModuleDestroy {
 
 	async getStats(): Promise<QueueStats> {
 		try {
-			const [imageStats, cacheStats] = await Promise.all([
-				this.getQueueStats(this.imageQueue),
-				this.getQueueStats(this.cacheQueue),
-			])
-
-			return {
-				waiting: imageStats.waiting + cacheStats.waiting,
-				active: imageStats.active + cacheStats.active,
-				completed: imageStats.completed + cacheStats.completed,
-				failed: imageStats.failed + cacheStats.failed,
-				delayed: imageStats.delayed + cacheStats.delayed,
-				paused: imageStats.paused && cacheStats.paused,
-			}
+			return await this.getQueueStats(this.cacheQueue)
 		}
 		catch (error: unknown) {
 			this._logger.error('Failed to get queue stats:', error)
@@ -86,12 +69,7 @@ export class BullQueueService implements IJobQueue, OnModuleDestroy {
 
 	async getJob(jobId: string): Promise<Job | null> {
 		try {
-			const [imageJob, cacheJob] = await Promise.all([
-				this.imageQueue.getJob(jobId),
-				this.cacheQueue.getJob(jobId),
-			])
-
-			const bullJob = imageJob || cacheJob
+			const bullJob = await this.cacheQueue.getJob(jobId)
 			return bullJob ? this.convertFromBullJob(bullJob) : null
 		}
 		catch (error: unknown) {
@@ -102,18 +80,14 @@ export class BullQueueService implements IJobQueue, OnModuleDestroy {
 
 	async removeJob(jobId: string): Promise<void> {
 		try {
-			const job = await this.getJob(jobId)
-			if (!job) {
+			const bullJob = await this.cacheQueue.getJob(jobId)
+
+			if (!bullJob) {
 				throw new Error(`Job ${jobId} not found`)
 			}
 
-			const queue = this.getQueueForJobType(job.name)
-			const bullJob = await queue.getJob(jobId)
-
-			if (bullJob) {
-				await bullJob.remove()
-				this._logger.debug(`Job ${jobId} removed from queue`)
-			}
+			await bullJob.remove()
+			this._logger.debug(`Job ${jobId} removed from queue`)
 		}
 		catch (error: unknown) {
 			this._logger.error(`Failed to remove job ${jobId}:`, error)
@@ -123,10 +97,7 @@ export class BullQueueService implements IJobQueue, OnModuleDestroy {
 
 	async pause(): Promise<void> {
 		try {
-			await Promise.all([
-				this.imageQueue.pause(),
-				this.cacheQueue.pause(),
-			])
+			await this.cacheQueue.pause()
 			this._logger.log('All queues paused')
 		}
 		catch (error: unknown) {
@@ -137,10 +108,7 @@ export class BullQueueService implements IJobQueue, OnModuleDestroy {
 
 	async resume(): Promise<void> {
 		try {
-			await Promise.all([
-				this.imageQueue.resume(),
-				this.cacheQueue.resume(),
-			])
+			await this.cacheQueue.resume()
 			this._logger.log('All queues resumed')
 		}
 		catch (error: unknown) {
@@ -151,11 +119,7 @@ export class BullQueueService implements IJobQueue, OnModuleDestroy {
 
 	async clean(grace: number, status: JobStatus): Promise<void> {
 		try {
-			const bullStatus = status as any
-			await Promise.all([
-				this.imageQueue.clean(grace, bullStatus),
-				this.cacheQueue.clean(grace, bullStatus),
-			])
+			await this.cacheQueue.clean(grace, status as any)
 			this._logger.debug(`Cleaned ${status} jobs older than ${grace}ms`)
 		}
 		catch (error: unknown) {
@@ -166,22 +130,12 @@ export class BullQueueService implements IJobQueue, OnModuleDestroy {
 
 	async onModuleDestroy(): Promise<void> {
 		try {
-			await Promise.all([
-				this.imageQueue.close(),
-				this.cacheQueue.close(),
-			])
+			await this.cacheQueue.close()
 			this._logger.log('Queue connections closed')
 		}
 		catch (error: unknown) {
 			this._logger.error('Failed to close queue connections:', error)
 		}
-	}
-
-	private getQueueForJobType(jobType: string): Queue {
-		if (jobType === JobType.IMAGE_PROCESSING) {
-			return this.imageQueue
-		}
-		return this.cacheQueue
 	}
 
 	private async getQueueStats(queue: Queue): Promise<QueueStats> {

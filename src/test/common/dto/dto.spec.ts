@@ -103,6 +103,53 @@ describe('cacheImageRequest', () => {
 	})
 })
 
+// C18 — Background-color injection: only transparent/#RGB/#RRGGBB/#RRGGBBAA accepted
+describe('parseColor security (C18)', () => {
+	it('should reject url() values and fall back to white', () => {
+		const opt = new ResizeOptions({ background: 'url(http://evil.com)' })
+		expect(opt.background).toEqual({ r: 255, g: 255, b: 255, alpha: 1 })
+	})
+
+	it('should reject CSS named color "red" and fall back to white', () => {
+		const opt = new ResizeOptions({ background: 'red' })
+		expect(opt.background).toEqual({ r: 255, g: 255, b: 255, alpha: 1 })
+	})
+
+	it('should reject "inherit" and fall back to white', () => {
+		const opt = new ResizeOptions({ background: 'inherit' })
+		expect(opt.background).toEqual({ r: 255, g: 255, b: 255, alpha: 1 })
+	})
+
+	it('should reject bare hex without # and fall back to white', () => {
+		const opt = new ResizeOptions({ background: 'FF0000' })
+		expect(opt.background).toEqual({ r: 255, g: 255, b: 255, alpha: 1 })
+	})
+
+	it('should accept #RGB shorthand', () => {
+		const opt = new ResizeOptions({ background: '#F00' })
+		expect(opt.background).toEqual({ r: 255, g: 0, b: 0, alpha: 1 })
+	})
+
+	it('should accept #RRGGBB', () => {
+		const opt = new ResizeOptions({ background: '#FF0000' })
+		expect(opt.background).toEqual({ r: 255, g: 0, b: 0, alpha: 1 })
+	})
+
+	it('should accept #RRGGBBAA (with alpha)', () => {
+		const opt = new ResizeOptions({ background: '#FF000080' })
+		// alpha = 0x80 / 255 ≈ 0.502
+		expect((opt.background as any).r).toBe(255)
+		expect((opt.background as any).g).toBe(0)
+		expect((opt.background as any).b).toBe(0)
+		expect((opt.background as any).alpha).toBeCloseTo(0x80 / 255, 5)
+	})
+
+	it('should accept transparent', () => {
+		const opt = new ResizeOptions({ background: 'transparent' })
+		expect(opt.background).toEqual({ r: 0, g: 0, b: 0, alpha: 0 })
+	})
+})
+
 describe('manipulationJobResult', () => {
 	it('should create an instance with default values', () => {
 		const result = new ManipulationJobResult()

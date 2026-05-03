@@ -73,26 +73,27 @@ export default class MediaStreamImageController {
 			? req.path.substring(basePath.length)
 			: req.path
 
-		// Some upstream content (notably TinyMCE-edited blog HTML) ends up
-		// with mixed or double-encoded image URLs — e.g. a slash stored as
-		// `%2F` and Greek bytes stored as `%25CF%2584`. A single decode
-		// pass leaves the inner layer intact, the URL builder re-encodes
-		// it again, and the upstream `static-svc` returns 404.
-		// Loop-decode until the result is stable, but cap iterations to
-		// prevent a pathological input from looping forever. Two passes
-		// covers every real case observed in production.
+		// Decode percent-encoding exactly once (C19 fix — multi-decode evasion).
+		// A single pass is sufficient: legitimate single-encoded paths become
+		// plain text; invalid encodings throw immediately.
+		// Double-encoded input (e.g. %252F → %2F after one pass) is detected
+		// by the presence of a literal '%' in the decoded string that was not
+		// there before decoding — this indicates an extra encoding layer that
+		// could be used to bypass path-traversal and security checks.
 		if (fullPath && fullPath.includes('%')) {
-			for (let i = 0; i < 3; i++) {
-				try {
-					const decoded = decodeURIComponent(fullPath)
-					if (decoded === fullPath)
-						break
-					fullPath = decoded
-				}
-				catch {
-					throw new BadRequestException('Invalid URL encoding in image path')
-				}
+			let decoded: string
+			try {
+				decoded = decodeURIComponent(fullPath)
 			}
+			catch {
+				throw new BadRequestException('Invalid URL encoding in image path')
+			}
+			// Reject double-encoded paths: decoded differs from input AND still
+			// contains a '%' — the inner layer was intentionally percent-encoded.
+			if (decoded !== fullPath && decoded.includes('%')) {
+				throw new BadRequestException('Double-encoded URL detected in image path')
+			}
+			fullPath = decoded
 		}
 
 		this._logger.debug('Processing image request', { fullPath, originalPath: req.path, correlationId })
