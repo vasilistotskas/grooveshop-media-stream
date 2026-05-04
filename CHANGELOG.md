@@ -1,3 +1,10 @@
+## [2.50.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.50.2...v2.50.3) (2026-05-04)
+
+
+### Bug Fixes
+
+* **ci:** ignore-unfixed on docker image trivy scan ([05331de](https://github.com/vasilistotskas/grooveshop-media-stream/commit/05331ded6199ae81570a1e21a911c2d5eb5bdba4))
+
 ## [2.50.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.50.1...v2.50.2) (2026-05-04)
 
 
