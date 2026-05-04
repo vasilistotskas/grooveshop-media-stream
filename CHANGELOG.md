@@ -1,3 +1,11 @@
+## [2.50.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.50.1...v2.50.2) (2026-05-04)
+
+
+### Bug Fixes
+
+* **deps:** override CVE-fixed lodash transitive ([b19cf0c](https://github.com/vasilistotskas/grooveshop-media-stream/commit/b19cf0cfbc31882b657f6960eaaa9641427dce88))
+* security and perf hardening, drop dead Bull image-processing queue ([fdf294d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/fdf294d9a65c508577610691b21163258983a401))
+
 ## [2.50.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.50.0...v2.50.1) (2026-05-02)
 
 
