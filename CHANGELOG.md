@@ -1,3 +1,10 @@
+## [2.50.4](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.50.3...v2.50.4) (2026-05-04)
+
+
+### Bug Fixes
+
+* **ci:** docker trivy scan reports without gating push ([5031b7d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/5031b7dbf455e941d2f6bd2da0b740349cab1fe5))
+
 ## [2.50.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.50.2...v2.50.3) (2026-05-04)
 
 
