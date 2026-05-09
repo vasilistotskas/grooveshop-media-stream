@@ -57,6 +57,37 @@ All source code lives under `src/MediaStream/`. Each domain is a NestJS module:
 - `#microservice/*` → `./src/MediaStream/*` (used throughout the codebase)
 - `#storage/*` → `./var/*`
 
+### Multi-Tenant Routing
+
+The service supports two image route types that map to different cache namespaces:
+
+| Route type | URL pattern | Source key | tenantSchema |
+|---|---|---|---|
+| Tenant-scoped | `media/:tenantSchema/uploads/:imagePath+/…` | `UPLOADED_MEDIA` | extracted from URL |
+| Legacy (pre-MT) | `media/uploads/:imagePath+/…` | `UPLOADED_MEDIA_LEGACY` | always `"public"` |
+| Static images | `static/images/:image/…` | `STATIC_IMAGES` | always `"public"` |
+
+The tenant-scoped route must appear first in `IMAGE_SOURCES` (V8 insertion order) so that `media/acme/uploads/…` is matched by `UPLOADED_MEDIA` before `UPLOADED_MEDIA_LEGACY` can swallow `acme` as part of `imagePath`. A regression test in `src/test/API/controllers/media-stream-image.controller.spec.ts` guards this ordering.
+
+**Cache namespace**: keys are stored as `image:{tenantSchema}:{uuid}` in memory and Redis. This allows targeted SCAN-based per-tenant invalidation via `MultiLayerCacheManager.invalidateNamespace('image:acme')`.
+
+**`VALIDATION_ALLOWED_DOMAINS`**: the built-in default includes all four `webside.gr` family hostnames so the service works without this env var set. Set it to override for new tenants or to restrict the whitelist. A startup `WARN` log is emitted when the fallback is in use.
+
+### Per-Tenant Cache Flush
+
+```
+POST /admin/cache/flush-tenant
+x-internal-secret: <INTERNAL_ADMIN_SECRET>
+Content-Type: application/json
+
+{ "tenantSchema": "acme" }
+```
+
+Invalidates all `image:acme:*` cache entries across memory and Redis layers. Keys from other tenants are not touched. Returns `{ flushed: true, tenantSchema, namespace, timestamp }`.
+
+- `tenantSchema` must match `/^[a-z_][a-z0-9_]{0,62}$/`
+- Requires `INTERNAL_ADMIN_SECRET` env var to be set (endpoint is fail-closed without it)
+
 ### Image Sources
 
 Defined in `src/MediaStream/API/config/image-sources.config.ts`. Each source maps a route pattern to an upstream URL pattern. Route params include: imagePath, width, height, fit, position, background, trimThreshold, quality, format.
