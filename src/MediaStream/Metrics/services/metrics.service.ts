@@ -72,14 +72,14 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		this.httpRequestsTotal = new promClient.Counter({
 			name: 'mediastream_http_requests_total',
 			help: 'Total number of HTTP requests',
-			labelNames: ['method', 'route', 'status_code'],
+			labelNames: ['method', 'route', 'status_code', 'tenant_schema'],
 			registers: [this.register],
 		})
 
 		this.httpRequestDuration = new promClient.Histogram({
 			name: 'mediastream_http_request_duration_seconds',
 			help: 'Duration of HTTP requests in seconds',
-			labelNames: ['method', 'route', 'status_code'],
+			labelNames: ['method', 'route', 'status_code', 'tenant_schema'],
 			buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10],
 			registers: [this.register],
 		})
@@ -87,7 +87,7 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		this.httpRequestSize = new promClient.Histogram({
 			name: 'mediastream_http_request_size_bytes',
 			help: 'Size of HTTP requests in bytes',
-			labelNames: ['method', 'route'],
+			labelNames: ['method', 'route', 'tenant_schema'],
 			buckets: [100, 1000, 10000, 100000, 1000000, 10000000],
 			registers: [this.register],
 		})
@@ -95,7 +95,7 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		this.httpResponseSize = new promClient.Histogram({
 			name: 'mediastream_http_response_size_bytes',
 			help: 'Size of HTTP responses in bytes',
-			labelNames: ['method', 'route', 'status_code'],
+			labelNames: ['method', 'route', 'status_code', 'tenant_schema'],
 			buckets: [100, 1000, 10000, 100000, 1000000, 10000000],
 			registers: [this.register],
 		})
@@ -213,7 +213,7 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		this.cacheOperationDuration = new promClient.Histogram({
 			name: 'mediastream_cache_operation_duration_seconds',
 			help: 'Duration of cache operations in seconds',
-			labelNames: ['operation', 'cache_type', 'status'],
+			labelNames: ['operation', 'cache_type', 'status', 'tenant_schema'],
 			buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1],
 			registers: [this.register],
 		})
@@ -221,7 +221,7 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		this.imageProcessingDuration = new promClient.Histogram({
 			name: 'mediastream_image_processing_duration_seconds',
 			help: 'Duration of image processing operations in seconds',
-			labelNames: ['operation', 'format', 'status'],
+			labelNames: ['operation', 'format', 'status', 'tenant_schema'],
 			buckets: [0.1, 0.5, 1, 2, 5, 10, 30],
 			registers: [this.register],
 		})
@@ -229,14 +229,14 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		this.imageProcessingTotal = new promClient.Counter({
 			name: 'mediastream_image_processing_total',
 			help: 'Total number of image processing operations',
-			labelNames: ['operation', 'format', 'status'],
+			labelNames: ['operation', 'format', 'status', 'tenant_schema'],
 			registers: [this.register],
 		})
 
 		this.cacheOperationsTotal = new promClient.Counter({
 			name: 'mediastream_cache_operations_total',
 			help: 'Total number of cache operations',
-			labelNames: ['operation', 'cache_type', 'status'],
+			labelNames: ['operation', 'cache_type', 'status', 'tenant_schema'],
 			registers: [this.register],
 		})
 
@@ -295,19 +295,23 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	/**
-	 * Record HTTP request metrics
+	 * Record HTTP request metrics.
+	 *
+	 * @param tenantSchema - Optional tenant schema label for per-tenant observability.
+	 *   Pass the schema extracted from the request URL (e.g. 'acme', 'public').
+	 *   Defaults to 'public' for legacy/shared routes that carry no tenant context.
 	 */
-	recordHttpRequest(method: string, route: string, statusCode: number, duration: number, requestSize?: number, responseSize?: number): void {
+	recordHttpRequest(method: string, route: string, statusCode: number, duration: number, requestSize?: number, responseSize?: number, tenantSchema: string = 'public'): void {
 		const statusCodeStr = statusCode.toString()
-		this.httpRequestsTotal.inc({ method, route, status_code: statusCodeStr })
-		this.httpRequestDuration.observe({ method, route, status_code: statusCodeStr }, duration)
+		this.httpRequestsTotal.inc({ method, route, status_code: statusCodeStr, tenant_schema: tenantSchema })
+		this.httpRequestDuration.observe({ method, route, status_code: statusCodeStr, tenant_schema: tenantSchema }, duration)
 
 		if (requestSize !== undefined) {
-			this.httpRequestSize.observe({ method, route }, requestSize)
+			this.httpRequestSize.observe({ method, route, tenant_schema: tenantSchema }, requestSize)
 		}
 
 		if (responseSize !== undefined) {
-			this.httpResponseSize.observe({ method, route, status_code: statusCodeStr }, responseSize)
+			this.httpResponseSize.observe({ method, route, status_code: statusCodeStr, tenant_schema: tenantSchema }, responseSize)
 		}
 	}
 
@@ -328,11 +332,14 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	/**
-	 * Record image processing metrics
+	 * Record image processing metrics.
+	 *
+	 * @param tenantSchema - Optional tenant schema label for per-tenant observability.
+	 *   Defaults to 'public' for requests that carry no tenant context.
 	 */
-	recordImageProcessing(operation: string, format: string, status: 'success' | 'error', duration: number): void {
-		this.imageProcessingTotal.inc({ operation, format, status })
-		this.imageProcessingDuration.observe({ operation, format, status }, duration)
+	recordImageProcessing(operation: string, format: string, status: 'success' | 'error', duration: number, tenantSchema: string = 'public'): void {
+		this.imageProcessingTotal.inc({ operation, format, status, tenant_schema: tenantSchema })
+		this.imageProcessingDuration.observe({ operation, format, status, tenant_schema: tenantSchema }, duration)
 
 		if (status === 'error') {
 			this.imageProcessingErrors.inc({ operation, error_type: 'processing' })
@@ -354,13 +361,17 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	/**
-	 * Record cache operation metrics
+	 * Record cache operation metrics.
+	 *
+	 * @param tenantSchema - Optional tenant schema label for per-tenant observability.
+	 *   Defaults to 'public' for infrastructure-level cache calls (memory/Redis layers)
+	 *   that have no tenant context.  Pass the actual schema at call sites that do.
 	 */
-	recordCacheOperation(operation: 'get' | 'set' | 'delete' | 'clear' | 'expire' | 'flush' | 'warmup', cacheType: string, status: 'hit' | 'miss' | 'success' | 'error', duration?: number): void {
-		this.cacheOperationsTotal.inc({ operation, cache_type: cacheType, status })
+	recordCacheOperation(operation: 'get' | 'set' | 'delete' | 'clear' | 'expire' | 'flush' | 'warmup', cacheType: string, status: 'hit' | 'miss' | 'success' | 'error', duration?: number, tenantSchema: string = 'public'): void {
+		this.cacheOperationsTotal.inc({ operation, cache_type: cacheType, status, tenant_schema: tenantSchema })
 
 		if (duration !== undefined) {
-			this.cacheOperationDuration.observe({ operation, cache_type: cacheType, status }, duration)
+			this.cacheOperationDuration.observe({ operation, cache_type: cacheType, status, tenant_schema: tenantSchema }, duration)
 		}
 	}
 

@@ -146,6 +146,44 @@ describe('metricsService', () => {
 		})
 	})
 
+	describe('tenant_schema label', () => {
+		it('recordHttpRequest emits tenant_schema label defaulting to "public"', async () => {
+			service.recordHttpRequest('GET', '/test', 200, 0.5)
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('tenant_schema="public"')
+		})
+
+		it('recordHttpRequest emits the supplied tenant_schema', async () => {
+			service.recordHttpRequest('GET', '/test', 200, 0.5, undefined, undefined, 'acme')
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('tenant_schema="acme"')
+		})
+
+		it('recordImageProcessing emits tenant_schema label defaulting to "public"', async () => {
+			service.recordImageProcessing('resize', 'webp', 'success', 1.0)
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('tenant_schema="public"')
+		})
+
+		it('recordImageProcessing emits the supplied tenant_schema', async () => {
+			service.recordImageProcessing('resize', 'webp', 'success', 1.0, 'tenant_xyz')
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('tenant_schema="tenant_xyz"')
+		})
+
+		it('recordCacheOperation emits tenant_schema label defaulting to "public"', async () => {
+			service.recordCacheOperation('get', 'memory', 'hit')
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('tenant_schema="public"')
+		})
+
+		it('recordCacheOperation emits the supplied tenant_schema', async () => {
+			service.recordCacheOperation('get', 'redis', 'hit', undefined, 'acme')
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('tenant_schema="acme"')
+		})
+	})
+
 	describe('cache Metrics', () => {
 		it('should record cache operations', async () => {
 			service.recordCacheOperation('get', 'memory', 'hit')
@@ -442,7 +480,7 @@ describe('metricsService', () => {
 			// Check that metrics are properly formatted
 			expect(metrics).toMatch(/^# HELP/)
 			expect(metrics).toMatch(/^# TYPE/m)
-			expect(metrics).toMatch(/mediastream_http_requests_total\{method="GET",route="\/test",status_code="200"\} \d+/)
+			expect(metrics).toMatch(/mediastream_http_requests_total\{method="GET",route="\/test",status_code="200",tenant_schema="public"\} \d+/)
 		})
 
 		it('should handle special characters in metric labels', async () => {

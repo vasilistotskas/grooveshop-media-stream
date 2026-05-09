@@ -285,7 +285,7 @@ describe('cacheImageResourceOperation', () => {
 			const result = await operation.checkResourceExists(opCtx)
 			expect(result).toBe(true)
 			expect(mockCacheManager.get).toHaveBeenCalledWith('image:public', 'mock-resource-id')
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'hit', expect.any(Number))
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'hit', expect.any(Number), expect.any(String))
 		})
 
 		it('should delete expired resource from cache', async () => {
@@ -324,7 +324,7 @@ describe('cacheImageResourceOperation', () => {
 
 			const result = await operation.checkResourceExists(opCtx)
 			expect(result).toBe(true)
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'hit', expect.any(Number))
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'hit', expect.any(Number), expect.any(String))
 		})
 	})
 
@@ -421,7 +421,7 @@ describe('cacheImageResourceOperation', () => {
 			vi.spyOn(mockFetchResourceResponseJob, 'handle').mockResolvedValue(mockResponse)
 
 			await expect(operation.execute(opCtx)).rejects.toThrow('Error fetching or processing image.')
-			expect(mockMetricsService.recordImageProcessing).toHaveBeenCalledWith('execute', 'unknown', 'error', expect.any(Number))
+			expect(mockMetricsService.recordImageProcessing).toHaveBeenCalledWith('execute', 'unknown', 'error', expect.any(Number), expect.any(String))
 		})
 	})
 
@@ -448,7 +448,7 @@ describe('cacheImageResourceOperation', () => {
 			const result = await operation.getCachedResource(opCtx)
 
 			expect(result).toEqual(mockCachedResource)
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'hit', expect.any(Number))
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'hit', expect.any(Number), expect.any(String))
 		})
 
 		it('should fallback to filesystem and cache result', async () => {
@@ -471,7 +471,7 @@ describe('cacheImageResourceOperation', () => {
 			expect(result).toBeDefined()
 			expect(result?.data).toEqual(Buffer.from('file-data'))
 			expect(mockCacheManager.set).toHaveBeenCalledWith('image:public', 'mock-resource-id', expect.any(Object), expect.any(Number))
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'hit', expect.any(Number))
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'hit', expect.any(Number), expect.any(String))
 		})
 
 		it('should return null when resource not found', async () => {
@@ -482,7 +482,7 @@ describe('cacheImageResourceOperation', () => {
 			const result = await operation.getCachedResource(opCtx)
 
 			expect(result).toBeNull()
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'miss', expect.any(Number))
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'miss', expect.any(Number), expect.any(String))
 		})
 
 		it('should handle errors gracefully', async () => {
@@ -492,7 +492,7 @@ describe('cacheImageResourceOperation', () => {
 
 			expect(result).toBeNull()
 			expect(mockMetricsService.recordError).toHaveBeenCalledWith('cache_retrieval', 'get_cached_resource')
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'error', expect.any(Number))
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'error', expect.any(Number), expect.any(String))
 		})
 	})
 

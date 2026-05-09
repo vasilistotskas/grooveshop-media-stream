@@ -137,7 +137,7 @@ export default class CacheImageResourceOperation {
 					if (isValid) {
 						CorrelatedLogger.debug(`Resource found in cache and is valid: ${ctx.id}`, CacheImageResourceOperation.name)
 						const duration = PerformanceTracker.endPhase('resource_exists_check')
-						this.metricsService.recordCacheOperation('get', 'multi-layer', 'hit', duration || 0)
+						this.metricsService.recordCacheOperation('get', 'multi-layer', 'hit', duration || 0, ctx.request.tenantSchema || 'public')
 						return true
 					}
 					else {
@@ -160,7 +160,7 @@ export default class CacheImageResourceOperation {
 			if (!metadataContent) {
 				CorrelatedLogger.debug(`Metadata not found in filesystem: ${resourceMetaPath}`, CacheImageResourceOperation.name)
 				const duration = PerformanceTracker.endPhase('resource_exists_check')
-				this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
+				this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0, ctx.request.tenantSchema || 'public')
 				return false
 			}
 
@@ -170,7 +170,7 @@ export default class CacheImageResourceOperation {
 			if (!resourcePathExists) {
 				CorrelatedLogger.debug(`Resource data not found in filesystem: ${resourcePath}`, CacheImageResourceOperation.name)
 				const duration = PerformanceTracker.endPhase('resource_exists_check')
-				this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
+				this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0, ctx.request.tenantSchema || 'public')
 				return false
 			}
 
@@ -182,27 +182,27 @@ export default class CacheImageResourceOperation {
 			catch {
 				CorrelatedLogger.warn('Metadata headers are missing or invalid', CacheImageResourceOperation.name)
 				const duration = PerformanceTracker.endPhase('resource_exists_check')
-				this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
+				this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0, ctx.request.tenantSchema || 'public')
 				return false
 			}
 
 			if (!headers.version || headers.version !== 1) {
 				CorrelatedLogger.warn('Invalid or missing version in metadata', CacheImageResourceOperation.name)
 				const duration = PerformanceTracker.endPhase('resource_exists_check')
-				this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
+				this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0, ctx.request.tenantSchema || 'public')
 				return false
 			}
 
 			const isValid = headers.dateCreated + headers.privateTTL > Date.now()
 			const duration = PerformanceTracker.endPhase('resource_exists_check')
-			this.metricsService.recordCacheOperation('get', 'multi-layer', isValid ? 'hit' : 'miss', duration || 0)
+			this.metricsService.recordCacheOperation('get', 'multi-layer', isValid ? 'hit' : 'miss', duration || 0, ctx.request.tenantSchema || 'public')
 			return isValid
 		}
 		catch (error: unknown) {
 			CorrelatedLogger.warn(`Error checking resource existence: ${(error as Error).message}`, CacheImageResourceOperation.name)
 			this.metricsService.recordError('cache_check', 'resource_exists')
 			const duration = PerformanceTracker.endPhase('resource_exists_check')
-			this.metricsService.recordCacheOperation('get', 'multi-layer', 'error', duration || 0)
+			this.metricsService.recordCacheOperation('get', 'multi-layer', 'error', duration || 0, ctx.request.tenantSchema || 'public')
 			return false
 		}
 	}
@@ -311,7 +311,7 @@ export default class CacheImageResourceOperation {
 			this.metricsService.recordError('image_processing', 'execute')
 			const duration = PerformanceTracker.endPhase('execute')
 			phaseEnded = true
-			this.metricsService.recordImageProcessing('execute', 'unknown', 'error', duration || 0)
+			this.metricsService.recordImageProcessing('execute', 'unknown', 'error', duration || 0, ctx.request.tenantSchema || 'public')
 			// Preserve typed MediaStreamError subclasses (e.g. UnableToFetchResourceException)
 			// so callers see the correct HTTP status. Only wrap truly unknown errors.
 			if (error instanceof MediaStreamError) {
@@ -485,12 +485,12 @@ export default class CacheImageResourceOperation {
 
 			const processedFormat = metadata.format || 'unknown'
 			const duration = PerformanceTracker.endPhase('sync_processing')
-			this.metricsService.recordImageProcessing('process', processedFormat, 'success', duration || 0)
+			this.metricsService.recordImageProcessing('process', processedFormat, 'success', duration || 0, ctx.request.tenantSchema || 'public')
 			CorrelatedLogger.debug(`Image processed successfully: ${ctx.id}`, CacheImageResourceOperation.name)
 		}
 		catch (error: unknown) {
 			const duration = PerformanceTracker.endPhase('sync_processing')
-			this.metricsService.recordImageProcessing('process', 'unknown', 'error', duration || 0)
+			this.metricsService.recordImageProcessing('process', 'unknown', 'error', duration || 0, ctx.request.tenantSchema || 'public')
 			throw error
 		}
 	}
@@ -738,7 +738,7 @@ export default class CacheImageResourceOperation {
 
 				CorrelatedLogger.debug(`Resource retrieved from cache: ${ctx.id}`, CacheImageResourceOperation.name)
 				const duration = PerformanceTracker.endPhase('get_cached_resource')
-				this.metricsService.recordCacheOperation('get', 'multi-layer', 'hit', duration || 0)
+				this.metricsService.recordCacheOperation('get', 'multi-layer', 'hit', duration || 0, ctx.request.tenantSchema || 'public')
 				return cachedResource
 			}
 
@@ -763,20 +763,20 @@ export default class CacheImageResourceOperation {
 
 				CorrelatedLogger.debug(`Resource retrieved from filesystem and cached: ${ctx.id}`, CacheImageResourceOperation.name)
 				const duration = PerformanceTracker.endPhase('get_cached_resource')
-				this.metricsService.recordCacheOperation('get', 'filesystem', 'hit', duration || 0)
+				this.metricsService.recordCacheOperation('get', 'filesystem', 'hit', duration || 0, ctx.request.tenantSchema || 'public')
 				return { data, metadata }
 			}
 
 			CorrelatedLogger.debug(`Resource not found: ${ctx.id}`, CacheImageResourceOperation.name)
 			const duration = PerformanceTracker.endPhase('get_cached_resource')
-			this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
+			this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0, ctx.request.tenantSchema || 'public')
 			return null
 		}
 		catch (error: unknown) {
 			CorrelatedLogger.error(`Failed to get cached resource: ${(error as Error).message}`, (error as Error).stack, CacheImageResourceOperation.name)
 			this.metricsService.recordError('cache_retrieval', 'get_cached_resource')
 			const duration = PerformanceTracker.endPhase('get_cached_resource')
-			this.metricsService.recordCacheOperation('get', 'multi-layer', 'error', duration || 0)
+			this.metricsService.recordCacheOperation('get', 'multi-layer', 'error', duration || 0, ctx.request.tenantSchema || 'public')
 			return null
 		}
 	}
