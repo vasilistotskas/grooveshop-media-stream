@@ -198,7 +198,8 @@ export class CacheOperationsProcessor {
 			})
 			const cacheKey = await this.generateIdentityJob.handle(request)
 
-			const cached = await this.cacheManager.get('image', cacheKey)
+			const cacheNamespace = `image:${tenantSchema}`
+			const cached = await this.cacheManager.get(cacheNamespace, cacheKey)
 			if (cached) {
 				this._logger.debug(`Image already cached: ${imageUrl}`)
 				return
@@ -210,7 +211,7 @@ export class CacheOperationsProcessor {
 			})
 
 			const buffer = Buffer.from(response.data)
-			await this.cacheManager.set('image', cacheKey, { data: buffer }, 3600)
+			await this.cacheManager.set(cacheNamespace, cacheKey, { data: buffer }, 3600)
 
 			this._logger.debug(`Cached image: ${imageUrl}`)
 		}

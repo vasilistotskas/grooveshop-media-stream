@@ -284,7 +284,7 @@ describe('cacheImageResourceOperation', () => {
 
 			const result = await operation.checkResourceExists(opCtx)
 			expect(result).toBe(true)
-			expect(mockCacheManager.get).toHaveBeenCalledWith('image', 'mock-resource-id')
+			expect(mockCacheManager.get).toHaveBeenCalledWith('image:public', 'mock-resource-id')
 			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'hit', expect.any(Number))
 		})
 
@@ -306,7 +306,7 @@ describe('cacheImageResourceOperation', () => {
 			mockedFs.access.mockResolvedValue()
 
 			await operation.checkResourceExists(opCtx)
-			expect(mockCacheManager.delete).toHaveBeenCalledWith('image', 'mock-resource-id')
+			expect(mockCacheManager.delete).toHaveBeenCalledWith('image:public', 'mock-resource-id')
 		})
 
 		it('should fallback to filesystem when cache miss', async () => {
@@ -374,7 +374,7 @@ describe('cacheImageResourceOperation', () => {
 
 			expect(mockFetchResourceResponseJob.handle).toHaveBeenCalled()
 			expect(mockWebpImageManipulationJob.handle).toHaveBeenCalled()
-			expect(mockCacheManager.set).toHaveBeenCalledWith('image', 'mock-resource-id', expect.any(Object), expect.any(Number))
+			expect(mockCacheManager.set).toHaveBeenCalledWith('image:public', 'mock-resource-id', expect.any(Object), expect.any(Number))
 		})
 
 		it('should process large images synchronously', async () => {
@@ -400,7 +400,7 @@ describe('cacheImageResourceOperation', () => {
 
 			expect(mockFetchResourceResponseJob.handle).toHaveBeenCalled()
 			expect(mockWebpImageManipulationJob.handle).toHaveBeenCalled()
-			expect(mockCacheManager.set).toHaveBeenCalledWith('image', 'mock-resource-id', expect.any(Object), expect.any(Number))
+			expect(mockCacheManager.set).toHaveBeenCalledWith('image:public', 'mock-resource-id', expect.any(Object), expect.any(Number))
 		})
 
 		it('should validate file size during processing', async () => {
@@ -470,7 +470,7 @@ describe('cacheImageResourceOperation', () => {
 
 			expect(result).toBeDefined()
 			expect(result?.data).toEqual(Buffer.from('file-data'))
-			expect(mockCacheManager.set).toHaveBeenCalledWith('image', 'mock-resource-id', expect.any(Object), expect.any(Number))
+			expect(mockCacheManager.set).toHaveBeenCalledWith('image:public', 'mock-resource-id', expect.any(Object), expect.any(Number))
 			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'hit', expect.any(Number))
 		})
 
@@ -665,7 +665,7 @@ describe('cacheImageResourceOperation', () => {
 
 			const negativeCacheKey = `negative:${opCtx.id}`
 			expect(mockCacheManager.set).toHaveBeenCalledWith(
-				'image',
+				'image:public',
 				negativeCacheKey,
 				expect.objectContaining({ status: 404 }),
 				NEGATIVE_CACHE_TTL_SECONDS, // must be seconds, not ms

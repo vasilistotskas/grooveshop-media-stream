@@ -80,6 +80,21 @@ export default class CacheImageResourceOperation {
 	}
 
 	/**
+	 * Derive the per-tenant cache namespace for this operation context.
+	 *
+	 * Keys are stored as ``image:{tenantSchema}:{uuid}`` in every cache layer.
+	 * This makes SCAN-based per-tenant invalidation possible:
+	 *   invalidateNamespace('image:acme') targets exactly ``image:acme:*``.
+	 *
+	 * Falls back to ``image:public`` for shared/static images and for the
+	 * legacy route where no tenant is present in the URL.
+	 */
+	private cacheNamespace(ctx: OperationContext): string {
+		const schema = ctx.request.tenantSchema || 'public'
+		return `image:${schema}`
+	}
+
+	/**
 	 * Get resource file path for a given context
 	 */
 	getResourcePath(ctx: OperationContext): string {
@@ -111,11 +126,11 @@ export default class CacheImageResourceOperation {
 		try {
 			CorrelatedLogger.debug(`Checking if resource exists in cache: ${ctx.id}`, CacheImageResourceOperation.name)
 
-			const cachedResource = await this.cacheManager.get<{ data: Buffer, metadata: ResourceMetaData }>('image', ctx.id)
+			const cachedResource = await this.cacheManager.get<{ data: Buffer, metadata: ResourceMetaData }>(this.cacheNamespace(ctx), ctx.id)
 			if (cachedResource) {
 				if (!cachedResource.metadata || typeof cachedResource.metadata.dateCreated !== 'number') {
 					CorrelatedLogger.warn(`Corrupted cache data found, deleting: ${ctx.id}`, CacheImageResourceOperation.name)
-					await this.cacheManager.delete('image', ctx.id)
+					await this.cacheManager.delete(this.cacheNamespace(ctx), ctx.id)
 				}
 				else {
 					const isValid = cachedResource.metadata.dateCreated + cachedResource.metadata.privateTTL > Date.now()
@@ -127,7 +142,7 @@ export default class CacheImageResourceOperation {
 					}
 					else {
 						CorrelatedLogger.debug(`Resource found in cache but expired: ${ctx.id}`, CacheImageResourceOperation.name)
-						await this.cacheManager.delete('image', ctx.id)
+						await this.cacheManager.delete(this.cacheNamespace(ctx), ctx.id)
 					}
 				}
 			}
@@ -317,7 +332,7 @@ export default class CacheImageResourceOperation {
 		try {
 			// Check negative cache first to avoid repeated failed fetches
 			const negativeCacheKey = `negative:${ctx.id}`
-			const negativeCached = await this.cacheManager.get<{ status: number, timestamp: number }>('image', negativeCacheKey)
+			const negativeCached = await this.cacheManager.get<{ status: number, timestamp: number }>(this.cacheNamespace(ctx), negativeCacheKey)
 			if (negativeCached && Date.now() - negativeCached.timestamp < this.negativeCacheTtl * 1000) {
 				CorrelatedLogger.debug(`Negative cache hit for ${ctx.request.resourceTarget}`, CacheImageResourceOperation.name)
 				throw new UnableToFetchResourceException(ctx.request.resourceTarget)
@@ -326,7 +341,7 @@ export default class CacheImageResourceOperation {
 			const response = await this.fetchResourceResponseJob.handle(ctx.request)
 			if (!response || response.status === 404 || response.status >= 400) {
 				// Cache the failure to prevent repeated requests
-				await this.cacheManager.set('image', negativeCacheKey, {
+				await this.cacheManager.set(this.cacheNamespace(ctx), negativeCacheKey, {
 					status: response?.status || 404,
 					timestamp: Date.now(),
 				}, this.negativeCacheTtl)
@@ -448,7 +463,7 @@ export default class CacheImageResourceOperation {
 				const resourceMetaTmpPath = `${resourceMetaPath}.tmp`
 
 				await Promise.all([
-					this.cacheManager.set('image', ctx.id, {
+					this.cacheManager.set(this.cacheNamespace(ctx), ctx.id, {
 						data: processedData,
 						metadata,
 					}, this.privateTtl),
@@ -708,18 +723,18 @@ export default class CacheImageResourceOperation {
 		PerformanceTracker.startPhase('get_cached_resource')
 
 		try {
-			let cachedResource = await this.cacheManager.get<{ data: Buffer, metadata: ResourceMetaData }>('image', ctx.id)
+			let cachedResource = await this.cacheManager.get<{ data: Buffer, metadata: ResourceMetaData }>(this.cacheNamespace(ctx), ctx.id)
 
 			if (cachedResource && (!cachedResource.metadata || typeof cachedResource.metadata.dateCreated !== 'number')) {
 				CorrelatedLogger.warn(`Corrupted cache data found in getCachedResource, deleting: ${ctx.id}`, CacheImageResourceOperation.name)
-				await this.cacheManager.delete('image', ctx.id)
+				await this.cacheManager.delete(this.cacheNamespace(ctx), ctx.id)
 				cachedResource = null
 			}
 
 			if (cachedResource) {
 				// Increment access count and backfill updated metadata into cache (fire-and-forget)
 				cachedResource.metadata.accessCount = (cachedResource.metadata.accessCount || 0) + 1
-				this.cacheManager.set('image', ctx.id, cachedResource, this.privateTtl).catch(() => {})
+				this.cacheManager.set(this.cacheNamespace(ctx), ctx.id, cachedResource, this.privateTtl).catch(() => {})
 
 				CorrelatedLogger.debug(`Resource retrieved from cache: ${ctx.id}`, CacheImageResourceOperation.name)
 				const duration = PerformanceTracker.endPhase('get_cached_resource')
@@ -744,7 +759,7 @@ export default class CacheImageResourceOperation {
 				metadata.accessCount = (metadata.accessCount || 0) + 1
 				writeFile(resourceMetaPath, JSON.stringify(metadata), 'utf8').catch(() => {})
 
-				await this.cacheManager.set('image', ctx.id, { data, metadata }, this.privateTtl)
+				await this.cacheManager.set(this.cacheNamespace(ctx), ctx.id, { data, metadata }, this.privateTtl)
 
 				CorrelatedLogger.debug(`Resource retrieved from filesystem and cached: ${ctx.id}`, CacheImageResourceOperation.name)
 				const duration = PerformanceTracker.endPhase('get_cached_resource')
