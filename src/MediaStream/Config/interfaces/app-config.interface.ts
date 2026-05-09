@@ -116,6 +116,10 @@ export interface ShutdownConfig {
 	forceTimeout: number
 }
 
+export interface InternalConfig {
+	adminSecret?: string
+}
+
 export interface AppConfig {
 	server: ServerConfig
 	cache: CacheConfig
@@ -125,4 +129,5 @@ export interface AppConfig {
 	http: HttpConfig
 	rateLimit: RateLimitConfig
 	shutdown: ShutdownConfig
+	internal: InternalConfig
 }

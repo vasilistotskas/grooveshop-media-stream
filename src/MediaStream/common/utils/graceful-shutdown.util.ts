@@ -130,19 +130,18 @@ export function setupGracefulShutdown(
 	process.on('SIGTERM', () => shutdown('SIGTERM'))
 	process.on('SIGINT', () => shutdown('SIGINT'))
 
-	// Handle uncaught exceptions during shutdown
+	// Log unexpected errors but do NOT initiate shutdown. A transient
+	// fire-and-forget rejection (e.g. a failed cache backfill or a
+	// dropped upstream image fetch) is not a reason to tear down the
+	// pod and drop every other in-flight request. K8s probes cover the
+	// "process is wedged" case; this handler exists so the error is
+	// observable in logs instead of crashing the runtime.
 	process.on('uncaughtException', (error) => {
-		logger.error('Uncaught exception:', error)
-		if (!state.isShuttingDown) {
-			shutdown('uncaughtException')
-		}
+		logger.error('Uncaught exception (continuing):', error)
 	})
 
 	process.on('unhandledRejection', (reason) => {
-		logger.error('Unhandled rejection:', reason)
-		if (!state.isShuttingDown) {
-			shutdown('unhandledRejection')
-		}
+		logger.error('Unhandled rejection (continuing):', reason)
 	})
 
 	logger.log('Graceful shutdown handlers registered')

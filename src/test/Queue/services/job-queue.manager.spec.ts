@@ -1,8 +1,6 @@
-import type { JobOptions } from '#microservice/Queue/interfaces/job-queue.interface'
 import type { MockedObject } from 'vitest'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { CacheOperationsProcessor } from '#microservice/Queue/processors/cache-operations.processor'
-import { ImageProcessingProcessor } from '#microservice/Queue/processors/image-processing.processor'
 import { BullQueueService } from '#microservice/Queue/services/bull-queue.service'
 import { JobQueueManager } from '#microservice/Queue/services/job-queue.manager'
 import { JobPriority, JobType } from '#microservice/Queue/types/job.types'
@@ -13,7 +11,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 describe('jobQueueManager', () => {
 	let manager: JobQueueManager
 	let mockQueueService: MockedObject<BullQueueService>
-	let mockImageProcessor: MockedObject<ImageProcessingProcessor>
 	let mockCacheProcessor: MockedObject<CacheOperationsProcessor>
 	let mockCorrelationService: MockedObject<CorrelationService>
 
@@ -27,10 +24,6 @@ describe('jobQueueManager', () => {
 			resume: vi.fn(),
 			getStats: vi.fn(),
 			clean: vi.fn(),
-		}
-
-		const mockImageProcessorFactory = {
-			process: vi.fn(),
 		}
 
 		const mockCacheProcessorFactory = {
@@ -50,10 +43,6 @@ describe('jobQueueManager', () => {
 					useValue: mockQueueServiceFactory,
 				},
 				{
-					provide: ImageProcessingProcessor,
-					useValue: mockImageProcessorFactory,
-				},
-				{
 					provide: CacheOperationsProcessor,
 					useValue: mockCacheProcessorFactory,
 				},
@@ -66,7 +55,6 @@ describe('jobQueueManager', () => {
 
 		manager = module.get<JobQueueManager>(JobQueueManager)
 		mockQueueService = module.get(BullQueueService)
-		mockImageProcessor = module.get(ImageProcessingProcessor)
 		mockCacheProcessor = module.get(CacheOperationsProcessor)
 		mockCorrelationService = module.get(CorrelationService)
 
@@ -86,81 +74,9 @@ describe('jobQueueManager', () => {
 		it('should setup job processors on initialization', async () => {
 			await manager.onModuleInit()
 
-			expect(mockQueueService.process).toHaveBeenCalledTimes(3)
-			expect(mockQueueService.process).toHaveBeenCalledWith(JobType.IMAGE_PROCESSING, expect.any(Function))
+			expect(mockQueueService.process).toHaveBeenCalledTimes(2)
 			expect(mockQueueService.process).toHaveBeenCalledWith(JobType.CACHE_WARMING, expect.any(Function))
 			expect(mockQueueService.process).toHaveBeenCalledWith(JobType.CACHE_CLEANUP, expect.any(Function))
-		})
-	})
-
-	describe('addImageProcessingJob', () => {
-		it('should add image processing job with correlation ID', async () => {
-			const jobData = {
-				imageUrl: 'https://example.com/image.jpg',
-				width: 300,
-				height: 200,
-				cacheKey: 'test-key',
-				priority: JobPriority.NORMAL,
-			}
-
-			const mockJob = {
-				id: 'job-123',
-				name: JobType.IMAGE_PROCESSING,
-				data: { ...jobData, correlationId: 'corr-123' },
-			}
-
-			mockCorrelationService.getCorrelationId.mockReturnValue('corr-123')
-			mockQueueService.add.mockResolvedValue(mockJob as any)
-
-			const result = await manager.addImageProcessingJob(jobData)
-
-			expect(mockCorrelationService.getCorrelationId).toHaveBeenCalled()
-			expect(mockQueueService.add).toHaveBeenCalledWith(
-				JobType.IMAGE_PROCESSING,
-				{ ...jobData, correlationId: 'corr-123' },
-				expect.objectContaining({
-					priority: JobPriority.NORMAL,
-					attempts: 3,
-					backoff: { type: 'exponential', delay: 2000 },
-					removeOnComplete: 10,
-					removeOnFail: 5,
-				}),
-			)
-			expect(result).toBe(mockJob)
-		})
-
-		it('should use custom options when provided', async () => {
-			const jobData = {
-				imageUrl: 'https://example.com/image.jpg',
-				cacheKey: 'test-key',
-				priority: JobPriority.HIGH,
-			}
-
-			const customOptions: Partial<JobOptions> = {
-				attempts: 5,
-				timeout: 60000,
-			}
-
-			const mockJob = {
-				id: 'job-456',
-				name: JobType.IMAGE_PROCESSING,
-				data: { ...jobData, correlationId: 'corr-456' },
-			}
-
-			mockCorrelationService.getCorrelationId.mockReturnValue('corr-456')
-			mockQueueService.add.mockResolvedValue(mockJob as any)
-
-			await manager.addImageProcessingJob(jobData, customOptions)
-
-			expect(mockQueueService.add).toHaveBeenCalledWith(
-				JobType.IMAGE_PROCESSING,
-				{ ...jobData, correlationId: 'corr-456' },
-				expect.objectContaining({
-					priority: JobPriority.HIGH,
-					attempts: 5,
-					timeout: 60000,
-				}),
-			)
 		})
 	})
 
@@ -235,8 +151,8 @@ describe('jobQueueManager', () => {
 		it('should retrieve job by ID', async () => {
 			const mockJob = {
 				id: 'job-123',
-				name: JobType.IMAGE_PROCESSING,
-				data: { imageUrl: 'https://example.com/image.jpg' },
+				name: JobType.CACHE_WARMING,
+				data: { imageUrls: ['https://example.com/image.jpg'] },
 			}
 
 			mockQueueService.getJob.mockResolvedValue(mockJob as any)
@@ -384,74 +300,6 @@ describe('jobQueueManager', () => {
 	describe('job processors', () => {
 		beforeEach(async () => {
 			await manager.onModuleInit()
-		})
-
-		it('should process image processing jobs successfully', async () => {
-			const mockJob = {
-				id: 'job-123',
-				name: JobType.IMAGE_PROCESSING,
-				data: { imageUrl: 'https://example.com/image.jpg' },
-			}
-
-			const mockResult = { success: true, data: 'processed-image', processingTime: 1000 }
-			mockImageProcessor.process.mockResolvedValue(mockResult)
-
-			// Mock queue stats
-			mockQueueService.getStats.mockResolvedValue({
-				waiting: 0,
-				active: 0,
-				completed: 1,
-				failed: 0,
-				delayed: 0,
-				paused: false,
-			})
-
-			// Get the processor function that was registered
-			const processorCall = mockQueueService.process.mock.calls.find(
-				call => call[0] === JobType.IMAGE_PROCESSING,
-			)
-			const processor = processorCall![1]
-
-			const result = await processor(mockJob as any)
-
-			expect(mockImageProcessor.process).toHaveBeenCalledWith(mockJob)
-			expect(result).toBe(mockResult)
-
-			// Check metrics were updated
-			const stats = await manager.getQueueStats()
-			expect(stats.completedJobs).toBe(1)
-		})
-
-		it('should handle image processing job failures', async () => {
-			const mockJob = {
-				id: 'job-123',
-				name: JobType.IMAGE_PROCESSING,
-				data: { imageUrl: 'https://example.com/image.jpg' },
-			}
-
-			const error = new Error('Processing failed')
-			mockImageProcessor.process.mockRejectedValue(error)
-
-			// Mock queue stats
-			mockQueueService.getStats.mockResolvedValue({
-				waiting: 0,
-				active: 0,
-				completed: 0,
-				failed: 1,
-				delayed: 0,
-				paused: false,
-			})
-
-			const processorCall = mockQueueService.process.mock.calls.find(
-				call => call[0] === JobType.IMAGE_PROCESSING,
-			)
-			const processor = processorCall![1]
-
-			await expect(processor(mockJob as any)).rejects.toThrow('Processing failed')
-
-			// Check metrics were updated
-			const stats = await manager.getQueueStats()
-			expect(stats.failedJobs).toBe(1)
 		})
 
 		it('should process cache warming jobs successfully', async () => {

@@ -64,6 +64,14 @@ export async function bootstrap(options: BootstrapOptions | boolean = true): Pro
 		const app = await NestFactory.create<NestExpressApplication>(MediaStreamModule, {
 			logger: resolveLogLevels(),
 		})
+
+		// Trust exactly 1 proxy hop (Traefik) so that req.ip reflects the real
+		// client IP from X-Forwarded-For rather than the ingress pod address.
+		// Setting this to 1 (not true) avoids trusting the full XFF chain,
+		// which would allow a remote client to spoof their IP by prepending
+		// arbitrary addresses to X-Forwarded-For.
+		app.set('trust proxy', 1)
+
 		const configService = app.get(ConfigService)
 
 		// Graceful shutdown middleware (must be first, only if enabled)

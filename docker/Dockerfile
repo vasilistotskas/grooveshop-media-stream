@@ -29,6 +29,8 @@ COPY --from=build --chown=node:node /usr/src/app/nest-cli.json ./
 
 RUN mkdir -p /usr/src/app/storage && chown -R node:node /usr/src/app/storage
 
+ENV NODE_OPTIONS="--max-old-space-size=1024 --max-semi-space-size=64"
+
 USER node
 
 CMD ["node", "build/dist/main.js"]

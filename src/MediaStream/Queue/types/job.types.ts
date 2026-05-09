@@ -1,19 +1,3 @@
-export interface ImageProcessingJobData {
-	correlationId: string
-	imageUrl: string
-	width?: number
-	height?: number
-	quality?: number
-	format?: 'webp' | 'jpeg' | 'png'
-	fit?: string
-	position?: string
-	background?: any
-	trimThreshold?: number
-	cacheKey: string
-	priority: JobPriority
-	metadata?: ImageMetadata
-}
-
 export interface CacheWarmingJobData {
 	correlationId: string
 	imageUrls: string[]
@@ -28,14 +12,6 @@ export interface CacheCleanupJobData {
 	priority: JobPriority
 }
 
-export interface ImageMetadata {
-	originalSize?: number
-	originalFormat?: string
-	requestedAt: number
-	clientIp?: string
-	userAgent?: string
-}
-
 export enum JobPriority {
 	LOW = 1,
 	NORMAL = 5,
@@ -44,13 +20,13 @@ export enum JobPriority {
 }
 
 export enum JobType {
-	IMAGE_PROCESSING = 'image-processing',
 	CACHE_WARMING = 'cache-warming',
 	CACHE_CLEANUP = 'cache-cleanup',
 }
 
 export interface JobResult {
 	success: boolean
+	/** Populated by cache-operations processors with operation-specific result data. */
 	data?: any
 	error?: string
 	processingTime: number

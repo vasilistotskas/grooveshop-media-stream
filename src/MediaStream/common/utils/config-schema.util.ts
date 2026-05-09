@@ -128,6 +128,8 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	// Image TTL configuration (in seconds — cache layers expect seconds)
 	'cache.image.publicTtl': { env: 'CACHE_IMAGE_PUBLIC_TTL', default: 12 * 30 * 24 * 3600, type: 'number' },
 	'cache.image.privateTtl': { env: 'CACHE_IMAGE_PRIVATE_TTL', default: 6 * 30 * 24 * 3600, type: 'number' },
+	// Negative-cache TTL in seconds — suppresses retries for failed upstream fetches
+	'cache.image.negativeCacheTtl': { env: 'CACHE_IMAGE_NEGATIVE_TTL', default: 300, type: 'number' },
 
 	// Processing configuration
 	'processing.maxConcurrent': { env: 'PROCESSING_MAX_CONCURRENT', default: 10, type: 'number' },
@@ -176,4 +178,7 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	// Graceful shutdown configuration
 	'shutdown.timeout': { env: 'SHUTDOWN_TIMEOUT', default: 30000, type: 'number' },
 	'shutdown.forceTimeout': { env: 'SHUTDOWN_FORCE_TIMEOUT', default: 60000, type: 'number' },
+
+	// Internal admin secret for /metrics and /health/circuit-breaker/reset
+	'internal.adminSecret': { env: 'INTERNAL_ADMIN_SECRET', default: undefined, type: 'string' },
 }

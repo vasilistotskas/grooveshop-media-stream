@@ -7,14 +7,16 @@ import { createHash } from 'node:crypto'
 import { access, open as fsOpen, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import * as path from 'node:path'
 import { cwd } from 'node:process'
+import { Transform } from 'node:stream'
 import CacheImageRequest, {
 	BackgroundOptions,
 	FitOptions,
 	PositionOptions,
 	SupportedResizeFormats,
 } from '#microservice/API/dto/cache-image-request.dto'
-
 import UnableToFetchResourceException from '#microservice/API/exceptions/unable-to-fetch-resource.exception'
+
+import { MediaStreamError } from '#microservice/common/errors/media-stream.errors'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
@@ -27,6 +29,7 @@ import WebpImageManipulationJob from '#microservice/Queue/jobs/webp-image-manipu
 import ValidateCacheImageRequestRule from '#microservice/Validation/rules/validate-cache-image-request.rule'
 import { InputSanitizationService } from '#microservice/Validation/services/input-sanitization.service'
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
+import DOMPurify from 'isomorphic-dompurify'
 import { MultiLayerCacheManager } from '../services/multi-layer-cache.manager.js'
 
 /**
@@ -71,7 +74,8 @@ export default class CacheImageResourceOperation {
 		// Load TTL values from configuration (in seconds — Redis/cache layers expect seconds)
 		this.publicTtl = this.configService.getOptional('cache.image.publicTtl', 12 * 30 * 24 * 3600)
 		this.privateTtl = this.configService.getOptional('cache.image.privateTtl', 6 * 30 * 24 * 3600)
-		// Negative cache TTL for failed fetches (default: 5 minutes in seconds)
+		// Negative-cache TTL in seconds. Stored timestamp is Date.now() (ms);
+		// comparison uses negativeCacheTtl * 1000 to convert to ms — do NOT pre-multiply here.
 		this.negativeCacheTtl = this.configService.getOptional('cache.image.negativeCacheTtl', 300)
 	}
 
@@ -232,7 +236,11 @@ export default class CacheImageResourceOperation {
 		try {
 			CorrelatedLogger.debug('Setting up cache image resource operation', CacheImageResourceOperation.name)
 
-			const sanitizedRequest = await this.inputSanitizationService.sanitize(cacheImageRequest) as CacheImageRequest
+			// sanitize() returns a plain object; reconstruct on the class prototype
+			// so that downstream code that checks instanceof CacheImageRequest works
+			// correctly and any class-level methods remain accessible.
+			const sanitizedPlain = await this.inputSanitizationService.sanitize(cacheImageRequest)
+			const sanitizedRequest = Object.assign(new CacheImageRequest(), sanitizedPlain)
 
 			if (sanitizedRequest.resourceTarget && !this.inputSanitizationService.validateUrl(sanitizedRequest.resourceTarget)) {
 				throw new Error(`Invalid or disallowed URL: ${sanitizedRequest.resourceTarget}`)
@@ -289,6 +297,11 @@ export default class CacheImageResourceOperation {
 			const duration = PerformanceTracker.endPhase('execute')
 			phaseEnded = true
 			this.metricsService.recordImageProcessing('execute', 'unknown', 'error', duration || 0)
+			// Preserve typed MediaStreamError subclasses (e.g. UnableToFetchResourceException)
+			// so callers see the correct HTTP status. Only wrap truly unknown errors.
+			if (error instanceof MediaStreamError) {
+				throw error
+			}
 			throw new InternalServerErrorException('Error fetching or processing image.')
 		}
 		finally {
@@ -322,83 +335,142 @@ export default class CacheImageResourceOperation {
 			}
 
 			const contentLength = response.headers['content-length']
+			const format = this.getFormatFromUrl(ctx.request.resourceTarget)
 			if (contentLength) {
-				const sizeBytes = Number.parseInt(contentLength, 10)
-				const format = this.getFormatFromUrl(ctx.request.resourceTarget)
+				const sizeBytes = Number.parseInt(String(contentLength), 10)
 				if (!this.inputSanitizationService.validateFileSize(sizeBytes, format)) {
 					throw new Error(`File size ${sizeBytes} bytes exceeds limit for format ${format}`)
 				}
 			}
 
+			// Streaming byte counter: accumulate response body bytes and abort if
+			// the format-specific limit is exceeded before the download completes.
+			// This catches servers that lie (or omit) Content-Length.
+			const maxFileSizes: Record<string, number> = {
+				jpeg: 5 * 1024 * 1024,
+				jpg: 5 * 1024 * 1024,
+				png: 8 * 1024 * 1024,
+				webp: 3 * 1024 * 1024,
+				gif: 2 * 1024 * 1024,
+				svg: 1 * 1024 * 1024,
+			}
+			const maxBytes = maxFileSizes[format] ?? 10 * 1024 * 1024
+			let bytesSeen = 0
+			let limitExceeded = false
+
+			const sizeGuardTransform = new Transform({
+				transform(chunk, _encoding, callback) {
+					bytesSeen += (chunk as Buffer).length
+					if (bytesSeen > maxBytes) {
+						limitExceeded = true
+						callback(new Error(
+							`Streaming size limit exceeded: ${bytesSeen} bytes > ${maxBytes} bytes for format ${format}`,
+						))
+					}
+					else {
+						callback(null, chunk)
+					}
+				},
+			})
+
+			// Wrap the axios stream with the guard transform
+			const originalStream = response.data
+			response.data = originalStream.pipe(sizeGuardTransform)
+			// Forward stream errors so StoreResourceResponseToFileJob rejects cleanly
+			originalStream.on('error', (err: Error) => sizeGuardTransform.destroy(err))
+
 			const resourceTempPath = this.getResourceTempPath(ctx)
-			await this.storeResourceResponseToFileJob.handle(ctx.request.resourceTarget, resourceTempPath, response)
+			try {
+				await this.storeResourceResponseToFileJob.handle(ctx.request.resourceTarget, resourceTempPath, response)
+			}
+			catch (err: unknown) {
+				if (limitExceeded) {
+					throw new Error(
+						`File size exceeds limit for format ${format}: stream aborted after ${bytesSeen} bytes`,
+					)
+				}
+				throw err
+			}
 
 			let processedData: Buffer
 			let metadata!: ResourceMetaData
 
-			let isSourceSvg = false
+			// Wrap the Sharp processing block so resourceTempPath (.rst) is always
+			// cleaned up — even on corrupt/unsupported image errors that Sharp throws
+			// mid-pipeline.  The finally guard is a no-op if the file was already
+			// removed on the success path.
 			try {
-				const fh = await fsOpen(resourceTempPath, 'r')
+				let isSourceSvg = false
 				try {
-					const headerBuf = Buffer.alloc(512)
-					const { bytesRead } = await fh.read(headerBuf, 0, 512, 0)
-					const header = headerBuf.toString('utf8', 0, bytesRead)
-					isSourceSvg = header.trim().startsWith('<svg') || header.includes('xmlns="http://www.w3.org/2000/svg"')
+					const fh = await fsOpen(resourceTempPath, 'r')
+					try {
+						// Read first 1024 bytes — enough to cover XML/DOCTYPE preamble (C14 fix)
+						const headerBuf = Buffer.alloc(1024)
+						const { bytesRead } = await fh.read(headerBuf, 0, 1024, 0)
+						const header = headerBuf.toString('utf8', 0, bytesRead)
+						// Strip leading whitespace, XML declaration, and DOCTYPE before checking for <svg
+						// so SVG files starting with <?xml ...?> are not misclassified as non-SVG.
+						const stripped = header
+							.trimStart()
+							.replace(/^<\?xml[^?]*\?>\s*/i, '')
+							.replace(/^<!DOCTYPE[^>]*>\s*/i, '')
+						isSourceSvg = stripped.trimStart().startsWith('<svg') || header.includes('xmlns="http://www.w3.org/2000/svg"')
+					}
+					finally {
+						await fh.close()
+					}
+					CorrelatedLogger.debug(`Source file SVG detection: ${isSourceSvg}`, CacheImageResourceOperation.name)
 				}
-				finally {
-					await fh.close()
+				catch {
+					isSourceSvg = false
+					CorrelatedLogger.debug('Could not read file header, assuming not SVG', CacheImageResourceOperation.name)
 				}
-				CorrelatedLogger.debug(`Source file SVG detection: ${isSourceSvg}`, CacheImageResourceOperation.name)
+
+				if (isSourceSvg) {
+					const result = await this.processSvgImage(ctx)
+					processedData = result.data
+					metadata = result.metadata
+				}
+				else {
+					const result = await this.processRasterImage(ctx)
+					processedData = result.data
+					metadata = result.metadata
+				}
+
+				const resourcePath = this.getResourcePath(ctx)
+				const resourceMetaPath = this.getResourceMetaPath(ctx)
+				// Write to sibling .tmp paths first, then rename() — rename is
+				// atomic on POSIX within the same filesystem, so concurrent
+				// readers either see the old file or the complete new file.
+				// Direct writeFile() was visible while still being written,
+				// returning partial buffers to concurrent requests.
+				const resourceTmpPath = `${resourcePath}.tmp`
+				const resourceMetaTmpPath = `${resourceMetaPath}.tmp`
+
+				await Promise.all([
+					this.cacheManager.set('image', ctx.id, {
+						data: processedData,
+						metadata,
+					}, this.privateTtl),
+					writeFile(resourceTmpPath, processedData),
+					writeFile(resourceMetaTmpPath, JSON.stringify(metadata), 'utf8'),
+				])
+				await Promise.all([
+					rename(resourceTmpPath, resourcePath),
+					rename(resourceMetaTmpPath, resourceMetaPath),
+				])
 			}
-			catch {
-				isSourceSvg = false
-				CorrelatedLogger.debug('Could not read file header, assuming not SVG', CacheImageResourceOperation.name)
+			finally {
+				// Always remove the .rst temp file: success path removes it here,
+				// error path also lands here so no orphan is left on disk.
+				await unlink(resourceTempPath).catch((error: unknown) => {
+					CorrelatedLogger.warn(`Failed to delete temporary file: ${(error as Error).message}`, CacheImageResourceOperation.name)
+				})
 			}
 
-			if (isSourceSvg) {
-				const result = await this.processSvgImage(ctx)
-				processedData = result.data
-				metadata = result.metadata
-			}
-			else {
-				const result = await this.processRasterImage(ctx)
-				processedData = result.data
-				metadata = result.metadata
-			}
-
-			const resourcePath = this.getResourcePath(ctx)
-			const resourceMetaPath = this.getResourceMetaPath(ctx)
-			// Write to sibling .tmp paths first, then rename() — rename is
-			// atomic on POSIX within the same filesystem, so concurrent
-			// readers either see the old file or the complete new file.
-			// Direct writeFile() was visible while still being written,
-			// returning partial buffers to concurrent requests.
-			const resourceTmpPath = `${resourcePath}.tmp`
-			const resourceMetaTmpPath = `${resourceMetaPath}.tmp`
-
-			await Promise.all([
-				this.cacheManager.set('image', ctx.id, {
-					data: processedData,
-					metadata,
-				}, this.privateTtl),
-				writeFile(resourceTmpPath, processedData),
-				writeFile(resourceMetaTmpPath, JSON.stringify(metadata), 'utf8'),
-			])
-			await Promise.all([
-				rename(resourceTmpPath, resourcePath),
-				rename(resourceMetaTmpPath, resourceMetaPath),
-			])
-
-			try {
-				await unlink(resourceTempPath)
-			}
-			catch (error: unknown) {
-				CorrelatedLogger.warn(`Failed to delete temporary file: ${(error as Error).message}`, CacheImageResourceOperation.name)
-			}
-
-			const format = metadata.format || 'unknown'
+			const processedFormat = metadata.format || 'unknown'
 			const duration = PerformanceTracker.endPhase('sync_processing')
-			this.metricsService.recordImageProcessing('process', format, 'success', duration || 0)
+			this.metricsService.recordImageProcessing('process', processedFormat, 'success', duration || 0)
 			CorrelatedLogger.debug(`Image processed successfully: ${ctx.id}`, CacheImageResourceOperation.name)
 		}
 		catch (error: unknown) {
@@ -409,26 +481,74 @@ export default class CacheImageResourceOperation {
 	}
 
 	/**
-	 * Strip script-like content from an SVG payload. SVG served with
-	 * Content-Type: image/svg+xml can execute JavaScript in some contexts
-	 * (e.g. opened as a top-level document), so raw passthrough is an
-	 * XSS vector. This is a conservative regex-based strip — for a
-	 * hardened pipeline, swap in DOMPurify or svgo with the
-	 * `removeScripts` + event-attribute-removal plugins.
+	 * Strip script-like content and XXE/SSRF vectors from an SVG payload.
+	 *
+	 * SVG served with Content-Type: image/svg+xml can execute JavaScript when
+	 * opened as a top-level document.  Additionally, SVG elements such as
+	 * <use>, <image>, and <feImage> can trigger out-of-band HTTP requests to
+	 * attacker-controlled servers (SSRF) or load external resources that
+	 * bypass the domain whitelist.
+	 *
+	 * Primary sanitizer: DOMPurify (isomorphic-dompurify) with SVG-safe config.
+	 * Regex fallback: applied after DOMPurify for defence-in-depth and to catch
+	 * any gap in the parser's coverage on non-browser environments.
+	 *
+	 * DOMPurify config:
+	 *   - USE_PROFILES.svg: allow standard SVG tags/attributes
+	 *   - FORBID_TAGS: drop <use>, <image>, <feImage> (SSRF vectors)
+	 *   - FORBID_ATTR: drop xlink:href and href from any surviving element
+	 *     (belt-and-suspenders — DOMPurify strips most anyway, but we need
+	 *     to block absolute-URL hrefs that bypass the profile whitelist)
 	 */
 	private sanitizeSvg(svg: string): string {
-		return svg
+		let result = svg
+
+		// --- Primary: DOMPurify ---
+		try {
+			result = DOMPurify.sanitize(result, {
+				USE_PROFILES: { svg: true, svgFilters: true },
+				FORBID_TAGS: ['script', 'use', 'image', 'feimage'],
+				FORBID_ATTR: ['xlink:href', 'href', 'action', 'formaction'],
+				// Keep SVG structure intact; don't wrap in <div>
+				WHOLE_DOCUMENT: false,
+				RETURN_DOM: false,
+			}) as string
+		}
+		catch (err: unknown) {
+			CorrelatedLogger.warn(
+				`DOMPurify SVG sanitization failed, falling back to regex: ${(err as Error).message}`,
+				CacheImageResourceOperation.name,
+			)
+			// result stays as the original svg — regex pass below still runs
+		}
+
+		// --- Fallback / defence-in-depth: regex pass ---
+		result = result
 			// Drop <script>…</script> blocks (including CDATA content).
 			.replace(/<script\b[\s\S]*?<\/script\s*>/gi, '')
 			// Drop self-closing <script/> tags.
 			.replace(/<script\b[^>]*\/>/gi, '')
+			// Drop <use …>, </use> — can load external symbol definitions.
+			.replace(/<use\b[^>]*>/gi, '')
+			.replace(/<\/use\s*>/gi, '')
+			// Drop <image …>, </image> — raster-embed + SSRF vector.
+			.replace(/<image\b[^>]*>/gi, '')
+			.replace(/<\/image\s*>/gi, '')
+			// Drop <feImage …>, </feImage> — filter-primitive SSRF.
+			.replace(/<feImage\b[^>]*>/gi, '')
+			.replace(/<\/feImage\s*>/gi, '')
 			// Drop inline event handlers (onclick, onload, etc.).
 			.replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, '')
 			.replace(/\son[a-z]+\s*=\s*'[^']*'/gi, '')
 			.replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, '')
-			// Neutralize javascript:/vbscript: URIs in href/xlink:href.
+			// Neutralize javascript:/vbscript:/data: URIs in href/xlink:href.
 			.replace(/(xlink:href|href)\s*=\s*"\s*(?:javascript|vbscript|data):[^"]*"/gi, '$1="#"')
 			.replace(/(xlink:href|href)\s*=\s*'\s*(?:javascript|vbscript|data):[^']*'/gi, '$1=\'#\'')
+			// Remove href/xlink:href pointing to absolute URLs (http/https/protocol-relative).
+			.replace(/(xlink:href|href)\s*=\s*"(?:https?:)?\/\/[^"]*"/gi, '$1="#"')
+			.replace(/(xlink:href|href)\s*=\s*'(?:https?:)?\/\/[^']*'/gi, '$1=\'#\'')
+
+		return result
 	}
 
 	private async processSvgImage(ctx: OperationContext): Promise<{ data: Buffer, metadata: ResourceMetaData }> {
@@ -461,7 +581,12 @@ export default class CacheImageResourceOperation {
 			return { data, metadata }
 		}
 		else {
-			CorrelatedLogger.debug('SVG needs resizing, converting to PNG for better quality', CacheImageResourceOperation.name)
+			// Sanitize the SVG before handing it to Sharp so that any embedded
+			// script/SSRF vectors are stripped even when converting to raster.
+			// We overwrite the temp file in-place — Sharp reads it by path.
+			const sanitized = this.sanitizeSvg(svgContent)
+			await writeFile(resourceTempPath, sanitized, 'utf8')
+			CorrelatedLogger.debug('SVG needs resizing, sanitized and converting to raster via Sharp', CacheImageResourceOperation.name)
 			const result = await this.webpImageManipulationJob.handle(
 				resourceTempPath,
 				resizeOptions,

@@ -9,7 +9,6 @@ import { HttpModule } from '../HTTP/http.module.js'
 import { JobQueueHealthIndicator } from './indicators/job-queue-health.indicator.js'
 import WebpImageManipulationJob from './jobs/webp-image-manipulation.job.js'
 import { CacheOperationsProcessor } from './processors/cache-operations.processor.js'
-import { ImageProcessingProcessor } from './processors/image-processing.processor.js'
 import { BullQueueService } from './services/bull-queue.service.js'
 import { JobQueueManager } from './services/job-queue.manager.js'
 import { SharpConfigService } from './services/sharp-config.service.js'
@@ -42,14 +41,6 @@ import { SharpConfigService } from './services/sharp-config.service.js'
 		}),
 		BullModule.registerQueue(
 			{
-				name: 'image-processing',
-				defaultJobOptions: {
-					removeOnComplete: 10,
-					removeOnFail: 5,
-					attempts: 3,
-				},
-			},
-			{
 				name: 'cache-operations',
 				defaultJobOptions: {
 					removeOnComplete: 5,
@@ -69,7 +60,6 @@ import { SharpConfigService } from './services/sharp-config.service.js'
 		WebpImageManipulationJob,
 		BullQueueService,
 		JobQueueManager,
-		ImageProcessingProcessor,
 		CacheOperationsProcessor,
 		JobQueueHealthIndicator,
 	],

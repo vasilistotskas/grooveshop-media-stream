@@ -1,3 +1,69 @@
+## [2.50.4](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.50.3...v2.50.4) (2026-05-04)
+
+
+### Bug Fixes
+
+* **ci:** docker trivy scan reports without gating push ([5031b7d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/5031b7dbf455e941d2f6bd2da0b740349cab1fe5))
+
+## [2.50.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.50.2...v2.50.3) (2026-05-04)
+
+
+### Bug Fixes
+
+* **ci:** ignore-unfixed on docker image trivy scan ([05331de](https://github.com/vasilistotskas/grooveshop-media-stream/commit/05331ded6199ae81570a1e21a911c2d5eb5bdba4))
+
+## [2.50.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.50.1...v2.50.2) (2026-05-04)
+
+
+### Bug Fixes
+
+* **deps:** override CVE-fixed lodash transitive ([b19cf0c](https://github.com/vasilistotskas/grooveshop-media-stream/commit/b19cf0cfbc31882b657f6960eaaa9641427dce88))
+* security and perf hardening, drop dead Bull image-processing queue ([fdf294d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/fdf294d9a65c508577610691b21163258983a401))
+
+## [2.50.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.50.0...v2.50.1) (2026-05-02)
+
+
+### Bug Fixes
+
+* hardening pass — security, atomicity, resource cleanup ([#3](https://github.com/vasilistotskas/grooveshop-media-stream/issues/3)) ([e945b62](https://github.com/vasilistotskas/grooveshop-media-stream/commit/e945b6287cc78a4e427d2211ff2d9ad1365194e2))
+
+# [2.50.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.49.0...v2.50.0) (2026-05-01)
+
+
+### Features
+
+* Bump Versions ([e56499e](https://github.com/vasilistotskas/grooveshop-media-stream/commit/e56499e7c57a4f55b96ec14f4b8317d38c7c1e48))
+
+# [2.49.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.48.1...v2.49.0) (2026-04-28)
+
+
+### Features
+
+* Bump Versions and lint ([1e2cbbc](https://github.com/vasilistotskas/grooveshop-media-stream/commit/1e2cbbc9014283d2c3c7c79065ce19ab78b67434))
+
+## [2.48.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.48.0...v2.48.1) (2026-04-26)
+
+
+### Bug Fixes
+
+* **graceful-shutdown:** log unhandledRejection without tearing down the pod ([5843462](https://github.com/vasilistotskas/grooveshop-media-stream/commit/58434626e5fb6e17f314981718d42c21dc674935))
+* **health:** correct liveness probe and move shutdown drain to readiness ([606b3fe](https://github.com/vasilistotskas/grooveshop-media-stream/commit/606b3fe0489b8eb216ed0c11fffd901118099ae5))
+* **image-controller:** loop-decode image path to handle double-encoded URLs ([d5a5d2d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/d5a5d2d5463cff5f4e70a23ebc434e8c21d12667))
+
+# [2.48.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.47.0...v2.48.0) (2026-04-26)
+
+
+### Bug Fixes
+
+* ci ([4467351](https://github.com/vasilistotskas/grooveshop-media-stream/commit/4467351db8a56be04113f1bf11aaea4d473c8a7f))
+* cors ([30b1d50](https://github.com/vasilistotskas/grooveshop-media-stream/commit/30b1d50175bd436fa55982d750a6a8cb7bf39463))
+* lint ([f64d85e](https://github.com/vasilistotskas/grooveshop-media-stream/commit/f64d85ee394cc872ac9b0c89114a3192174b3399))
+
+
+### Features
+
+* hardening pass — test fixes, validation docs, image stream stability ([f60a94e](https://github.com/vasilistotskas/grooveshop-media-stream/commit/f60a94e1cf9adf00ba1973c902b3c34734ff8d8f))
+
 # [2.47.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.46.0...v2.47.0) (2026-04-23)
 
 

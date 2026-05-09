@@ -162,10 +162,13 @@ describe('inputSanitizationService', () => {
 			expect(service.validateImageDimensions(0, 0)).toBe(true)
 		})
 
-		it('should reject mixed zero dimensions', () => {
-			// One dimension 0 and other non-zero is invalid
-			expect(service.validateImageDimensions(0, 100)).toBe(false)
-			expect(service.validateImageDimensions(100, 0)).toBe(false)
+		it('should allow single-axis (mixed zero) dimensions', () => {
+			// Single-axis resize: one dimension 0 means "use original for that axis"
+			// (0, 100) = scale to 100px tall, preserve aspect ratio
+			// (100, 0) = scale to 100px wide, preserve aspect ratio
+			// Both are valid — Sharp supports aspect-ratio-preserving resize this way.
+			expect(service.validateImageDimensions(0, 100)).toBe(true)
+			expect(service.validateImageDimensions(100, 0)).toBe(true)
 		})
 
 		it('should reject negative dimensions', () => {

@@ -149,7 +149,8 @@ describe('configService', () => {
 		it('should identify hot-reloadable keys', () => {
 			expect(service.isHotReloadable('MONITORING_ENABLED')).toBe(true)
 			expect(service.isHotReloadable('PROCESSING_MAX_CONCURRENT')).toBe(true)
-			expect(service.isHotReloadable('CACHE_MEMORY_TTL')).toBe(true)
+			// Production code uses CACHE_MEMORY_DEFAULT_TTL (not CACHE_MEMORY_TTL)
+			expect(service.isHotReloadable('CACHE_MEMORY_DEFAULT_TTL')).toBe(true)
 			expect(service.isHotReloadable('PORT')).toBe(false)
 		})
 

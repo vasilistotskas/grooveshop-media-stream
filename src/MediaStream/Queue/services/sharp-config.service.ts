@@ -14,7 +14,6 @@ import sharp from 'sharp'
  *
  * This replaces conflicting configurations in:
  * - webp-image-manipulation.job.ts (was: 8 concurrent, 200MB cache)
- * - image-processing.processor.ts (was: 4 concurrent, 50MB cache)
  */
 @Injectable()
 export class SharpConfigService implements OnModuleInit {

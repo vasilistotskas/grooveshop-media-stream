@@ -96,6 +96,9 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 		const correlationId = this._correlationService.getCorrelationId()
 
 		if (error instanceof MediaStreamError) {
+			// Deliberately omit error.context (e.g. { resource: url }) from the
+			// response body — it is written to logs via toJSON() above. Exposing
+			// upstream resource URLs in API responses leaks internal topology.
 			return {
 				name: error.name,
 				message: error.message,

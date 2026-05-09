@@ -6,14 +6,18 @@ import type {
 import type { DiskSpaceInfo } from '../indicators/disk-space-health.indicator.js'
 import type { MemoryInfo } from '../indicators/memory-health.indicator.js'
 import * as process from 'node:process'
+import * as v8 from 'node:v8'
 import { CacheHealthIndicator } from '#microservice/Cache/indicators/cache-health.indicator'
 import { RedisHealthIndicator } from '#microservice/Cache/indicators/redis-health.indicator'
+import { InternalSecretGuard } from '#microservice/common/guards/internal-secret.guard'
+import { isShuttingDown } from '#microservice/common/utils/graceful-shutdown.util'
 import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 import { JobQueueHealthIndicator } from '#microservice/Queue/indicators/job-queue-health.indicator'
 import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
-import { Controller, Get, ServiceUnavailableException } from '@nestjs/common'
+import { Controller, Get, HttpCode, HttpStatus, Post, ServiceUnavailableException, UseGuards } from '@nestjs/common'
 import { HealthCheck, HealthCheckError, HealthCheckService } from '@nestjs/terminus'
+import { HealthDetailGuard } from '../guards/health-detail.guard.js'
 import { DiskSpaceHealthIndicator } from '../indicators/disk-space-health.indicator.js'
 import { MemoryHealthIndicator } from '../indicators/memory-health.indicator.js'
 import { SharpHealthIndicator } from '../indicators/sharp-health.indicator.js'
@@ -49,6 +53,7 @@ export class HealthController {
 	}
 
 	@Get('detailed')
+	@UseGuards(HealthDetailGuard)
 	async getDetailedHealth(): Promise<{
 		status: HealthCheckStatus
 		info: HealthIndicatorResult
@@ -93,6 +98,17 @@ export class HealthController {
 
 	@Get('ready')
 	async readiness(): Promise<{ status: string, timestamp: string, checks?: any }> {
+		// Drain traffic during shutdown: failing readiness here makes the K8s
+		// Service stop routing new requests to this pod while existing
+		// in-flight requests finish. Liveness stays passing so kubelet does
+		// not race the graceful-shutdown sequence with SIGKILL.
+		if (isShuttingDown()) {
+			throw new ServiceUnavailableException({
+				status: 'shutting-down',
+				timestamp: new Date().toISOString(),
+			})
+		}
+
 		try {
 			// Readiness probe: checks ONLY in-process state required to serve
 			// traffic. Do NOT include external dependencies (Redis, upstream HTTP)
@@ -139,6 +155,29 @@ export class HealthController {
 
 	@Get('live')
 	async liveness(): Promise<{ status: string, timestamp: string, uptime: number }> {
+		// Liveness MUST stay passing while the process is alive. It does not
+		// fail during graceful shutdown (that is /health/ready's job) — failing
+		// it would make kubelet send SIGKILL and race the in-progress shutdown.
+		//
+		// We compare RSS against V8's actual heap ceiling
+		// (`heap_size_limit` ≈ --max-old-space-size). The previous check used
+		// `heapUsed / heapTotal`, which is meaningless: V8 grows `heapTotal`
+		// lazily up to the ceiling, so apps routinely sit at >95% of the
+		// currently-allocated heap during normal GC churn — that is not OOM.
+		// True OOM is handled by the kernel / K8s memory limit; this is a
+		// soft guard that fires only when we are within 5% of the V8 ceiling.
+		const memUsage = process.memoryUsage()
+		const heapLimit = v8.getHeapStatistics().heap_size_limit
+		const heapPercent = memUsage.heapUsed / heapLimit
+		if (heapPercent > 0.95) {
+			throw new ServiceUnavailableException({
+				status: 'heap-pressure',
+				heapUsed: memUsage.heapUsed,
+				heapLimit,
+				heapPercent: (heapPercent * 100).toFixed(1),
+			})
+		}
+
 		return {
 			status: 'alive',
 			timestamp: new Date().toISOString(),
@@ -160,6 +199,22 @@ export class HealthController {
 			circuitBreaker: {
 				isOpen,
 			},
+		}
+	}
+
+	/**
+	 * Force-reset the HTTP circuit breaker to closed state.
+	 * Protected by InternalSecretGuard — requires x-internal-secret header.
+	 * Should only be called by ops/admin tooling after a confirmed upstream recovery.
+	 */
+	@Post('circuit-breaker/reset')
+	@UseGuards(InternalSecretGuard)
+	@HttpCode(HttpStatus.OK)
+	resetCircuitBreaker(): { timestamp: string, message: string } {
+		this.httpClientService.resetCircuitBreaker()
+		return {
+			timestamp: new Date().toISOString(),
+			message: 'Circuit breaker reset to closed state',
 		}
 	}
 }

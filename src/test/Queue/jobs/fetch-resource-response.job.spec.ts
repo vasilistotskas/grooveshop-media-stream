@@ -63,10 +63,19 @@ describe('fetchResourceResponseJob', () => {
 		})
 
 		it('should handle error and return 404 response', async () => {
-			const mockError = new AxiosError('Network error')
-			mockError.config = {
+			// Errors with a response (HTTP-level 4xx/5xx from upstream) return a shaped
+			// 404 object. Errors without a response (network-level, e.g. ECONNREFUSED)
+			// throw UnableToFetchResourceException instead.
+			const mockConfig = {
 				headers: new AxiosHeaders(),
 			}
+			const mockError = new AxiosError('Not Found', 'ERR_BAD_RESPONSE', mockConfig, null, {
+				status: 404,
+				statusText: 'Not Found',
+				headers: {} as any,
+				config: mockConfig as any,
+				data: null,
+			} as any)
 
 			const request = new CacheImageRequest({
 				resourceTarget: 'http://example.com/image.jpg',
@@ -79,9 +88,9 @@ describe('fetchResourceResponseJob', () => {
 
 			expect(result).toEqual({
 				status: 404,
-				statusText: 'Bad Request',
+				statusText: 'Not Found',
 				headers: {},
-				config: mockError.config,
+				config: mockConfig,
 				data: null,
 			})
 		})

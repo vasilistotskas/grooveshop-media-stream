@@ -156,6 +156,31 @@ describe('mediaStreamImageController', () => {
 			)
 		})
 
+		// C19 — Double-encoded URL must be rejected (400)
+		it('should reject double-encoded paths', async () => {
+			// %252F is a double-encoded slash: first pass decodes %25 → %, leaving %2F
+			// which means the decoded string still contains %, signaling double-encoding
+			const mockRequest = {
+				path: '/media_stream-image/media/uploads/test%252Fpath/image.webp/100/100/contain/entropy/transparent/5/80.webp',
+			} as any
+
+			await expect(controller.handleImageRequest(mockRequest, mockResponse))
+				.rejects
+				.toThrow('Double-encoded URL detected in image path')
+		})
+
+		it('should reject deeply double-encoded path traversal attempt', async () => {
+			// %25252e%25252e%2525252f is a deeply double-encoded ../
+			const mockRequest = {
+				path: '/media_stream-image/%25252e%25252e%2525252f/image.webp/100/100/contain/entropy/transparent/5/80.webp',
+			} as any
+
+			// After one decode pass, result still contains %, so it gets rejected
+			await expect(controller.handleImageRequest(mockRequest, mockResponse))
+				.rejects
+				.toThrow()
+		})
+
 		it('should decode URL-encoded Unicode characters (Greek)', async () => {
 			// Test with Greek characters as sent by Facebook/Twitter crawlers
 			// URL: /media/uploads/blog/πωσ_cover.png/1200/630/cover/entropy/transparent/5/80.png

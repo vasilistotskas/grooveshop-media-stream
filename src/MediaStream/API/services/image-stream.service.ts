@@ -199,7 +199,12 @@ export class ImageStreamService {
 			imageData = data
 		}
 		else if (data && typeof data === 'object' && 'data' in data) {
-			imageData = Buffer.from((data as any).data)
+			const payload = (data as any).data
+			// Avoid copying when the cache already holds a real Buffer — Buffer.from(Buffer)
+			// allocates a new backing ArrayBuffer and copies every byte. When payload
+			// is a Uint8Array subarray (e.g. from deserializeValue's subarray() view)
+			// Buffer.isBuffer() is true and we skip the copy entirely.
+			imageData = Buffer.isBuffer(payload) ? payload : Buffer.from(payload)
 		}
 		else {
 			this._logger.warn('Unexpected data type, falling back to file', { correlationId })

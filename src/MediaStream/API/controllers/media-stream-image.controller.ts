@@ -73,13 +73,27 @@ export default class MediaStreamImageController {
 			? req.path.substring(basePath.length)
 			: req.path
 
+		// Decode percent-encoding exactly once (C19 fix — multi-decode evasion).
+		// A single pass is sufficient: legitimate single-encoded paths become
+		// plain text; invalid encodings throw immediately.
+		// Double-encoded input (e.g. %252F → %2F after one pass) is detected
+		// by the presence of a literal '%' in the decoded string that was not
+		// there before decoding — this indicates an extra encoding layer that
+		// could be used to bypass path-traversal and security checks.
 		if (fullPath && fullPath.includes('%')) {
+			let decoded: string
 			try {
-				fullPath = decodeURIComponent(fullPath)
+				decoded = decodeURIComponent(fullPath)
 			}
 			catch {
 				throw new BadRequestException('Invalid URL encoding in image path')
 			}
+			// Reject double-encoded paths: decoded differs from input AND still
+			// contains a '%' — the inner layer was intentionally percent-encoded.
+			if (decoded !== fullPath && decoded.includes('%')) {
+				throw new BadRequestException('Double-encoded URL detected in image path')
+			}
+			fullPath = decoded
 		}
 
 		this._logger.debug('Processing image request', { fullPath, originalPath: req.path, correlationId })
