@@ -173,7 +173,14 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	'rateLimit.bypass.bots': { env: 'RATE_LIMIT_BYPASS_BOTS', default: true, type: 'boolean' },
 
 	// Validation configuration
-	'validation.allowedDomains': { env: 'VALIDATION_ALLOWED_DOMAINS', default: 'localhost,127.0.0.1,backend-service,static-svc,frontend-nuxt-service,media-stream-service', type: 'string' },
+	// Production hostnames are included in the built-in default so that the service
+	// works correctly even when VALIDATION_ALLOWED_DOMAINS is absent from the env.
+	// Operators can override this list entirely by setting the env var.
+	'validation.allowedDomains': {
+		env: 'VALIDATION_ALLOWED_DOMAINS',
+		default: 'localhost,127.0.0.1,backend-service,static-svc,frontend-nuxt-service,media-stream-service,webside.gr,api.webside.gr,assets.webside.gr,static.webside.gr',
+		type: 'string',
+	},
 
 	// Graceful shutdown configuration
 	'shutdown.timeout': { env: 'SHUTDOWN_TIMEOUT', default: 30000, type: 'number' },

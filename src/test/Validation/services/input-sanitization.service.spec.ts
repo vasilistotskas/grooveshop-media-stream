@@ -100,6 +100,26 @@ describe('inputSanitizationService', () => {
 			expect(service.validateUrl('http://localhost:3000/test.png')).toBe(true)
 		})
 
+		it('should accept webside.gr production hostnames when using built-in default domain list', () => {
+			// Regression test for the production failure where the webside.gr family was
+			// dropped from the default — any upstream fetch from those hosts must be
+			// accepted even without VALIDATION_ALLOWED_DOMAINS in the environment.
+			const serviceWithProductionDefaults = new InputSanitizationService({
+				getOptional: (key: string, defaultValue: any) => {
+					// Simulate the built-in config default (no env override)
+					if (key === 'validation.allowedDomains') {
+						return 'localhost,127.0.0.1,backend-service,static-svc,frontend-nuxt-service,media-stream-service,webside.gr,api.webside.gr,assets.webside.gr,static.webside.gr'
+					}
+					return defaultValue
+				},
+			} as any)
+
+			expect(serviceWithProductionDefaults.validateUrl('https://webside.gr/media/public/uploads/image.jpg')).toBe(true)
+			expect(serviceWithProductionDefaults.validateUrl('https://api.webside.gr/media/tenant/uploads/img.jpg')).toBe(true)
+			expect(serviceWithProductionDefaults.validateUrl('https://assets.webside.gr/static/images/logo.png')).toBe(true)
+			expect(serviceWithProductionDefaults.validateUrl('https://static.webside.gr/static/images/hero.webp')).toBe(true)
+		})
+
 		it('should reject URLs from non-allowed domains', () => {
 			expect(service.validateUrl('https://malicious.com/image.jpg')).toBe(false)
 			expect(service.validateUrl('http://evil.org/test.png')).toBe(false)

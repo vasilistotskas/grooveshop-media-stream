@@ -23,7 +23,27 @@ export class ConfigService implements OnModuleInit {
 
 	async onModuleInit(): Promise<void> {
 		await this.validate()
+		this.warnIfUsingFallbackDomains()
 		this._logger.log('Configuration loaded and validated successfully')
+	}
+
+	/**
+	 * Emit a WARNING when VALIDATION_ALLOWED_DOMAINS is absent and the service
+	 * is running with the built-in fallback list.  The fallback includes the
+	 * production webside.gr hostnames so the service remains operational, but
+	 * operators should override the list when adding new tenants.
+	 */
+	private warnIfUsingFallbackDomains(): void {
+		const isUsingEnvOverride = !!(
+			this.nestConfigService.get<string>('VALIDATION_ALLOWED_DOMAINS')
+		)
+		if (!isUsingEnvOverride) {
+			this._logger.warn(
+				'VALIDATION_ALLOWED_DOMAINS is not set. Using built-in fallback domain list '
+				+ '(includes webside.gr family). Set VALIDATION_ALLOWED_DOMAINS env to override '
+				+ 'for new tenants or to restrict the whitelist in production.',
+			)
+		}
 	}
 
 	/**
@@ -381,7 +401,7 @@ export class ConfigService implements OnModuleInit {
 			},
 			validation: {
 				allowedDomains: config.validation?.allowedDomains
-					?? 'localhost,127.0.0.1,backend-service,static-svc,frontend-nuxt-service,media-stream-service',
+					?? 'localhost,127.0.0.1,backend-service,static-svc,frontend-nuxt-service,media-stream-service,webside.gr,api.webside.gr,assets.webside.gr,static.webside.gr',
 			},
 			shutdown: {
 				timeout: config.shutdown?.timeout ?? 30000,

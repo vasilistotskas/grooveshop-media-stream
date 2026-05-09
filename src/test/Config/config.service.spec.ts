@@ -186,6 +186,22 @@ describe('configService', () => {
 			expect(serviceWithDefaults.get('processing.maxConcurrent')).toBe(10)
 			expect(serviceWithDefaults.get('monitoring.enabled')).toBe(true)
 		})
+
+		it('should include webside.gr production hostnames in the default allowed-domains list', () => {
+			const emptyNestConfigService = {
+				get: vi.fn(() => undefined),
+			}
+
+			const serviceWithDefaults = new ConfigService(emptyNestConfigService as any)
+			const allowedDomains: string = serviceWithDefaults.get('validation.allowedDomains')
+
+			// The built-in fallback must include all four webside.gr family hostnames
+			// so that upstream fetches work even when VALIDATION_ALLOWED_DOMAINS is absent.
+			expect(allowedDomains).toContain('webside.gr')
+			expect(allowedDomains).toContain('api.webside.gr')
+			expect(allowedDomains).toContain('assets.webside.gr')
+			expect(allowedDomains).toContain('static.webside.gr')
+		})
 	})
 
 	describe('type Safety', () => {
