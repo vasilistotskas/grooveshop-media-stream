@@ -9,6 +9,7 @@ import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 import { CacheOperationsProcessor } from '#microservice/Queue/processors/cache-operations.processor'
+import GenerateResourceIdentityFromRequestJob from '#microservice/Queue/jobs/generate-resource-identity-from-request.job'
 import { JobPriority } from '#microservice/Queue/types/job.types'
 import { Logger } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
@@ -23,6 +24,7 @@ describe('cacheOperationsProcessor', () => {
 	let mockCacheManager: MockedObject<MultiLayerCacheManager>
 	let mockCorrelationService: MockedObject<CorrelationService>
 	let mockHttpClient: MockedObject<HttpClientService>
+	let generateIdentityJob: GenerateResourceIdentityFromRequestJob
 
 	const createMockWarmingJob = (data: Partial<CacheWarmingJobData>): Job<CacheWarmingJobData> => ({
 		id: 'test-job',
@@ -78,6 +80,7 @@ describe('cacheOperationsProcessor', () => {
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [
 				CacheOperationsProcessor,
+				GenerateResourceIdentityFromRequestJob,
 				{
 					provide: MultiLayerCacheManager,
 					useValue: mockCacheManagerFactory,
@@ -97,6 +100,7 @@ describe('cacheOperationsProcessor', () => {
 		mockCacheManager = module.get(MultiLayerCacheManager)
 		mockCorrelationService = module.get(CorrelationService)
 		mockHttpClient = module.get(HttpClientService)
+		generateIdentityJob = module.get(GenerateResourceIdentityFromRequestJob)
 
 		// Mock logger to avoid console output during tests
 		vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => {})
@@ -357,19 +361,12 @@ describe('cacheOperationsProcessor', () => {
 				maxSize: 1024 * 1024,
 			})
 
-			// Mock a critical error that breaks the entire job by throwing synchronously
-			const localProcessor = new CacheOperationsProcessor(
-				mockCorrelationService,
-				mockCacheManager,
-				mockHttpClient,
-			)
-
 			// Override cleanupFileCache to throw a critical error
-			vi.spyOn(localProcessor as any, 'cleanupFileCache').mockImplementation(() => {
+			vi.spyOn(processor as any, 'cleanupFileCache').mockImplementation(() => {
 				throw new Error('Critical cache error')
 			})
 
-			const result = await localProcessor.processCacheCleanup(job)
+			const result = await processor.processCacheCleanup(job)
 
 			expect(result.success).toBe(false)
 			expect(result.error).toBe('Critical cache error')
@@ -377,36 +374,67 @@ describe('cacheOperationsProcessor', () => {
 		})
 	})
 
-	describe('generateCacheKey', () => {
-		it('should generate consistent cache keys', () => {
-			const localProcessor = new CacheOperationsProcessor(
-				mockCorrelationService,
-				mockCacheManager,
-				mockHttpClient,
-			)
-
+	describe('resource identity via GenerateResourceIdentityFromRequestJob', () => {
+		it('should generate consistent UUIDs for the same request', async () => {
 			const request = new CacheImageRequest({ resourceTarget: 'https://example.com/image.jpg' })
-			const key1 = (localProcessor as any).generateCacheKey(request)
-			const key2 = (localProcessor as any).generateCacheKey(request)
+			const key1 = await generateIdentityJob.handle(request)
+			const key2 = await generateIdentityJob.handle(request)
 
 			expect(key1).toBe(key2)
-			// generateCacheKey returns a UUID-v5 (no prefix)
+			// handle() returns a UUID-v5 (no prefix)
 			expect(key1).toMatch(/^[\da-f]{8}-[\da-f]{4}-5[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i)
 		})
 
-		it('should generate different keys for different URLs', () => {
-			const localProcessor = new CacheOperationsProcessor(
-				mockCorrelationService,
-				mockCacheManager,
-				mockHttpClient,
-			)
-
+		it('should generate different UUIDs for different URLs', async () => {
 			const request1 = new CacheImageRequest({ resourceTarget: 'https://example.com/image1.jpg' })
 			const request2 = new CacheImageRequest({ resourceTarget: 'https://example.com/image2.jpg' })
-			const key1 = (localProcessor as any).generateCacheKey(request1)
-			const key2 = (localProcessor as any).generateCacheKey(request2)
+			const key1 = await generateIdentityJob.handle(request1)
+			const key2 = await generateIdentityJob.handle(request2)
 
 			expect(key1).not.toBe(key2)
+		})
+
+		it('processor warmCacheForImage delegates to GenerateResourceIdentityFromRequestJob for the same UUID', async () => {
+			// Verify the processor uses the injected job — not a fork — so cache keys
+			// on the warm path always match the identity on the request path.
+			//
+			// The URL below embeds a tenant schema in the /media/{schema}/uploads/ pattern,
+			// so extractTenantSchemaFromUrl returns 'acme' — matching the request we build.
+			const imageUrl = 'https://example.com/media/acme/uploads/banner.jpg'
+			const request = new CacheImageRequest({
+				resourceTarget: imageUrl,
+				tenantSchema: 'acme',
+			})
+			const expectedKey = await generateIdentityJob.handle(request)
+
+			// Spy on the job before the processor calls it
+			const spyHandle = vi.spyOn(generateIdentityJob, 'handle')
+			mockCacheManager.get.mockResolvedValue('cached-data') // already cached → skip fetch
+
+			const job = {
+				id: 'test',
+				name: 'cache-warming',
+				data: {
+					correlationId: 'corr-1',
+					imageUrls: [imageUrl],
+					priority: JobPriority.LOW,
+					batchSize: 1,
+				},
+				opts: {},
+				progress: 0,
+				delay: 0,
+				timestamp: Date.now(),
+				attemptsMade: 0,
+			}
+
+			await processor.processCacheWarming(job)
+
+			expect(spyHandle).toHaveBeenCalledOnce()
+			const calledWith = spyHandle.mock.calls[0][0] as CacheImageRequest
+			expect(calledWith.resourceTarget).toBe(imageUrl)
+			// The key produced by the job call must match the one we pre-computed
+			const keyFromSpy = await spyHandle.mock.results[0].value
+			expect(keyFromSpy).toBe(expectedKey)
 		})
 	})
 })

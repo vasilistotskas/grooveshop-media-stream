@@ -1,7 +1,6 @@
 import type { Job } from '../interfaces/job-queue.interface.js'
 import type { CacheCleanupJobData, CacheWarmingJobData, JobResult } from '../types/job.types.js'
 import { Buffer } from 'node:buffer'
-import { createHash } from 'node:crypto'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import * as process from 'node:process'
@@ -10,9 +9,7 @@ import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 import { Injectable, Logger } from '@nestjs/common'
-
-const NAMESPACE_URL = '6ba7b811-9dad-11d1-80b4-00c04fd430c8'
-const DASH_RE = /-/g
+import GenerateResourceIdentityFromRequestJob from '../jobs/generate-resource-identity-from-request.job.js'
 
 @Injectable()
 export class CacheOperationsProcessor {
@@ -22,6 +19,7 @@ export class CacheOperationsProcessor {
 		private readonly _correlationService: CorrelationService,
 		private readonly cacheManager: MultiLayerCacheManager,
 		private readonly httpClient: HttpClientService,
+		private readonly generateIdentityJob: GenerateResourceIdentityFromRequestJob,
 	) {}
 
 	async processCacheWarming(job: Job<CacheWarmingJobData>): Promise<JobResult> {
@@ -179,7 +177,7 @@ export class CacheOperationsProcessor {
 				resourceTarget: imageUrl,
 				tenantSchema,
 			})
-			const cacheKey = this.generateCacheKey(request)
+			const cacheKey = await this.generateIdentityJob.handle(request)
 
 			const cached = await this.cacheManager.get('image', cacheKey)
 			if (cached) {
@@ -262,25 +260,4 @@ export class CacheOperationsProcessor {
 		}
 	}
 
-	/**
-	 * Generates a UUID-v5 cache key from a CacheImageRequest, matching the
-	 * identity produced by GenerateResourceIdentityFromRequestJob on the sync path.
-	 */
-	private generateCacheKey(request: CacheImageRequest): string {
-		const requestStr = JSON.stringify(JSON.parse(JSON.stringify(request)))
-		const ns = Buffer.from(NAMESPACE_URL.replace(DASH_RE, ''), 'hex')
-		const hash = createHash('sha1').update(Buffer.concat([ns, Buffer.from(requestStr)])).digest()
-
-		hash[6] = (hash[6] & 0x0F) | 0x50
-		hash[8] = (hash[8] & 0x3F) | 0x80
-
-		const hex = hash.subarray(0, 16).toString('hex')
-		return (
-			`${hex.substring(0, 8)}-`
-			+ `${hex.substring(8, 12)}-`
-			+ `${hex.substring(12, 16)}-`
-			+ `${hex.substring(16, 20)}-`
-			+ `${hex.substring(20)}`
-		)
-	}
 }
