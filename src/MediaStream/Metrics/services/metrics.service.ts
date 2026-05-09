@@ -297,6 +297,12 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	/**
 	 * Record HTTP request metrics.
 	 *
+	 * @param method - HTTP method (GET, POST, etc.)
+	 * @param route - Normalized route path
+	 * @param statusCode - HTTP response status code
+	 * @param duration - Request duration in seconds
+	 * @param requestSize - Optional request body size in bytes
+	 * @param responseSize - Optional response body size in bytes
 	 * @param tenantSchema - Optional tenant schema label for per-tenant observability.
 	 *   Pass the schema extracted from the request URL (e.g. 'acme', 'public').
 	 *   Defaults to 'public' for legacy/shared routes that carry no tenant context.
@@ -334,6 +340,10 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	/**
 	 * Record image processing metrics.
 	 *
+	 * @param operation - Processing operation name
+	 * @param format - Image format (webp, jpeg, png, etc.)
+	 * @param status - Operation result: 'success' or 'error'
+	 * @param duration - Processing duration in seconds
 	 * @param tenantSchema - Optional tenant schema label for per-tenant observability.
 	 *   Defaults to 'public' for requests that carry no tenant context.
 	 */
@@ -363,6 +373,10 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	/**
 	 * Record cache operation metrics.
 	 *
+	 * @param operation - Cache operation type
+	 * @param cacheType - Cache layer name (memory, redis, multi-layer, etc.)
+	 * @param status - Operation result: 'hit', 'miss', 'success', or 'error'
+	 * @param duration - Optional operation duration in seconds
 	 * @param tenantSchema - Optional tenant schema label for per-tenant observability.
 	 *   Defaults to 'public' for infrastructure-level cache calls (memory/Redis layers)
 	 *   that have no tenant context.  Pass the actual schema at call sites that do.

@@ -8,8 +8,8 @@ import CacheImageRequest from '#microservice/API/dto/cache-image-request.dto'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
-import { CacheOperationsProcessor } from '#microservice/Queue/processors/cache-operations.processor'
 import GenerateResourceIdentityFromRequestJob from '#microservice/Queue/jobs/generate-resource-identity-from-request.job'
+import { CacheOperationsProcessor } from '#microservice/Queue/processors/cache-operations.processor'
 import { JobPriority } from '#microservice/Queue/types/job.types'
 import { Logger } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
@@ -22,7 +22,7 @@ const mockFs = fs as MockedObject<typeof fs>
 describe('cacheOperationsProcessor', () => {
 	let processor: CacheOperationsProcessor
 	let mockCacheManager: MockedObject<MultiLayerCacheManager>
-	let mockCorrelationService: MockedObject<CorrelationService>
+	let _mockCorrelationService: MockedObject<CorrelationService>
 	let mockHttpClient: MockedObject<HttpClientService>
 	let generateIdentityJob: GenerateResourceIdentityFromRequestJob
 
@@ -98,7 +98,7 @@ describe('cacheOperationsProcessor', () => {
 
 		processor = module.get<CacheOperationsProcessor>(CacheOperationsProcessor)
 		mockCacheManager = module.get(MultiLayerCacheManager)
-		mockCorrelationService = module.get(CorrelationService)
+		_mockCorrelationService = module.get(CorrelationService)
 		mockHttpClient = module.get(HttpClientService)
 		generateIdentityJob = module.get(GenerateResourceIdentityFromRequestJob)
 
