@@ -111,7 +111,24 @@ export default class MediaStreamImageController {
 	}
 
 	/**
-	 * Find matching image source and extract parameters
+	 * Find matching image source and extract parameters.
+	 *
+	 * **Route ordering contract** — patterns are tested in V8 insertion order of
+	 * the IMAGE_SOURCES object literal.  The current order is:
+	 *
+	 *   1. UPLOADED_MEDIA  — ``media/:tenantSchema/uploads/:imagePath+/…``
+	 *   2. UPLOADED_MEDIA_LEGACY — ``media/uploads/:imagePath+/…``
+	 *   3. STATIC_IMAGES   — ``static/images/:image/…``
+	 *
+	 * UPLOADED_MEDIA **must** come before UPLOADED_MEDIA_LEGACY; otherwise a
+	 * multi-tenant URL like ``media/acme/uploads/…`` could be matched by the
+	 * legacy pattern, silently mapping ``acme`` as the start of ``imagePath``
+	 * and losing the tenant schema.  The patterns are distinct enough that no
+	 * ambiguity exists between UPLOADED_MEDIA and STATIC_IMAGES.
+	 *
+	 * Regression guard: see the unit test
+	 * ``src/test/API/controllers/media-stream-image.controller.spec.ts``
+	 * → "route ordering — UPLOADED_MEDIA matched before UPLOADED_MEDIA_LEGACY"
 	 */
 	private findMatchingSource(path: string): { sourceKey: ImageSourceKey, params: ImageProcessingParams } | null {
 		for (const [key, config] of Object.entries(IMAGE_SOURCES)) {

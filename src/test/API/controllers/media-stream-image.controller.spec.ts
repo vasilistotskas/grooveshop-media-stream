@@ -258,4 +258,46 @@ describe('mediaStreamImageController', () => {
 			)
 		})
 	})
+
+	describe('route ordering — UPLOADED_MEDIA matched before UPLOADED_MEDIA_LEGACY', () => {
+		/**
+		 * Regression guard for the IMAGE_SOURCES insertion-order contract.
+		 *
+		 * A multi-tenant URL like ``media/acme/uploads/banner.jpg/…`` must match
+		 * UPLOADED_MEDIA (which captures ``tenantSchema = "acme"``) and NOT
+		 * UPLOADED_MEDIA_LEGACY (which would swallow ``acme`` as part of
+		 * ``imagePath``, losing the tenant context entirely).
+		 *
+		 * If IMAGE_SOURCES is ever reordered, this test will fail loudly.
+		 */
+		it('should match UPLOADED_MEDIA for multi-tenant URLs, capturing tenantSchema', async () => {
+			const mockRequest = {
+				path: '/media_stream-image/media/acme/uploads/banner.jpg/800/600/cover/entropy/transparent/5/80.webp',
+			} as any
+
+			await controller.handleImageRequest(mockRequest, mockResponse)
+
+			// The UPLOADED_MEDIA source must be selected — its routeParams include 'tenantSchema'
+			expect(mockRequestValidatorService.validateRequest).toHaveBeenCalledWith(
+				expect.objectContaining({
+					source: expect.objectContaining({ name: 'uploaded_media' }),
+					params: expect.objectContaining({ tenantSchema: 'acme' }),
+				}),
+			)
+		})
+
+		it('should match UPLOADED_MEDIA_LEGACY for legacy URLs without tenant segment', async () => {
+			const mockRequest = {
+				path: '/media_stream-image/media/uploads/banner.jpg/800/600/cover/entropy/transparent/5/80.webp',
+			} as any
+
+			await controller.handleImageRequest(mockRequest, mockResponse)
+
+			expect(mockRequestValidatorService.validateRequest).toHaveBeenCalledWith(
+				expect.objectContaining({
+					source: expect.objectContaining({ name: 'uploaded_media_legacy' }),
+				}),
+			)
+		})
+	})
 })
