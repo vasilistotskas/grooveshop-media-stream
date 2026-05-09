@@ -11,6 +11,13 @@ import { HttpClientService } from '#microservice/HTTP/services/http-client.servi
 import { Injectable, Logger } from '@nestjs/common'
 import GenerateResourceIdentityFromRequestJob from '../jobs/generate-resource-identity-from-request.job.js'
 
+/**
+ * Validates extracted tenant schema segments: lowercase letter or underscore,
+ * followed by up to 62 lowercase alphanumeric or underscore characters.
+ * Must match the pattern used in RequestValidatorService.
+ */
+const TENANT_SCHEMA_PATTERN = /^[a-z_][a-z0-9_]{0,62}$/
+
 @Injectable()
 export class CacheOperationsProcessor {
 	private readonly _logger = new Logger(CacheOperationsProcessor.name)
@@ -153,7 +160,7 @@ export class CacheOperationsProcessor {
 	}
 
 	/**
-	 * Extract the tenant schema from a resource URL.
+	 * Extract and validate the tenant schema from a resource URL.
 	 *
 	 * ``UPLOADED_MEDIA`` URLs look like
 	 * ``{backend}/media/{tenantSchema}/uploads/{path}``; we pull the
@@ -161,11 +168,23 @@ export class CacheOperationsProcessor {
 	 * (which is the legacy, pre-multi-tenant path). Static images and
 	 * legacy paths return ``"public"`` so their cache keys remain
 	 * stable and shared across tenants.
+	 *
+	 * The extracted segment is validated against ``TENANT_SCHEMA_PATTERN``
+	 * (lowercase alphanumeric + underscore, 1–63 chars).  An invalid segment
+	 * degrades gracefully to ``"public"`` with a debug log rather than
+	 * crashing the warm-up job.
 	 */
 	private extractTenantSchemaFromUrl(url: string): string {
 		const match = url.match(/\/media\/([^/]+)\/uploads\//)
 		if (match && match[1] !== 'uploads') {
-			return match[1]
+			const candidate = match[1]
+			if (TENANT_SCHEMA_PATTERN.test(candidate)) {
+				return candidate
+			}
+			this._logger.debug(
+				`Extracted tenant schema "${candidate}" from URL does not match TENANT_SCHEMA_PATTERN — `
+				+ `falling back to "public". URL: ${url}`,
+			)
 		}
 		return 'public'
 	}

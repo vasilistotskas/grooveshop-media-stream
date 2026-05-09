@@ -374,6 +374,37 @@ describe('cacheOperationsProcessor', () => {
 		})
 	})
 
+	describe('extractTenantSchemaFromUrl', () => {
+		it('should extract a valid lowercase schema from a multi-tenant URL', () => {
+			const extract = (url: string) => (processor as any).extractTenantSchemaFromUrl(url)
+			expect(extract('http://api.webside.gr/media/acme/uploads/banner.jpg')).toBe('acme')
+			expect(extract('http://api.webside.gr/media/tenant_abc/uploads/img.png')).toBe('tenant_abc')
+		})
+
+		it('should return "public" for legacy (non-multi-tenant) URLs', () => {
+			const extract = (url: string) => (processor as any).extractTenantSchemaFromUrl(url)
+			expect(extract('http://api.webside.gr/media/uploads/banner.jpg')).toBe('public')
+			expect(extract('http://api.webside.gr/static/images/logo.png')).toBe('public')
+			expect(extract('http://api.webside.gr/no-match')).toBe('public')
+		})
+
+		it('should reject uppercase schema segments and fall back to "public"', () => {
+			const extract = (url: string) => (processor as any).extractTenantSchemaFromUrl(url)
+			expect(extract('http://api.webside.gr/media/UPPERCASE/uploads/img.png')).toBe('public')
+		})
+
+		it('should reject schema segments with hyphens and fall back to "public"', () => {
+			const extract = (url: string) => (processor as any).extractTenantSchemaFromUrl(url)
+			expect(extract('http://api.webside.gr/media/bad-schema/uploads/img.png')).toBe('public')
+		})
+
+		it('should reject schema segments with special characters and fall back to "public"', () => {
+			const extract = (url: string) => (processor as any).extractTenantSchemaFromUrl(url)
+			expect(extract('http://api.webside.gr/media/sch@ma!/uploads/img.png')).toBe('public')
+			expect(extract('http://api.webside.gr/media/../uploads/img.png')).toBe('public')
+		})
+	})
+
 	describe('resource identity via GenerateResourceIdentityFromRequestJob', () => {
 		it('should generate consistent UUIDs for the same request', async () => {
 			const request = new CacheImageRequest({ resourceTarget: 'https://example.com/image.jpg' })
