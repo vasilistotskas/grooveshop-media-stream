@@ -63,27 +63,32 @@ describe('adminCacheController', () => {
 
 		it('should throw BadRequestException for uppercase tenant schema', async () => {
 			await expect(controller.flushTenant({ tenantSchema: 'UPPERCASE' }))
-				.rejects.toThrow(BadRequestException)
+				.rejects
+				.toThrow(BadRequestException)
 		})
 
 		it('should throw BadRequestException for tenant schema with hyphens', async () => {
 			await expect(controller.flushTenant({ tenantSchema: 'bad-schema' }))
-				.rejects.toThrow(BadRequestException)
+				.rejects
+				.toThrow(BadRequestException)
 		})
 
 		it('should throw BadRequestException for tenant schema with special characters', async () => {
 			await expect(controller.flushTenant({ tenantSchema: 'sch@ma!' }))
-				.rejects.toThrow(BadRequestException)
+				.rejects
+				.toThrow(BadRequestException)
 		})
 
 		it('should throw BadRequestException for empty tenant schema', async () => {
 			await expect(controller.flushTenant({ tenantSchema: '' }))
-				.rejects.toThrow(BadRequestException)
+				.rejects
+				.toThrow(BadRequestException)
 		})
 
 		it('should throw BadRequestException when tenantSchema is missing', async () => {
 			await expect(controller.flushTenant({} as any))
-				.rejects.toThrow(BadRequestException)
+				.rejects
+				.toThrow(BadRequestException)
 		})
 
 		it('should not affect other tenant namespaces when flushing tenant A', async () => {

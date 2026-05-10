@@ -279,5 +279,4 @@ export class CacheOperationsProcessor {
 			throw new Error(`File cache cleanup failed: ${(error as Error).message}`)
 		}
 	}
-
 }
