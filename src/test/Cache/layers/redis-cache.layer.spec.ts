@@ -1,7 +1,7 @@
 import type { MockedObject } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { RedisCacheLayer } from '#microservice/Cache/layers/redis-cache.layer'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('redisCacheLayer', () => {
 	let layer: RedisCacheLayer

@@ -1,3 +1,4 @@
+import { Module } from '@nestjs/common'
 import { ConfigModule } from '#microservice/Config/config.module'
 import { HttpModule } from '#microservice/HTTP/http.module'
 import { MetricsModule } from '#microservice/Metrics/metrics.module'
@@ -9,7 +10,6 @@ import { QueueModule } from '#microservice/Queue/queue.module'
 import ValidateCacheImageRequestResizeTargetRule from '#microservice/Validation/rules/validate-cache-image-request-resize-target.rule'
 import ValidateCacheImageRequestRule from '#microservice/Validation/rules/validate-cache-image-request.rule'
 import { ValidationModule } from '#microservice/Validation/validation.module'
-import { Module } from '@nestjs/common'
 import { CacheModule } from './cache.module.js'
 import CacheImageResourceOperation from './operations/cache-image-resource.operation.js'
 

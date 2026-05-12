@@ -1,12 +1,12 @@
 import type { AxiosResponse } from 'axios'
-import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
-import { ConfigService } from '#microservice/Config/config.service'
-import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 import { HttpService, HttpModule as NestHttpModule } from '@nestjs/axios'
 import { Test, TestingModule } from '@nestjs/testing'
 import { AxiosError } from 'axios'
 import { Observable, of, throwError } from 'rxjs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
+import { ConfigService } from '#microservice/Config/config.service'
+import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 
 describe('httpClientService', () => {
 	let service: HttpClientService

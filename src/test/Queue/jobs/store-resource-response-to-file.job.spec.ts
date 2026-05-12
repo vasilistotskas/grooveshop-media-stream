@@ -1,10 +1,10 @@
 import type { AxiosResponse } from 'axios'
 import type { Mock } from 'vitest'
 import { open, unlink } from 'node:fs/promises'
-import UnableToStoreFetchedResourceException from '#microservice/API/exceptions/unable-to-store-fetched-resource.exception'
-import StoreResourceResponseToFileJob from '#microservice/Queue/jobs/store-resource-response-to-file.job'
 import { Test, TestingModule } from '@nestjs/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import UnableToStoreFetchedResourceException from '#microservice/API/exceptions/unable-to-store-fetched-resource.exception'
+import StoreResourceResponseToFileJob from '#microservice/Queue/jobs/store-resource-response-to-file.job'
 
 vi.mock('node:fs/promises')
 

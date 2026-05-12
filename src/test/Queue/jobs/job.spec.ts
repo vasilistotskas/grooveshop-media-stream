@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it } from 'vitest'
 import CacheImageRequest, {
 	BackgroundOptions,
 	FitOptions,
@@ -5,7 +6,6 @@ import CacheImageRequest, {
 	SupportedResizeFormats,
 } from '#microservice/API/dto/cache-image-request.dto'
 import GenerateResourceIdentityFromRequestJob from '#microservice/Queue/jobs/generate-resource-identity-from-request.job'
-import { beforeEach, describe, expect, it } from 'vitest'
 
 describe('generateResourceIdentityFromRequestJob', () => {
 	let job: GenerateResourceIdentityFromRequestJob

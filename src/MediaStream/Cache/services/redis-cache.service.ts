@@ -2,11 +2,11 @@ import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import type { CacheStats, ICacheManager } from '../interfaces/cache-manager.interface.js'
 import { Buffer } from 'node:buffer'
 import { env } from 'node:process'
+import { Injectable } from '@nestjs/common'
+import { Redis } from 'ioredis'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-import { Injectable } from '@nestjs/common'
-import { Redis } from 'ioredis'
 
 const DB_KEYS_RE = /db\d+:keys=(\d+)/
 const USED_MEMORY_RE = /used_memory:(\d+)/

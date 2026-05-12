@@ -1,12 +1,12 @@
 import type { MockedObject } from 'vitest'
+import { Logger } from '@nestjs/common'
+import { Test, TestingModule } from '@nestjs/testing'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { CacheOperationsProcessor } from '#microservice/Queue/processors/cache-operations.processor'
 import { BullQueueService } from '#microservice/Queue/services/bull-queue.service'
 import { JobQueueManager } from '#microservice/Queue/services/job-queue.manager'
 import { JobPriority, JobType } from '#microservice/Queue/types/job.types'
-import { Logger } from '@nestjs/common'
-import { Test, TestingModule } from '@nestjs/testing'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('jobQueueManager', () => {
 	let manager: JobQueueManager

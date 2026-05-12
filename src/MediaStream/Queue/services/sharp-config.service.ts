@@ -1,7 +1,7 @@
 import type { OnModuleInit } from '@nestjs/common'
-import { ConfigService } from '#microservice/Config/config.service'
 import { Injectable, Logger } from '@nestjs/common'
 import sharp from 'sharp'
+import { ConfigService } from '#microservice/Config/config.service'
 
 /**
  * Centralized Sharp configuration service.

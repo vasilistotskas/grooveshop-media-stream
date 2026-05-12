@@ -1,8 +1,8 @@
 import type { RequestContext } from '#microservice/Correlation/interfaces/correlation.interface'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { requestContextStorage } from '#microservice/Correlation/async-local-storage'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Spy on CorrelatedLogger static methods which delegate to NestJS Logger.
 

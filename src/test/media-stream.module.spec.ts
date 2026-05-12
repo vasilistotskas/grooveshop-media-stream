@@ -1,3 +1,7 @@
+import { HttpModule } from '@nestjs/axios'
+import { ScheduleModule } from '@nestjs/schedule'
+import { Test, TestingModule } from '@nestjs/testing'
+import { beforeEach, describe, expect, it } from 'vitest'
 import MediaStreamImageController from '#microservice/API/controllers/media-stream-image.controller'
 import CacheImageResourceOperation from '#microservice/Cache/operations/cache-image-resource.operation'
 import MediaStreamModule from '#microservice/media-stream.module'
@@ -7,10 +11,6 @@ import StoreResourceResponseToFileJob from '#microservice/Queue/jobs/store-resou
 import WebpImageManipulationJob from '#microservice/Queue/jobs/webp-image-manipulation.job'
 import ValidateCacheImageRequestResizeTargetRule from '#microservice/Validation/rules/validate-cache-image-request-resize-target.rule'
 import ValidateCacheImageRequestRule from '#microservice/Validation/rules/validate-cache-image-request.rule'
-import { HttpModule } from '@nestjs/axios'
-import { ScheduleModule } from '@nestjs/schedule'
-import { Test, TestingModule } from '@nestjs/testing'
-import { beforeEach, describe, expect, it } from 'vitest'
 
 describe('mediaStreamModule', () => {
 	let module: TestingModule

@@ -1,14 +1,14 @@
 import type { Response } from 'express'
 import type { MockedObject } from 'vitest'
+import { NotFoundException } from '@nestjs/common'
+import { Test, TestingModule } from '@nestjs/testing'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import MediaStreamImageController from '#microservice/API/controllers/media-stream-image.controller'
 import { ImageStreamService } from '#microservice/API/services/image-stream.service'
 import { RequestValidatorService } from '#microservice/API/services/request-validator.service'
 import { UrlBuilderService } from '#microservice/API/services/url-builder.service'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-import { NotFoundException } from '@nestjs/common'
-import { Test, TestingModule } from '@nestjs/testing'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('#microservice/API/services/image-stream.service')
 vi.mock('#microservice/API/services/request-validator.service')

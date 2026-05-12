@@ -1,11 +1,11 @@
 import type { Request, Response } from 'express'
 import type { ImageSourceKey } from '../config/image-sources.config.js'
 import type { ImageProcessingContext, ImageProcessingParams } from '../types/image-source.types.js'
+import { BadRequestException, Controller, Get, Logger, NotFoundException, Req, Res } from '@nestjs/common'
 import { IMAGE } from '#microservice/common/constants/route-prefixes.constant'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-import { BadRequestException, Controller, Get, Logger, NotFoundException, Req, Res } from '@nestjs/common'
 import { IMAGE_SOURCES } from '../config/image-sources.config.js'
 import CacheImageRequest, {
 	BackgroundOptions,

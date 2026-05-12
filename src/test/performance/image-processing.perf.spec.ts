@@ -1,10 +1,10 @@
 import { Buffer } from 'node:buffer'
 import { join } from 'node:path'
 import { cwd } from 'node:process'
-import { ResizeOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
-import WebpImageManipulationJob from '#microservice/Queue/jobs/webp-image-manipulation.job'
 import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { ResizeOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
+import WebpImageManipulationJob from '#microservice/Queue/jobs/webp-image-manipulation.job'
 
 /**
  * Performance tests for the image processing pipeline.

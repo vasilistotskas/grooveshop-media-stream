@@ -1,11 +1,11 @@
-import type { LayerDistribution, StringMap } from '#microservice/common/types/common.types'
 import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
+import type { LayerDistribution, StringMap } from '#microservice/common/types/common.types'
 
 import type { CacheKeyStrategy, CacheLayer, CacheLayerStats } from '../interfaces/cache-layer.interface.js'
+import { Injectable } from '@nestjs/common'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-import { Injectable } from '@nestjs/common'
 import { MemoryCacheLayer } from '../layers/memory-cache.layer.js'
 import { RedisCacheLayer } from '../layers/redis-cache.layer.js'
 

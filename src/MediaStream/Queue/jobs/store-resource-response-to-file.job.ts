@@ -1,8 +1,8 @@
 import type { AxiosResponse } from 'axios'
 import type { FileHandle } from 'node:fs/promises'
 import { open, unlink } from 'node:fs/promises'
-import UnableToStoreFetchedResourceException from '#microservice/API/exceptions/unable-to-store-fetched-resource.exception'
 import { Injectable, Logger } from '@nestjs/common'
+import UnableToStoreFetchedResourceException from '#microservice/API/exceptions/unable-to-store-fetched-resource.exception'
 
 /**
  * Stores fetched resource responses to the filesystem.

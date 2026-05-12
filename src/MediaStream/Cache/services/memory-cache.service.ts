@@ -1,10 +1,10 @@
 import type { CacheStats, ICacheManager } from '../interfaces/cache-manager.interface.js'
 import { Buffer } from 'node:buffer'
+import { Injectable } from '@nestjs/common'
+import NodeCache from 'node-cache'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-import { Injectable } from '@nestjs/common'
-import NodeCache from 'node-cache'
 
 @Injectable()
 export class MemoryCacheService implements ICacheManager {

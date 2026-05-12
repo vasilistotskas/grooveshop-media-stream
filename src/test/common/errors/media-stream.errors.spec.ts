@@ -1,3 +1,5 @@
+import { HttpStatus } from '@nestjs/common'
+import { describe, expect, it } from 'vitest'
 import {
 	DefaultImageFallbackError,
 	InvalidRequestError,
@@ -6,8 +8,6 @@ import {
 	ResourceProcessingError,
 	ResourceStreamingError,
 } from '#microservice/common/errors/media-stream.errors'
-import { HttpStatus } from '@nestjs/common'
-import { describe, expect, it } from 'vitest'
 
 describe('mediaStreamErrors', () => {
 	describe('mediaStreamError', () => {

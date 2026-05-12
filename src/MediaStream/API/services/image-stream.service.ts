@@ -1,9 +1,10 @@
+import type { Request, Response } from 'express'
 import type { OperationContext } from '#microservice/Cache/operations/cache-image-resource.operation'
 import type ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
-import type { Request, Response } from 'express'
 import type { ImageProcessingContext } from '../types/image-source.types.js'
 import { Buffer } from 'node:buffer'
 import { open } from 'node:fs/promises'
+import { Injectable, Logger } from '@nestjs/common'
 import CacheImageResourceOperation from '#microservice/Cache/operations/cache-image-resource.operation'
 import { DefaultImageFallbackError, InvalidRequestError, ResourceStreamingError } from '#microservice/common/errors/media-stream.errors'
 import { getMimeType, getVaryHeader, negotiateImageFormat } from '#microservice/common/utils/content-negotiation.util'
@@ -11,7 +12,6 @@ import { checkETagMatch, checkIfModifiedSince, formatLastModified, generateWeakE
 import { RequestDeduplicator } from '#microservice/common/utils/request-deduplication.util'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-import { Injectable, Logger } from '@nestjs/common'
 import CacheImageRequest from '../dto/cache-image-request.dto.js'
 
 /**

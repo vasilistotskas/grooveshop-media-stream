@@ -1,5 +1,5 @@
-import { CircuitBreaker, CircuitState } from '#microservice/HTTP/utils/circuit-breaker'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { CircuitBreaker, CircuitState } from '#microservice/HTTP/utils/circuit-breaker'
 
 describe('circuitBreaker', () => {
 	let circuitBreaker: CircuitBreaker

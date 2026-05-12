@@ -1,6 +1,6 @@
+import { Module } from '@nestjs/common'
 import { ConfigModule } from '#microservice/Config/config.module'
 import { CorrelationModule } from '#microservice/Correlation/correlation.module'
-import { Module } from '@nestjs/common'
 
 import { StorageHealthIndicator } from './indicators/storage-health.indicator.js'
 import { IntelligentEvictionService } from './services/intelligent-eviction.service.js'

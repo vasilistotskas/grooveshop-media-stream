@@ -1,7 +1,7 @@
-import { ConfigService } from '#microservice/Config/config.service'
-import { SecurityCheckerService } from '#microservice/Validation/services/security-checker.service'
 import { Test, TestingModule } from '@nestjs/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ConfigService } from '#microservice/Config/config.service'
+import { SecurityCheckerService } from '#microservice/Validation/services/security-checker.service'
 
 describe('securityCheckerService', () => {
 	let service: SecurityCheckerService

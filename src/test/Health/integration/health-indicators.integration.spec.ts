@@ -1,3 +1,6 @@
+import { ScheduleModule } from '@nestjs/schedule'
+import { Test, TestingModule } from '@nestjs/testing'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { CacheHealthIndicator } from '#microservice/Cache/indicators/cache-health.indicator'
 import { RedisHealthIndicator } from '#microservice/Cache/indicators/redis-health.indicator'
 import { HealthController } from '#microservice/Health/controllers/health.controller'
@@ -7,9 +10,6 @@ import { MemoryHealthIndicator } from '#microservice/Health/indicators/memory-he
 import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
 import { JobQueueHealthIndicator } from '#microservice/Queue/indicators/job-queue-health.indicator'
 import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
-import { ScheduleModule } from '@nestjs/schedule'
-import { Test, TestingModule } from '@nestjs/testing'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 describe('health Indicators Integration', () => {
 	let module: TestingModule

@@ -1,8 +1,8 @@
 import type { RequestContext } from '#microservice/Correlation/interfaces/correlation.interface'
-import { requestContextStorage } from '#microservice/Correlation/async-local-storage'
-import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { Logger } from '@nestjs/common'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { requestContextStorage } from '#microservice/Correlation/async-local-storage'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 
 function createRequestContext(correlationId: string): RequestContext {
 	return {

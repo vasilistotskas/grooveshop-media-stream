@@ -1,9 +1,9 @@
 import type { MockedObject } from 'vitest'
+import { Test, TestingModule } from '@nestjs/testing'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { InternalSecretGuard } from '#microservice/common/guards/internal-secret.guard'
 import { MetricsController } from '#microservice/Metrics/controllers/metrics.controller'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-import { Test, TestingModule } from '@nestjs/testing'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 import 'reflect-metadata'
 
 describe('metricsController', () => {

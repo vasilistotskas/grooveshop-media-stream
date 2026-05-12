@@ -2,12 +2,12 @@ import type { LogLevel } from '@nestjs/common'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import * as process from 'node:process'
 import * as zlib from 'node:zlib'
-import { setupGracefulShutdown, shutdownMiddleware } from '#microservice/common/utils/graceful-shutdown.util'
-import { ConfigService } from '#microservice/Config/config.service'
-import MediaStreamModule from '#microservice/media-stream.module'
 import { NestFactory } from '@nestjs/core'
 import compression from 'compression'
 import helmet from 'helmet'
+import { setupGracefulShutdown, shutdownMiddleware } from '#microservice/common/utils/graceful-shutdown.util'
+import { ConfigService } from '#microservice/Config/config.service'
+import MediaStreamModule from '#microservice/media-stream.module'
 
 interface BootstrapOptions {
 	/** If true, will call process.exit on error (default in production) */

@@ -1,10 +1,10 @@
 import type { INestApplication } from '@nestjs/common'
-import { ConfigModule } from '#microservice/Config/config.module'
-import { MetricsModule } from '#microservice/Metrics/metrics.module'
-import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Test, TestingModule } from '@nestjs/testing'
 import request from 'supertest'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { ConfigModule } from '#microservice/Config/config.module'
+import { MetricsModule } from '#microservice/Metrics/metrics.module'
+import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import 'reflect-metadata'
 
 // /metrics is now protected by InternalSecretGuard.  Tests load a known

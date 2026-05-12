@@ -1,10 +1,10 @@
-import type { StringMap } from '#microservice/common/types/common.types'
 import type { OnModuleInit } from '@nestjs/common'
+import type { StringMap } from '#microservice/common/types/common.types'
 import type { AppConfig } from './interfaces/app-config.interface.js'
 import * as process from 'node:process'
-import { APP_CONFIG_SCHEMA, buildConfigFromSchema } from '#microservice/common/utils/config-schema.util'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService as NestConfigService } from '@nestjs/config'
+import { APP_CONFIG_SCHEMA, buildConfigFromSchema } from '#microservice/common/utils/config-schema.util'
 
 @Injectable()
 export class ConfigService implements OnModuleInit {

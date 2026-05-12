@@ -1,8 +1,8 @@
+import { Test, TestingModule } from '@nestjs/testing'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { MemoryCacheService } from '#microservice/Cache/services/memory-cache.service'
 import { ConfigService } from '#microservice/Config/config.service'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-import { Test, TestingModule } from '@nestjs/testing'
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 describe('memoryCacheService Integration', () => {
 	let service: MemoryCacheService

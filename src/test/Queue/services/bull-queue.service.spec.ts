@@ -1,13 +1,13 @@
-import type { JobOptions, JobProcessor } from '#microservice/Queue/interfaces/job-queue.interface'
 import type { Job as BullJob, Queue } from 'bull'
 import type { MockedObject } from 'vitest'
-import { BullQueueService } from '#microservice/Queue/services/bull-queue.service'
-import { SharpConfigService } from '#microservice/Queue/services/sharp-config.service'
-import { JobType } from '#microservice/Queue/types/job.types'
+import type { JobOptions, JobProcessor } from '#microservice/Queue/interfaces/job-queue.interface'
 import { getQueueToken } from '@nestjs/bull'
 import { Logger } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { BullQueueService } from '#microservice/Queue/services/bull-queue.service'
+import { SharpConfigService } from '#microservice/Queue/services/sharp-config.service'
+import { JobType } from '#microservice/Queue/types/job.types'
 
 describe('bullQueueService', () => {
 	let service: BullQueueService

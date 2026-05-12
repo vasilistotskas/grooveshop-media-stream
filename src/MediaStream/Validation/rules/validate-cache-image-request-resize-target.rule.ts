@@ -1,7 +1,7 @@
 import type CacheImageRequest from '#microservice/API/dto/cache-image-request.dto'
+import { Injectable } from '@nestjs/common'
 import RequestedResizeTargetTooLargeException from '#microservice/API/exceptions/requested-resize-target-too-large.exception'
 import { MAX_TOTAL_PIXELS } from '#microservice/common/constants/image-limits.constant'
-import { Injectable } from '@nestjs/common'
 
 /**
  * Validates that requested resize dimensions don't exceed maximum allowed pixels.

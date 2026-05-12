@@ -1,3 +1,6 @@
+import { ScheduleModule } from '@nestjs/schedule'
+import { Test, TestingModule } from '@nestjs/testing'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import CacheImageRequest, { ResizeOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
 import { ConfigModule } from '#microservice/Config/config.module'
 import { CorrelationModule } from '#microservice/Correlation/correlation.module'
@@ -5,9 +8,6 @@ import { InputSanitizationService } from '#microservice/Validation/services/inpu
 import { SecurityCheckerService } from '#microservice/Validation/services/security-checker.service'
 import { SimpleValidationService } from '#microservice/Validation/services/simple-validation.service'
 import { ValidationModule } from '#microservice/Validation/validation.module'
-import { ScheduleModule } from '@nestjs/schedule'
-import { Test, TestingModule } from '@nestjs/testing'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 describe('validation Integration', () => {
 	let module: TestingModule

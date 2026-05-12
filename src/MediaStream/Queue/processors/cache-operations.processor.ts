@@ -5,11 +5,11 @@ import { createHash } from 'node:crypto'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import * as process from 'node:process'
+import { Injectable, Logger } from '@nestjs/common'
 import CacheImageRequest from '#microservice/API/dto/cache-image-request.dto'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
-import { Injectable, Logger } from '@nestjs/common'
 
 const NAMESPACE_URL = '6ba7b811-9dad-11d1-80b4-00c04fd430c8'
 const DASH_RE = /-/g

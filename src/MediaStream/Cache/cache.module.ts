@@ -1,6 +1,6 @@
+import { Module } from '@nestjs/common'
 import { ConfigModule } from '#microservice/Config/config.module'
 import { MetricsModule } from '#microservice/Metrics/metrics.module'
-import { Module } from '@nestjs/common'
 import { CacheHealthIndicator } from './indicators/cache-health.indicator.js'
 import { RedisHealthIndicator } from './indicators/redis-health.indicator.js'
 import { MemoryCacheLayer } from './layers/memory-cache.layer.js'

@@ -1,12 +1,12 @@
 import type { ExecutionContext } from '@nestjs/common'
 import type { MockedObject } from 'vitest'
-import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-import { AdaptiveRateLimitGuard } from '#microservice/RateLimit/guards/adaptive-rate-limit.guard'
-import { RateLimitService } from '#microservice/RateLimit/services/rate-limit.service'
 import { Reflector } from '@nestjs/core'
 import { Test, TestingModule } from '@nestjs/testing'
 import { getOptionsToken, getStorageToken, ThrottlerException } from '@nestjs/throttler'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { MetricsService } from '#microservice/Metrics/services/metrics.service'
+import { AdaptiveRateLimitGuard } from '#microservice/RateLimit/guards/adaptive-rate-limit.guard'
+import { RateLimitService } from '#microservice/RateLimit/services/rate-limit.service'
 
 describe('adaptiveRateLimitGuard', () => {
 	let guard: AdaptiveRateLimitGuard
