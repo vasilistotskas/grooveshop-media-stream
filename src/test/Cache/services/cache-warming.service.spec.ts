@@ -286,7 +286,10 @@ describe('cacheWarmingService', () => {
 
 			await service.warmupSpecificFile(resourceId, content, ttl)
 
-			expect(cacheManager.set).toHaveBeenCalledWith('image', resourceId, expect.objectContaining({ data: content, metadata: expect.any(Object) }), ttl)
+			// Namespace is per-tenant since H21 in MULTI_TENANT_AUDIT.md.
+			// ``warmupSpecificFile`` defaults tenantSchema to 'public' when
+			// the caller omits it.
+			expect(cacheManager.set).toHaveBeenCalledWith('image:public', resourceId, expect.objectContaining({ data: content, metadata: expect.any(Object) }), ttl)
 		})
 
 		it('should handle manual warmup errors', async () => {
@@ -407,9 +410,11 @@ describe('cacheWarmingService', () => {
 
 			await service.warmupCache()
 
-			// Service sets { data: content, metadata } as the value, not a raw Buffer
+			// Service sets { data: content, metadata } as the value, not a raw Buffer.
+			// Namespace is `image:{tenantSchema}` after H21; this fixture metadata
+			// has no tenantSchema so it defaults to 'public'.
 			expect(cacheManager.set).toHaveBeenCalledWith(
-				'image',
+				'image:public',
 				expect.any(String),
 				expect.any(Object),
 				expect.any(Number),
