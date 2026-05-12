@@ -3,13 +3,13 @@ import { Buffer } from 'node:buffer'
 import { access, readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { cwd } from 'node:process'
+import { Injectable } from '@nestjs/common'
+import { SchedulerRegistry } from '@nestjs/schedule'
+import { CronJob } from 'cron'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-import { Injectable } from '@nestjs/common'
-import { SchedulerRegistry } from '@nestjs/schedule'
-import { CronJob } from 'cron'
 import { MultiLayerCacheManager } from './multi-layer-cache.manager.js'
 
 const FILE_EXTENSION_RE = /\.[^/.]+$/
@@ -220,11 +220,6 @@ export class CacheWarmingService implements OnModuleInit {
 	private async warmupFile(fileInfo: FileAccessInfo): Promise<void> {
 		const resourceId = this.extractResourceId(fileInfo.path)
 
-		if (await this.cacheManager.exists('image', resourceId)) {
-			CorrelatedLogger.debug(`File already in cache: ${fileInfo.path}`, CacheWarmingService.name)
-			return
-		}
-
 		try {
 			const metadataPath = fileInfo.path.replace(/\.rsc$/, '.rsm')
 			const [content, metaRaw] = await Promise.all([
@@ -245,12 +240,26 @@ export class CacheWarmingService implements OnModuleInit {
 				metadata = new ResourceMetaData()
 			}
 
+			// The `image` namespace was previously hard-coded here, which
+			// meant warmed entries landed under `image:{id}` while every
+			// request path read `image:{tenantSchema}:{id}` — warming
+			// was a no-op for tenant content (H21 in MULTI_TENANT_AUDIT.md).
+			// `metadata.tenantSchema` was persisted at write time by
+			// `cache-image-resource.operation.ts`; legacy entries that
+			// pre-date this field default to `'public'` via the DTO.
+			const namespace = `image:${metadata.tenantSchema || 'public'}`
+
+			if (await this.cacheManager.exists(namespace, resourceId)) {
+				CorrelatedLogger.debug(`File already in cache: ${fileInfo.path}`, CacheWarmingService.name)
+				return
+			}
+
 			const accessMultiplier = Math.min(fileInfo.accessCount / 10, 5)
 			const ttl = Math.floor(this.baseCacheTtl * (1 + accessMultiplier))
 
-			await this.cacheManager.set('image', resourceId, { data: content, metadata }, ttl)
+			await this.cacheManager.set(namespace, resourceId, { data: content, metadata }, ttl)
 
-			CorrelatedLogger.debug(`Warmed up file: ${fileInfo.path} (TTL: ${ttl}s)`, CacheWarmingService.name)
+			CorrelatedLogger.debug(`Warmed up file: ${fileInfo.path} (ns=${namespace}, TTL: ${ttl}s)`, CacheWarmingService.name)
 		}
 		catch (error: unknown) {
 			CorrelatedLogger.warn(`Failed to warm up file ${fileInfo.path}: ${(error as Error).message}`, CacheWarmingService.name)
@@ -263,18 +272,20 @@ export class CacheWarmingService implements OnModuleInit {
 		return filename?.replace(FILE_EXTENSION_RE, '') || ''
 	}
 
-	async warmupSpecificFile(resourceId: string, content: Buffer, ttl?: number): Promise<void> {
+	async warmupSpecificFile(resourceId: string, content: Buffer, ttl?: number, tenantSchema: string = 'public'): Promise<void> {
 		try {
 			const metadata = new ResourceMetaData({
 				size: content.length.toString(),
 				dateCreated: Date.now(),
+				tenantSchema,
 			})
 			// `ttl` is intentionally optional: undefined and 0 both fall through to
 			// the configured default TTL inside RedisCacheService.set() (see fix #1
 			// in redis-cache.service.ts). Callers that want a specific lifetime pass
 			// an explicit positive value; callers that omit it rely on the config default.
-			await this.cacheManager.set('image', resourceId, { data: content, metadata }, ttl)
-			CorrelatedLogger.debug(`Manually warmed up resource: ${resourceId}`, CacheWarmingService.name)
+			const namespace = `image:${tenantSchema || 'public'}`
+			await this.cacheManager.set(namespace, resourceId, { data: content, metadata }, ttl)
+			CorrelatedLogger.debug(`Manually warmed up resource: ${resourceId} (ns=${namespace})`, CacheWarmingService.name)
 		}
 		catch (error: unknown) {
 			CorrelatedLogger.error(`Failed to manually warm up resource ${resourceId}: ${(error as Error).message}`, (error as Error).stack, CacheWarmingService.name)

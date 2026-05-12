@@ -8,6 +8,9 @@ import { access, open as fsOpen, readFile, rename, unlink, writeFile } from 'nod
 import * as path from 'node:path'
 import { cwd } from 'node:process'
 import { Transform } from 'node:stream'
+import { Injectable, InternalServerErrorException } from '@nestjs/common'
+import DOMPurify from 'isomorphic-dompurify'
+
 import CacheImageRequest, {
 	BackgroundOptions,
 	FitOptions,
@@ -15,7 +18,6 @@ import CacheImageRequest, {
 	SupportedResizeFormats,
 } from '#microservice/API/dto/cache-image-request.dto'
 import UnableToFetchResourceException from '#microservice/API/exceptions/unable-to-fetch-resource.exception'
-
 import { MediaStreamError } from '#microservice/common/errors/media-stream.errors'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
@@ -28,8 +30,6 @@ import StoreResourceResponseToFileJob from '#microservice/Queue/jobs/store-resou
 import WebpImageManipulationJob from '#microservice/Queue/jobs/webp-image-manipulation.job'
 import ValidateCacheImageRequestRule from '#microservice/Validation/rules/validate-cache-image-request.rule'
 import { InputSanitizationService } from '#microservice/Validation/services/input-sanitization.service'
-import { Injectable, InternalServerErrorException } from '@nestjs/common'
-import DOMPurify from 'isomorphic-dompurify'
 import { MultiLayerCacheManager } from '../services/multi-layer-cache.manager.js'
 
 /**
@@ -591,6 +591,7 @@ export default class CacheImageResourceOperation {
 				dateCreated: Date.now(),
 				publicTTL: this.publicTtl * 1000,
 				privateTTL: this.privateTtl * 1000,
+				tenantSchema: ctx.request.tenantSchema || 'public',
 			})
 
 			return { data, metadata }
@@ -614,6 +615,7 @@ export default class CacheImageResourceOperation {
 				dateCreated: Date.now(),
 				publicTTL: this.publicTtl * 1000,
 				privateTTL: this.privateTtl * 1000,
+				tenantSchema: ctx.request.tenantSchema || 'public',
 			})
 
 			return { data: result.buffer, metadata }
@@ -644,6 +646,7 @@ export default class CacheImageResourceOperation {
 			dateCreated: Date.now(),
 			publicTTL: this.publicTtl * 1000,
 			privateTTL: this.privateTtl * 1000,
+			tenantSchema: ctx.request.tenantSchema || 'public',
 		})
 
 		CorrelatedLogger.debug(`processRasterImage created metadata: ${JSON.stringify(metadata)}`, 'CacheImageResourceOperation')
@@ -660,6 +663,7 @@ export default class CacheImageResourceOperation {
 			dateCreated: Date.now(),
 			publicTTL: this.publicTtl * 1000,
 			privateTTL: this.privateTtl * 1000,
+			tenantSchema: ctx.request.tenantSchema || 'public',
 		})
 
 		return { data, metadata }
