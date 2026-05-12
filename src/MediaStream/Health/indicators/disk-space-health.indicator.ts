@@ -1,8 +1,8 @@
 import type { HealthIndicatorResult } from '@nestjs/terminus'
 import type { HealthCheckOptions } from '../interfaces/health-indicator.interface.js'
 import { promises as fs } from 'node:fs'
-import { ConfigService } from '#microservice/Config/config.service'
 import { Injectable } from '@nestjs/common'
+import { ConfigService } from '#microservice/Config/config.service'
 import { BaseHealthIndicator } from '../base/base-health-indicator.js'
 
 export interface DiskSpaceInfo {

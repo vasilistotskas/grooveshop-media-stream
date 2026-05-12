@@ -1,9 +1,9 @@
 import type { MockedObject } from 'vitest'
-import { ConfigService } from '#microservice/Config/config.service'
-import { DiskSpaceHealthIndicator } from '#microservice/Health/indicators/disk-space-health.indicator'
 import { HealthCheckError } from '@nestjs/terminus'
 import { Test, TestingModule } from '@nestjs/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ConfigService } from '#microservice/Config/config.service'
+import { DiskSpaceHealthIndicator } from '#microservice/Health/indicators/disk-space-health.indicator'
 import 'reflect-metadata'
 
 describe('diskSpaceHealthIndicator', () => {

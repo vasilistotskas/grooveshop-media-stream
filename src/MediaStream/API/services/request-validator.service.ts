@@ -1,4 +1,5 @@
 import type { ImageProcessingContext } from '../types/image-source.types.js'
+import { Injectable, Logger } from '@nestjs/common'
 import {
 	MAX_IMAGE_HEIGHT,
 	MAX_IMAGE_WIDTH,
@@ -11,7 +12,6 @@ import {
 import { InvalidRequestError } from '#microservice/common/errors/media-stream.errors'
 import { InputSanitizationService } from '#microservice/Validation/services/input-sanitization.service'
 import { SecurityCheckerService } from '#microservice/Validation/services/security-checker.service'
-import { Injectable, Logger } from '@nestjs/common'
 
 /**
  * Validation rules for image processing parameters

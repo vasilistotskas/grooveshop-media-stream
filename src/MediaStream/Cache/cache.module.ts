@@ -1,7 +1,7 @@
+import { Module } from '@nestjs/common'
 import { InternalSecretGuard } from '#microservice/common/guards/internal-secret.guard'
 import { ConfigModule } from '#microservice/Config/config.module'
 import { MetricsModule } from '#microservice/Metrics/metrics.module'
-import { Module } from '@nestjs/common'
 import { AdminCacheController } from './controllers/admin-cache.controller.js'
 import { CacheHealthIndicator } from './indicators/cache-health.indicator.js'
 import { RedisHealthIndicator } from './indicators/redis-health.indicator.js'

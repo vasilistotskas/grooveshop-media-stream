@@ -1,9 +1,9 @@
 import type { Request, Response } from 'express'
 import type { Mock, MockedObject } from 'vitest'
-import { MetricsMiddleware } from '#microservice/Metrics/middleware/metrics.middleware'
-import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Test, TestingModule } from '@nestjs/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MetricsMiddleware } from '#microservice/Metrics/middleware/metrics.middleware'
+import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import 'reflect-metadata'
 
 describe('metricsMiddleware', () => {

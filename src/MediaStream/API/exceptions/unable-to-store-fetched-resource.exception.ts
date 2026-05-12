@@ -1,5 +1,5 @@
-import { MediaStreamError } from '#microservice/common/errors/media-stream.errors'
 import { HttpStatus } from '@nestjs/common'
+import { MediaStreamError } from '#microservice/common/errors/media-stream.errors'
 
 export default class UnableToStoreFetchedResourceException extends MediaStreamError {
 	constructor(resource: string) {

@@ -1,12 +1,12 @@
-import type { CacheLayer, CacheLayerStats } from '#microservice/Cache/interfaces/cache-layer.interface'
 import type { MockedObject } from 'vitest'
+import type { CacheLayer, CacheLayerStats } from '#microservice/Cache/interfaces/cache-layer.interface'
+import { Test, TestingModule } from '@nestjs/testing'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryCacheLayer } from '#microservice/Cache/layers/memory-cache.layer'
 import { RedisCacheLayer } from '#microservice/Cache/layers/redis-cache.layer'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
 import { ConfigService } from '#microservice/Config/config.service'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-import { Test, TestingModule } from '@nestjs/testing'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import 'reflect-metadata'
 
 /**

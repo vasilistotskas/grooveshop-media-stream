@@ -1,5 +1,5 @@
-import type { DetailsMap } from '#microservice/common/types/common.types'
 import type { HealthIndicatorResult } from '@nestjs/terminus'
+import type { DetailsMap } from '#microservice/common/types/common.types'
 import type { HealthCheckOptions, HealthMetrics, IHealthIndicator } from '../interfaces/health-indicator.interface.js'
 import { Injectable, Logger } from '@nestjs/common'
 import { HealthCheckError } from '@nestjs/terminus'

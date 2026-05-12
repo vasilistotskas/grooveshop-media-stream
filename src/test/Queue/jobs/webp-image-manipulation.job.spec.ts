@@ -1,9 +1,9 @@
 import { Buffer } from 'node:buffer'
+import sharp from 'sharp'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BackgroundOptions, FitOptions, PositionOptions, ResizeOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
 import ManipulationJobResult from '#microservice/Queue/dto/manipulation-job-result.dto'
 import WebpImageManipulationJob from '#microservice/Queue/jobs/webp-image-manipulation.job'
-import sharp from 'sharp'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('sharp', () => ({
 	default: vi.fn(),

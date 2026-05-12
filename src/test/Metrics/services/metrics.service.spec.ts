@@ -1,8 +1,8 @@
 import type { MockedObject } from 'vitest'
-import { ConfigService } from '#microservice/Config/config.service'
-import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ConfigService } from '#microservice/Config/config.service'
+import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import 'reflect-metadata'
 
 describe('metricsService', () => {

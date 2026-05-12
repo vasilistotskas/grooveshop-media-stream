@@ -1,10 +1,10 @@
+import { Test, TestingModule } from '@nestjs/testing'
+import { AxiosError, AxiosHeaders } from 'axios'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CacheImageRequest, { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
 import { ConfigService } from '#microservice/Config/config.service'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 import FetchResourceResponseJob from '#microservice/Queue/jobs/fetch-resource-response.job'
-import { Test, TestingModule } from '@nestjs/testing'
-import { AxiosError, AxiosHeaders } from 'axios'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('fetchResourceResponseJob', () => {
 	let job: FetchResourceResponseJob

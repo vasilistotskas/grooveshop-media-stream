@@ -1,9 +1,14 @@
-import type { OperationContext } from '#microservice/Cache/operations/cache-image-resource.operation'
 import type { AxiosResponse } from 'axios'
+import type { OperationContext } from '#microservice/Cache/operations/cache-image-resource.operation'
 import { Buffer } from 'node:buffer'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { Readable } from 'node:stream'
+import { HttpService } from '@nestjs/axios'
+import { Logger } from '@nestjs/common'
+import { Test } from '@nestjs/testing'
+import { AxiosHeaders } from 'axios'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CacheImageRequest, {
 	BackgroundOptions,
 	FitOptions,
@@ -24,11 +29,6 @@ import WebpImageManipulationJob from '#microservice/Queue/jobs/webp-image-manipu
 import ValidateCacheImageRequestResizeTargetRule from '#microservice/Validation/rules/validate-cache-image-request-resize-target.rule'
 import ValidateCacheImageRequestRule from '#microservice/Validation/rules/validate-cache-image-request.rule'
 import { InputSanitizationService } from '#microservice/Validation/services/input-sanitization.service'
-import { HttpService } from '@nestjs/axios'
-import { Logger } from '@nestjs/common'
-import { Test } from '@nestjs/testing'
-import { AxiosHeaders } from 'axios'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('node:fs/promises')
 vi.mock('node:process', () => ({

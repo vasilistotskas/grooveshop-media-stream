@@ -1,8 +1,8 @@
 import * as process from 'node:process'
+import { Injectable, Logger } from '@nestjs/common'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { ConfigService } from '#microservice/Config/config.service'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-import { Injectable, Logger } from '@nestjs/common'
 
 const UA_WHITESPACE_RE = /\s+/g
 const VERSION_NUMBER_RE = /\/[\d.]+/g

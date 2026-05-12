@@ -1,9 +1,12 @@
+import type { MockedObject } from 'vitest'
 import type { Job } from '#microservice/Queue/interfaces/job-queue.interface'
 import type { CacheCleanupJobData, CacheWarmingJobData } from '#microservice/Queue/types/job.types'
-import type { MockedObject } from 'vitest'
 import { Buffer } from 'node:buffer'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
+import { Logger } from '@nestjs/common'
+import { Test, TestingModule } from '@nestjs/testing'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CacheImageRequest from '#microservice/API/dto/cache-image-request.dto'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
@@ -11,9 +14,6 @@ import { HttpClientService } from '#microservice/HTTP/services/http-client.servi
 import GenerateResourceIdentityFromRequestJob from '#microservice/Queue/jobs/generate-resource-identity-from-request.job'
 import { CacheOperationsProcessor } from '#microservice/Queue/processors/cache-operations.processor'
 import { JobPriority } from '#microservice/Queue/types/job.types'
-import { Logger } from '@nestjs/common'
-import { Test, TestingModule } from '@nestjs/testing'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock fs module
 vi.mock('node:fs/promises')

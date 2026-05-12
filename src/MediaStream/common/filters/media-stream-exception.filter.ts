@@ -1,10 +1,10 @@
 import type { ArgumentsHost, ExceptionFilter } from '@nestjs/common'
 import type { Request, Response } from 'express'
 import type { Metadata, StringMap } from '../types/common.types.js'
-import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
-import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { Catch, HttpException, HttpStatus } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
+import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 
 import { MediaStreamError } from '../errors/media-stream.errors.js'
 

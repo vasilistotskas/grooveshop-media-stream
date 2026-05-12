@@ -1,11 +1,11 @@
 import type { MockedObject } from 'vitest'
 import { Buffer } from 'node:buffer'
-import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
-import { ConfigService } from '#microservice/Config/config.service'
-import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Test, TestingModule } from '@nestjs/testing'
 import Redis from 'ioredis'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
+import { ConfigService } from '#microservice/Config/config.service'
+import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 
 // Mock ioredis
 vi.mock('ioredis', () => {

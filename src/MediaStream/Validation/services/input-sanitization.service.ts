@@ -1,4 +1,5 @@
 import type { ISanitizer } from '../interfaces/validator.interface.js'
+import { Injectable, Logger } from '@nestjs/common'
 import {
 	MAX_FILE_SIZES,
 	MAX_IMAGE_HEIGHT,
@@ -7,7 +8,6 @@ import {
 	MAX_TOTAL_PIXELS,
 } from '#microservice/common/constants/image-limits.constant'
 import { ConfigService } from '#microservice/Config/config.service'
-import { Injectable, Logger } from '@nestjs/common'
 
 const EMPTY_STRING_PATTERNS: RegExp[] = [
 	/^\s*on\w+\s*=.*$/i,

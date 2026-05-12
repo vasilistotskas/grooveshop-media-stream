@@ -1,5 +1,5 @@
-import { IMAGE } from '#microservice/common/constants/route-prefixes.constant'
 import { Controller, Get } from '@nestjs/common'
+import { IMAGE } from '#microservice/common/constants/route-prefixes.constant'
 import { IMAGE_SOURCES } from '../config/image-sources.config.js'
 import {
 	BackgroundOptions,

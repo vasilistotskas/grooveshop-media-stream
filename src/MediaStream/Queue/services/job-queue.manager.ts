@@ -5,8 +5,8 @@ import type {
 	CacheWarmingJobData,
 	JobMetrics,
 } from '../types/job.types.js'
-import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { Injectable, Logger } from '@nestjs/common'
+import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { CacheOperationsProcessor } from '../processors/cache-operations.processor.js'
 import { JobPriority, JobType } from '../types/job.types.js'
 import { BullQueueService } from './bull-queue.service.js'

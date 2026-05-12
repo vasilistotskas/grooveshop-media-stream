@@ -1,4 +1,7 @@
 import type { MiddlewareConsumer, NestModule } from '@nestjs/common'
+import { Module } from '@nestjs/common'
+import { APP_FILTER, APP_GUARD, HttpAdapterHost } from '@nestjs/core'
+import { ScheduleModule } from '@nestjs/schedule'
 import { ApiModule } from '#microservice/API/api.module'
 import { ConfigController } from '#microservice/API/controllers/config.controller'
 import MediaStreamImageController from '#microservice/API/controllers/media-stream-image.controller'
@@ -19,9 +22,6 @@ import { AdaptiveRateLimitGuard } from '#microservice/RateLimit/guards/adaptive-
 import { RateLimitModule } from '#microservice/RateLimit/rate-limit.module'
 import { StorageModule } from '#microservice/Storage/storage.module'
 import { ValidationModule } from '#microservice/Validation/validation.module'
-import { Module } from '@nestjs/common'
-import { APP_FILTER, APP_GUARD, HttpAdapterHost } from '@nestjs/core'
-import { ScheduleModule } from '@nestjs/schedule'
 
 const controllers = [MediaStreamImageController, ConfigController]
 

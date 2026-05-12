@@ -1,7 +1,7 @@
 import type { ISecurityChecker, SecurityEvent } from '../interfaces/validator.interface.js'
+import { Injectable, Logger, Optional } from '@nestjs/common'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { ConfigService } from '#microservice/Config/config.service'
-import { Injectable, Logger, Optional } from '@nestjs/common'
 
 const SUSPICIOUS_PATTERNS: RegExp[] = [
 	/<script\b[^>]{0,100}>/i,

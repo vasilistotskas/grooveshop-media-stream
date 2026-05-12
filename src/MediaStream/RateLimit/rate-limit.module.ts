@@ -1,10 +1,10 @@
+import { Module } from '@nestjs/common'
+import { Reflector } from '@nestjs/core'
+import { ThrottlerModule } from '@nestjs/throttler'
 import { CacheModule } from '#microservice/Cache/cache.module'
 import { ConfigModule } from '#microservice/Config/config.module'
 import { ConfigService } from '#microservice/Config/config.service'
 import { MetricsModule } from '#microservice/Metrics/metrics.module'
-import { Module } from '@nestjs/common'
-import { Reflector } from '@nestjs/core'
-import { ThrottlerModule } from '@nestjs/throttler'
 import { AdaptiveRateLimitGuard } from './guards/adaptive-rate-limit.guard.js'
 import { RateLimitService } from './services/rate-limit.service.js'
 

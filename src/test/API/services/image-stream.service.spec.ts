@@ -1,15 +1,15 @@
+import type { MockedObject } from 'vitest'
 import type { ImageProcessingContext } from '#microservice/API/types/image-source.types'
 import type { OperationContext } from '#microservice/Cache/operations/cache-image-resource.operation'
 import type ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
-import type { MockedObject } from 'vitest'
 import { Buffer } from 'node:buffer'
+import { Test, TestingModule } from '@nestjs/testing'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CacheImageRequest, { ResizeOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
 import { ImageStreamService } from '#microservice/API/services/image-stream.service'
 import CacheImageResourceOperation from '#microservice/Cache/operations/cache-image-resource.operation'
 import { RequestDeduplicator } from '#microservice/common/utils/request-deduplication.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-import { Test, TestingModule } from '@nestjs/testing'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import 'reflect-metadata'
 
 /**

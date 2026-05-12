@@ -1,18 +1,18 @@
 import type { INestApplication } from '@nestjs/common'
+import { Controller, Get, UseGuards } from '@nestjs/common'
+import { ScheduleModule } from '@nestjs/schedule'
+import { Test, TestingModule } from '@nestjs/testing'
+import request from 'supertest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { ConfigModule } from '#microservice/Config/config.module'
 import { ConfigService } from '#microservice/Config/config.service'
 import { MetricsModule } from '#microservice/Metrics/metrics.module'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
+
 import { AdaptiveRateLimitGuard } from '#microservice/RateLimit/guards/adaptive-rate-limit.guard'
 import { RateLimitModule } from '#microservice/RateLimit/rate-limit.module'
 import { RateLimitService } from '#microservice/RateLimit/services/rate-limit.service'
-import { Controller, Get, UseGuards } from '@nestjs/common'
-import { ScheduleModule } from '@nestjs/schedule'
-
-import { Test, TestingModule } from '@nestjs/testing'
-import request from 'supertest'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Test controller for integration testing
 // Uses media_stream-image prefix for image routes to match AdaptiveRateLimitGuard.getRequestType()

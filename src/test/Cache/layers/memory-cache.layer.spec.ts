@@ -1,7 +1,7 @@
 import type { MockedObject } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryCacheLayer } from '#microservice/Cache/layers/memory-cache.layer'
 import { MemoryCacheService } from '#microservice/Cache/services/memory-cache.service'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('memoryCacheLayer', () => {
 	let layer: MemoryCacheLayer

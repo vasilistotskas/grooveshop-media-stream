@@ -1,4 +1,7 @@
 import type { INestApplication } from '@nestjs/common'
+import { Test, TestingModule } from '@nestjs/testing'
+import request from 'supertest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { CacheHealthIndicator } from '#microservice/Cache/indicators/cache-health.indicator'
 import { RedisHealthIndicator } from '#microservice/Cache/indicators/redis-health.indicator'
 import { CacheWarmingService } from '#microservice/Cache/services/cache-warming.service'
@@ -11,9 +14,6 @@ import MediaStreamModule from '#microservice/media-stream.module'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { JobQueueHealthIndicator } from '#microservice/Queue/indicators/job-queue-health.indicator'
 import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
-import { Test, TestingModule } from '@nestjs/testing'
-import request from 'supertest'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 describe('middleware Configuration', () => {
 	let app: INestApplication

@@ -1,10 +1,10 @@
 import type { ExecutionContext } from '@nestjs/common'
 import type { ThrottlerModuleOptions, ThrottlerStorage } from '@nestjs/throttler'
 import * as process from 'node:process'
-import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { getOptionsToken, getStorageToken, ThrottlerException, ThrottlerGuard } from '@nestjs/throttler'
+import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { RateLimitService } from '../services/rate-limit.service.js'
 
 const STATIC_ASSET_RE = /\.(?:css|js|png|jpg|jpeg|gif|ico|svg)$/

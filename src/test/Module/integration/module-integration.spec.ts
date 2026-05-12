@@ -1,4 +1,6 @@
 import type { INestApplication } from '@nestjs/common'
+import { Test, TestingModule } from '@nestjs/testing'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { CacheWarmingService } from '#microservice/Cache/services/cache-warming.service'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
@@ -12,8 +14,6 @@ import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { JobQueueManager } from '#microservice/Queue/services/job-queue.manager'
 import { AdaptiveRateLimitGuard } from '#microservice/RateLimit/guards/adaptive-rate-limit.guard'
 import { SimpleValidationService } from '#microservice/Validation/services/simple-validation.service'
-import { Test, TestingModule } from '@nestjs/testing'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 describe('module Integration', () => {
 	let app: INestApplication

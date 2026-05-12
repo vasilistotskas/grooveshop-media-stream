@@ -1,5 +1,5 @@
-import { InternalSecretGuard } from '#microservice/common/guards/internal-secret.guard'
 import { Controller, Get, Header, HttpCode, HttpStatus, UseGuards } from '@nestjs/common'
+import { InternalSecretGuard } from '#microservice/common/guards/internal-secret.guard'
 import { MetricsService } from '../services/metrics.service.js'
 
 @Controller('metrics')

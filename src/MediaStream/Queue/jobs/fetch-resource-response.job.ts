@@ -1,10 +1,10 @@
-import type CacheImageRequest from '#microservice/API/dto/cache-image-request.dto'
 import type { AxiosResponse } from 'axios'
+import type CacheImageRequest from '#microservice/API/dto/cache-image-request.dto'
+import { Injectable, Logger } from '@nestjs/common'
+import { isAxiosError } from 'axios'
 import UnableToFetchResourceException from '#microservice/API/exceptions/unable-to-fetch-resource.exception'
 import { ConfigService } from '#microservice/Config/config.service'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
-import { Injectable, Logger } from '@nestjs/common'
-import { isAxiosError } from 'axios'
 
 /**
  * Fetches resources from remote URLs.
