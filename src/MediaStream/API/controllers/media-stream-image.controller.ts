@@ -24,6 +24,16 @@ const PARAM_DOT_PARAM_RE = /:([^/.]+)\.([^/.]+)/g
 const PARAM_RE = /:([^/]+)/g
 const SLASH_RE = /\//g
 
+// PostgreSQL identifier rules: lowercase letter or underscore, followed
+// by up to 62 lowercase alphanumeric or underscore characters. The
+// route regex already constrains the segment to ``[^/]+``, so any value
+// that reaches the controller is non-empty — this guard catches
+// uppercase, hyphens, dots, and over-length values before they reach
+// the cache namespace or the Prometheus ``tenant_schema`` label
+// (H20 in MULTI_TENANT_AUDIT.md). The same pattern is enforced by
+// ``admin-cache.controller.ts``.
+const TENANT_SCHEMA_PATTERN = /^[a-z_][a-z0-9_]{0,62}$/
+
 /**
  * Controller for image streaming with dynamic route matching
  *
@@ -217,10 +227,19 @@ export default class MediaStreamImageController {
 			// tenantSchema is extracted from route params when the URL pattern
 			// includes it (UPLOADED_MEDIA). For the legacy route and shared
 			// sources (STATIC_IMAGES), fall back to "public" so keys remain
-			// stable. Used downstream as part of the cache namespace.
-			const tenantSchema = typeof (params as Record<string, unknown>).tenantSchema === 'string'
-				? (params as Record<string, string>).tenantSchema
+			// stable. Used downstream as part of the cache namespace AND
+			// as the ``tenant_schema`` Prometheus label, so we validate
+			// the shape here before it can drive disk paths or metrics
+			// cardinality (H20 in MULTI_TENANT_AUDIT.md).
+			const rawTenantSchema = (params as Record<string, unknown>)['tenantSchema']
+			const tenantSchema = typeof rawTenantSchema === 'string'
+				? rawTenantSchema
 				: 'public'
+			if (tenantSchema !== 'public' && !TENANT_SCHEMA_PATTERN.test(tenantSchema)) {
+				throw new BadRequestException(
+					`Invalid tenantSchema: ${tenantSchema}. Must match /^[a-z_][a-z0-9_]{0,62}$/`,
+				)
+			}
 
 			const request = new CacheImageRequest({
 				resourceTarget: resourceUrl,
