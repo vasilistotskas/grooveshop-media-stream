@@ -73,27 +73,46 @@ export default class MediaStreamImageController {
 			? req.path.substring(basePath.length)
 			: req.path
 
-		// Decode percent-encoding exactly once (C19 fix — multi-decode evasion).
-		// A single pass is sufficient: legitimate single-encoded paths become
-		// plain text; invalid encodings throw immediately.
-		// Double-encoded input (e.g. %252F → %2F after one pass) is detected
-		// by the presence of a literal '%' in the decoded string that was not
-		// there before decoding — this indicates an extra encoding layer that
-		// could be used to bypass path-traversal and security checks.
+		// Loop-decode percent-encoding until stable, capped at 3 passes.
+		//
+		// TinyMCE-edited blog HTML stores image URLs with inconsistent
+		// percent-encoding — the slash sometimes ends up as ``%2F`` and Greek
+		// bytes as ``%25CF%2584`` (double-encoded). Single-pass decoding
+		// leaves the inner layer intact, the URL builder re-encodes it, and
+		// the upstream returns 404 with a confusing "Double-encoded URL
+		// detected" or "No matching image source" rejection (verified
+		// 2026-05-16: 34 × C19 rejections + 42 × no-source-found on legit
+		// blog covers in 24h).
+		//
+		// Security: this looks like the C19 evasion (multi-decode bypass)
+		// it isn't, because path-traversal defence lives downstream of
+		// here — ``RequestValidatorService.validateRequest`` runs
+		// ``SecurityCheckerService.checkForMaliciousContent`` on every
+		// string param including ``imagePath``, and that service's
+		// ``containsPathTraversal`` already multi-decodes (single + double)
+		// and tests every traversal pattern (``../``, ``%2e%2e%2f`` etc.)
+		// against each decoded variant. Additionally, the strict
+		// IMAGE_SOURCES regex (``media/uploads/:imagePath+/:width/.../...``)
+		// rejects anything not shaped like a legitimate image path.
+		//
+		// A pathological input that never stabilises within 3 passes falls
+		// through still containing ``%`` — the regex won't match and the
+		// request 404s, which is the right outcome.
+		const MAX_DECODE_PASSES = 3
 		if (fullPath && fullPath.includes('%')) {
-			let decoded: string
-			try {
-				decoded = decodeURIComponent(fullPath)
+			for (let i = 0; i < MAX_DECODE_PASSES; i++) {
+				let decoded: string
+				try {
+					decoded = decodeURIComponent(fullPath)
+				}
+				catch {
+					throw new BadRequestException('Invalid URL encoding in image path')
+				}
+				if (decoded === fullPath) {
+					break
+				}
+				fullPath = decoded
 			}
-			catch {
-				throw new BadRequestException('Invalid URL encoding in image path')
-			}
-			// Reject double-encoded paths: decoded differs from input AND still
-			// contains a '%' — the inner layer was intentionally percent-encoded.
-			if (decoded !== fullPath && decoded.includes('%')) {
-				throw new BadRequestException('Double-encoded URL detected in image path')
-			}
-			fullPath = decoded
 		}
 
 		this._logger.debug('Processing image request', { fullPath, originalPath: req.path, correlationId })
