@@ -1,3 +1,10 @@
+## [2.51.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.51.0...v2.51.1) (2026-05-16)
+
+
+### Bug Fixes
+
+* **image-controller:** loop-decode image paths to handle TinyMCE double-encoding ([6c8dbb8](https://github.com/vasilistotskas/grooveshop-media-stream/commit/6c8dbb899ae5dc0e38ec54473acc3f77c35efa38))
+
 # [2.51.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.50.4...v2.51.0) (2026-05-12)
 
 
