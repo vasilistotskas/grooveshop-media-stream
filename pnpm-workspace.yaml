@@ -4,12 +4,8 @@ allowBuilds:
   esbuild: true
   msgpackr-extract: true
   sharp: true
+overrides:
+  lodash: '>=4.18.1'
 minimumReleaseAgeExclude:
   - '@types/node@25.9.1'
   - isomorphic-dompurify@3.14.0
-onlyBuiltDependencies:
-  - '@nestjs/core'
-  - '@swc/core'
-  - esbuild
-  - msgpackr-extract
-  - sharp
