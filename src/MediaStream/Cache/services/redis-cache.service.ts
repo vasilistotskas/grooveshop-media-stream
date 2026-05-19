@@ -498,10 +498,16 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 
 	/**
 	 * Deserialize value from Redis storage.
-	 * Handles three formats:
-	 * 1. Binary format (0x00 prefix) — new compact format
-	 * 2. Legacy JSON with base64-encoded Buffers — backward compatible
-	 * 3. Plain JSON for non-binary values
+	 * Handles two formats:
+	 * 1. Binary format (BINARY_MARKER prefix) — compact, used for cached
+	 *    image payloads (avoids the base64 bloat the old format paid).
+	 * 2. Plain JSON — for non-binary cache values (counters, metadata-only
+	 *    entries, plain objects).
+	 *
+	 * Any entry still using the pre-binary-marker base64-Buffer wrapping
+	 * (``{ type: "Buffer", data: "<base64>" }``) returns ``null`` →
+	 * treated as a cache miss → the consumer re-fetches and re-caches
+	 * in the current binary format. Self-healing.
 	 */
 	private deserializeValue<T>(value: Buffer): T | null {
 		// Check for binary format marker
@@ -516,12 +522,19 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			}
 		}
 
-		// Fall back to JSON parsing (handles legacy base64 format and plain objects)
+		// Fall back to JSON parsing for non-binary values. The reviver
+		// detects the pre-binary-marker base64-Buffer shape and throws,
+		// caught below → null → cache miss → self-heal.
 		try {
 			const str = value.toString('utf8')
 			return JSON.parse(str, (_key, val) => {
-				if (val && typeof val === 'object' && val.type === 'Buffer' && typeof val.data === 'string') {
-					return Buffer.from(val.data, 'base64')
+				if (
+					val
+					&& typeof val === 'object'
+					&& val.type === 'Buffer'
+					&& typeof val.data === 'string'
+				) {
+					throw new Error('stale base64-buffer cache entry — re-cache in binary format')
 				}
 				return val
 			})

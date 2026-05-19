@@ -239,19 +239,22 @@ describe('redisCacheService', () => {
 				expect(result!.metadata).toEqual(metadata.metadata)
 			})
 
-			it('should handle legacy base64 format for backward compatibility', async () => {
-				const imageData = Buffer.from('legacy-image-data')
-				const legacyValue = JSON.stringify({
+			it('treats stale base64-buffer entries as cache misses (self-heal)', async () => {
+				// The pre-binary-marker cache format wrapped Buffers as
+				// ``{ type: "Buffer", data: "<base64>" }``. Any entry
+				// still using that shape must return ``null`` so the
+				// consumer re-fetches the upstream image and re-caches
+				// it in the current compact binary format.
+				const imageData = Buffer.from('stale-image-data')
+				const staleValue = JSON.stringify({
 					data: { type: 'Buffer', data: imageData.toString('base64') },
 					metadata: { format: 'webp' },
 				})
-				mockRedis.getBuffer.mockResolvedValue(Buffer.from(legacyValue))
+				mockRedis.getBuffer.mockResolvedValue(Buffer.from(staleValue))
 
-				const result = await service.get<{ data: Buffer, metadata: any }>('legacy-key')
+				const result = await service.get<{ data: Buffer, metadata: any }>('stale-key')
 
-				expect(result).not.toBeNull()
-				expect(Buffer.isBuffer(result!.data)).toBe(true)
-				expect(result!.data).toEqual(imageData)
+				expect(result).toBeNull()
 			})
 		})
 

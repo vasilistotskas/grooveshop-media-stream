@@ -54,11 +54,12 @@ function resolveLogLevels(): LogLevel[] {
  * @param options Bootstrap configuration options
  * @returns A promise that resolves when the application is started
  */
-export async function bootstrap(options: BootstrapOptions | boolean = true): Promise<void> {
-	// Handle legacy boolean parameter for backwards compatibility
-	const opts: BootstrapOptions = typeof options === 'boolean'
-		? { exitProcess: options, enableGracefulShutdown: options }
-		: { exitProcess: true, enableGracefulShutdown: true, ...options }
+export async function bootstrap(options: BootstrapOptions = {}): Promise<void> {
+	const opts: Required<BootstrapOptions> = {
+		exitProcess: true,
+		enableGracefulShutdown: true,
+		...options,
+	}
 
 	try {
 		const app = await NestFactory.create<NestExpressApplication>(MediaStreamModule, {
@@ -159,7 +160,7 @@ export async function bootstrap(options: BootstrapOptions | boolean = true): Pro
 if (process.env.NODE_ENV !== 'test') {
 	void (async () => {
 		try {
-			await bootstrap(true)
+			await bootstrap()
 		}
 		catch (error) {
 			console.error('Unhandled error during bootstrap:', error)
