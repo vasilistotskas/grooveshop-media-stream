@@ -1,3 +1,10 @@
+## [2.52.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.52.0...v2.52.1) (2026-05-19)
+
+
+### Bug Fixes
+
+* **release:** cut release after legacy bootstrap-param + base64 cache cleanup ([cda4085](https://github.com/vasilistotskas/grooveshop-media-stream/commit/cda40854afd0ad5178e91e88cfed757e4f86f4e4))
+
 # [2.52.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.51.1...v2.52.0) (2026-05-18)
 
 
