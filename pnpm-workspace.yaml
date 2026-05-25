@@ -4,9 +4,17 @@ allowBuilds:
   esbuild: true
   msgpackr-extract: true
   sharp: true
-onlyBuiltDependencies:
-  - '@nestjs/core'
-  - '@swc/core'
-  - esbuild
-  - msgpackr-extract
-  - sharp
+overrides:
+  lodash: '>=4.18.1'
+minimumReleaseAgeExclude:
+  - '@types/node@25.9.1'
+  - isomorphic-dompurify@3.14.0
+  - '@vitest/coverage-v8@4.1.7'
+  - '@vitest/expect@4.1.7'
+  - '@vitest/mocker@4.1.7'
+  - '@vitest/pretty-format@4.1.7'
+  - '@vitest/runner@4.1.7'
+  - '@vitest/snapshot@4.1.7'
+  - '@vitest/spy@4.1.7'
+  - '@vitest/utils@4.1.7'
+  - vitest@4.1.7

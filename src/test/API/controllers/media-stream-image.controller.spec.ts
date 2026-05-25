@@ -156,29 +156,82 @@ describe('mediaStreamImageController', () => {
 			)
 		})
 
-		// C19 — Double-encoded URL must be rejected (400)
-		it('should reject double-encoded paths', async () => {
-			// %252F is a double-encoded slash: first pass decodes %25 → %, leaving %2F
-			// which means the decoded string still contains %, signaling double-encoding
+		// Loop-decode legitimate TinyMCE-style double-encoded URLs.
+		// Site owner reported on 2026-05-16 that blog cover images were
+		// returning ``Double-encoded URL detected`` rejections at high
+		// volume; the source is TinyMCE serialising image URLs with
+		// percent-encoded slashes (``%2F``) on top of percent-encoded
+		// UTF-8 (``%25CF%2584``). Path-traversal defence has moved to
+		// ``SecurityCheckerService.containsPathTraversal`` (which
+		// multi-decodes and tests every traversal pattern against each
+		// decoded variant), so the controller can safely canonicalise
+		// the path by looping ``decodeURIComponent`` until stable.
+		it('should loop-decode TinyMCE-style double-encoded image paths', async () => {
+			// %252F is a double-encoded slash. Loop-decode: pass 1 →
+			// "test%2Fpath", pass 2 → "test/path", stable. The regex
+			// then matches imagePath="test/path/image.webp" via the
+			// :imagePath+ wildcard.
 			const mockRequest = {
 				path: '/media_stream-image/media/uploads/test%252Fpath/image.webp/100/100/contain/entropy/transparent/5/80.webp',
 			} as any
 
-			await expect(controller.handleImageRequest(mockRequest, mockResponse))
-				.rejects
-				.toThrow('Double-encoded URL detected in image path')
+			await controller.handleImageRequest(mockRequest, mockResponse)
+
+			expect(mockRequestValidatorService.validateRequest).toHaveBeenCalledWith(
+				expect.objectContaining({
+					params: expect.objectContaining({
+						imagePath: 'test/path/image.webp',
+					}),
+				}),
+			)
 		})
 
-		it('should reject deeply double-encoded path traversal attempt', async () => {
-			// %25252e%25252e%2525252f is a deeply double-encoded ../
+		it('should loop-decode quadruple-encoded Greek bytes (real prod case)', async () => {
+			// %25CF%2584 is a double-encoded Greek τ; %2525CF%252584 is
+			// quadruple-encoded. Loop terminates within 3 passes for
+			// any reasonable input. After the loop the path is the
+			// canonical UTF-8 string.
+			const mockRequest = {
+				path: '/media_stream-image/media/uploads/blog/%2525CF%252584_cover.png/100/100/cover/entropy/transparent/5/80.webp',
+			} as any
+
+			await controller.handleImageRequest(mockRequest, mockResponse)
+
+			expect(mockRequestValidatorService.validateRequest).toHaveBeenCalledWith(
+				expect.objectContaining({
+					params: expect.objectContaining({
+						imagePath: 'blog/τ_cover.png',
+					}),
+				}),
+			)
+		})
+
+		it('should 404 a deeply double-encoded path traversal attempt', async () => {
+			// %25252e%25252e%2525252f loop-decodes to "../". The
+			// resulting path does not start with ``media/uploads/`` /
+			// ``static/images/`` so no IMAGE_SOURCES regex matches and
+			// the request returns 404 — safe outcome. If a traversal
+			// attempt happened to match the regex, the param-level
+			// SecurityCheckerService would catch it.
 			const mockRequest = {
 				path: '/media_stream-image/%25252e%25252e%2525252f/image.webp/100/100/contain/entropy/transparent/5/80.webp',
 			} as any
 
-			// After one decode pass, result still contains %, so it gets rejected
 			await expect(controller.handleImageRequest(mockRequest, mockResponse))
 				.rejects
-				.toThrow()
+				.toThrow(NotFoundException)
+		})
+
+		it('should reject malformed percent-encoding with 400', async () => {
+			// ``%ZZ`` is not valid percent-encoding — decodeURIComponent
+			// throws, and we surface it as a 400.
+			const mockRequest = {
+				path: '/media_stream-image/media/uploads/test%ZZpath/image.webp/100/100/contain/entropy/transparent/5/80.webp',
+			} as any
+
+			await expect(controller.handleImageRequest(mockRequest, mockResponse))
+				.rejects
+				.toThrow('Invalid URL encoding in image path')
 		})
 
 		it('should decode URL-encoded Unicode characters (Greek)', async () => {

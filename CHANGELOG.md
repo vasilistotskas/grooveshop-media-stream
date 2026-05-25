@@ -1,3 +1,38 @@
+# [2.54.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.53.0...v2.54.0) (2026-05-20)
+
+
+### Features
+
+* Bump Versions ([6e473ea](https://github.com/vasilistotskas/grooveshop-media-stream/commit/6e473ea6158ef2d9bf21cd9ba93ad976f748cc38))
+
+# [2.53.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.52.1...v2.53.0) (2026-05-19)
+
+
+### Features
+
+* Bump Versions ([bc70303](https://github.com/vasilistotskas/grooveshop-media-stream/commit/bc703037779e92bb7cae43a5771d45b97e59e221))
+
+## [2.52.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.52.0...v2.52.1) (2026-05-19)
+
+
+### Bug Fixes
+
+* **release:** cut release after legacy bootstrap-param + base64 cache cleanup ([cda4085](https://github.com/vasilistotskas/grooveshop-media-stream/commit/cda40854afd0ad5178e91e88cfed757e4f86f4e4))
+
+# [2.52.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.51.1...v2.52.0) (2026-05-18)
+
+
+### Features
+
+* Bump Versions ([026db04](https://github.com/vasilistotskas/grooveshop-media-stream/commit/026db048c2c44a630fbad8839cc8792a407ea053))
+
+## [2.51.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.51.0...v2.51.1) (2026-05-16)
+
+
+### Bug Fixes
+
+* **image-controller:** loop-decode image paths to handle TinyMCE double-encoding ([6c8dbb8](https://github.com/vasilistotskas/grooveshop-media-stream/commit/6c8dbb899ae5dc0e38ec54473acc3f77c35efa38))
+
 # [2.51.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.50.4...v2.51.0) (2026-05-12)
 
 
