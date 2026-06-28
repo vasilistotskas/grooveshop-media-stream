@@ -1,3 +1,16 @@
+# [2.56.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.55.0...v2.56.0) (2026-06-28)
+
+
+### Bug Fixes
+
+* **deps:** cap undici override at <8 to keep jsdom working ([35a8ad4](https://github.com/vasilistotskas/grooveshop-media-stream/commit/35a8ad427026a8e3cedcc5fd796291b29a0accc8))
+* **deps:** patch HIGH-severity CVEs flagged by Trivy ([02ff5b6](https://github.com/vasilistotskas/grooveshop-media-stream/commit/02ff5b6015c5259e4a642931c92f01a6511aef4c)), closes [HI#severity](https://github.com/HI/issues/severity)
+
+
+### Features
+
+* Bump Versions ([08a675a](https://github.com/vasilistotskas/grooveshop-media-stream/commit/08a675afdd91e246264636cadbbbe9caa100d8fd))
+
 # [2.55.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.54.0...v2.55.0) (2026-05-26)
 
 
