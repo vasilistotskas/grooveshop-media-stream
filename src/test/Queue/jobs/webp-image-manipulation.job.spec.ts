@@ -177,7 +177,9 @@ describe('webpImageManipulationJob', () => {
 
 		it('should handle avif format with optimized encoding settings', async () => {
 			const filePathFrom = 'test.avif'
-			mockManipulation.toBuffer.mockResolvedValue({ data: testBuffer, info: { size: 1000, format: 'avif' } })
+			// Sharp/libvips reports AVIF output as 'heif' — mirror that here so the
+			// test exercises the heif→avif normalisation (see lovell/sharp#2504).
+			mockManipulation.toBuffer.mockResolvedValue({ data: testBuffer, info: { size: 1000, format: 'heif' } })
 			const options = new ResizeOptions({
 				width: 800,
 				height: 600,
@@ -202,6 +204,9 @@ describe('webpImageManipulationJob', () => {
 			expect(result).toBeInstanceOf(ManipulationJobResult)
 			expect(result.size).toBe('1000')
 			expect(result.buffer).toBe(testBuffer)
+			// The job must normalise Sharp's 'heif' back to 'avif' so the
+			// downstream Content-Type resolves to image/avif, not octet-stream.
+			expect(result.format).toBe('avif')
 		})
 
 		it('should handle resize with trim threshold', async () => {

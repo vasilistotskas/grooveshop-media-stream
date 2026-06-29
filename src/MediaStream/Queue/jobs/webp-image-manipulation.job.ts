@@ -291,9 +291,16 @@ export default class WebpImageManipulationJob {
 		try {
 			const { data, info } = await manipulation.toBuffer({ resolveWithObject: true })
 
+			// Sharp/libvips reports AVIF output with format 'heif' (AVIF is a
+			// HEIF-family container and shares the encoder). Normalise it back to
+			// 'avif' so the stored metadata, weak ETag and resolved Content-Type
+			// (image/avif) match the requested/actual output instead of falling
+			// through to application/octet-stream. See lovell/sharp#2504.
+			const outputFormat = info.format === 'heif' ? 'avif' : info.format
+
 			return new ManipulationJobResult({
 				size: String(info.size),
-				format: info.format,
+				format: outputFormat,
 				buffer: data,
 			})
 		}

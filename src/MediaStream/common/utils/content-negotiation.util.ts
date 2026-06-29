@@ -132,6 +132,11 @@ export function getMimeType(format: SupportedResizeFormats | string): string {
 			return 'image/gif'
 		case 'tiff':
 			return 'image/tiff'
+		// Sharp/libvips reports AVIF output as 'heif' (the only producer of this
+		// value in our pipeline is the .avif() encoder). Map it to image/avif so
+		// entries cached before this normalisation still serve the correct type.
+		case 'heif':
+			return 'image/avif'
 		default:
 			return 'application/octet-stream'
 	}
