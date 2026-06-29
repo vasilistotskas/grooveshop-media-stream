@@ -1,3 +1,10 @@
+## [2.56.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.56.0...v2.56.1) (2026-06-29)
+
+
+### Bug Fixes
+
+* **image:** serve AVIF output as image/avif instead of octet-stream ([30e264d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/30e264de3642bc92a239ee33a084c83b2a574832)), closes [lovell/sharp#2504](https://github.com/lovell/sharp/issues/2504)
+
 # [2.56.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.55.0...v2.56.0) (2026-06-28)
 
 
