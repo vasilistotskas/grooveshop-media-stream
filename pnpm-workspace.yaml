@@ -28,7 +28,7 @@ minimumReleaseAgeExclude:
   - '@vitest/spy@4.1.7'
   - '@vitest/utils@4.1.7'
   - vitest@4.1.7
-  - eslint@10.6.0
+  - eslint@10.6.0 || 10.7.0
   - '@img/sharp-darwin-arm64@0.35.3'
   - '@img/sharp-darwin-x64@0.35.3'
   - '@img/sharp-freebsd-wasm32@0.35.3'
@@ -47,3 +47,6 @@ minimumReleaseAgeExclude:
   - '@img/sharp-win32-x64@0.35.3'
   - '@semantic-release/github@12.0.9'
   - sharp@0.35.3
+  - '@nestjs/cli@11.0.24'
+  - '@vitest/eslint-plugin@1.6.23'
+  - semantic-release@25.0.6
