@@ -45,7 +45,7 @@ describe('redisHealthIndicator', () => {
 				return undefined
 			}),
 			getOptional: vi.fn().mockImplementation((key: string, defaultValue?: any) => {
-				if (key === 'health.redis.cacheTtl')
+				if (key === 'cache.redis.healthCheckCacheTtl')
 					return 10000 // 10 seconds cache TTL for tests
 				return defaultValue
 			}),

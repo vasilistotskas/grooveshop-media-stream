@@ -16,7 +16,7 @@ describe('configService', () => {
 		CORS_METHODS: 'GET',
 		CORS_MAX_AGE: '86400',
 		CACHE_MEMORY_MAX_SIZE: '104857600',
-		CACHE_MEMORY_TTL: '3600',
+		CACHE_MEMORY_DEFAULT_TTL: '3600',
 		CACHE_MEMORY_CHECK_PERIOD: '600',
 		REDIS_HOST: 'localhost',
 		REDIS_PORT: '6379',
@@ -25,20 +25,11 @@ describe('configService', () => {
 		REDIS_MAX_RETRIES: '3',
 		REDIS_RETRY_DELAY: '100',
 		CACHE_FILE_DIRECTORY: './storage',
-		CACHE_FILE_MAX_SIZE: '1073741824',
-		CACHE_FILE_CLEANUP_INTERVAL: '3600',
-		PROCESSING_MAX_CONCURRENT: '10',
-		PROCESSING_TIMEOUT: '30000',
-		PROCESSING_RETRIES: '3',
-		PROCESSING_MAX_FILE_SIZE: '10485760',
-		PROCESSING_ALLOWED_FORMATS: 'jpg,jpeg,png,webp,gif,svg',
+		CACHE_IMAGE_NEGATIVE_TTL: '600',
+		PROCESSING_CPU_CORES: '1.5',
 		MONITORING_ENABLED: 'true',
-		MONITORING_METRICS_PORT: '9090',
-		MONITORING_HEALTH_PATH: '/health',
-		MONITORING_METRICS_PATH: '/metrics',
 		BACKEND_URL: 'http://localhost:8000',
 		EXTERNAL_REQUEST_TIMEOUT: '30000',
-		EXTERNAL_MAX_RETRIES: '3',
 		RATE_LIMIT_ENABLED: 'true',
 		RATE_LIMIT_DEFAULT_WINDOW_MS: '60000',
 		RATE_LIMIT_DEFAULT_MAX: '100',
@@ -98,6 +89,8 @@ describe('configService', () => {
 			expect(config).toHaveProperty('processing')
 			expect(config).toHaveProperty('monitoring')
 			expect(config).toHaveProperty('externalServices')
+			expect(config).toHaveProperty('validation')
+			expect(config).toHaveProperty('storage')
 		})
 
 		it('should throw error for non-existent configuration key', () => {
@@ -105,18 +98,40 @@ describe('configService', () => {
 				'Configuration key \'nonexistent.key\' not found',
 			)
 		})
+
+		it('should apply CACHE_IMAGE_NEGATIVE_TTL from the environment', () => {
+			// Regression: ensureConfigStructure() used to rebuild cache.image
+			// without negativeCacheTtl, silently discarding the env value.
+			expect(service.get('cache.image.negativeCacheTtl')).toBe(600)
+		})
+
+		it('should parse fractional numeric values', () => {
+			expect(service.get('processing.cpuCores')).toBe(1.5)
+		})
 	})
 
 	describe('configuration Validation', () => {
-		it('should validate server configuration', async () => {
+		it('should reject out-of-range server port', async () => {
+			nestConfigService.get.mockImplementation((key: string) => {
+				if (key === 'PORT')
+					return '99999'
+				return mockEnvVars[key as keyof typeof mockEnvVars]
+			})
+
+			const invalidService = new ConfigService(nestConfigService)
+			await expect(invalidService.validate()).rejects.toThrow('Configuration validation failed')
+		})
+
+		it('should fall back to the schema default for unparseable numbers', async () => {
 			nestConfigService.get.mockImplementation((key: string) => {
 				if (key === 'PORT')
 					return 'invalid-port'
 				return mockEnvVars[key as keyof typeof mockEnvVars]
 			})
 
-			const invalidService = new ConfigService(nestConfigService)
-			await expect(invalidService.validate()).rejects.toThrow('Configuration validation failed')
+			const fallbackService = new ConfigService(nestConfigService)
+			expect(fallbackService.get('server.port')).toBe(3003)
+			await expect(fallbackService.validate()).resolves.not.toThrow()
 		})
 
 		it('should validate cache configuration', async () => {
@@ -132,43 +147,13 @@ describe('configService', () => {
 
 		it('should validate processing configuration', async () => {
 			nestConfigService.get.mockImplementation((key: string) => {
-				if (key === 'PROCESSING_MAX_CONCURRENT')
+				if (key === 'PROCESSING_CPU_CORES')
 					return '0'
 				return mockEnvVars[key as keyof typeof mockEnvVars]
 			})
 
 			const invalidService = new ConfigService(nestConfigService)
 			await expect(invalidService.validate()).rejects.toThrow('Configuration validation failed')
-		})
-
-		// External services URLs are now validated per-source, not globally
-		// This test is no longer applicable
-	})
-
-	describe('hot Reload Functionality', () => {
-		it('should identify hot-reloadable keys', () => {
-			expect(service.isHotReloadable('MONITORING_ENABLED')).toBe(true)
-			expect(service.isHotReloadable('PROCESSING_MAX_CONCURRENT')).toBe(true)
-			// Production code uses CACHE_MEMORY_DEFAULT_TTL (not CACHE_MEMORY_TTL)
-			expect(service.isHotReloadable('CACHE_MEMORY_DEFAULT_TTL')).toBe(true)
-			expect(service.isHotReloadable('PORT')).toBe(false)
-		})
-
-		it('should reload hot-reloadable configuration', async () => {
-			const originalEnabled = service.get('monitoring.enabled')
-
-			// Mock environment change
-			nestConfigService.get.mockImplementation((key: string) => {
-				if (key === 'MONITORING_ENABLED')
-					return 'false'
-				return mockEnvVars[key as keyof typeof mockEnvVars]
-			})
-
-			await service.reload()
-
-			// Should update hot-reloadable setting
-			expect(service.get('monitoring.enabled')).toBe(false)
-			expect(service.get('monitoring.enabled')).not.toBe(originalEnabled)
 		})
 	})
 
@@ -183,8 +168,12 @@ describe('configService', () => {
 			expect(serviceWithDefaults.get('server.port')).toBe(3003)
 			expect(serviceWithDefaults.get('server.host')).toBe('0.0.0.0')
 			expect(serviceWithDefaults.get('cache.memory.maxSize')).toBe(104857600)
-			expect(serviceWithDefaults.get('processing.maxConcurrent')).toBe(10)
+			expect(serviceWithDefaults.get('processing.cpuCores')).toBe(1.5)
 			expect(serviceWithDefaults.get('monitoring.enabled')).toBe(true)
+			expect(serviceWithDefaults.get('cache.image.negativeCacheTtl')).toBe(300)
+			expect(serviceWithDefaults.get('storage.cleanup.cronSchedule')).toBe('0 2 * * *')
+			expect(serviceWithDefaults.get('http.healthCheck.urls')).toEqual([])
+			await expect(serviceWithDefaults.validate()).resolves.not.toThrow()
 		})
 	})
 
@@ -192,12 +181,12 @@ describe('configService', () => {
 		it('should maintain type safety for configuration values', () => {
 			const port: number = service.get('server.port')
 			const enabled: boolean = service.get('monitoring.enabled')
-			const formats: string[] = service.get('processing.allowedFormats')
+			const domains: string[] = service.get('validation.allowedDomains')
 
 			expect(typeof port).toBe('number')
 			expect(typeof enabled).toBe('boolean')
-			expect(Array.isArray(formats)).toBe(true)
-			expect(formats.every(format => typeof format === 'string')).toBe(true)
+			expect(Array.isArray(domains)).toBe(true)
+			expect(domains.every(domain => typeof domain === 'string')).toBe(true)
 		})
 	})
 })

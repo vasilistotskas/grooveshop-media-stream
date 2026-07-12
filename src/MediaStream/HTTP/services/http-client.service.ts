@@ -50,7 +50,7 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	) {
 		this.maxRetries = this._configService.getOptional('http.maxRetries', 3)
 		this.retryDelay = this._configService.getOptional('http.retryDelay', 1000)
-		this.maxRetryDelay = this._configService.getOptional('http.retry.maxRetryDelay', 10000)
+		this.maxRetryDelay = this._configService.getOptional('http.maxRetryDelay', 10000)
 		this.timeout = this._configService.getOptional('http.timeout', 30000)
 
 		// Boolean is now properly parsed by config schema
