@@ -12,6 +12,8 @@ import ValidateCacheImageRequestRule from '#microservice/Validation/rules/valida
 import { ValidationModule } from '#microservice/Validation/validation.module'
 import { CacheModule } from './cache.module.js'
 import CacheImageResourceOperation from './operations/cache-image-resource.operation.js'
+import { ImageFormatProcessor } from './operations/image-format-processor.service.js'
+import { ResourceFetcher } from './operations/resource-fetcher.service.js'
 
 /**
  * Shared module for cache operations
@@ -27,6 +29,8 @@ import CacheImageResourceOperation from './operations/cache-image-resource.opera
 	],
 	providers: [
 		CacheImageResourceOperation,
+		ResourceFetcher,
+		ImageFormatProcessor,
 		ValidateCacheImageRequestRule,
 		ValidateCacheImageRequestResizeTargetRule,
 		GenerateResourceIdentityFromRequestJob,

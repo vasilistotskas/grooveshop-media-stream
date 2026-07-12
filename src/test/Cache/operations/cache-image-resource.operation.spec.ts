@@ -17,6 +17,8 @@ import CacheImageRequest, {
 	SupportedResizeFormats,
 } from '#microservice/API/dto/cache-image-request.dto'
 import CacheImageResourceOperation from '#microservice/Cache/operations/cache-image-resource.operation'
+import { ImageFormatProcessor } from '#microservice/Cache/operations/image-format-processor.service'
+import { ResourceFetcher } from '#microservice/Cache/operations/resource-fetcher.service'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
 import { ConfigService } from '#microservice/Config/config.service'
 import ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
@@ -186,6 +188,10 @@ describe('cacheImageResourceOperation', () => {
 		moduleRef = await Test.createTestingModule({
 			providers: [
 				CacheImageResourceOperation,
+				// Real collaborators — they consume the mocked jobs/cache/config below,
+				// so behaviour assertions against those mocks remain valid.
+				ResourceFetcher,
+				ImageFormatProcessor,
 				{ provide: HttpService, useValue: mockHttpService },
 				{ provide: GenerateResourceIdentityFromRequestJob, useValue: mockGenerateResourceIdentityFromRequestJob },
 				{ provide: FetchResourceResponseJob, useValue: mockFetchResourceResponseJob },
