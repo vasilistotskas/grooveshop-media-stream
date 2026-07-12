@@ -15,7 +15,6 @@ import { InternalSecretGuard } from '#microservice/common/guards/internal-secret
 import { isShuttingDown } from '#microservice/common/utils/graceful-shutdown.util'
 import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
-import { JobQueueHealthIndicator } from '#microservice/Queue/indicators/job-queue-health.indicator'
 import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
 import { HealthDetailGuard } from '../guards/health-detail.guard.js'
 import { DiskSpaceHealthIndicator } from '../indicators/disk-space-health.indicator.js'
@@ -31,7 +30,6 @@ export class HealthController {
 		private readonly httpHealthIndicator: HttpHealthIndicator,
 		private readonly cacheHealthIndicator: CacheHealthIndicator,
 		private readonly redisHealthIndicator: RedisHealthIndicator,
-		private readonly jobQueueHealthIndicator: JobQueueHealthIndicator,
 		private readonly storageHealthIndicator: StorageHealthIndicator,
 		private readonly sharpHealthIndicator: SharpHealthIndicator,
 		private readonly httpClientService: HttpClientService,
@@ -46,7 +44,6 @@ export class HealthController {
 			() => this.httpHealthIndicator.isHealthy(),
 			() => this.cacheHealthIndicator.isHealthy(),
 			() => this.redisHealthIndicator.isHealthy(),
-			() => this.jobQueueHealthIndicator.isHealthy(),
 			() => this.storageHealthIndicator.isHealthy(),
 			() => this.sharpHealthIndicator.isHealthy(),
 		])
@@ -73,7 +70,6 @@ export class HealthController {
 			() => this.httpHealthIndicator.isHealthy(),
 			() => this.cacheHealthIndicator.isHealthy(),
 			() => this.redisHealthIndicator.isHealthy(),
-			() => this.jobQueueHealthIndicator.isHealthy(),
 			() => this.storageHealthIndicator.isHealthy(),
 			() => this.sharpHealthIndicator.isHealthy(),
 		])
@@ -148,7 +144,6 @@ export class HealthController {
 			() => this.redisHealthIndicator.isHealthy(),
 			() => this.httpHealthIndicator.isHealthy(),
 			() => this.cacheHealthIndicator.isHealthy(),
-			() => this.jobQueueHealthIndicator.isHealthy(),
 			() => this.storageHealthIndicator.isHealthy(),
 		])
 	}

@@ -1,10 +1,12 @@
 import { Buffer } from 'node:buffer'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { cwd } from 'node:process'
 import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { ResizeOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
-import WebpImageManipulationJob from '#microservice/Queue/jobs/webp-image-manipulation.job'
+import WebpImageManipulationJob from '#microservice/Processing/jobs/webp-image-manipulation.job'
 
 /**
  * Performance tests for the image processing pipeline.
@@ -20,6 +22,12 @@ let smallImage: Buffer // 200x200
 let mediumImage: Buffer // 1024x768
 let largeImage: Buffer // 4096x3072
 let xlImage: Buffer // 8192x4320 (max supported)
+
+// File-based fixtures for WebpImageManipulationJob.handle (the production path)
+let tempDir: string
+let smallImagePath: string
+let mediumImagePath: string
+let largeImagePath: string
 
 beforeAll(async () => {
 	// Re-enable Sharp cache and concurrency for realistic benchmarks
@@ -42,12 +50,23 @@ beforeAll(async () => {
 	xlImage = await sharp({
 		create: { width: 8192, height: 4320, channels: 3, background: { r: 100, g: 200, b: 150 } },
 	}).png().toBuffer()
+
+	tempDir = await mkdtemp(join(tmpdir(), 'perf-images-'))
+	smallImagePath = join(tempDir, 'small.png')
+	mediumImagePath = join(tempDir, 'medium.png')
+	largeImagePath = join(tempDir, 'large.png')
+	await Promise.all([
+		writeFile(smallImagePath, smallImage),
+		writeFile(mediumImagePath, mediumImage),
+		writeFile(largeImagePath, largeImage),
+	])
 })
 
-afterAll(() => {
+afterAll(async () => {
 	// Restore test defaults
 	sharp.cache(false)
 	sharp.concurrency(1)
+	await rm(tempDir, { recursive: true, force: true })
 })
 
 function makeResizeOptions(overrides: Partial<ResizeOptions> = {}): ResizeOptions {
@@ -170,11 +189,11 @@ describe('image Processing Performance', () => {
 			expect(ms).toBeLessThan(200)
 		})
 
-		it('should process buffer via handleBuffer under 200ms', async () => {
+		it('should process medium image file via handle under 200ms', async () => {
 			const options = makeResizeOptions({ width: 800, height: 600 })
 
 			const ms = await measureMs(async () => {
-				const result = await job.handleBuffer(mediumImage, options)
+				const result = await job.handle(mediumImagePath, options)
 				expect(result.buffer).toBeDefined()
 				expect(result.format).toBeDefined()
 			})
@@ -187,7 +206,7 @@ describe('image Processing Performance', () => {
 
 			const ms = await measureMs(async () => {
 				for (let i = 0; i < 10; i++) {
-					await job.handleBuffer(mediumImage, options)
+					await job.handle(mediumImagePath, options)
 				}
 			})
 
@@ -203,7 +222,7 @@ describe('image Processing Performance', () => {
 			})
 
 			const ms = await measureMs(async () => {
-				const result = await job.handleBuffer(largeImage, options)
+				const result = await job.handle(largeImagePath, options)
 				expect(result.buffer).toBeDefined()
 				// Should be WebP due to fallback (4096*3072 > 2M pixels)
 				expect(result.format).toBe('webp')
@@ -226,7 +245,7 @@ describe('image Processing Performance', () => {
 			const ms = await measureMs(async () => {
 				const tasks = []
 				for (let i = 0; i < 5; i++)
-					tasks.push(job.handleBuffer(mediumImage, options))
+					tasks.push(job.handle(mediumImagePath, options))
 				await Promise.all(tasks)
 			})
 
@@ -239,7 +258,7 @@ describe('image Processing Performance', () => {
 			const ms = await measureMs(async () => {
 				const tasks = []
 				for (let i = 0; i < 10; i++)
-					tasks.push(job.handleBuffer(smallImage, options))
+					tasks.push(job.handle(smallImagePath, options))
 				await Promise.all(tasks)
 			})
 
@@ -252,7 +271,7 @@ describe('image Processing Performance', () => {
 			const ms = await measureMs(async () => {
 				const tasks = []
 				for (let i = 0; i < 20; i++)
-					tasks.push(job.handleBuffer(smallImage, options))
+					tasks.push(job.handle(smallImagePath, options))
 				await Promise.all(tasks)
 			})
 
@@ -263,10 +282,10 @@ describe('image Processing Performance', () => {
 			const ms = await measureMs(async () => {
 				const tasks: Promise<unknown>[] = []
 				for (let i = 0; i < 5; i++)
-					tasks.push(job.handleBuffer(smallImage, makeResizeOptions({ width: 100, height: 100 })))
+					tasks.push(job.handle(smallImagePath, makeResizeOptions({ width: 100, height: 100 })))
 				for (let i = 0; i < 3; i++)
-					tasks.push(job.handleBuffer(mediumImage, makeResizeOptions({ width: 400, height: 300 })))
-				tasks.push(job.handleBuffer(largeImage, makeResizeOptions({ width: 800, height: 600 })))
+					tasks.push(job.handle(mediumImagePath, makeResizeOptions({ width: 400, height: 300 })))
+				tasks.push(job.handle(largeImagePath, makeResizeOptions({ width: 800, height: 600 })))
 				await Promise.all(tasks)
 			})
 

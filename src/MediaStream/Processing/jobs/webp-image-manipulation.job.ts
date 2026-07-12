@@ -35,19 +35,6 @@ export default class WebpImageManipulationJob {
 		return this.processRaster(filePathFrom, options)
 	}
 
-	/**
-	 * Process an image from a Buffer.
-	 * Used by the queue processor for background jobs.
-	 * Skips SVG handling (queue only processes raster images).
-	 */
-	async handleBuffer(
-		buffer: Buffer,
-		options: ResizeOptions,
-	): Promise<ManipulationJobResult> {
-		this.logger.debug(`WebpImageManipulationJob.handleBuffer called`)
-		return this.processRaster(buffer, options)
-	}
-
 	private async handleSvgFormat(
 		filePathFrom: string,
 		options: ResizeOptions,
@@ -171,7 +158,7 @@ export default class WebpImageManipulationJob {
 	}
 
 	private async processRaster(
-		input: string | Buffer,
+		input: string,
 		options: ResizeOptions,
 	): Promise<ManipulationJobResult> {
 		const sharpOptions = { limitInputPixels: 268402689, sequentialRead: true }
@@ -179,7 +166,7 @@ export default class WebpImageManipulationJob {
 		// For AVIF, get metadata upfront to decide fallback before building the pipeline
 		let avifFallbackToWebp = false
 		if (options.format === 'avif') {
-			const metaPipeline = sharp(input as any, sharpOptions)
+			const metaPipeline = sharp(input, sharpOptions)
 			const metadata = await metaPipeline.metadata()
 			metaPipeline.destroy()
 			const totalPixels = (metadata.width || 0) * (metadata.height || 0)
@@ -193,7 +180,7 @@ export default class WebpImageManipulationJob {
 		// downstream operations (trim/resize) work on pixels in display
 		// orientation. Phone cameras commonly set orientation=6 (rotate
 		// 90° CW); without this, portrait photos arrive rotated.
-		let manipulation = sharp(input as any, sharpOptions).autoOrient()
+		let manipulation = sharp(input, sharpOptions).autoOrient()
 
 		const resizeScales: { width?: number, height?: number } = {};
 

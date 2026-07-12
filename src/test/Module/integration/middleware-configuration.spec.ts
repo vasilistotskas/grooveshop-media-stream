@@ -12,7 +12,6 @@ import { MemoryHealthIndicator } from '#microservice/Health/indicators/memory-he
 import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
 import MediaStreamModule from '#microservice/media-stream.module'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-import { JobQueueHealthIndicator } from '#microservice/Queue/indicators/job-queue-health.indicator'
 import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
 
 describe('middleware Configuration', () => {
@@ -104,10 +103,6 @@ describe('middleware Configuration', () => {
 			.overrideProvider(HttpHealthIndicator)
 			.useValue({
 				isHealthy: vi.fn().mockResolvedValue({ http: { status: 'up' } }),
-			})
-			.overrideProvider(JobQueueHealthIndicator)
-			.useValue({
-				isHealthy: vi.fn().mockResolvedValue({ jobQueue: { status: 'up' } }),
 			})
 			.overrideProvider(StorageHealthIndicator)
 			.useValue({

@@ -5,7 +5,7 @@ import CacheImageRequest, {
 	PositionOptions,
 	SupportedResizeFormats,
 } from '#microservice/API/dto/cache-image-request.dto'
-import GenerateResourceIdentityFromRequestJob from '#microservice/Queue/jobs/generate-resource-identity-from-request.job'
+import GenerateResourceIdentityFromRequestJob from '#microservice/Processing/jobs/generate-resource-identity-from-request.job'
 
 describe('generateResourceIdentityFromRequestJob', () => {
 	let job: GenerateResourceIdentityFromRequestJob

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CacheImageRequest, { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
 import { ConfigService } from '#microservice/Config/config.service'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
-import FetchResourceResponseJob from '#microservice/Queue/jobs/fetch-resource-response.job'
+import FetchResourceResponseJob from '#microservice/Processing/jobs/fetch-resource-response.job'
 
 describe('fetchResourceResponseJob', () => {
 	let job: FetchResourceResponseJob
