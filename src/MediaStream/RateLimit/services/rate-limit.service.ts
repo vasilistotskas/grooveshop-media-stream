@@ -373,43 +373,6 @@ export class RateLimitService {
 	}
 
 	/**
-	 * Get current rate limit status for a key
-	 */
-	async getRateLimitStatus(key: string): Promise<RateLimitInfo | null> {
-		// Try Redis first
-		try {
-			const redisStatus = this.redisCacheService.getConnectionStatus()
-			if (redisStatus.connected) {
-				const cached = await this.redisCacheService.get<{ count: number, resetTime: number }>(`${this.RATE_LIMIT_PREFIX}${key}`)
-				if (cached) {
-					return {
-						limit: 0, // Would need to be passed or stored
-						current: cached.count,
-						remaining: 0, // Would need to be calculated
-						resetTime: new Date(cached.resetTime),
-					}
-				}
-			}
-		}
-		catch {
-			// Fall through to local
-		}
-
-		// Fallback to local
-		const entry = this.localRequestCounts.get(key)
-		if (!entry) {
-			return null
-		}
-
-		return {
-			limit: 0,
-			current: entry.count,
-			remaining: 0,
-			resetTime: new Date(entry.resetTime),
-		}
-	}
-
-	/**
 	 * Get whitelisted domains from configuration
 	 */
 	getWhitelistedDomains(): string[] {
@@ -429,24 +392,5 @@ export class RateLimitService {
 	 */
 	getBypassBotsConfig(): boolean {
 		return this._configService.getOptional<boolean>('rateLimit.bypass.bots', true)
-	}
-
-	/**
-	 * Get debug information about current rate limit state (for testing)
-	 */
-	getDebugInfo(): { totalEntries: number, entries: Array<{ key: string, count: number, resetTime: number }>, storageType: string } {
-		const entries = Array.from(this.localRequestCounts.entries()).map(([key, entry]) => ({
-			key,
-			count: entry.count,
-			resetTime: entry.resetTime,
-		}))
-
-		const redisStatus = this.redisCacheService.getConnectionStatus()
-
-		return {
-			totalEntries: this.localRequestCounts.size,
-			entries,
-			storageType: redisStatus.connected ? 'redis' : 'local',
-		}
 	}
 }
