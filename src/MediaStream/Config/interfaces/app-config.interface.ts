@@ -111,7 +111,6 @@ export interface RateLimitThrottlerConfig {
 
 export interface RateLimitBypassConfig {
 	healthChecks: boolean
-	metricsEndpoint: boolean
 	staticAssets: boolean
 	whitelistedDomains: string
 	bots: boolean

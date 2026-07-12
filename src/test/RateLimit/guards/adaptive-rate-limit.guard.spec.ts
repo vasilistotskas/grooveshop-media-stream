@@ -48,6 +48,9 @@ describe('adaptiveRateLimitGuard', () => {
 			recordRateLimitMetrics: vi.fn(),
 			getWhitelistedDomains: vi.fn(),
 			getBypassBotsConfig: vi.fn(),
+			isEnabled: vi.fn().mockReturnValue(true),
+			getBypassHealthChecksConfig: vi.fn().mockReturnValue(true),
+			getBypassStaticAssetsConfig: vi.fn().mockReturnValue(true),
 			isBot: vi.fn(),
 		}
 

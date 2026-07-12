@@ -1,4 +1,5 @@
 import * as process from 'node:process'
+import * as v8 from 'node:v8'
 import { Injectable, Logger } from '@nestjs/common'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { ConfigService } from '#microservice/Config/config.service'
@@ -27,9 +28,7 @@ export interface RateLimitInfo {
 }
 
 export interface SystemLoadInfo {
-	cpuUsage: number
 	memoryUsage: number
-	activeConnections: number
 }
 
 /**
@@ -42,11 +41,8 @@ export class RateLimitService {
 	/** In-memory fallback when Redis is unavailable */
 	private readonly localRequestCounts = new Map<string, { count: number, resetTime: number }>()
 	private readonly MAX_LOCAL_ENTRIES = 10000
-	private readonly systemLoadThresholds = {
-		cpu: 80,
-		memory: 85,
-		connections: 1000,
-	}
+	/** Heap-pressure percentage above which the adaptive limit shrinks */
+	private readonly MEMORY_PRESSURE_THRESHOLD = 85
 
 	private readonly RATE_LIMIT_PREFIX = 'ratelimit:'
 
@@ -246,25 +242,25 @@ export class RateLimitService {
 	}
 
 	/**
-	 * Get current system load for adaptive rate limiting
+	 * Get current system load for adaptive rate limiting.
+	 *
+	 * Memory pressure is heapUsed against V8's actual heap ceiling
+	 * (`heap_size_limit` ≈ --max-old-space-size), NOT heapTotal: V8 grows
+	 * heapTotal lazily, so heapUsed/heapTotal routinely reads >85% during
+	 * normal GC churn and would keep the adaptive limiter permanently
+	 * throttled. Same rationale as the /health/live heap check.
 	 */
 	async getSystemLoad(): Promise<SystemLoadInfo> {
-		const memoryUsage = process.memoryUsage()
-		const memoryUsagePercent = (memoryUsage.heapUsed / memoryUsage.heapTotal) * 100
-
-		// Note: CPU usage would require additional monitoring in a real implementation
-		// For now, we'll use a placeholder
-		const cpuUsage = 0 // This would be implemented with actual CPU monitoring
+		const heapLimit = v8.getHeapStatistics().heap_size_limit
+		const memoryUsagePercent = (process.memoryUsage().heapUsed / heapLimit) * 100
 
 		return {
-			cpuUsage,
 			memoryUsage: memoryUsagePercent,
-			activeConnections: 0, // This would be tracked by connection monitoring
 		}
 	}
 
 	/**
-	 * Calculate adaptive rate limit based on system load
+	 * Calculate adaptive rate limit based on heap pressure
 	 */
 	async calculateAdaptiveLimit(baseLimit: number): Promise<number> {
 		if (process.env.NODE_ENV === 'test') {
@@ -275,13 +271,8 @@ export class RateLimitService {
 
 		let adaptiveLimit = baseLimit
 
-		if (systemLoad.memoryUsage > this.systemLoadThresholds.memory) {
-			const reductionFactor = Math.min(0.5, (systemLoad.memoryUsage - this.systemLoadThresholds.memory) / 20)
-			adaptiveLimit = Math.floor(adaptiveLimit * (1 - reductionFactor))
-		}
-
-		if (systemLoad.cpuUsage > this.systemLoadThresholds.cpu) {
-			const reductionFactor = Math.min(0.5, (systemLoad.cpuUsage - this.systemLoadThresholds.cpu) / 20)
+		if (systemLoad.memoryUsage > this.MEMORY_PRESSURE_THRESHOLD) {
+			const reductionFactor = Math.min(0.5, (systemLoad.memoryUsage - this.MEMORY_PRESSURE_THRESHOLD) / 20)
 			adaptiveLimit = Math.floor(adaptiveLimit * (1 - reductionFactor))
 		}
 
@@ -294,22 +285,9 @@ export class RateLimitService {
 	recordRateLimitMetrics(requestType: string, allowed: boolean, info: RateLimitInfo): void {
 		if (!allowed) {
 			this.metricsService.recordError('rate_limit_exceeded', requestType)
-		}
-
-		try {
-			this.metricsService.getRegistry()
-
-			// This would be implemented with custom Prometheus metrics
-			this._logger.debug('Rate limit metrics recorded', {
-				requestType,
-				allowed,
-				current: info.current,
-				limit: info.limit,
-				remaining: info.remaining,
-			})
-		}
-		catch (error: unknown) {
-			this._logger.error('Failed to record rate limit metrics:', error)
+			this._logger.debug(
+				`Rate limit exceeded for ${requestType}: ${info.current}/${info.limit}`,
+			)
 		}
 	}
 
@@ -392,5 +370,26 @@ export class RateLimitService {
 	 */
 	getBypassBotsConfig(): boolean {
 		return this._configService.getOptional<boolean>('rateLimit.bypass.bots', true)
+	}
+
+	/**
+	 * Operator kill-switch: RATE_LIMIT_ENABLED=false disables all rate limiting
+	 */
+	isEnabled(): boolean {
+		return this._configService.getOptional<boolean>('rateLimit.enabled', true)
+	}
+
+	/**
+	 * Whether health endpoints bypass rate limiting (K8s probes fire every few seconds)
+	 */
+	getBypassHealthChecksConfig(): boolean {
+		return this._configService.getOptional<boolean>('rateLimit.bypass.healthChecks', true)
+	}
+
+	/**
+	 * Whether static assets bypass rate limiting
+	 */
+	getBypassStaticAssetsConfig(): boolean {
+		return this._configService.getOptional<boolean>('rateLimit.bypass.staticAssets', true)
 	}
 }

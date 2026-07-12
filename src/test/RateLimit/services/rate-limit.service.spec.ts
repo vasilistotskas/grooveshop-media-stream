@@ -190,13 +190,14 @@ describe('rateLimitService', () => {
 	})
 
 	describe('getSystemLoad', () => {
-		it('should return system load information', async () => {
+		it('should report heap pressure against the V8 heap ceiling', async () => {
 			const systemLoad = await service.getSystemLoad()
 
-			expect(systemLoad).toHaveProperty('cpuUsage')
-			expect(systemLoad).toHaveProperty('memoryUsage')
-			expect(systemLoad).toHaveProperty('activeConnections')
 			expect(typeof systemLoad.memoryUsage).toBe('number')
+			// heapUsed / heap_size_limit: a healthy test process sits far below
+			// its heap ceiling (heapUsed/heapTotal would routinely read >85%).
+			expect(systemLoad.memoryUsage).toBeGreaterThan(0)
+			expect(systemLoad.memoryUsage).toBeLessThan(85)
 		})
 	})
 
@@ -209,9 +210,7 @@ describe('rateLimitService', () => {
 			try {
 				// Mock low system load
 				vi.spyOn(service, 'getSystemLoad').mockResolvedValue({
-					cpuUsage: 50,
 					memoryUsage: 60,
-					activeConnections: 100,
 				})
 
 				const adaptiveLimit = await service.calculateAdaptiveLimit(100)
@@ -231,9 +230,7 @@ describe('rateLimitService', () => {
 			try {
 				// Mock high memory usage
 				vi.spyOn(service, 'getSystemLoad').mockResolvedValue({
-					cpuUsage: 50,
 					memoryUsage: 90, // Above 85% threshold
-					activeConnections: 100,
 				})
 
 				const adaptiveLimit = await service.calculateAdaptiveLimit(100)
@@ -254,9 +251,7 @@ describe('rateLimitService', () => {
 			try {
 				// Mock extremely high system load
 				vi.spyOn(service, 'getSystemLoad').mockResolvedValue({
-					cpuUsage: 95,
 					memoryUsage: 95,
-					activeConnections: 2000,
 				})
 
 				const adaptiveLimit = await service.calculateAdaptiveLimit(10)

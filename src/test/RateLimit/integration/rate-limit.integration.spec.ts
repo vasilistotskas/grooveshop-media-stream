@@ -565,15 +565,11 @@ describe('rate Limiting Integration', () => {
 			process.env.NODE_ENV = 'production'
 
 			try {
-				// Mock high system load
+				// Mock high heap pressure
 
 				vi.spyOn(rateLimitService, 'getSystemLoad').mockResolvedValue({
 
-					cpuUsage: 90, // High CPU
-
 					memoryUsage: 90, // High memory
-
-					activeConnections: 2000, // High connections
 
 				})
 
@@ -601,15 +597,11 @@ describe('rate Limiting Integration', () => {
 			process.env.NODE_ENV = 'production'
 
 			try {
-				// Mock normal system load
+				// Mock normal heap pressure
 
 				vi.spyOn(rateLimitService, 'getSystemLoad').mockResolvedValue({
 
-					cpuUsage: 50, // Normal CPU
-
 					memoryUsage: 60, // Normal memory
-
-					activeConnections: 100, // Normal connections
 
 				})
 

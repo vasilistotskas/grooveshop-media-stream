@@ -180,7 +180,6 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	'rateLimit.healthCheck.windowMs': { env: 'RATE_LIMIT_HEALTH_CHECK_WINDOW_MS', default: 10000, type: 'number' },
 	'rateLimit.healthCheck.max': { env: 'RATE_LIMIT_HEALTH_CHECK_MAX', default: 1000, type: 'number' },
 	'rateLimit.bypass.healthChecks': { env: 'RATE_LIMIT_BYPASS_HEALTH_CHECKS', default: true, type: 'boolean' },
-	'rateLimit.bypass.metricsEndpoint': { env: 'RATE_LIMIT_BYPASS_METRICS_ENDPOINT', default: true, type: 'boolean' },
 	'rateLimit.bypass.staticAssets': { env: 'RATE_LIMIT_BYPASS_STATIC_ASSETS', default: true, type: 'boolean' },
 	'rateLimit.bypass.whitelistedDomains': { env: 'RATE_LIMIT_BYPASS_WHITELISTED_DOMAINS', default: '', type: 'string' },
 	'rateLimit.bypass.bots': { env: 'RATE_LIMIT_BYPASS_BOTS', default: true, type: 'boolean' },

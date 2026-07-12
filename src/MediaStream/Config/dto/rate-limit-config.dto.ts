@@ -22,9 +22,6 @@ export class BypassConfigDto {
 	healthChecks: boolean = true
 
 	@IsBoolean()
-	metricsEndpoint: boolean = true
-
-	@IsBoolean()
 	staticAssets: boolean = true
 
 	@IsBoolean()
