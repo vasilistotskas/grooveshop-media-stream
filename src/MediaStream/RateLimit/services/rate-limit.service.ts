@@ -1,8 +1,9 @@
 import * as process from 'node:process'
 import * as v8 from 'node:v8'
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { ConfigService } from '#microservice/Config/config.service'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 
 const UA_WHITESPACE_RE = /\s+/g
@@ -37,7 +38,6 @@ export interface SystemLoadInfo {
  */
 @Injectable()
 export class RateLimitService {
-	private readonly _logger = new Logger(RateLimitService.name)
 	/** In-memory fallback when Redis is unavailable */
 	private readonly localRequestCounts = new Map<string, { count: number, resetTime: number }>()
 	private readonly MAX_LOCAL_ENTRIES = 10000
@@ -150,7 +150,7 @@ export class RateLimitService {
 			}
 		}
 		catch (error: unknown) {
-			this._logger.warn(`Redis rate limit check failed, falling back to local: ${(error as Error).message}`)
+			CorrelatedLogger.warn(`Redis rate limit check failed, falling back to local: ${(error as Error).message}`, RateLimitService.name)
 		}
 
 		// Fallback to local in-memory rate limiting
@@ -285,9 +285,7 @@ export class RateLimitService {
 	recordRateLimitMetrics(requestType: string, allowed: boolean, info: RateLimitInfo): void {
 		if (!allowed) {
 			this.metricsService.recordError('rate_limit_exceeded', requestType)
-			this._logger.debug(
-				`Rate limit exceeded for ${requestType}: ${info.current}/${info.limit}`,
-			)
+			CorrelatedLogger.debug(`Rate limit exceeded for ${requestType}: ${info.current}/${info.limit}`, RateLimitService.name)
 		}
 	}
 
@@ -345,7 +343,7 @@ export class RateLimitService {
 		const entriesCount = this.localRequestCounts.size
 		this.localRequestCounts.clear()
 		if (process.env.NODE_ENV === 'test' && entriesCount > 0) {
-			this._logger.debug(`Cleared ${entriesCount} local rate limit entries`)
+			CorrelatedLogger.debug(`Cleared ${entriesCount} local rate limit entries`, RateLimitService.name)
 		}
 		// Note: Redis entries will expire via TTL
 	}

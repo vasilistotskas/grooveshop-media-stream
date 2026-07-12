@@ -2,8 +2,9 @@ import type { ResizeOptions } from '#microservice/API/dto/cache-image-request.dt
 import { Buffer } from 'node:buffer'
 import * as fs from 'node:fs/promises'
 import { extname } from 'node:path'
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import sharp from 'sharp'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import ManipulationJobResult from '../dto/manipulation-job-result.dto.js'
 
 /**
@@ -13,8 +14,6 @@ import ManipulationJobResult from '../dto/manipulation-job-result.dto.js'
  */
 @Injectable()
 export default class WebpImageManipulationJob {
-	private readonly logger = new Logger(WebpImageManipulationJob.name)
-
 	/**
 	 * Process an image from a file path.
 	 * Supports SVG detection/handling and all raster formats.
@@ -23,10 +22,7 @@ export default class WebpImageManipulationJob {
 		filePathFrom: string,
 		options: ResizeOptions,
 	): Promise<ManipulationJobResult> {
-		this.logger.debug(`WebpImageManipulationJob.handle called with options:`, {
-			filePathFrom,
-			options: JSON.stringify(options, null, 2),
-		})
+		CorrelatedLogger.debug(`WebpImageManipulationJob.handle called for ${filePathFrom} with options: ${JSON.stringify(options)}`, WebpImageManipulationJob.name)
 
 		if (options.format === 'svg') {
 			return this.handleSvgFormat(filePathFrom, options)
@@ -39,11 +35,11 @@ export default class WebpImageManipulationJob {
 		filePathFrom: string,
 		options: ResizeOptions,
 	): Promise<ManipulationJobResult> {
-		this.logger.debug(`SVG format requested. Source file: ${filePathFrom}`)
+		CorrelatedLogger.debug(`SVG format requested. Source file: ${filePathFrom}`, WebpImageManipulationJob.name)
 		const sourceExtension = extname(filePathFrom).toLowerCase()
 		let isSourceSvg = sourceExtension === '.svg'
 
-		this.logger.debug(`Source extension: ${sourceExtension}, isSourceSvg: ${isSourceSvg}`)
+		CorrelatedLogger.debug(`Source extension: ${sourceExtension}, isSourceSvg: ${isSourceSvg}`, WebpImageManipulationJob.name)
 
 		if (!isSourceSvg) {
 			try {
@@ -53,7 +49,7 @@ export default class WebpImageManipulationJob {
 					const { bytesRead } = await fileHandle.read(buffer, 0, 512, 0)
 					const content = buffer.toString('utf8', 0, bytesRead)
 					isSourceSvg = content.trim().startsWith('<svg') || content.includes('xmlns="http://www.w3.org/2000/svg"')
-					this.logger.debug(`Content-based SVG detection (header only): ${isSourceSvg}`)
+					CorrelatedLogger.debug(`Content-based SVG detection (header only): ${isSourceSvg}`, WebpImageManipulationJob.name)
 				}
 				finally {
 					await fileHandle.close()
@@ -61,7 +57,7 @@ export default class WebpImageManipulationJob {
 			}
 			catch (error: unknown) {
 				isSourceSvg = false
-				this.logger.debug(`Could not read file header: ${(error as Error).message}, assuming not SVG`)
+				CorrelatedLogger.debug(`Could not read file header: ${(error as Error).message}, assuming not SVG`, WebpImageManipulationJob.name)
 			}
 		}
 
@@ -70,14 +66,14 @@ export default class WebpImageManipulationJob {
 				|| (options.height !== null && !Number.isNaN(options.height) && options.height > 0)
 
 			if (!needsResizing) {
-				this.logger.debug(`SVG file needs no resizing, returning original`)
+				CorrelatedLogger.debug(`SVG file needs no resizing, returning original`, WebpImageManipulationJob.name)
 				const data = await fs.readFile(filePathFrom)
 				const result = new ManipulationJobResult({
 					size: String(data.length),
 					format: 'svg',
 					buffer: data,
 				})
-				this.logger.debug(`SVG copy result: ${JSON.stringify({ size: result.size, format: result.format })}`)
+				CorrelatedLogger.debug(`SVG copy result: ${JSON.stringify({ size: result.size, format: result.format })}`, WebpImageManipulationJob.name)
 				return result
 			}
 
@@ -110,12 +106,12 @@ export default class WebpImageManipulationJob {
 				format: 'png',
 				buffer: data,
 			})
-			this.logger.debug(`SVG resized to PNG. Result: ${JSON.stringify({ size: result.size, format: result.format })}`)
+			CorrelatedLogger.debug(`SVG resized to PNG. Result: ${JSON.stringify({ size: result.size, format: result.format })}`, WebpImageManipulationJob.name)
 			return result
 		}
 
 		// Non-SVG source with SVG output requested → convert to PNG
-		this.logger.debug('Non-SVG source with SVG output requested, converting to PNG')
+		CorrelatedLogger.debug('Non-SVG source with SVG output requested, converting to PNG', WebpImageManipulationJob.name)
 		const manipulation = sharp(filePathFrom, { limitInputPixels: 268402689 })
 
 		const resizeScales: { width?: number, height?: number } = {}
@@ -126,7 +122,7 @@ export default class WebpImageManipulationJob {
 			resizeScales.height = Number(options.height)
 		}
 
-		this.logger.debug(`Resize scales: ${JSON.stringify(resizeScales)}`)
+		CorrelatedLogger.debug(`Resize scales: ${JSON.stringify(resizeScales)}`, WebpImageManipulationJob.name)
 
 		if (Object.keys(resizeScales).length > 0) {
 			if (options.trimThreshold !== null && !Number.isNaN(options.trimThreshold)) {
@@ -148,7 +144,7 @@ export default class WebpImageManipulationJob {
 		manipulation.png({ quality: options.quality })
 
 		const { data, info } = await manipulation.toBuffer({ resolveWithObject: true })
-		this.logger.debug(`Manipulation complete. Result format: png, size: ${info.size}`)
+		CorrelatedLogger.debug(`Manipulation complete. Result format: png, size: ${info.size}`, WebpImageManipulationJob.name)
 
 		return new ManipulationJobResult({
 			size: String(info.size),
@@ -171,7 +167,7 @@ export default class WebpImageManipulationJob {
 			metaPipeline.destroy()
 			const totalPixels = (metadata.width || 0) * (metadata.height || 0)
 			if (totalPixels > 2073600) {
-				this.logger.warn(`Image too large for AVIF (${totalPixels}px), using WebP fallback`)
+				CorrelatedLogger.warn(`Image too large for AVIF (${totalPixels}px), using WebP fallback`, WebpImageManipulationJob.name)
 				avifFallbackToWebp = true
 			}
 		}
@@ -207,14 +203,12 @@ export default class WebpImageManipulationJob {
 				background: options.background,
 			}
 
-			this.logger.debug(`Applying Sharp resize with config:`, {
-				resizeConfig: JSON.stringify(resizeConfig, null, 2),
-			})
+			CorrelatedLogger.debug(`Applying Sharp resize with config: ${JSON.stringify(resizeConfig)}`, WebpImageManipulationJob.name)
 
 			manipulation = manipulation.resize(resizeConfig)
 		}
 		else {
-			this.logger.debug(`Skipping resize - using original image dimensions (width: ${options.width}, height: ${options.height})`)
+			CorrelatedLogger.debug(`Skipping resize - using original image dimensions (width: ${options.width}, height: ${options.height})`, WebpImageManipulationJob.name)
 		}
 
 		// Format conversion

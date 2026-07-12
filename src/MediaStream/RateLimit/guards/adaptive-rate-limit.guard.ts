@@ -1,10 +1,11 @@
 import type { ExecutionContext } from '@nestjs/common'
 import type { ThrottlerModuleOptions, ThrottlerStorage } from '@nestjs/throttler'
 import * as process from 'node:process'
-import { Inject, Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { getOptionsToken, getStorageToken, ThrottlerException, ThrottlerGuard } from '@nestjs/throttler'
 import { getClientIp, isInternalIp } from '#microservice/common/utils/ip.util'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { RateLimitService } from '../services/rate-limit.service.js'
 
@@ -37,7 +38,6 @@ const STATIC_ASSET_RE = /\.(?:css|js|png|jpg|jpeg|gif|ico|svg)$/
  */
 @Injectable()
 export class AdaptiveRateLimitGuard extends ThrottlerGuard {
-	private readonly _logger = new Logger(AdaptiveRateLimitGuard.name)
 	private cachedWhitelistedDomains: string[] | null = null
 	private cachedBypassBots: boolean | null = null
 	private cachedEnabled: boolean | null = null
@@ -60,7 +60,7 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 	 */
 	override async canActivate(context: ExecutionContext): Promise<boolean> {
 		if (process.env.NODE_ENV === 'development') {
-			this._logger.debug('Skipping rate limiting in development mode')
+			CorrelatedLogger.debug('Skipping rate limiting in development mode', AdaptiveRateLimitGuard.name)
 			return true
 		}
 
@@ -105,31 +105,19 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 			this.addRateLimitHeaders(response, info, allowed)
 
 			if (!allowed) {
-				this._logger.warn(`Rate limit exceeded for ${clientIp} on ${requestType}`, {
-					clientIp,
-					requestType,
-					current: info.current,
-					limit: info.limit,
-					resetTime: info.resetTime,
-				})
+				CorrelatedLogger.warn(`Rate limit exceeded for ${clientIp} on ${requestType} (${info.current}/${info.limit}, resets ${info.resetTime.toISOString()})`, AdaptiveRateLimitGuard.name)
 
 				throw new ThrottlerException('Rate limit exceeded')
 			}
 
-			this._logger.debug(`Rate limit pre-check passed for ${clientIp} on ${requestType}`, {
-				clientIp,
-				requestType,
-				current: info.current,
-				limit: info.limit,
-				remaining: info.remaining,
-			})
+			CorrelatedLogger.debug(`Rate limit pre-check passed for ${clientIp} on ${requestType} (${info.current}/${info.limit}, ${info.remaining} remaining)`, AdaptiveRateLimitGuard.name)
 		}
 		catch (error: unknown) {
 			if (error instanceof ThrottlerException) {
 				throw error
 			}
 
-			this._logger.error('Error in rate limit adaptive pre-check:', error)
+			CorrelatedLogger.error(`Error in rate limit adaptive pre-check: ${(error as Error).message}`, (error as Error).stack, AdaptiveRateLimitGuard.name)
 			// Do not block on pre-check errors; fall through to ThrottlerGuard.
 		}
 
@@ -211,13 +199,13 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 
 		const userAgent = request.headers['user-agent'] || ''
 		if (this.shouldBypassBot(userAgent) && isInternalIp(getClientIp(request))) {
-			this._logger.debug(`Skipping rate limiting for bot from internal IP: ${userAgent}`)
+			CorrelatedLogger.debug(`Skipping rate limiting for bot from internal IP: ${userAgent}`, AdaptiveRateLimitGuard.name)
 			return true
 		}
 
 		// Most expensive check last (IP check + URL parsing + domain matching)
 		if (this.isDomainWhitelisted(request)) {
-			this._logger.debug(`Skipping rate limiting for internal whitelisted domain (ip: ${getClientIp(request)})`)
+			CorrelatedLogger.debug(`Skipping rate limiting for internal whitelisted domain (ip: ${getClientIp(request)})`, AdaptiveRateLimitGuard.name)
 			return true
 		}
 
@@ -290,7 +278,7 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 			return false
 		}
 		catch (error: unknown) {
-			this._logger.error('Error checking domain whitelist:', error)
+			CorrelatedLogger.error(`Error checking domain whitelist: ${(error as Error).message}`, (error as Error).stack, AdaptiveRateLimitGuard.name)
 			return false
 		}
 	}

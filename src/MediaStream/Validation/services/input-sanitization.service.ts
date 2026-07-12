@@ -1,5 +1,5 @@
 import type { ISanitizer } from '../interfaces/validator.interface.js'
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import {
 	MAX_FILE_SIZES,
 	MAX_IMAGE_HEIGHT,
@@ -8,6 +8,7 @@ import {
 	MAX_TOTAL_PIXELS,
 } from '#microservice/common/constants/image-limits.constant'
 import { ConfigService } from '#microservice/Config/config.service'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 
 const EMPTY_STRING_PATTERNS: RegExp[] = [
 	/^\s*on\w+\s*=.*$/i,
@@ -34,8 +35,7 @@ const HTML_ENTITY_CHAR_RE = /[#\w]/
 
 @Injectable()
 export class InputSanitizationService implements ISanitizer<any> {
-	private readonly _logger = new Logger(InputSanitizationService.name)
-	private allowedDomains: string[] | null = null as any
+	private allowedDomains: string[] | null = null
 
 	constructor(private readonly _configService: ConfigService) {
 	}
@@ -92,7 +92,7 @@ export class InputSanitizationService implements ISanitizer<any> {
 
 		for (const pattern of EMPTY_STRING_PATTERNS) {
 			if (pattern.test(str)) {
-				this._logger.warn(`Standalone dangerous pattern detected, returning empty string`)
+				CorrelatedLogger.warn(`Standalone dangerous pattern detected, returning empty string`, InputSanitizationService.name)
 				return ''
 			}
 		}
@@ -113,7 +113,7 @@ export class InputSanitizationService implements ISanitizer<any> {
 
 		if (sanitized.length > MAX_STRING_LENGTH) {
 			sanitized = sanitized.substring(0, MAX_STRING_LENGTH)
-			this._logger.warn(`String truncated to ${MAX_STRING_LENGTH} characters for security`)
+			CorrelatedLogger.warn(`String truncated to ${MAX_STRING_LENGTH} characters for security`, InputSanitizationService.name)
 		}
 
 		return sanitized
@@ -147,7 +147,7 @@ export class InputSanitizationService implements ISanitizer<any> {
 			const lowerUrl = url.toLowerCase().trim()
 			for (const protocol of DANGEROUS_PROTOCOLS) {
 				if (lowerUrl.startsWith(protocol)) {
-					this._logger.warn(`Dangerous protocol detected: ${protocol}`)
+					CorrelatedLogger.warn(`Dangerous protocol detected: ${protocol}`, InputSanitizationService.name)
 					return false
 				}
 			}
@@ -155,12 +155,12 @@ export class InputSanitizationService implements ISanitizer<any> {
 			const urlObj = new URL(url)
 
 			if (!['http:', 'https:'].includes(urlObj.protocol)) {
-				this._logger.warn(`Invalid protocol: ${urlObj.protocol}`)
+				CorrelatedLogger.warn(`Invalid protocol: ${urlObj.protocol}`, InputSanitizationService.name)
 				return false
 			}
 
 			if (!urlObj.hostname || urlObj.hostname.length === 0) {
-				this._logger.warn('Empty hostname detected')
+				CorrelatedLogger.warn('Empty hostname detected', InputSanitizationService.name)
 				return false
 			}
 
@@ -170,14 +170,14 @@ export class InputSanitizationService implements ISanitizer<any> {
 			)
 
 			if (!isAllowed) {
-				this._logger.warn(`URL blocked - not in whitelist: ${urlObj.hostname}`)
+				CorrelatedLogger.warn(`URL blocked - not in whitelist: ${urlObj.hostname}`, InputSanitizationService.name)
 				return false
 			}
 
 			return true
 		}
 		catch (error: unknown) {
-			this._logger.warn(`Invalid URL format: ${url}, error: ${error}`)
+			CorrelatedLogger.warn(`Invalid URL format: ${url}, error: ${error}`, InputSanitizationService.name)
 			return false
 		}
 	}

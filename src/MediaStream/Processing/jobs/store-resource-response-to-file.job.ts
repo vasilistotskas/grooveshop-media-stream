@@ -1,8 +1,9 @@
 import type { AxiosResponse } from 'axios'
 import type { FileHandle } from 'node:fs/promises'
 import { open, unlink } from 'node:fs/promises'
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import UnableToStoreFetchedResourceException from '#microservice/API/exceptions/unable-to-store-fetched-resource.exception'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 
 /**
  * Stores fetched resource responses to the filesystem.
@@ -10,11 +11,9 @@ import UnableToStoreFetchedResourceException from '#microservice/API/exceptions/
  */
 @Injectable()
 export default class StoreResourceResponseToFileJob {
-	private readonly _logger = new Logger(StoreResourceResponseToFileJob.name)
-
 	async handle(resourceName: string, path: string, response: AxiosResponse): Promise<void> {
 		if (!response.data || typeof response.data.pipe !== 'function') {
-			this._logger.error('No data found in response or data is not streamable')
+			CorrelatedLogger.error('No data found in response or data is not streamable', undefined, StoreResourceResponseToFileJob.name)
 			throw new UnableToStoreFetchedResourceException(resourceName)
 		}
 
@@ -35,19 +34,19 @@ export default class StoreResourceResponseToFileJob {
 			success = true
 		}
 		catch (e) {
-			this._logger.error(e)
+			CorrelatedLogger.error(`Failed to store ${resourceName} to ${path}: ${(e as Error).message}`, (e as Error).stack, StoreResourceResponseToFileJob.name)
 			throw new UnableToStoreFetchedResourceException(resourceName)
 		}
 		finally {
 			if (fd) {
 				await fd.close().catch((err: unknown) => {
-					this._logger.error('Error closing file descriptor', err, { path, resourceName })
+					CorrelatedLogger.error(`Error closing file descriptor for ${path}: ${(err as Error).message}`, (err as Error).stack, StoreResourceResponseToFileJob.name)
 				})
 			}
 			// Clean up partial temp file on failure (best-effort)
 			if (!success) {
 				await unlink(path).catch((err: unknown) => {
-					this._logger.debug(`Could not remove partial temp file ${path}: ${(err as Error).message}`)
+					CorrelatedLogger.debug(`Could not remove partial temp file ${path}: ${(err as Error).message}`, StoreResourceResponseToFileJob.name)
 				})
 			}
 		}
