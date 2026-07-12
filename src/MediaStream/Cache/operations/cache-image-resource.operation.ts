@@ -18,6 +18,7 @@ import CacheImageRequest, {
 	SupportedResizeFormats,
 } from '#microservice/API/dto/cache-image-request.dto'
 import UnableToFetchResourceException from '#microservice/API/exceptions/unable-to-fetch-resource.exception'
+import { MAX_FILE_SIZES } from '#microservice/common/constants/image-limits.constant'
 import { MediaStreamError } from '#microservice/common/errors/media-stream.errors'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
@@ -346,15 +347,7 @@ export default class CacheImageResourceOperation {
 			// Streaming byte counter: accumulate response body bytes and abort if
 			// the format-specific limit is exceeded before the download completes.
 			// This catches servers that lie (or omit) Content-Length.
-			const maxFileSizes: Record<string, number> = {
-				jpeg: 5 * 1024 * 1024,
-				jpg: 5 * 1024 * 1024,
-				png: 8 * 1024 * 1024,
-				webp: 3 * 1024 * 1024,
-				gif: 2 * 1024 * 1024,
-				svg: 1 * 1024 * 1024,
-			}
-			const maxBytes = maxFileSizes[format] ?? 10 * 1024 * 1024
+			const maxBytes = (MAX_FILE_SIZES as Record<string, number>)[format] ?? MAX_FILE_SIZES.default
 			let bytesSeen = 0
 			let limitExceeded = false
 
@@ -719,7 +712,9 @@ export default class CacheImageResourceOperation {
 			if (cachedResource) {
 				// Increment access count and backfill updated metadata into cache (fire-and-forget)
 				cachedResource.metadata.accessCount = (cachedResource.metadata.accessCount || 0) + 1
-				this.cacheManager.set('image', ctx.id, cachedResource, this.privateTtl).catch(() => {})
+				this.cacheManager.set('image', ctx.id, cachedResource, this.privateTtl).catch((err: unknown) => {
+					CorrelatedLogger.warn(`Failed to backfill access count for ${ctx.id}: ${(err as Error).message}`, CacheImageResourceOperation.name)
+				})
 
 				CorrelatedLogger.debug(`Resource retrieved from cache: ${ctx.id}`, CacheImageResourceOperation.name)
 				const duration = PerformanceTracker.endPhase('get_cached_resource')
@@ -742,7 +737,9 @@ export default class CacheImageResourceOperation {
 
 				// Increment access count and persist back to the .rsm file (fire-and-forget)
 				metadata.accessCount = (metadata.accessCount || 0) + 1
-				writeFile(resourceMetaPath, JSON.stringify(metadata), 'utf8').catch(() => {})
+				writeFile(resourceMetaPath, JSON.stringify(metadata), 'utf8').catch((err: unknown) => {
+					CorrelatedLogger.warn(`Failed to persist access count to ${resourceMetaPath}: ${(err as Error).message}`, CacheImageResourceOperation.name)
+				})
 
 				await this.cacheManager.set('image', ctx.id, { data, metadata }, this.privateTtl)
 

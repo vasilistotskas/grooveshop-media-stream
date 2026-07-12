@@ -44,9 +44,11 @@ export default class StoreResourceResponseToFileJob {
 					this._logger.error('Error closing file descriptor', err, { path, resourceName })
 				})
 			}
-			// Clean up partial temp file on failure
+			// Clean up partial temp file on failure (best-effort)
 			if (!success) {
-				await unlink(path).catch(() => {})
+				await unlink(path).catch((err: unknown) => {
+					this._logger.debug(`Could not remove partial temp file ${path}: ${(err as Error).message}`)
+				})
 			}
 		}
 	}

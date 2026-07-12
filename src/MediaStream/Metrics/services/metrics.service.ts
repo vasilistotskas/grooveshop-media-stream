@@ -593,22 +593,23 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 
 	private async collectDiskSpaceMetrics(): Promise<void> {
 		try {
-			const storagePaths = ['./storage', './public', './build']
+			// statfs reports filesystem-level usage, so the configured cache
+			// directory is the only path worth sampling (./public and ./build
+			// live on the same filesystem and produced identical duplicates).
+			const storagePath = this._configService.getOptional('cache.file.directory', './storage')
 
-			for (const path of storagePaths) {
-				try {
-					await fs.promises.access(path)
-					const stats = await fs.promises.stat(path)
-					if (stats.isDirectory()) {
-						const diskUsage = await this.getDiskUsage(path)
-						if (diskUsage) {
-							this.updateDiskSpaceMetrics(path, diskUsage.total, diskUsage.used, diskUsage.free)
-						}
+			try {
+				await fs.promises.access(storagePath)
+				const stats = await fs.promises.stat(storagePath)
+				if (stats.isDirectory()) {
+					const diskUsage = await this.getDiskUsage(storagePath)
+					if (diskUsage) {
+						this.updateDiskSpaceMetrics(storagePath, diskUsage.total, diskUsage.used, diskUsage.free)
 					}
 				}
-				catch {
-					// Path doesn't exist or not accessible, ignore
-				}
+			}
+			catch {
+				// Path doesn't exist or not accessible, ignore
 			}
 		}
 		catch (error: unknown) {

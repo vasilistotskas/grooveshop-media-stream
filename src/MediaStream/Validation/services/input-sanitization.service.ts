@@ -16,6 +16,10 @@ const EMPTY_STRING_PATTERNS: RegExp[] = [
 	/^\s*data\s*:.*$/i,
 ]
 
+// Single source for the dangerous-protocol set; the regexes below encode the
+// same list with different matching semantics (full URL, prefix, bare word).
+const DANGEROUS_PROTOCOLS = ['javascript:', 'data:', 'vbscript:', 'file:', 'ftp:', 'about:'] as const
+
 const DANGEROUS_PROTOCOL_URL_RE = /(?:javascript|vbscript|data|file|ftp|about)\s*:\S*/gi
 const DANGEROUS_PROTOCOL_RE = /(?:javascript|vbscript|data|file|ftp|about)\s*:/gi
 const DANGEROUS_PROTOCOL_WORD_RE = /\b(?:javascript|vbscript|data|file|ftp|about)\b/gi
@@ -80,8 +84,7 @@ export class InputSanitizationService implements ISanitizer<any> {
 
 	private sanitizeString(str: string): string {
 		const lowerStr = str.toLowerCase()
-		const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'ftp:', 'about:']
-		for (const protocol of dangerousProtocols) {
+		for (const protocol of DANGEROUS_PROTOCOLS) {
 			if (lowerStr.startsWith(protocol)) {
 				return ''
 			}
@@ -142,8 +145,7 @@ export class InputSanitizationService implements ISanitizer<any> {
 	validateUrl(url: string): boolean {
 		try {
 			const lowerUrl = url.toLowerCase().trim()
-			const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'ftp:', 'about:']
-			for (const protocol of dangerousProtocols) {
+			for (const protocol of DANGEROUS_PROTOCOLS) {
 				if (lowerUrl.startsWith(protocol)) {
 					this._logger.warn(`Dangerous protocol detected: ${protocol}`)
 					return false
@@ -181,9 +183,11 @@ export class InputSanitizationService implements ISanitizer<any> {
 	}
 
 	validateFileSize(sizeBytes: number, format?: string): boolean {
-		const maxSizes = this._configService.getOptional('validation.maxFileSizes', MAX_FILE_SIZES)
-
-		const maxSize = format ? (maxSizes as any)[format.toLowerCase()] || maxSizes.default : maxSizes.default
+		// MAX_FILE_SIZES is the single source for per-format limits; there is no
+		// config override ('validation.maxFileSizes' was never a real config key).
+		const maxSize = format
+			? (MAX_FILE_SIZES as Record<string, number>)[format.toLowerCase()] || MAX_FILE_SIZES.default
+			: MAX_FILE_SIZES.default
 		return sizeBytes > 0 && sizeBytes <= maxSize
 	}
 
