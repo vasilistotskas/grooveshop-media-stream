@@ -9,13 +9,23 @@ export default defineConfig({
 			provider: 'v8',
 			reportsDirectory: fileURLToPath(new URL('./coverage', import.meta.url)),
 			reporter: ['text', 'html', 'clover', 'lcov', 'json', 'json-summary'],
-			include: ['**/*.ts', '**/*.vue'],
+			// Application sources only — test files and config must not dilute
+			// (or pad) the coverage denominators.
+			include: ['src/MediaStream/**/*.ts'],
 			exclude: [
 				'**/build/**/*',
 				'**/dist/**/*',
 				'**/node_modules/**/*',
 				'**/.cache/**/*',
 			],
+			// Floors sit ~2 points under the measured baseline so regressions
+			// fail CI while normal churn does not. Raise them as coverage grows.
+			thresholds: {
+				statements: 75,
+				branches: 60,
+				functions: 76,
+				lines: 75,
+			},
 			clean: true,
 			cleanOnRerun: true,
 		},
@@ -36,7 +46,6 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			'#microservice': fileURLToPath(new URL('./src/MediaStream', import.meta.url)),
-			'@storage': fileURLToPath(new URL('./var', import.meta.url)),
 		},
 	},
 	plugins: [

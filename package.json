@@ -32,7 +32,7 @@
     "prod": "node build/dist/main",
     "repl": "nest start --watch --entryFile repl",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "type-check": "tsc --noEmit",
+    "type-check": "tsc --noEmit && tsc --noEmit -p tsconfig.spec.json",
     "type-check:watch": "tsc --noEmit --watch",
     "test": "vitest run",
     "test:e2e": "vitest run --config src/test/vitest.e2e.ts",

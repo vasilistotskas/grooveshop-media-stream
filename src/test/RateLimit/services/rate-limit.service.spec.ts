@@ -10,7 +10,6 @@ describe('rateLimitService', () => {
 	let service: RateLimitService
 	let configService: MockedObject<ConfigService>
 	let metricsService: MockedObject<MetricsService>
-	let _redisCacheService: MockedObject<RedisCacheService>
 
 	beforeEach(async () => {
 		const mockConfigService = {
@@ -43,7 +42,6 @@ describe('rateLimitService', () => {
 		service = module.get<RateLimitService>(RateLimitService)
 		configService = module.get(ConfigService)
 		metricsService = module.get(MetricsService)
-		_redisCacheService = module.get(RedisCacheService)
 	})
 
 	afterEach(() => {

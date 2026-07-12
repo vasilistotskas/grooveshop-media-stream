@@ -73,7 +73,7 @@ describe('redisHealthIndicator', () => {
 			let deleteWasCalled = false
 
 			redisCacheService.ping.mockResolvedValue('PONG')
-			redisCacheService.set.mockImplementation(async (key, value) => {
+			redisCacheService.set.mockImplementation(async (_key, value) => {
 				capturedValue = value
 				return undefined
 			})
@@ -192,7 +192,7 @@ describe('redisHealthIndicator', () => {
 			let deleteWasCalled = false
 
 			redisCacheService.ping.mockResolvedValue('PONG')
-			redisCacheService.set.mockImplementation(async (key, value) => {
+			redisCacheService.set.mockImplementation(async (_key, value) => {
 				capturedValue = value
 				return undefined
 			})

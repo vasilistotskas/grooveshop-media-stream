@@ -6,7 +6,6 @@ import { CacheHealthIndicator } from '#microservice/Cache/indicators/cache-healt
 import { RedisHealthIndicator } from '#microservice/Cache/indicators/redis-health.indicator'
 import { CacheWarmingService } from '#microservice/Cache/services/cache-warming.service'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
-import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { DiskSpaceHealthIndicator } from '#microservice/Health/indicators/disk-space-health.indicator'
 import { MemoryHealthIndicator } from '#microservice/Health/indicators/memory-health.indicator'
 import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
@@ -17,7 +16,6 @@ import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage
 describe('middleware Configuration', () => {
 	let app: INestApplication
 	let module: TestingModule
-	let _correlationService: CorrelationService
 	let metricsService: MetricsService
 
 	// Helper function for reliable HTTP requests
@@ -111,7 +109,6 @@ describe('middleware Configuration', () => {
 			.compile()
 
 		app = module.createNestApplication()
-		_correlationService = module.get<CorrelationService>(CorrelationService)
 		metricsService = module.get<MetricsService>(MetricsService)
 
 		await app.init()

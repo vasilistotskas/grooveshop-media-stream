@@ -1,7 +1,7 @@
 import type { MockedObject } from 'vitest'
 import { Buffer } from 'node:buffer'
 import { Test, TestingModule } from '@nestjs/testing'
-import Redis from 'ioredis'
+import { Redis } from 'ioredis'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { ConfigService } from '#microservice/Config/config.service'
@@ -170,7 +170,7 @@ describe('redisCacheService', () => {
 			}
 
 			// Simulate ready event
-			const readyCallback = mockRedis.on.mock.calls.find(call => call[0] === 'ready')?.[1]
+			const readyCallback = mockRedis.on.mock.calls.find((call: unknown[]) => call[0] === 'ready')?.[1]
 			if (readyCallback)
 				readyCallback()
 		})
@@ -207,7 +207,7 @@ describe('redisCacheService', () => {
 
 			it('should return null when Redis is not connected', async () => {
 				// Simulate disconnected state
-				const closeCallback = mockRedis.on.mock.calls.find(call => call[0] === 'close')?.[1]
+				const closeCallback = mockRedis.on.mock.calls.find((call: unknown[]) => call[0] === 'close')?.[1]
 				if (closeCallback)
 					closeCallback()
 
@@ -309,7 +309,7 @@ describe('redisCacheService', () => {
 
 			it('should skip operation when Redis is not connected', async () => {
 				// Simulate disconnected state
-				const closeCallback = mockRedis.on.mock.calls.find(call => call[0] === 'close')?.[1]
+				const closeCallback = mockRedis.on.mock.calls.find((call: unknown[]) => call[0] === 'close')?.[1]
 				if (closeCallback)
 					closeCallback()
 
@@ -352,7 +352,7 @@ describe('redisCacheService', () => {
 
 			it('should skip operation when Redis is not connected', async () => {
 				// Simulate disconnected state
-				const closeCallback = mockRedis.on.mock.calls.find(call => call[0] === 'close')?.[1]
+				const closeCallback = mockRedis.on.mock.calls.find((call: unknown[]) => call[0] === 'close')?.[1]
 				if (closeCallback)
 					closeCallback()
 
@@ -516,7 +516,7 @@ describe('redisCacheService', () => {
 			}
 
 			// Simulate ready event
-			const readyCallback = mockRedis.on.mock.calls.find(call => call[0] === 'ready')?.[1]
+			const readyCallback = mockRedis.on.mock.calls.find((call: unknown[]) => call[0] === 'ready')?.[1]
 			if (readyCallback)
 				readyCallback()
 		})
@@ -531,7 +531,7 @@ describe('redisCacheService', () => {
 
 			it('should throw error when Redis is not connected', async () => {
 				// Simulate disconnected state
-				const closeCallback = mockRedis.on.mock.calls.find(call => call[0] === 'close')?.[1]
+				const closeCallback = mockRedis.on.mock.calls.find((call: unknown[]) => call[0] === 'close')?.[1]
 				if (closeCallback)
 					closeCallback()
 
@@ -551,7 +551,7 @@ describe('redisCacheService', () => {
 
 			it('should return -1 when Redis is not connected', async () => {
 				// Simulate disconnected state
-				const closeCallback = mockRedis.on.mock.calls.find(call => call[0] === 'close')?.[1]
+				const closeCallback = mockRedis.on.mock.calls.find((call: unknown[]) => call[0] === 'close')?.[1]
 				if (closeCallback)
 					closeCallback()
 
@@ -613,7 +613,7 @@ describe('redisCacheService', () => {
 
 			it('should return zeros when Redis is not connected', async () => {
 				// Simulate disconnected state
-				const closeCallback = mockRedis.on.mock.calls.find(call => call[0] === 'close')?.[1]
+				const closeCallback = mockRedis.on.mock.calls.find((call: unknown[]) => call[0] === 'close')?.[1]
 				if (closeCallback)
 					closeCallback()
 

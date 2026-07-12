@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { cwd } from 'node:process'
 import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { ResizeOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
+import { BackgroundOptions, FitOptions, PositionOptions, ResizeOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
 import WebpImageManipulationJob from '#microservice/Processing/jobs/webp-image-manipulation.job'
 
 /**
@@ -73,9 +73,9 @@ function makeResizeOptions(overrides: Partial<ResizeOptions> = {}): ResizeOption
 	return new ResizeOptions({
 		width: 800,
 		height: 600,
-		fit: 'contain',
-		position: 'entropy',
-		background: 'transparent',
+		fit: FitOptions.contain,
+		position: PositionOptions.entropy,
+		background: BackgroundOptions.transparent,
 		trimThreshold: 0,
 		format: SupportedResizeFormats.webp,
 		quality: 80,
