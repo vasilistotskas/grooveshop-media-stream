@@ -21,10 +21,10 @@ export default defineConfig({
 			// Floors sit ~2 points under the measured baseline so regressions
 			// fail CI while normal churn does not. Raise them as coverage grows.
 			thresholds: {
-				statements: 75,
-				branches: 60,
-				functions: 76,
-				lines: 75,
+				statements: 78,
+				branches: 66,
+				functions: 80,
+				lines: 78,
 			},
 			clean: true,
 			cleanOnRerun: true,
