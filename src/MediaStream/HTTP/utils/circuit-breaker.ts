@@ -14,8 +14,9 @@ export interface CircuitBreakerOptions {
 	name?: string
 	persistState?: (state: CircuitBreakerPersistedState) => Promise<void>
 	loadState?: () => Promise<CircuitBreakerPersistedState | null>
-	persistenceInterval?: number // ✅ Configurable persistence interval (default: 10000ms)
 }
+
+const PERSISTENCE_INTERVAL_MS = 10000
 
 export interface CircuitBreakerPersistedState {
 	state: CircuitState
@@ -47,15 +48,20 @@ export class CircuitBreaker {
 			persistState: options.persistState,
 			loadState: options.loadState,
 		}
+	}
 
-		// Load persisted state, then start persistence timer only after load completes
-		this.loadPersistedState().then(() => {
-			if (this.options.persistState) {
-				const persistenceInterval = this.options.persistenceInterval || 10000
-				this.persistenceTimer = setInterval(() => this.persistCurrentState(), persistenceInterval)
-				this.persistenceTimer.unref()
-			}
-		})
+	/**
+	 * Restore persisted state and start the periodic persistence timer.
+	 * Must be awaited by the owner (e.g. from onModuleInit) so state
+	 * restoration completes before the breaker serves traffic.
+	 */
+	async init(): Promise<void> {
+		await this.loadPersistedState()
+
+		if (this.options.persistState && !this.persistenceTimer) {
+			this.persistenceTimer = setInterval(() => this.persistCurrentState(), PERSISTENCE_INTERVAL_MS)
+			this.persistenceTimer.unref()
+		}
 	}
 
 	/**

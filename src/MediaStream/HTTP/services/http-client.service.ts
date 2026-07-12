@@ -131,6 +131,9 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	}
 
 	async onModuleInit(): Promise<void> {
+		// Restore circuit-breaker state from Redis before serving traffic and
+		// start its periodic persistence timer.
+		await this.circuitBreaker.init()
 		CorrelatedLogger.log('HTTP client service initialized', HttpClientService.name)
 	}
 
