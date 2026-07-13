@@ -4,7 +4,8 @@
  */
 
 import type { OnModuleDestroy } from '@nestjs/common'
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 
 export interface PendingRequest<T> {
 	promise: Promise<T>
@@ -14,7 +15,6 @@ export interface PendingRequest<T> {
 
 @Injectable()
 export class RequestDeduplicator<T = void> implements OnModuleDestroy {
-	private readonly _logger = new Logger(RequestDeduplicator.name)
 	private readonly pendingRequests = new Map<string, PendingRequest<T>>()
 	private readonly maxPendingAge: number = 60000
 	private readonly cleanupIntervalMs: number = 30000
@@ -30,7 +30,7 @@ export class RequestDeduplicator<T = void> implements OnModuleDestroy {
 			this.cleanupInterval = null
 		}
 		this.pendingRequests.clear()
-		this._logger.log('Request deduplicator destroyed')
+		CorrelatedLogger.log('Request deduplicator destroyed', RequestDeduplicator.name)
 	}
 
 	/**
@@ -42,7 +42,7 @@ export class RequestDeduplicator<T = void> implements OnModuleDestroy {
 		const existing = this.pendingRequests.get(key)
 		if (existing) {
 			existing.refCount++
-			this._logger.debug(`Request deduplicated for key: ${key} (refs: ${existing.refCount})`)
+			CorrelatedLogger.debug(`Request deduplicated for key: ${key} (refs: ${existing.refCount})`, RequestDeduplicator.name)
 			return existing.promise
 		}
 
@@ -55,7 +55,7 @@ export class RequestDeduplicator<T = void> implements OnModuleDestroy {
 		}
 
 		this.pendingRequests.set(key, pending)
-		this._logger.debug(`New request started for key: ${key}`)
+		CorrelatedLogger.debug(`New request started for key: ${key}`, RequestDeduplicator.name)
 
 		return promise
 	}
@@ -89,7 +89,7 @@ export class RequestDeduplicator<T = void> implements OnModuleDestroy {
 	 */
 	clear(): void {
 		this.pendingRequests.clear()
-		this._logger.warn('All pending requests cleared')
+		CorrelatedLogger.warn('All pending requests cleared', RequestDeduplicator.name)
 	}
 
 	private async executeWithCleanup(key: string, fn: () => Promise<T>): Promise<T> {
@@ -98,7 +98,7 @@ export class RequestDeduplicator<T = void> implements OnModuleDestroy {
 			// Success: keep in map briefly to allow late joiners to share the result
 			setTimeout(() => {
 				this.pendingRequests.delete(key)
-				this._logger.debug(`Request completed and removed for key: ${key}`)
+				CorrelatedLogger.debug(`Request completed and removed for key: ${key}`, RequestDeduplicator.name)
 			}, 100)
 			return result
 		}
@@ -106,7 +106,7 @@ export class RequestDeduplicator<T = void> implements OnModuleDestroy {
 			// Failure: remove immediately so the next request retries rather than
 			// receiving the cached rejection
 			this.pendingRequests.delete(key)
-			this._logger.debug(`Request failed and removed for key: ${key}`)
+			CorrelatedLogger.debug(`Request failed and removed for key: ${key}`, RequestDeduplicator.name)
 			throw error
 		}
 	}
@@ -123,7 +123,7 @@ export class RequestDeduplicator<T = void> implements OnModuleDestroy {
 		}
 
 		if (cleaned > 0) {
-			this._logger.warn(`Cleaned up ${cleaned} stale pending requests`)
+			CorrelatedLogger.warn(`Cleaned up ${cleaned} stale pending requests`, RequestDeduplicator.name)
 		}
 	}
 }

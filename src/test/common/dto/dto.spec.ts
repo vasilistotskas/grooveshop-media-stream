@@ -5,7 +5,7 @@ import ResourceMetaData, {
 	defaultPublicTTL,
 	resourceMetaVersion,
 } from '#microservice/HTTP/dto/resource-meta-data.dto'
-import ManipulationJobResult from '#microservice/Queue/dto/manipulation-job-result.dto'
+import ManipulationJobResult from '#microservice/Processing/dto/manipulation-job-result.dto'
 
 describe('resizeOptions', () => {
 	it('should set default values', () => {

@@ -1,7 +1,9 @@
 import * as process from 'node:process'
-import { Injectable, Logger } from '@nestjs/common'
+import * as v8 from 'node:v8'
+import { Injectable } from '@nestjs/common'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { ConfigService } from '#microservice/Config/config.service'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 
 const UA_WHITESPACE_RE = /\s+/g
@@ -27,9 +29,7 @@ export interface RateLimitInfo {
 }
 
 export interface SystemLoadInfo {
-	cpuUsage: number
 	memoryUsage: number
-	activeConnections: number
 }
 
 /**
@@ -38,15 +38,11 @@ export interface SystemLoadInfo {
  */
 @Injectable()
 export class RateLimitService {
-	private readonly _logger = new Logger(RateLimitService.name)
 	/** In-memory fallback when Redis is unavailable */
 	private readonly localRequestCounts = new Map<string, { count: number, resetTime: number }>()
 	private readonly MAX_LOCAL_ENTRIES = 10000
-	private readonly systemLoadThresholds = {
-		cpu: 80,
-		memory: 85,
-		connections: 1000,
-	}
+	/** Heap-pressure percentage above which the adaptive limit shrinks */
+	private readonly MEMORY_PRESSURE_THRESHOLD = 85
 
 	private readonly RATE_LIMIT_PREFIX = 'ratelimit:'
 
@@ -154,7 +150,7 @@ export class RateLimitService {
 			}
 		}
 		catch (error: unknown) {
-			this._logger.warn(`Redis rate limit check failed, falling back to local: ${(error as Error).message}`)
+			CorrelatedLogger.warn(`Redis rate limit check failed, falling back to local: ${(error as Error).message}`, RateLimitService.name)
 		}
 
 		// Fallback to local in-memory rate limiting
@@ -246,25 +242,25 @@ export class RateLimitService {
 	}
 
 	/**
-	 * Get current system load for adaptive rate limiting
+	 * Get current system load for adaptive rate limiting.
+	 *
+	 * Memory pressure is heapUsed against V8's actual heap ceiling
+	 * (`heap_size_limit` ≈ --max-old-space-size), NOT heapTotal: V8 grows
+	 * heapTotal lazily, so heapUsed/heapTotal routinely reads >85% during
+	 * normal GC churn and would keep the adaptive limiter permanently
+	 * throttled. Same rationale as the /health/live heap check.
 	 */
 	async getSystemLoad(): Promise<SystemLoadInfo> {
-		const memoryUsage = process.memoryUsage()
-		const memoryUsagePercent = (memoryUsage.heapUsed / memoryUsage.heapTotal) * 100
-
-		// Note: CPU usage would require additional monitoring in a real implementation
-		// For now, we'll use a placeholder
-		const cpuUsage = 0 // This would be implemented with actual CPU monitoring
+		const heapLimit = v8.getHeapStatistics().heap_size_limit
+		const memoryUsagePercent = (process.memoryUsage().heapUsed / heapLimit) * 100
 
 		return {
-			cpuUsage,
 			memoryUsage: memoryUsagePercent,
-			activeConnections: 0, // This would be tracked by connection monitoring
 		}
 	}
 
 	/**
-	 * Calculate adaptive rate limit based on system load
+	 * Calculate adaptive rate limit based on heap pressure
 	 */
 	async calculateAdaptiveLimit(baseLimit: number): Promise<number> {
 		if (process.env.NODE_ENV === 'test') {
@@ -275,13 +271,8 @@ export class RateLimitService {
 
 		let adaptiveLimit = baseLimit
 
-		if (systemLoad.memoryUsage > this.systemLoadThresholds.memory) {
-			const reductionFactor = Math.min(0.5, (systemLoad.memoryUsage - this.systemLoadThresholds.memory) / 20)
-			adaptiveLimit = Math.floor(adaptiveLimit * (1 - reductionFactor))
-		}
-
-		if (systemLoad.cpuUsage > this.systemLoadThresholds.cpu) {
-			const reductionFactor = Math.min(0.5, (systemLoad.cpuUsage - this.systemLoadThresholds.cpu) / 20)
+		if (systemLoad.memoryUsage > this.MEMORY_PRESSURE_THRESHOLD) {
+			const reductionFactor = Math.min(0.5, (systemLoad.memoryUsage - this.MEMORY_PRESSURE_THRESHOLD) / 20)
 			adaptiveLimit = Math.floor(adaptiveLimit * (1 - reductionFactor))
 		}
 
@@ -294,22 +285,7 @@ export class RateLimitService {
 	recordRateLimitMetrics(requestType: string, allowed: boolean, info: RateLimitInfo): void {
 		if (!allowed) {
 			this.metricsService.recordError('rate_limit_exceeded', requestType)
-		}
-
-		try {
-			this.metricsService.getRegistry()
-
-			// This would be implemented with custom Prometheus metrics
-			this._logger.debug('Rate limit metrics recorded', {
-				requestType,
-				allowed,
-				current: info.current,
-				limit: info.limit,
-				remaining: info.remaining,
-			})
-		}
-		catch (error: unknown) {
-			this._logger.error('Failed to record rate limit metrics:', error)
+			CorrelatedLogger.debug(`Rate limit exceeded for ${requestType}: ${info.current}/${info.limit}`, RateLimitService.name)
 		}
 	}
 
@@ -367,46 +343,9 @@ export class RateLimitService {
 		const entriesCount = this.localRequestCounts.size
 		this.localRequestCounts.clear()
 		if (process.env.NODE_ENV === 'test' && entriesCount > 0) {
-			this._logger.debug(`Cleared ${entriesCount} local rate limit entries`)
+			CorrelatedLogger.debug(`Cleared ${entriesCount} local rate limit entries`, RateLimitService.name)
 		}
 		// Note: Redis entries will expire via TTL
-	}
-
-	/**
-	 * Get current rate limit status for a key
-	 */
-	async getRateLimitStatus(key: string): Promise<RateLimitInfo | null> {
-		// Try Redis first
-		try {
-			const redisStatus = this.redisCacheService.getConnectionStatus()
-			if (redisStatus.connected) {
-				const cached = await this.redisCacheService.get<{ count: number, resetTime: number }>(`${this.RATE_LIMIT_PREFIX}${key}`)
-				if (cached) {
-					return {
-						limit: 0, // Would need to be passed or stored
-						current: cached.count,
-						remaining: 0, // Would need to be calculated
-						resetTime: new Date(cached.resetTime),
-					}
-				}
-			}
-		}
-		catch {
-			// Fall through to local
-		}
-
-		// Fallback to local
-		const entry = this.localRequestCounts.get(key)
-		if (!entry) {
-			return null
-		}
-
-		return {
-			limit: 0,
-			current: entry.count,
-			remaining: 0,
-			resetTime: new Date(entry.resetTime),
-		}
 	}
 
 	/**
@@ -432,21 +371,23 @@ export class RateLimitService {
 	}
 
 	/**
-	 * Get debug information about current rate limit state (for testing)
+	 * Operator kill-switch: RATE_LIMIT_ENABLED=false disables all rate limiting
 	 */
-	getDebugInfo(): { totalEntries: number, entries: Array<{ key: string, count: number, resetTime: number }>, storageType: string } {
-		const entries = Array.from(this.localRequestCounts.entries()).map(([key, entry]) => ({
-			key,
-			count: entry.count,
-			resetTime: entry.resetTime,
-		}))
+	isEnabled(): boolean {
+		return this._configService.getOptional<boolean>('rateLimit.enabled', true)
+	}
 
-		const redisStatus = this.redisCacheService.getConnectionStatus()
+	/**
+	 * Whether health endpoints bypass rate limiting (K8s probes fire every few seconds)
+	 */
+	getBypassHealthChecksConfig(): boolean {
+		return this._configService.getOptional<boolean>('rateLimit.bypass.healthChecks', true)
+	}
 
-		return {
-			totalEntries: this.localRequestCounts.size,
-			entries,
-			storageType: redisStatus.connected ? 'redis' : 'local',
-		}
+	/**
+	 * Whether static assets bypass rate limiting
+	 */
+	getBypassStaticAssetsConfig(): boolean {
+		return this._configService.getOptional<boolean>('rateLimit.bypass.staticAssets', true)
 	}
 }

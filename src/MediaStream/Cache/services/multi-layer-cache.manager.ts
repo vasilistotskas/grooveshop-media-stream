@@ -77,7 +77,9 @@ export class MultiLayerCacheManager implements OnModuleInit, OnModuleDestroy {
 					this.metricsService.recordCacheOperation('get', layer.getLayerName(), 'hit')
 
 					// Backfill higher priority layers asynchronously (don't wait)
-					this.backfillLayers(key, value, layer).catch(() => {})
+					this.backfillLayers(key, value, layer).catch((err: unknown) => {
+						CorrelatedLogger.warn(`Backfill failed for key ${key}: ${(err as Error).message}`, MultiLayerCacheManager.name)
+					})
 
 					return value
 				}

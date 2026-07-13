@@ -1,9 +1,10 @@
 import type { Request, Response } from 'express'
 import type { ImageSourceKey } from '../config/image-sources.config.js'
 import type { ImageProcessingContext, ImageProcessingParams } from '../types/image-source.types.js'
-import { BadRequestException, Controller, Get, Logger, NotFoundException, Req, Res } from '@nestjs/common'
+import { BadRequestException, Controller, Get, NotFoundException, Req, Res } from '@nestjs/common'
 import { IMAGE } from '#microservice/common/constants/route-prefixes.constant'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { IMAGE_SOURCES } from '../config/image-sources.config.js'
@@ -33,8 +34,6 @@ const SLASH_RE = /\//g
  */
 @Controller(IMAGE)
 export default class MediaStreamImageController {
-	private readonly _logger = new Logger(MediaStreamImageController.name)
-
 	private readonly compiledPatterns = new Map<string, RegExp>()
 
 	constructor(
@@ -44,9 +43,9 @@ export default class MediaStreamImageController {
 		private readonly correlationService: CorrelationService,
 		private readonly metricsService: MetricsService,
 	) {
-		this._logger.log('Image controller initialized with sources:')
+		CorrelatedLogger.log('Image controller initialized with sources:', MediaStreamImageController.name)
 		Object.entries(IMAGE_SOURCES).forEach(([key, config]) => {
-			this._logger.log(`  - ${key}: /${IMAGE}/${config.routePattern}`)
+			CorrelatedLogger.log(`  - ${key}: /${IMAGE}/${config.routePattern}`, MediaStreamImageController.name)
 
 			// Pre-compile regex patterns
 			const regex = this.compilePattern(config.routePattern)
@@ -63,8 +62,6 @@ export default class MediaStreamImageController {
 		@Req() req: Request,
 		@Res() res: Response,
 	): Promise<void> {
-		const correlationId = this.correlationService.getCorrelationId() || 'unknown'
-
 		// Extract the path after the controller base path
 		// req.path is like: /media_stream-image/media/uploads/...
 		// We need to remove the base path (/{IMAGE}/) to get just the route pattern
@@ -115,12 +112,12 @@ export default class MediaStreamImageController {
 			}
 		}
 
-		this._logger.debug('Processing image request', { fullPath, originalPath: req.path, correlationId })
+		CorrelatedLogger.debug(`Processing image request: ${fullPath} (original: ${req.path})`, MediaStreamImageController.name)
 
 		const match = this.findMatchingSource(fullPath)
 
 		if (!match) {
-			this._logger.warn('No matching image source found', { fullPath, correlationId })
+			CorrelatedLogger.warn(`No matching image source found: ${fullPath}`, MediaStreamImageController.name)
 			throw new NotFoundException(`No image source matches path: ${fullPath}`)
 		}
 
@@ -221,12 +218,7 @@ export default class MediaStreamImageController {
 				resizeOptions,
 			})
 
-			this._logger.debug('Processing image request', {
-				source: source.name,
-				params,
-				resourceUrl,
-				correlationId,
-			})
+			CorrelatedLogger.debug(`Processing ${source.name} request for ${resourceUrl} (params: ${JSON.stringify(params)})`, MediaStreamImageController.name)
 
 			res.locals.requestedFormat = resizeOptions.format
 			res.locals.originalUrl = resourceUrl
@@ -235,7 +227,11 @@ export default class MediaStreamImageController {
 		}
 		catch (error: unknown) {
 			const errorName = error instanceof Error ? error.constructor.name : 'UnknownError'
-			this._logger.error(`Error in ${source.name}`, error, { params, correlationId })
+			CorrelatedLogger.error(
+				`Error in ${source.name} (params: ${JSON.stringify(params)}): ${(error as Error).message}`,
+				error instanceof Error ? error.stack : undefined,
+				MediaStreamImageController.name,
+			)
 			this.metricsService.recordError(phaseKey, errorName)
 			throw error
 		}

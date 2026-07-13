@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Test assertions constantly read index-signatured results
+    // (HealthIndicatorResult, config maps); bracket-access adds noise
+    // without safety in specs. All other strict flags stay inherited.
+    "noPropertyAccessFromIndexSignature": false
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "build",
+    "vitest.config.ts"
+  ]
+}

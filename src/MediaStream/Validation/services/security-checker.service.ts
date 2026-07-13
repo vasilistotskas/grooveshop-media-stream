@@ -1,7 +1,8 @@
 import type { ISecurityChecker, SecurityEvent } from '../interfaces/validator.interface.js'
-import { Injectable, Logger, Optional } from '@nestjs/common'
+import { Injectable, Optional } from '@nestjs/common'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { ConfigService } from '#microservice/Config/config.service'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 
 const SUSPICIOUS_PATTERNS: RegExp[] = [
 	/<script\b[^>]{0,100}>/i,
@@ -46,7 +47,6 @@ const REDIS_SECURITY_EVENTS_MAX = 10000
 
 @Injectable()
 export class SecurityCheckerService implements ISecurityChecker {
-	private readonly _logger = new Logger(SecurityCheckerService.name)
 	private readonly suspiciousPatterns: RegExp[]
 	private readonly securityEvents: SecurityEvent[] = []
 	private readonly maxStringLength: number
@@ -89,7 +89,7 @@ export class SecurityCheckerService implements ISecurityChecker {
 			return false
 		}
 		if (str.length > this.maxStringLength) {
-			this._logger.warn(`Excessively long string detected: ${str.length} characters`)
+			CorrelatedLogger.warn(`Excessively long string detected: ${str.length} characters`, SecurityCheckerService.name)
 			return true
 		}
 
@@ -99,12 +99,12 @@ export class SecurityCheckerService implements ISecurityChecker {
 		for (const pattern of this.suspiciousPatterns) {
 			try {
 				if (pattern.test(testStr)) {
-					this._logger.warn(`Suspicious pattern detected: ${pattern.source}`)
+					CorrelatedLogger.warn(`Suspicious pattern detected: ${pattern.source}`, SecurityCheckerService.name)
 					return true
 				}
 			}
 			catch {
-				this._logger.warn(`Pattern matching failed, potential ReDoS attempt: ${pattern.source}`)
+				CorrelatedLogger.warn(`Pattern matching failed, potential ReDoS attempt: ${pattern.source}`, SecurityCheckerService.name)
 				return true
 			}
 		}
@@ -112,12 +112,12 @@ export class SecurityCheckerService implements ISecurityChecker {
 		// Check decoded variants to catch mixed-case encoding (%2E%2E/),
 		// partial encoding (..%2f), and overlong UTF-8 sequences (%c0%ae...)
 		if (this.containsPathTraversal(str)) {
-			this._logger.warn('Path traversal detected in decoded input')
+			CorrelatedLogger.warn('Path traversal detected in decoded input', SecurityCheckerService.name)
 			return true
 		}
 
 		if (this.hasHighEntropy(str)) {
-			this._logger.warn('High entropy string detected (potential encoded payload)')
+			CorrelatedLogger.warn('High entropy string detected (potential encoded payload)', SecurityCheckerService.name)
 			return true
 		}
 
@@ -163,7 +163,7 @@ export class SecurityCheckerService implements ISecurityChecker {
 	private async checkObject(obj: any): Promise<boolean> {
 		for (const key of Object.keys(obj)) {
 			if (DANGEROUS_KEYS.has(key)) {
-				this._logger.warn(`Dangerous object key detected: ${key}`)
+				CorrelatedLogger.warn(`Dangerous object key detected: ${key}`, SecurityCheckerService.name)
 				return true
 			}
 
@@ -173,7 +173,7 @@ export class SecurityCheckerService implements ISecurityChecker {
 		}
 
 		if (this.getObjectDepth(obj) > 10) {
-			this._logger.warn('Excessively deep object detected (potential DoS)')
+			CorrelatedLogger.warn('Excessively deep object detected (potential DoS)', SecurityCheckerService.name)
 			return true
 		}
 
@@ -242,13 +242,7 @@ export class SecurityCheckerService implements ISecurityChecker {
 			this.securityEvents.shift()
 		}
 
-		this._logger.warn(`Security event: ${event.type}`, {
-			source: event.source,
-			details: event.details,
-			clientIp: event.clientIp,
-			userAgent: event.userAgent,
-			timestamp: event.timestamp,
-		})
+		CorrelatedLogger.warn(`Security event: ${event.type} (source: ${event.source}, ip: ${event.clientIp || 'n/a'}, ua: ${event.userAgent || 'n/a'}, details: ${JSON.stringify(event.details)})`, SecurityCheckerService.name)
 
 		// Persist to Redis for cross-replica visibility and crash durability (fire-and-forget)
 		this.persistEventToRedis(event)
@@ -264,7 +258,7 @@ export class SecurityCheckerService implements ISecurityChecker {
 		redisClient.lpush(REDIS_SECURITY_EVENTS_KEY, serialized)
 			.then(() => redisClient.ltrim(REDIS_SECURITY_EVENTS_KEY, 0, REDIS_SECURITY_EVENTS_MAX - 1))
 			.catch((error: unknown) => {
-				this._logger.warn(`Failed to persist security event to Redis: ${(error as Error).message}`)
+				CorrelatedLogger.warn(`Failed to persist security event to Redis: ${(error as Error).message}`, SecurityCheckerService.name)
 			})
 	}
 
@@ -285,7 +279,7 @@ export class SecurityCheckerService implements ISecurityChecker {
 			})
 		}
 		catch (error: unknown) {
-			this._logger.warn(`Failed to read security events from Redis: ${(error as Error).message}`)
+			CorrelatedLogger.warn(`Failed to read security events from Redis: ${(error as Error).message}`, SecurityCheckerService.name)
 			return []
 		}
 	}

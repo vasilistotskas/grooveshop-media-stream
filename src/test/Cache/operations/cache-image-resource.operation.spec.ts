@@ -17,15 +17,17 @@ import CacheImageRequest, {
 	SupportedResizeFormats,
 } from '#microservice/API/dto/cache-image-request.dto'
 import CacheImageResourceOperation from '#microservice/Cache/operations/cache-image-resource.operation'
+import { ImageFormatProcessor } from '#microservice/Cache/operations/image-format-processor.service'
+import { ResourceFetcher } from '#microservice/Cache/operations/resource-fetcher.service'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
 import { ConfigService } from '#microservice/Config/config.service'
 import ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-import ManipulationJobResult from '#microservice/Queue/dto/manipulation-job-result.dto'
-import FetchResourceResponseJob from '#microservice/Queue/jobs/fetch-resource-response.job'
-import GenerateResourceIdentityFromRequestJob from '#microservice/Queue/jobs/generate-resource-identity-from-request.job'
-import StoreResourceResponseToFileJob from '#microservice/Queue/jobs/store-resource-response-to-file.job'
-import WebpImageManipulationJob from '#microservice/Queue/jobs/webp-image-manipulation.job'
+import ManipulationJobResult from '#microservice/Processing/dto/manipulation-job-result.dto'
+import FetchResourceResponseJob from '#microservice/Processing/jobs/fetch-resource-response.job'
+import GenerateResourceIdentityFromRequestJob from '#microservice/Processing/jobs/generate-resource-identity-from-request.job'
+import StoreResourceResponseToFileJob from '#microservice/Processing/jobs/store-resource-response-to-file.job'
+import WebpImageManipulationJob from '#microservice/Processing/jobs/webp-image-manipulation.job'
 import ValidateCacheImageRequestResizeTargetRule from '#microservice/Validation/rules/validate-cache-image-request-resize-target.rule'
 import ValidateCacheImageRequestRule from '#microservice/Validation/rules/validate-cache-image-request.rule'
 import { InputSanitizationService } from '#microservice/Validation/services/input-sanitization.service'
@@ -186,6 +188,10 @@ describe('cacheImageResourceOperation', () => {
 		moduleRef = await Test.createTestingModule({
 			providers: [
 				CacheImageResourceOperation,
+				// Real collaborators — they consume the mocked jobs/cache/config below,
+				// so behaviour assertions against those mocks remain valid.
+				ResourceFetcher,
+				ImageFormatProcessor,
 				{ provide: HttpService, useValue: mockHttpService },
 				{ provide: GenerateResourceIdentityFromRequestJob, useValue: mockGenerateResourceIdentityFromRequestJob },
 				{ provide: FetchResourceResponseJob, useValue: mockFetchResourceResponseJob },

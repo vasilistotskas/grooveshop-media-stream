@@ -59,7 +59,7 @@ describe('MediaStreamModule (e2e)', () => {
 		}
 
 		// Give extra time for all async operations to complete
-		// This includes Redis disconnection, Bull queue cleanup, and scheduled tasks
+		// This includes Redis disconnection and scheduled tasks
 		await new Promise(resolve => setTimeout(resolve, 1000))
 	})
 

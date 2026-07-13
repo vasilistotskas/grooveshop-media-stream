@@ -50,7 +50,7 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	) {
 		this.maxRetries = this._configService.getOptional('http.maxRetries', 3)
 		this.retryDelay = this._configService.getOptional('http.retryDelay', 1000)
-		this.maxRetryDelay = this._configService.getOptional('http.retry.maxRetryDelay', 10000)
+		this.maxRetryDelay = this._configService.getOptional('http.maxRetryDelay', 10000)
 		this.timeout = this._configService.getOptional('http.timeout', 30000)
 
 		// Boolean is now properly parsed by config schema
@@ -131,6 +131,9 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	}
 
 	async onModuleInit(): Promise<void> {
+		// Restore circuit-breaker state from Redis before serving traffic and
+		// start its periodic persistence timer.
+		await this.circuitBreaker.init()
 		CorrelatedLogger.log('HTTP client service initialized', HttpClientService.name)
 	}
 
@@ -324,7 +327,8 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	 * Check if an error is retryable
 	 */
 	private isRetryableError(error: any): boolean {
-		if ((error as any).code && ['ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'ENOTFOUND'].includes((error as any).code)) {
+		const errnoCode = (error as NodeJS.ErrnoException).code
+		if (errnoCode && ['ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'ENOTFOUND'].includes(errnoCode)) {
 			return true
 		}
 

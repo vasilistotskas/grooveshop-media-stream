@@ -3,7 +3,7 @@ import type { AccessPattern } from './storage-monitoring.service.js'
 import { Buffer } from 'node:buffer'
 import { createReadStream, promises as fs } from 'node:fs'
 import { join } from 'node:path'
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
@@ -43,7 +43,6 @@ export interface FileOptimization {
 
 @Injectable()
 export class StorageOptimizationService implements OnModuleInit {
-	private readonly _logger = new Logger(StorageOptimizationService.name)
 	private readonly storageDirectory: string
 	private readonly config: OptimizationConfig
 	private readonly strategies = new Map<string, OptimizationStrategy>()
@@ -57,7 +56,10 @@ export class StorageOptimizationService implements OnModuleInit {
 		this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage')
 		this.config = {
 			enabled: this._configService.getOptional('storage.optimization.enabled', true),
-			strategies: this._configService.getOptional('storage.optimization.strategies', ['deduplication']),
+			// Strategy names are registered lowercase in initializeStrategies() and
+			// looked up by the configured value; normalize so mixed-case env input
+			// (STORAGE_OPTIMIZATION_STRATEGIES=Deduplication) still resolves.
+			strategies: this._configService.getOptional<string[]>('storage.optimization.strategies', ['deduplication']).map(s => s.toLowerCase()),
 			popularFileThreshold: this._configService.getOptional('storage.optimization.popularThreshold', 10),
 			compressionLevel: this._configService.getOptional('storage.optimization.compressionLevel', 6),
 			createBackups: this._configService.getOptional('storage.optimization.createBackups', false),
@@ -69,10 +71,10 @@ export class StorageOptimizationService implements OnModuleInit {
 
 	async onModuleInit(): Promise<void> {
 		if (this.config.enabled) {
-			this._logger.log(`Storage optimization enabled with strategies: ${this.config.strategies.join(', ')}`)
+			CorrelatedLogger.log(`Storage optimization enabled with strategies: ${this.config.strategies.join(', ')}`, StorageOptimizationService.name)
 		}
 		else {
-			this._logger.log('Storage optimization disabled')
+			CorrelatedLogger.log('Storage optimization disabled', StorageOptimizationService.name)
 		}
 	}
 
@@ -296,7 +298,7 @@ export class StorageOptimizationService implements OnModuleInit {
 			}
 			catch (error: unknown) {
 				// File might have been deleted or is inaccessible
-				this._logger.warn(`Failed to process file for deduplication: ${file.file} - ${(error as Error).message}`)
+				CorrelatedLogger.warn(`Failed to process file for deduplication: ${file.file} - ${(error as Error).message}`, StorageOptimizationService.name)
 			}
 		}
 

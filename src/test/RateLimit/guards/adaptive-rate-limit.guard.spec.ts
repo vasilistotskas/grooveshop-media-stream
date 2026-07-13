@@ -48,6 +48,9 @@ describe('adaptiveRateLimitGuard', () => {
 			recordRateLimitMetrics: vi.fn(),
 			getWhitelistedDomains: vi.fn(),
 			getBypassBotsConfig: vi.fn(),
+			isEnabled: vi.fn().mockReturnValue(true),
+			getBypassHealthChecksConfig: vi.fn().mockReturnValue(true),
+			getBypassStaticAssetsConfig: vi.fn().mockReturnValue(true),
 			isBot: vi.fn(),
 		}
 
@@ -140,7 +143,14 @@ describe('adaptiveRateLimitGuard', () => {
 			expect(rateLimitService.checkRateLimit).not.toHaveBeenCalled()
 		})
 
-		it('should skip rate limiting for metrics endpoint', async () => {
+		it('should NOT skip rate limiting for the metrics endpoint (defence-in-depth alongside InternalSecretGuard)', async () => {
+			const mockConfig = { windowMs: 60000, max: 100, skipSuccessfulRequests: false, skipFailedRequests: false }
+			const mockInfo = { limit: 100, current: 1, remaining: 99, resetTime: new Date() }
+			rateLimitService.generateAdvancedKey.mockReturnValue('192.168.1.1:get-default')
+			rateLimitService.getRateLimitConfig.mockReturnValue(mockConfig)
+			rateLimitService.calculateAdaptiveLimit.mockResolvedValue(100)
+			rateLimitService.checkRateLimit.mockResolvedValue({ allowed: true, info: mockInfo })
+
 			const metricsContext = {
 				switchToHttp: () => ({
 					getRequest: () => ({ ...mockRequest, url: '/metrics' }),
@@ -153,7 +163,8 @@ describe('adaptiveRateLimitGuard', () => {
 			const result = await guard.canActivate(metricsContext)
 
 			expect(result).toBe(true)
-			expect(rateLimitService.checkRateLimit).not.toHaveBeenCalled()
+			// /metrics is deliberately NOT rate-limit-exempt — the throttle must run
+			expect(rateLimitService.checkRateLimit).toHaveBeenCalled()
 		})
 
 		it('should skip rate limiting for static assets', async () => {
@@ -170,6 +181,32 @@ describe('adaptiveRateLimitGuard', () => {
 
 			expect(result).toBe(true)
 			expect(rateLimitService.checkRateLimit).not.toHaveBeenCalled()
+		})
+
+		it('should NOT skip rate limiting for image-processing routes ending in a static-asset extension', async () => {
+			// Regression: image routes end in `:quality.:format`, so a .png/.jpg/.gif/.svg
+			// output format must not match the static-asset bypass and skip the throttle.
+			const mockConfig = { windowMs: 60000, max: 50, skipSuccessfulRequests: false, skipFailedRequests: false }
+			const mockInfo = { limit: 50, current: 1, remaining: 49, resetTime: new Date() }
+			rateLimitService.generateAdvancedKey.mockReturnValue('192.168.1.1:image-processing')
+			rateLimitService.getRateLimitConfig.mockReturnValue(mockConfig)
+			rateLimitService.calculateAdaptiveLimit.mockResolvedValue(50)
+			rateLimitService.checkRateLimit.mockResolvedValue({ allowed: true, info: mockInfo })
+
+			const imagePngContext = {
+				switchToHttp: () => ({
+					getRequest: () => ({ ...mockRequest, url: '/media_stream-image/media/uploads/x.jpg/64/64/contain/entropy/transparent/5/80.png' }),
+					getResponse: () => mockResponse,
+				}),
+				getHandler: () => ({}),
+				getClass: () => ({}),
+			} as unknown as ExecutionContext
+
+			const result = await guard.canActivate(imagePngContext)
+
+			expect(result).toBe(true)
+			// The key assertion: the throttle actually ran rather than being bypassed
+			expect(rateLimitService.checkRateLimit).toHaveBeenCalled()
 		})
 
 		it('should skip rate limiting for bot user agents', async () => {

@@ -2,7 +2,7 @@ services:
   service-media_stream:
     container_name: service-media_stream
     restart: no
-    image: gro0ve/grooveshop-media-stream:v1.102.1
+    image: gro0ve/grooveshop-media-stream:v2.58.0
     env_file:
       - ./grooveshop-media-stream/.env.docker
     ports:

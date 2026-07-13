@@ -2,35 +2,26 @@ import type {
 	ResizeOptions,
 } from '#microservice/API/dto/cache-image-request.dto'
 import type { ResourceIdentifierKP } from '#microservice/common/constants/key-properties.constant'
+import type { ProcessedImage } from './image-format-processor.service.js'
 import { Buffer } from 'node:buffer'
-import { createHash } from 'node:crypto'
-import { access, open as fsOpen, readFile, rename, unlink, writeFile } from 'node:fs/promises'
+import { access, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import * as path from 'node:path'
 import { cwd } from 'node:process'
-import { Transform } from 'node:stream'
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
-import DOMPurify from 'isomorphic-dompurify'
 
-import CacheImageRequest, {
-	BackgroundOptions,
-	FitOptions,
-	PositionOptions,
-	SupportedResizeFormats,
-} from '#microservice/API/dto/cache-image-request.dto'
-import UnableToFetchResourceException from '#microservice/API/exceptions/unable-to-fetch-resource.exception'
+import CacheImageRequest from '#microservice/API/dto/cache-image-request.dto'
 import { MediaStreamError } from '#microservice/common/errors/media-stream.errors'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
 import ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-import FetchResourceResponseJob from '#microservice/Queue/jobs/fetch-resource-response.job'
-import GenerateResourceIdentityFromRequestJob from '#microservice/Queue/jobs/generate-resource-identity-from-request.job'
-import StoreResourceResponseToFileJob from '#microservice/Queue/jobs/store-resource-response-to-file.job'
-import WebpImageManipulationJob from '#microservice/Queue/jobs/webp-image-manipulation.job'
+import GenerateResourceIdentityFromRequestJob from '#microservice/Processing/jobs/generate-resource-identity-from-request.job'
 import ValidateCacheImageRequestRule from '#microservice/Validation/rules/validate-cache-image-request.rule'
 import { InputSanitizationService } from '#microservice/Validation/services/input-sanitization.service'
 import { MultiLayerCacheManager } from '../services/multi-layer-cache.manager.js'
+import { ImageFormatProcessor } from './image-format-processor.service.js'
+import { ResourceFetcher } from './resource-fetcher.service.js'
 
 /**
  * Operation context for a single cache image request.
@@ -44,8 +35,12 @@ export interface OperationContext {
 }
 
 /**
- * Handles caching and processing of image resources.
+ * Orchestrates caching and processing of image resources.
  * Singleton service - request-specific state is managed via OperationContext parameter.
+ *
+ * Fetching lives in ResourceFetcher, format processing in ImageFormatProcessor;
+ * this class owns validation/identity setup, the cache/filesystem read paths,
+ * and the atomic write of processed results.
  *
  * IMPORTANT: This service is STATELESS. All request-specific data is passed via
  * the OperationContext parameter returned from setup() and passed to all methods.
@@ -55,28 +50,20 @@ export interface OperationContext {
 export default class CacheImageResourceOperation {
 	private readonly basePath = cwd()
 
-	// Configurable TTL values in seconds (loaded from config; cache layers expect seconds)
-	private readonly publicTtl: number
+	// Configurable TTL in seconds (loaded from config; cache layers expect seconds)
 	private readonly privateTtl: number
-	private readonly negativeCacheTtl: number
 
 	constructor(
 		private readonly validateCacheImageRequest: ValidateCacheImageRequestRule,
-		private readonly fetchResourceResponseJob: FetchResourceResponseJob,
-		private readonly webpImageManipulationJob: WebpImageManipulationJob,
-		private readonly storeResourceResponseToFileJob: StoreResourceResponseToFileJob,
 		private readonly generateResourceIdentityFromRequestJob: GenerateResourceIdentityFromRequestJob,
+		private readonly resourceFetcher: ResourceFetcher,
+		private readonly imageFormatProcessor: ImageFormatProcessor,
 		private readonly cacheManager: MultiLayerCacheManager,
 		private readonly inputSanitizationService: InputSanitizationService,
 		private readonly metricsService: MetricsService,
 		private readonly configService: ConfigService,
 	) {
-		// Load TTL values from configuration (in seconds — Redis/cache layers expect seconds)
-		this.publicTtl = this.configService.getOptional('cache.image.publicTtl', 12 * 30 * 24 * 3600)
 		this.privateTtl = this.configService.getOptional('cache.image.privateTtl', 6 * 30 * 24 * 3600)
-		// Negative-cache TTL in seconds. Stored timestamp is Date.now() (ms);
-		// comparison uses negativeCacheTtl * 1000 to convert to ms — do NOT pre-multiply here.
-		this.negativeCacheTtl = this.configService.getOptional('cache.image.negativeCacheTtl', 300)
 	}
 
 	/**
@@ -101,6 +88,14 @@ export default class CacheImageResourceOperation {
 	}
 
 	/**
+	 * End a performance phase and record the cache operation metric in one step.
+	 */
+	private endPhaseAndRecord(phase: string, layer: string, result: 'hit' | 'miss' | 'error'): void {
+		const duration = PerformanceTracker.endPhase(phase)
+		this.metricsService.recordCacheOperation('get', layer, result, duration || 0)
+	}
+
+	/**
 	 * Check if the resource exists in cache or filesystem
 	 * @param ctx - Operation context containing request-specific state
 	 * @returns true if resource exists and is valid
@@ -121,8 +116,10 @@ export default class CacheImageResourceOperation {
 					const isValid = cachedResource.metadata.dateCreated + cachedResource.metadata.privateTTL > Date.now()
 					if (isValid) {
 						CorrelatedLogger.debug(`Resource found in cache and is valid: ${ctx.id}`, CacheImageResourceOperation.name)
-						const duration = PerformanceTracker.endPhase('resource_exists_check')
-						this.metricsService.recordCacheOperation('get', 'multi-layer', 'hit', duration || 0)
+						// Populate ctx.metaData so fetchHeaders() reuses it instead of a
+						// second cache lookup (which would also double-increment accessCount)
+						ctx.metaData = cachedResource.metadata
+						this.endPhaseAndRecord('resource_exists_check', 'multi-layer', 'hit')
 						return true
 					}
 					else {
@@ -144,8 +141,7 @@ export default class CacheImageResourceOperation {
 
 			if (!metadataContent) {
 				CorrelatedLogger.debug(`Metadata not found in filesystem: ${resourceMetaPath}`, CacheImageResourceOperation.name)
-				const duration = PerformanceTracker.endPhase('resource_exists_check')
-				this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
+				this.endPhaseAndRecord('resource_exists_check', 'multi-layer', 'miss')
 				return false
 			}
 
@@ -154,8 +150,7 @@ export default class CacheImageResourceOperation {
 			const resourcePathExists = await access(resourcePath).then(() => true).catch(() => false)
 			if (!resourcePathExists) {
 				CorrelatedLogger.debug(`Resource data not found in filesystem: ${resourcePath}`, CacheImageResourceOperation.name)
-				const duration = PerformanceTracker.endPhase('resource_exists_check')
-				this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
+				this.endPhaseAndRecord('resource_exists_check', 'multi-layer', 'miss')
 				return false
 			}
 
@@ -166,28 +161,24 @@ export default class CacheImageResourceOperation {
 			}
 			catch {
 				CorrelatedLogger.warn('Metadata headers are missing or invalid', CacheImageResourceOperation.name)
-				const duration = PerformanceTracker.endPhase('resource_exists_check')
-				this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
+				this.endPhaseAndRecord('resource_exists_check', 'multi-layer', 'miss')
 				return false
 			}
 
 			if (!headers.version || headers.version !== 1) {
 				CorrelatedLogger.warn('Invalid or missing version in metadata', CacheImageResourceOperation.name)
-				const duration = PerformanceTracker.endPhase('resource_exists_check')
-				this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
+				this.endPhaseAndRecord('resource_exists_check', 'multi-layer', 'miss')
 				return false
 			}
 
 			const isValid = headers.dateCreated + headers.privateTTL > Date.now()
-			const duration = PerformanceTracker.endPhase('resource_exists_check')
-			this.metricsService.recordCacheOperation('get', 'multi-layer', isValid ? 'hit' : 'miss', duration || 0)
+			this.endPhaseAndRecord('resource_exists_check', 'multi-layer', isValid ? 'hit' : 'miss')
 			return isValid
 		}
 		catch (error: unknown) {
 			CorrelatedLogger.warn(`Error checking resource existence: ${(error as Error).message}`, CacheImageResourceOperation.name)
 			this.metricsService.recordError('cache_check', 'resource_exists')
-			const duration = PerformanceTracker.endPhase('resource_exists_check')
-			this.metricsService.recordCacheOperation('get', 'multi-layer', 'error', duration || 0)
+			this.endPhaseAndRecord('resource_exists_check', 'multi-layer', 'error')
 			return false
 		}
 	}
@@ -315,127 +306,22 @@ export default class CacheImageResourceOperation {
 		PerformanceTracker.startPhase('sync_processing')
 
 		try {
-			// Check negative cache first to avoid repeated failed fetches
-			const negativeCacheKey = `negative:${ctx.id}`
-			const negativeCached = await this.cacheManager.get<{ status: number, timestamp: number }>('image', negativeCacheKey)
-			if (negativeCached && Date.now() - negativeCached.timestamp < this.negativeCacheTtl * 1000) {
-				CorrelatedLogger.debug(`Negative cache hit for ${ctx.request.resourceTarget}`, CacheImageResourceOperation.name)
-				throw new UnableToFetchResourceException(ctx.request.resourceTarget)
-			}
-
-			const response = await this.fetchResourceResponseJob.handle(ctx.request)
-			if (!response || response.status === 404 || response.status >= 400) {
-				// Cache the failure to prevent repeated requests
-				await this.cacheManager.set('image', negativeCacheKey, {
-					status: response?.status || 404,
-					timestamp: Date.now(),
-				}, this.negativeCacheTtl)
-				CorrelatedLogger.warn(`Caching negative result for ${ctx.request.resourceTarget} (status: ${response?.status || 404})`, CacheImageResourceOperation.name)
-				throw new UnableToFetchResourceException(ctx.request.resourceTarget)
-			}
-
-			const contentLength = response.headers['content-length']
-			const format = this.getFormatFromUrl(ctx.request.resourceTarget)
-			if (contentLength) {
-				const sizeBytes = Number.parseInt(String(contentLength), 10)
-				if (!this.inputSanitizationService.validateFileSize(sizeBytes, format)) {
-					throw new Error(`File size ${sizeBytes} bytes exceeds limit for format ${format}`)
-				}
-			}
-
-			// Streaming byte counter: accumulate response body bytes and abort if
-			// the format-specific limit is exceeded before the download completes.
-			// This catches servers that lie (or omit) Content-Length.
-			const maxFileSizes: Record<string, number> = {
-				jpeg: 5 * 1024 * 1024,
-				jpg: 5 * 1024 * 1024,
-				png: 8 * 1024 * 1024,
-				webp: 3 * 1024 * 1024,
-				gif: 2 * 1024 * 1024,
-				svg: 1 * 1024 * 1024,
-			}
-			const maxBytes = maxFileSizes[format] ?? 10 * 1024 * 1024
-			let bytesSeen = 0
-			let limitExceeded = false
-
-			const sizeGuardTransform = new Transform({
-				transform(chunk, _encoding, callback) {
-					bytesSeen += (chunk as Buffer).length
-					if (bytesSeen > maxBytes) {
-						limitExceeded = true
-						callback(new Error(
-							`Streaming size limit exceeded: ${bytesSeen} bytes > ${maxBytes} bytes for format ${format}`,
-						))
-					}
-					else {
-						callback(null, chunk)
-					}
-				},
-			})
-
-			// Wrap the axios stream with the guard transform
-			const originalStream = response.data
-			response.data = originalStream.pipe(sizeGuardTransform)
-			// Forward stream errors so StoreResourceResponseToFileJob rejects cleanly
-			originalStream.on('error', (err: Error) => sizeGuardTransform.destroy(err))
-
 			const resourceTempPath = this.getResourceTempPath(ctx)
-			try {
-				await this.storeResourceResponseToFileJob.handle(ctx.request.resourceTarget, resourceTempPath, response)
-			}
-			catch (err: unknown) {
-				if (limitExceeded) {
-					throw new Error(
-						`File size exceeds limit for format ${format}: stream aborted after ${bytesSeen} bytes`,
-					)
-				}
-				throw err
-			}
+			await this.resourceFetcher.fetchToTempFile(ctx.request, ctx.id, resourceTempPath)
 
-			let processedData: Buffer
-			let metadata!: ResourceMetaData
+			let processed: ProcessedImage
 
 			// Wrap the Sharp processing block so resourceTempPath (.rst) is always
 			// cleaned up — even on corrupt/unsupported image errors that Sharp throws
 			// mid-pipeline.  The finally guard is a no-op if the file was already
 			// removed on the success path.
 			try {
-				let isSourceSvg = false
-				try {
-					const fh = await fsOpen(resourceTempPath, 'r')
-					try {
-						// Read first 1024 bytes — enough to cover XML/DOCTYPE preamble (C14 fix)
-						const headerBuf = Buffer.alloc(1024)
-						const { bytesRead } = await fh.read(headerBuf, 0, 1024, 0)
-						const header = headerBuf.toString('utf8', 0, bytesRead)
-						// Strip leading whitespace, XML declaration, and DOCTYPE before checking for <svg
-						// so SVG files starting with <?xml ...?> are not misclassified as non-SVG.
-						const stripped = header
-							.trimStart()
-							.replace(/^<\?xml[^?]*\?>\s*/i, '')
-							.replace(/^<!DOCTYPE[^>]*>\s*/i, '')
-						isSourceSvg = stripped.trimStart().startsWith('<svg') || header.includes('xmlns="http://www.w3.org/2000/svg"')
-					}
-					finally {
-						await fh.close()
-					}
-					CorrelatedLogger.debug(`Source file SVG detection: ${isSourceSvg}`, CacheImageResourceOperation.name)
-				}
-				catch {
-					isSourceSvg = false
-					CorrelatedLogger.debug('Could not read file header, assuming not SVG', CacheImageResourceOperation.name)
-				}
+				const isSourceSvg = await this.imageFormatProcessor.detectSvgByHeader(resourceTempPath)
+				CorrelatedLogger.debug(`Source file SVG detection: ${isSourceSvg}`, CacheImageResourceOperation.name)
 
-				if (isSourceSvg) {
-					const result = await this.processSvgImage(ctx)
-					processedData = result.data
-					metadata = result.metadata
-				}
-				else {
-					const result = await this.processRasterImage(ctx)
-					processedData = result.data
-					metadata = result.metadata
-				}
+				processed = isSourceSvg
+					? await this.imageFormatProcessor.processSvg(resourceTempPath, ctx.request.resizeOptions)
+					: await this.imageFormatProcessor.processRaster(resourceTempPath, ctx.request.resizeOptions)
 
 				const resourcePath = this.getResourcePath(ctx)
 				const resourceMetaPath = this.getResourceMetaPath(ctx)
@@ -449,11 +335,11 @@ export default class CacheImageResourceOperation {
 
 				await Promise.all([
 					this.cacheManager.set('image', ctx.id, {
-						data: processedData,
-						metadata,
+						data: processed.data,
+						metadata: processed.metadata,
 					}, this.privateTtl),
-					writeFile(resourceTmpPath, processedData),
-					writeFile(resourceMetaTmpPath, JSON.stringify(metadata), 'utf8'),
+					writeFile(resourceTmpPath, processed.data),
+					writeFile(resourceMetaTmpPath, JSON.stringify(processed.metadata), 'utf8'),
 				])
 				await Promise.all([
 					rename(resourceTmpPath, resourcePath),
@@ -468,7 +354,7 @@ export default class CacheImageResourceOperation {
 				})
 			}
 
-			const processedFormat = metadata.format || 'unknown'
+			const processedFormat = processed.metadata.format || 'unknown'
 			const duration = PerformanceTracker.endPhase('sync_processing')
 			this.metricsService.recordImageProcessing('process', processedFormat, 'success', duration || 0)
 			CorrelatedLogger.debug(`Image processed successfully: ${ctx.id}`, CacheImageResourceOperation.name)
@@ -481,223 +367,12 @@ export default class CacheImageResourceOperation {
 	}
 
 	/**
-	 * Strip script-like content and XXE/SSRF vectors from an SVG payload.
-	 *
-	 * SVG served with Content-Type: image/svg+xml can execute JavaScript when
-	 * opened as a top-level document.  Additionally, SVG elements such as
-	 * <use>, <image>, and <feImage> can trigger out-of-band HTTP requests to
-	 * attacker-controlled servers (SSRF) or load external resources that
-	 * bypass the domain whitelist.
-	 *
-	 * Primary sanitizer: DOMPurify (isomorphic-dompurify) with SVG-safe config.
-	 * Regex fallback: applied after DOMPurify for defence-in-depth and to catch
-	 * any gap in the parser's coverage on non-browser environments.
-	 *
-	 * DOMPurify config:
-	 *   - USE_PROFILES.svg: allow standard SVG tags/attributes
-	 *   - FORBID_TAGS: drop <use>, <image>, <feImage> (SSRF vectors)
-	 *   - FORBID_ATTR: drop xlink:href and href from any surviving element
-	 *     (belt-and-suspenders — DOMPurify strips most anyway, but we need
-	 *     to block absolute-URL hrefs that bypass the profile whitelist)
+	 * Resize/optimize the bundled default image (fallback path).
+	 * Delegates to ImageFormatProcessor; kept on the operation so the public
+	 * API consumed by ImageStreamService stays in one place.
 	 */
-	private sanitizeSvg(svg: string): string {
-		let result = svg
-
-		// --- Primary: DOMPurify ---
-		try {
-			result = DOMPurify.sanitize(result, {
-				USE_PROFILES: { svg: true, svgFilters: true },
-				FORBID_TAGS: ['script', 'use', 'image', 'feimage'],
-				FORBID_ATTR: ['xlink:href', 'href', 'action', 'formaction'],
-				// Keep SVG structure intact; don't wrap in <div>
-				WHOLE_DOCUMENT: false,
-				RETURN_DOM: false,
-			}) as string
-		}
-		catch (err: unknown) {
-			CorrelatedLogger.warn(
-				`DOMPurify SVG sanitization failed, falling back to regex: ${(err as Error).message}`,
-				CacheImageResourceOperation.name,
-			)
-			// result stays as the original svg — regex pass below still runs
-		}
-
-		// --- Fallback / defence-in-depth: regex pass ---
-		result = result
-			// Drop <script>…</script> blocks (including CDATA content).
-			.replace(/<script\b[\s\S]*?<\/script\s*>/gi, '')
-			// Drop self-closing <script/> tags.
-			.replace(/<script\b[^>]*\/>/gi, '')
-			// Drop <use …>, </use> — can load external symbol definitions.
-			.replace(/<use\b[^>]*>/gi, '')
-			.replace(/<\/use\s*>/gi, '')
-			// Drop <image …>, </image> — raster-embed + SSRF vector.
-			.replace(/<image\b[^>]*>/gi, '')
-			.replace(/<\/image\s*>/gi, '')
-			// Drop <feImage …>, </feImage> — filter-primitive SSRF.
-			.replace(/<feImage\b[^>]*>/gi, '')
-			.replace(/<\/feImage\s*>/gi, '')
-			// Drop inline event handlers (onclick, onload, etc.).
-			.replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, '')
-			.replace(/\son[a-z]+\s*=\s*'[^']*'/gi, '')
-			.replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, '')
-			// Neutralize javascript:/vbscript:/data: URIs in href/xlink:href.
-			.replace(/(xlink:href|href)\s*=\s*"\s*(?:javascript|vbscript|data):[^"]*"/gi, '$1="#"')
-			.replace(/(xlink:href|href)\s*=\s*'\s*(?:javascript|vbscript|data):[^']*'/gi, '$1=\'#\'')
-			// Remove href/xlink:href pointing to absolute URLs (http/https/protocol-relative).
-			.replace(/(xlink:href|href)\s*=\s*"(?:https?:)?\/\/[^"]*"/gi, '$1="#"')
-			.replace(/(xlink:href|href)\s*=\s*'(?:https?:)?\/\/[^']*'/gi, '$1=\'#\'')
-
-		return result
-	}
-
-	private async processSvgImage(ctx: OperationContext): Promise<{ data: Buffer, metadata: ResourceMetaData }> {
-		CorrelatedLogger.debug('Processing SVG format', CacheImageResourceOperation.name)
-
-		const resourceTempPath = this.getResourceTempPath(ctx)
-		const svgContent = await readFile(resourceTempPath, 'utf8')
-
-		if (!svgContent.toLowerCase().includes('<svg')) {
-			CorrelatedLogger.warn('The file is not a valid SVG. Serving default WebP image.', CacheImageResourceOperation.name)
-			return await this.processDefaultImage(ctx)
-		}
-
-		const resizeOptions = ctx.request.resizeOptions
-		const needsResizing = (resizeOptions?.width !== null && !Number.isNaN(resizeOptions?.width))
-			|| (resizeOptions?.height !== null && !Number.isNaN(resizeOptions?.height))
-
-		if (!needsResizing) {
-			const sanitized = this.sanitizeSvg(svgContent)
-			const data = Buffer.from(sanitized, 'utf8')
-			const metadata = new ResourceMetaData({
-				version: 1,
-				size: data.length.toString(),
-				format: 'svg',
-				dateCreated: Date.now(),
-				publicTTL: this.publicTtl * 1000,
-				privateTTL: this.privateTtl * 1000,
-			})
-
-			return { data, metadata }
-		}
-		else {
-			// Sanitize the SVG before handing it to Sharp so that any embedded
-			// script/SSRF vectors are stripped even when converting to raster.
-			// We overwrite the temp file in-place — Sharp reads it by path.
-			const sanitized = this.sanitizeSvg(svgContent)
-			await writeFile(resourceTempPath, sanitized, 'utf8')
-			CorrelatedLogger.debug('SVG needs resizing, sanitized and converting to raster via Sharp', CacheImageResourceOperation.name)
-			const result = await this.webpImageManipulationJob.handle(
-				resourceTempPath,
-				resizeOptions,
-			)
-
-			const metadata = new ResourceMetaData({
-				version: 1,
-				size: result.size,
-				format: result.format,
-				dateCreated: Date.now(),
-				publicTTL: this.publicTtl * 1000,
-				privateTTL: this.privateTtl * 1000,
-			})
-
-			return { data: result.buffer, metadata }
-		}
-	}
-
-	private async processRasterImage(ctx: OperationContext): Promise<{ data: Buffer, metadata: ResourceMetaData }> {
-		const resourceTempPath = this.getResourceTempPath(ctx)
-
-		const result = await this.webpImageManipulationJob.handle(
-			resourceTempPath,
-			ctx.request.resizeOptions,
-		)
-
-		CorrelatedLogger.debug(`processRasterImage received result: ${JSON.stringify({ size: result.size, format: result.format })}`, 'CacheImageResourceOperation')
-
-		const actualFormat = result.format
-		const requestedFormat = ctx.request.resizeOptions?.format
-
-		if (requestedFormat === 'svg' && result.format !== 'svg') {
-			CorrelatedLogger.debug(`SVG format requested but actual format is ${result.format}. Using actual format for content-type.`, 'CacheImageResourceOperation')
-		}
-
-		const metadata = new ResourceMetaData({
-			version: 1,
-			size: result.size,
-			format: actualFormat,
-			dateCreated: Date.now(),
-			publicTTL: this.publicTtl * 1000,
-			privateTTL: this.privateTtl * 1000,
-		})
-
-		CorrelatedLogger.debug(`processRasterImage created metadata: ${JSON.stringify(metadata)}`, 'CacheImageResourceOperation')
-
-		return { data: result.buffer, metadata }
-	}
-
-	private async processDefaultImage(ctx: OperationContext): Promise<{ data: Buffer, metadata: ResourceMetaData }> {
-		const data = await this.optimizeAndServeDefaultImage(ctx.request.resizeOptions)
-		const metadata = new ResourceMetaData({
-			version: 1,
-			size: data.length.toString(),
-			format: 'webp',
-			dateCreated: Date.now(),
-			publicTTL: this.publicTtl * 1000,
-			privateTTL: this.privateTtl * 1000,
-		})
-
-		return { data, metadata }
-	}
-
-	private getFormatFromUrl(url: string): string {
-		const extension = url.split('.').pop()?.toLowerCase()
-		return extension || 'unknown'
-	}
-
 	public async optimizeAndServeDefaultImage(resizeOptions: ResizeOptions): Promise<Buffer> {
-		const resizeOptionsWithDefaults: ResizeOptions = {
-			width: resizeOptions.width || 800,
-			height: resizeOptions.height || 600,
-			fit: resizeOptions.fit || FitOptions.contain,
-			position: resizeOptions.position || PositionOptions.entropy,
-			format: resizeOptions.format || SupportedResizeFormats.webp,
-			background: resizeOptions.background || BackgroundOptions.white,
-			trimThreshold: resizeOptions.trimThreshold || 5,
-			quality: resizeOptions.quality || 80,
-		}
-
-		const optionsString = this.createOptionsString(resizeOptionsWithDefaults)
-		const optimizedPath = path.join(this.basePath, 'storage', `default_optimized_${optionsString}.webp`)
-
-		// Check if already cached on disk
-		try {
-			await access(optimizedPath)
-			return await readFile(optimizedPath)
-		}
-		catch (error: unknown) {
-			if ((error as any).code === 'ENOENT') {
-				const result = await this.webpImageManipulationJob.handle(
-					path.join(this.basePath, 'public', 'default.png'),
-					resizeOptionsWithDefaults,
-				)
-
-				if (!result) {
-					throw new Error('Failed to optimize default image')
-				}
-
-				// Cache to disk for subsequent requests
-				await writeFile(optimizedPath, result.buffer)
-				return result.buffer
-			}
-			throw error
-		}
-	}
-
-	private createOptionsString(options: ResizeOptions): string {
-		const hash = createHash('md5')
-		hash.update(JSON.stringify(options))
-		return hash.digest('hex')
+		return this.imageFormatProcessor.optimizeAndServeDefaultImage(resizeOptions)
 	}
 
 	/**
@@ -719,11 +394,12 @@ export default class CacheImageResourceOperation {
 			if (cachedResource) {
 				// Increment access count and backfill updated metadata into cache (fire-and-forget)
 				cachedResource.metadata.accessCount = (cachedResource.metadata.accessCount || 0) + 1
-				this.cacheManager.set('image', ctx.id, cachedResource, this.privateTtl).catch(() => {})
+				this.cacheManager.set('image', ctx.id, cachedResource, this.privateTtl).catch((err: unknown) => {
+					CorrelatedLogger.warn(`Failed to backfill access count for ${ctx.id}: ${(err as Error).message}`, CacheImageResourceOperation.name)
+				})
 
 				CorrelatedLogger.debug(`Resource retrieved from cache: ${ctx.id}`, CacheImageResourceOperation.name)
-				const duration = PerformanceTracker.endPhase('get_cached_resource')
-				this.metricsService.recordCacheOperation('get', 'multi-layer', 'hit', duration || 0)
+				this.endPhaseAndRecord('get_cached_resource', 'multi-layer', 'hit')
 				return cachedResource
 			}
 
@@ -742,26 +418,29 @@ export default class CacheImageResourceOperation {
 
 				// Increment access count and persist back to the .rsm file (fire-and-forget)
 				metadata.accessCount = (metadata.accessCount || 0) + 1
-				writeFile(resourceMetaPath, JSON.stringify(metadata), 'utf8').catch(() => {})
+				writeFile(resourceMetaPath, JSON.stringify(metadata), 'utf8').catch((err: unknown) => {
+					CorrelatedLogger.warn(`Failed to persist access count to ${resourceMetaPath}: ${(err as Error).message}`, CacheImageResourceOperation.name)
+				})
 
-				await this.cacheManager.set('image', ctx.id, { data, metadata }, this.privateTtl)
+				// Backfill the multi-layer cache fire-and-forget — awaiting here would
+				// block the response on a Redis/memory write on every filesystem hit
+				this.cacheManager.set('image', ctx.id, { data, metadata }, this.privateTtl).catch((err: unknown) => {
+					CorrelatedLogger.warn(`Failed to backfill multi-layer cache for ${ctx.id}: ${(err as Error).message}`, CacheImageResourceOperation.name)
+				})
 
 				CorrelatedLogger.debug(`Resource retrieved from filesystem and cached: ${ctx.id}`, CacheImageResourceOperation.name)
-				const duration = PerformanceTracker.endPhase('get_cached_resource')
-				this.metricsService.recordCacheOperation('get', 'filesystem', 'hit', duration || 0)
+				this.endPhaseAndRecord('get_cached_resource', 'filesystem', 'hit')
 				return { data, metadata }
 			}
 
 			CorrelatedLogger.debug(`Resource not found: ${ctx.id}`, CacheImageResourceOperation.name)
-			const duration = PerformanceTracker.endPhase('get_cached_resource')
-			this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', duration || 0)
+			this.endPhaseAndRecord('get_cached_resource', 'multi-layer', 'miss')
 			return null
 		}
 		catch (error: unknown) {
 			CorrelatedLogger.error(`Failed to get cached resource: ${(error as Error).message}`, (error as Error).stack, CacheImageResourceOperation.name)
 			this.metricsService.recordError('cache_retrieval', 'get_cached_resource')
-			const duration = PerformanceTracker.endPhase('get_cached_resource')
-			this.metricsService.recordCacheOperation('get', 'multi-layer', 'error', duration || 0)
+			this.endPhaseAndRecord('get_cached_resource', 'multi-layer', 'error')
 			return null
 		}
 	}

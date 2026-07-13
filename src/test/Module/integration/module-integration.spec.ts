@@ -11,9 +11,9 @@ import { HttpClientService } from '#microservice/HTTP/services/http-client.servi
 import MediaStreamModule from '#microservice/media-stream.module'
 import { MetricsController } from '#microservice/Metrics/controllers/metrics.controller'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-import { JobQueueManager } from '#microservice/Queue/services/job-queue.manager'
+import WebpImageManipulationJob from '#microservice/Processing/jobs/webp-image-manipulation.job'
 import { AdaptiveRateLimitGuard } from '#microservice/RateLimit/guards/adaptive-rate-limit.guard'
-import { SimpleValidationService } from '#microservice/Validation/services/simple-validation.service'
+import { InputSanitizationService } from '#microservice/Validation/services/input-sanitization.service'
 
 describe('module Integration', () => {
 	let app: INestApplication
@@ -94,13 +94,13 @@ describe('module Integration', () => {
 	})
 
 	describe('service Dependencies', () => {
-		it('should have QueueModule services available', () => {
-			const jobQueueManager = module.get<JobQueueManager>(JobQueueManager)
-			expect(jobQueueManager).toBeDefined()
+		it('should have image processing jobs available', () => {
+			const webpJob = module.get<WebpImageManipulationJob>(WebpImageManipulationJob)
+			expect(webpJob).toBeDefined()
 		})
 
 		it('should have ValidationModule services available', () => {
-			const validationService = module.get<SimpleValidationService>(SimpleValidationService)
+			const validationService = module.get<InputSanitizationService>(InputSanitizationService)
 			expect(validationService).toBeDefined()
 		})
 

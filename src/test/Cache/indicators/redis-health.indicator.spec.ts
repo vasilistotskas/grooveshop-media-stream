@@ -45,7 +45,7 @@ describe('redisHealthIndicator', () => {
 				return undefined
 			}),
 			getOptional: vi.fn().mockImplementation((key: string, defaultValue?: any) => {
-				if (key === 'health.redis.cacheTtl')
+				if (key === 'cache.redis.healthCheckCacheTtl')
 					return 10000 // 10 seconds cache TTL for tests
 				return defaultValue
 			}),
@@ -73,7 +73,7 @@ describe('redisHealthIndicator', () => {
 			let deleteWasCalled = false
 
 			redisCacheService.ping.mockResolvedValue('PONG')
-			redisCacheService.set.mockImplementation(async (key, value) => {
+			redisCacheService.set.mockImplementation(async (_key, value) => {
 				capturedValue = value
 				return undefined
 			})
@@ -192,7 +192,7 @@ describe('redisHealthIndicator', () => {
 			let deleteWasCalled = false
 
 			redisCacheService.ping.mockResolvedValue('PONG')
-			redisCacheService.set.mockImplementation(async (key, value) => {
+			redisCacheService.set.mockImplementation(async (_key, value) => {
 				capturedValue = value
 				return undefined
 			})

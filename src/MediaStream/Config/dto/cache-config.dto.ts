@@ -1,40 +1,36 @@
-import { Transform, Type } from 'class-transformer'
+import { Type } from 'class-transformer'
 import { IsBoolean, IsNumber, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator'
 
 export class MemoryCacheConfigDto {
 	@IsNumber()
 	@Min(1)
-	@Transform(({ value }) => Number.parseInt(value) || 104857600)
 	maxSize: number = 104857600
 
 	@IsNumber()
 	@Min(1)
-	@Transform(({ value }) => Number.parseInt(value) || 3600)
-	ttl: number = 3600
+	defaultTtl: number = 3600
 
 	@IsNumber()
 	@Min(1)
-	@Transform(({ value }) => Number.parseInt(value) || 600)
 	checkPeriod: number = 600
 
-	@IsBoolean()
-	@Transform(({ value }) => value === 'true' || value === true || false)
-	useClones: boolean = false
+	@IsNumber()
+	@Min(1)
+	maxKeys: number = 1000
 
-	@IsBoolean()
-	@Transform(({ value }) => value === 'true' || value === true)
-	deleteOnExpire: boolean = true
+	@IsNumber()
+	@Min(1)
+	@Max(100)
+	warningThreshold: number = 80
 }
 
 export class RedisConfigDto {
 	@IsString()
-	@Transform(({ value }) => value || 'localhost')
 	host: string = 'localhost'
 
 	@IsNumber()
 	@Min(1)
 	@Max(65535)
-	@Transform(({ value }) => Number.parseInt(value) || 6379)
 	port: number = 6379
 
 	@IsOptional()
@@ -44,39 +40,74 @@ export class RedisConfigDto {
 	@IsNumber()
 	@Min(0)
 	@Max(15)
-	@Transform(({ value }) => Number.parseInt(value) || 0)
 	db: number = 0
 
 	@IsNumber()
 	@Min(1)
-	@Transform(({ value }) => Number.parseInt(value) || 7200)
 	ttl: number = 7200
 
 	@IsNumber()
 	@Min(1)
-	@Transform(({ value }) => Number.parseInt(value) || 3)
 	maxRetries: number = 3
 
 	@IsNumber()
 	@Min(100)
-	@Transform(({ value }) => Number.parseInt(value) || 100)
 	retryDelayOnFailover: number = 100
+
+	@IsNumber()
+	@Min(0)
+	healthCheckCacheTtl: number = 10000
 }
 
 export class FileCacheConfigDto {
 	@IsString()
-	@Transform(({ value }) => value || './storage')
 	directory: string = './storage'
+}
+
+export class CacheWarmingConfigDto {
+	@IsBoolean()
+	enabled: boolean = true
+
+	@IsBoolean()
+	warmupOnStart: boolean = true
 
 	@IsNumber()
 	@Min(1)
-	@Transform(({ value }) => Number.parseInt(value) || 1073741824)
-	maxSize: number = 1073741824
+	maxFilesToWarm: number = 50
+
+	@IsString()
+	warmupCron: string = '0 */6 * * *'
 
 	@IsNumber()
 	@Min(1)
-	@Transform(({ value }) => Number.parseInt(value) || 3600)
-	cleanupInterval: number = 3600
+	popularImageThreshold: number = 5
+
+	@IsNumber()
+	@Min(1)
+	baseTtl: number = 3600
+}
+
+export class CachePreloadingConfigDto {
+	@IsBoolean()
+	enabled: boolean = false
+
+	@IsNumber()
+	@Min(1000)
+	interval: number = 300000
+}
+
+export class ImageCacheConfigDto {
+	@IsNumber()
+	@Min(1)
+	publicTtl: number = 12 * 30 * 24 * 3600
+
+	@IsNumber()
+	@Min(1)
+	privateTtl: number = 6 * 30 * 24 * 3600
+
+	@IsNumber()
+	@Min(1)
+	negativeCacheTtl: number = 300
 }
 
 export class CacheConfigDto {
@@ -91,4 +122,16 @@ export class CacheConfigDto {
 	@ValidateNested()
 	@Type(() => FileCacheConfigDto)
 	file: FileCacheConfigDto = new FileCacheConfigDto()
+
+	@ValidateNested()
+	@Type(() => CacheWarmingConfigDto)
+	warming: CacheWarmingConfigDto = new CacheWarmingConfigDto()
+
+	@ValidateNested()
+	@Type(() => CachePreloadingConfigDto)
+	preloading: CachePreloadingConfigDto = new CachePreloadingConfigDto()
+
+	@ValidateNested()
+	@Type(() => ImageCacheConfigDto)
+	image: ImageCacheConfigDto = new ImageCacheConfigDto()
 }

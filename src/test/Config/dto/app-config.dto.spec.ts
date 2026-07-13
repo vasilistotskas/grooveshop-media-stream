@@ -1,4 +1,4 @@
-import { plainToClass } from 'class-transformer'
+import { plainToInstance } from 'class-transformer'
 import { validate } from 'class-validator'
 import { describe, expect, it } from 'vitest'
 import { AppConfigDto } from '#microservice/Config/dto/app-config.dto'
@@ -26,8 +26,10 @@ describe('appConfigDto', () => {
 				cache: {
 					memory: {
 						maxSize: 104857600,
-						ttl: 3600,
+						defaultTtl: 3600,
 						checkPeriod: 600,
+						maxKeys: 1000,
+						warningThreshold: 80,
 					},
 					redis: {
 						host: 'localhost',
@@ -36,35 +38,80 @@ describe('appConfigDto', () => {
 						ttl: 7200,
 						maxRetries: 3,
 						retryDelayOnFailover: 100,
+						healthCheckCacheTtl: 10000,
 					},
 					file: {
 						directory: './storage',
-						maxSize: 1073741824,
-						cleanupInterval: 3600,
+					},
+					warming: {
+						enabled: true,
+						warmupOnStart: true,
+						maxFilesToWarm: 50,
+						warmupCron: '0 */6 * * *',
+						popularImageThreshold: 5,
+						baseTtl: 3600,
+					},
+					preloading: {
+						enabled: false,
+						interval: 300000,
+					},
+					image: {
+						publicTtl: 31104000,
+						privateTtl: 15552000,
+						negativeCacheTtl: 300,
 					},
 				},
 				processing: {
-					maxConcurrent: 10,
-					timeout: 30000,
-					retries: 3,
-					maxFileSize: 10485760,
-					allowedFormats: ['jpg', 'jpeg', 'png', 'webp'],
+					cpuCores: 1.5,
 				},
 				monitoring: {
 					enabled: true,
-					metricsPort: 9090,
-					healthPath: '/health',
-					metricsPath: '/metrics',
+					systemMetricsInterval: 60000,
+					performanceMetricsInterval: 30000,
 				},
 				externalServices: {
-					djangoUrl: 'http://localhost:8000',
-					nuxtUrl: 'http://localhost:3000',
 					requestTimeout: 30000,
-					maxRetries: 3,
+				},
+				validation: {
+					allowedDomains: ['localhost', 'webside.gr'],
+					maxStringLength: 10000,
+				},
+				storage: {
+					maxSize: 1073741824,
+					maxFileAge: 30,
+					warningSize: 838860800,
+					criticalSize: 1073741824,
+					warningFileCount: 5000,
+					criticalFileCount: 10000,
+					cleanup: {
+						enabled: true,
+						cronSchedule: '0 2 * * *',
+						dryRun: false,
+						maxDuration: 300000,
+					},
+					eviction: {
+						strategy: 'intelligent',
+						aggressiveness: 'moderate',
+						preservePopular: true,
+						minAccessCount: 5,
+						maxFileAge: 7,
+					},
+					optimization: {
+						enabled: true,
+						strategies: ['deduplication'],
+						popularThreshold: 10,
+						compressionLevel: 6,
+						createBackups: false,
+						maxTime: 600000,
+					},
+				},
+				shutdown: {
+					timeout: 30000,
+					forceTimeout: 60000,
 				},
 			}
 
-			const dto = plainToClass(AppConfigDto, validConfig)
+			const dto = plainToInstance(AppConfigDto, validConfig)
 			const errors = await validate(dto)
 			expect(errors).toHaveLength(0)
 		})
@@ -77,7 +124,7 @@ describe('appConfigDto', () => {
 				},
 			}
 
-			const dto = plainToClass(AppConfigDto, invalidConfig)
+			const dto = plainToInstance(AppConfigDto, invalidConfig)
 			const errors = await validate(dto)
 			expect(errors.length).toBeGreaterThan(0)
 
@@ -90,25 +137,24 @@ describe('appConfigDto', () => {
 				cache: {
 					memory: {
 						maxSize: -1,
-						ttl: 0,
+						defaultTtl: 0,
 					},
 				},
 			}
 
-			const dto = plainToClass(AppConfigDto, invalidConfig)
+			const dto = plainToInstance(AppConfigDto, invalidConfig)
 			const errors = await validate(dto)
 			expect(errors.length).toBeGreaterThan(0)
 		})
 
-		it('should fail validation with invalid external service URLs', async () => {
+		it('should fail validation with invalid external services timeout', async () => {
 			const invalidConfig = {
 				externalServices: {
 					requestTimeout: -1000, // Invalid: below minimum
-					maxRetries: 20, // Invalid: above maximum
 				},
 			}
 
-			const dto = plainToClass(AppConfigDto, invalidConfig, {
+			const dto = plainToInstance(AppConfigDto, invalidConfig, {
 				enableImplicitConversion: true,
 				excludeExtraneousValues: false,
 			})
@@ -123,10 +169,29 @@ describe('appConfigDto', () => {
 			expect(externalServicesError?.children).toBeDefined()
 			expect(externalServicesError?.children?.length).toBeGreaterThan(0)
 		})
+
+		it('should fail validation with an unknown eviction strategy', async () => {
+			const invalidConfig = {
+				storage: {
+					eviction: {
+						strategy: 'random',
+					},
+				},
+			}
+
+			const dto = plainToInstance(AppConfigDto, invalidConfig)
+			const errors = await validate(dto)
+			expect(errors.length).toBeGreaterThan(0)
+
+			const storageError = errors.find(error => error.property === 'storage')
+			expect(storageError).toBeDefined()
+		})
 	})
 
 	describe('transformation', () => {
-		it('should transform string values to appropriate types', async () => {
+		it('should transform string values to appropriate types with implicit conversion', async () => {
+			// The schema-built config is already typed, but implicit conversion
+			// keeps DTO validation tolerant of plain string input.
 			const stringConfig = {
 				server: {
 					port: '3003',
@@ -137,16 +202,12 @@ describe('appConfigDto', () => {
 				cache: {
 					memory: {
 						maxSize: '104857600',
-						ttl: '3600',
+						defaultTtl: '3600',
 					},
-				},
-				monitoring: {
-					enabled: 'true',
-					metricsPort: '9090',
 				},
 			}
 
-			const dto = plainToClass(AppConfigDto, stringConfig, {
+			const dto = plainToInstance(AppConfigDto, stringConfig, {
 				enableImplicitConversion: true,
 			})
 
@@ -156,23 +217,6 @@ describe('appConfigDto', () => {
 			expect(dto.server.cors.maxAge).toBe(86400)
 			expect(typeof dto.cache.memory.maxSize).toBe('number')
 			expect(dto.cache.memory.maxSize).toBe(104857600)
-			expect(typeof dto.monitoring.enabled).toBe('boolean')
-			expect(dto.monitoring.enabled).toBe(true)
-		})
-
-		it('should handle comma-separated allowed formats', async () => {
-			const configWithFormats = {
-				processing: {
-					allowedFormats: 'jpg,jpeg,png,webp,gif',
-				},
-			}
-
-			const dto = plainToClass(AppConfigDto, configWithFormats, {
-				enableImplicitConversion: true,
-			})
-
-			expect(Array.isArray(dto.processing.allowedFormats)).toBe(true)
-			expect(dto.processing.allowedFormats).toEqual(['jpg', 'jpeg', 'png', 'webp', 'gif'])
 		})
 	})
 })

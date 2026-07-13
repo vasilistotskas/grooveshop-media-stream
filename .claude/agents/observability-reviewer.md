@@ -11,7 +11,7 @@ Audit new code for compliance with the project's correlation, logging, and metri
 
 ### 2. AsyncLocalStorage Context
 - `src/MediaStream/Correlation/async-local-storage.ts` exports `requestContextStorage`. The correlation middleware (`src/MediaStream/Correlation/middleware/correlation.middleware.ts:30`) wraps every request via `runWithContext`.
-- Flag any background work (Bull processors, scheduled tasks, `setImmediate` callbacks) that needs correlation but doesn't preserve it. Long-lived async chains should pass correlationId explicitly or call `runWithContext` to re-establish it.
+- Flag any background work (scheduled cron tasks, `setImmediate` callbacks, fire-and-forget promises) that needs correlation but doesn't preserve it. Long-lived async chains should pass correlationId explicitly or call `runWithContext` to re-establish it.
 
 ### 3. Performance Tracking
 - `src/MediaStream/Correlation/utils/performance-tracker.util.ts` — `PerformanceTracker.startPhase()/endPhase()` for inline phases, `@PerformanceTracker.measureMethod()` decorator (factory at line 193) for whole methods.

@@ -32,10 +32,4 @@ export class CorrelatedLogger {
 		const prefix = correlationId ? `[${correlationId}] ` : ''
 		CorrelatedLogger.nestLogger.debug(`${prefix}${message}`, context)
 	}
-
-	static verbose(message: string, context?: string): void {
-		const correlationId = this.getCorrelationId()
-		const prefix = correlationId ? `[${correlationId}] ` : ''
-		CorrelatedLogger.nestLogger.verbose(`${prefix}${message}`, context)
-	}
 }

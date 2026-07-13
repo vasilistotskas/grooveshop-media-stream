@@ -3,7 +3,7 @@ name: run-tests
 description: Run vitest tests for specific modules or all tests in grooveshop-media-stream
 arguments:
   - name: module
-    description: "Module name (API, Cache, Config, Correlation, Health, HTTP, Metrics, Queue, RateLimit, Storage, Validation, common, e2e) or 'all'"
+    description: "Module name (API, Cache, Config, Correlation, Health, HTTP, Metrics, Processing, RateLimit, Storage, Validation, common, e2e) or 'all'"
     required: false
     default: "all"
 ---
