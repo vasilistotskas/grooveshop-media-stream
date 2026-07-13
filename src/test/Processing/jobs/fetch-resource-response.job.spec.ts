@@ -25,7 +25,7 @@ describe('fetchResourceResponseJob', () => {
 				{
 					provide: ConfigService,
 					useValue: {
-						getOptional: vi.fn().mockReturnValue(15000),
+						getOptional: vi.fn().mockReturnValue(30000),
 					},
 				},
 			],
@@ -57,7 +57,7 @@ describe('fetchResourceResponseJob', () => {
 				url: request.resourceTarget,
 				method: 'GET',
 				responseType: 'stream',
-				timeout: 15000,
+				timeout: 30000,
 			})
 			expect(result).toEqual(mockResponse)
 		})

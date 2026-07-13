@@ -121,6 +121,21 @@ describe('inputSanitizationService', () => {
 			expect(service.validateUrl('https://cdn.example.com/image.jpg')).toBe(true)
 			expect(service.validateUrl('https://api.test.com/resource')).toBe(true)
 		})
+
+		it('should match allowed domains case-insensitively regardless of operator env casing', () => {
+			// Regression: URL.hostname is always lowercase, so a mixed-case
+			// VALIDATION_ALLOWED_DOMAINS value must still match. Fresh service
+			// per test, so this re-mock is read on the first getAllowedDomains call.
+			configService.getOptional.mockImplementation((key, defaultValue) => {
+				if (key === 'validation.allowedDomains')
+					return ['Example.COM', 'API.Webside.GR']
+				return defaultValue
+			})
+
+			expect(service.validateUrl('https://example.com/image.jpg')).toBe(true)
+			expect(service.validateUrl('https://cdn.example.com/image.jpg')).toBe(true)
+			expect(service.validateUrl('https://api.webside.gr/image.jpg')).toBe(true)
+		})
 	})
 
 	describe('validateFileSize', () => {

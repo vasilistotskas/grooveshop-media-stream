@@ -42,6 +42,9 @@ export class InputSanitizationService implements ISanitizer<any> {
 
 	private getAllowedDomains(): string[] {
 		if (this.allowedDomains === null) {
+			// Lowercase every configured domain: hostnames are case-insensitive
+			// (RFC 4343) and URL.hostname is always lowercase, so the comparison
+			// in validateUrl must not depend on the operator's env-var casing.
 			this.allowedDomains = this._configService.getOptional<string[]>('validation.allowedDomains', [
 				'localhost',
 				'127.0.0.1',
@@ -53,7 +56,7 @@ export class InputSanitizationService implements ISanitizer<any> {
 				'static-svc',
 				'frontend-nuxt-service',
 				'media-stream-service',
-			])
+			]).map(domain => domain.toLowerCase())
 		}
 		return this.allowedDomains
 	}

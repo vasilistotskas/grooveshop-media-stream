@@ -56,7 +56,10 @@ export class StorageOptimizationService implements OnModuleInit {
 		this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage')
 		this.config = {
 			enabled: this._configService.getOptional('storage.optimization.enabled', true),
-			strategies: this._configService.getOptional('storage.optimization.strategies', ['deduplication']),
+			// Strategy names are registered lowercase in initializeStrategies() and
+			// looked up by the configured value; normalize so mixed-case env input
+			// (STORAGE_OPTIMIZATION_STRATEGIES=Deduplication) still resolves.
+			strategies: this._configService.getOptional<string[]>('storage.optimization.strategies', ['deduplication']).map(s => s.toLowerCase()),
 			popularFileThreshold: this._configService.getOptional('storage.optimization.popularThreshold', 10),
 			compressionLevel: this._configService.getOptional('storage.optimization.compressionLevel', 6),
 			createBackups: this._configService.getOptional('storage.optimization.createBackups', false),

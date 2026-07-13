@@ -20,8 +20,9 @@ export default class FetchResourceResponseJob {
 		private readonly _httpClientService: HttpClientService,
 		private readonly _configService: ConfigService,
 	) {
-		// Use external request timeout from config, default 15s
-		this.requestTimeout = this._configService.getOptional('externalServices.requestTimeout', 15000)
+		// Upstream fetch timeout (ms). Fallback matches the schema default so the
+		// value is consistent whether or not EXTERNAL_REQUEST_TIMEOUT is set.
+		this.requestTimeout = this._configService.getOptional('externalServices.requestTimeout', 30000)
 	}
 
 	async handle(request: CacheImageRequest): Promise<AxiosResponse> {

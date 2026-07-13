@@ -4,6 +4,7 @@ import * as process from 'node:process'
 import { Inject, Injectable } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { getOptionsToken, getStorageToken, ThrottlerException, ThrottlerGuard } from '@nestjs/throttler'
+import { IMAGE } from '#microservice/common/constants/route-prefixes.constant'
 import { getClientIp, isInternalIp } from '#microservice/common/utils/ip.util'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
@@ -193,7 +194,13 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 			return true
 		}
 
-		if (this.cachedBypassStaticAssets && STATIC_ASSET_RE.test(url)) {
+		// Static-asset bypass is for genuinely static files served from public/
+		// (default.png, robots.txt, etc). It must NOT match image-processing
+		// routes: those end in `:quality.:format` (e.g. `/…/80.png`), so a png/
+		// jpg/gif/svg output format would otherwise match STATIC_ASSET_RE and
+		// let an attacker skip the image-processing throttle entirely by
+		// choosing a non-webp/avif output format.
+		if (this.cachedBypassStaticAssets && !url.includes(`/${IMAGE}/`) && STATIC_ASSET_RE.test(url)) {
 			return true
 		}
 
