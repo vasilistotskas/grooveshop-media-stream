@@ -1,3 +1,16 @@
+## [2.58.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.58.0...v2.58.1) (2026-07-13)
+
+
+### Bug Fixes
+
+* address code-review findings on cache hot path and SVG sanitizer ([6926876](https://github.com/vasilistotskas/grooveshop-media-stream/commit/692687668e4589f9b9df2728cd519c19e07fbb08))
+* **api:** ignore unparseable If-Modified-Since headers ([78e97e4](https://github.com/vasilistotskas/grooveshop-media-stream/commit/78e97e4d63fecb41b9ed9e72933153b5856d09ff))
+* **health:** report disk-space check failures as unhealthy ([818454c](https://github.com/vasilistotskas/grooveshop-media-stream/commit/818454c74ef42d7d9dd92daf12eb33d495f40675))
+* **http:** initialize circuit breaker explicitly on module init ([e80724b](https://github.com/vasilistotskas/grooveshop-media-stream/commit/e80724bbdb6ba33ad2d1094c795221c4b2685682))
+* **rate-limit:** wire kill-switch and bypass flags; measure real heap pressure ([394f646](https://github.com/vasilistotskas/grooveshop-media-stream/commit/394f6468055ac403be0d8b5c08a668d297ea1d8a))
+* resolve findings from adversarial pre-merge review ([4f5b079](https://github.com/vasilistotskas/grooveshop-media-stream/commit/4f5b079af8837bfaec34282fadaaa72aeccf903b))
+* **security:** make DOMPurify the sole SVG sanitizer, drop bypassable regex pass ([4e7e947](https://github.com/vasilistotskas/grooveshop-media-stream/commit/4e7e9479a2205b42e82281fd7f91d1ee1e461cdf))
+
 # [2.58.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.57.0...v2.58.0) (2026-07-11)
 
 
