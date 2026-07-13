@@ -327,7 +327,8 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	 * Check if an error is retryable
 	 */
 	private isRetryableError(error: any): boolean {
-		if ((error as NodeJS.ErrnoException).code && ['ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'ENOTFOUND'].includes((error as NodeJS.ErrnoException).code as string)) {
+		const errnoCode = (error as NodeJS.ErrnoException).code
+		if (errnoCode && ['ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'ENOTFOUND'].includes(errnoCode)) {
 			return true
 		}
 

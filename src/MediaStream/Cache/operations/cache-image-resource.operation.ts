@@ -116,6 +116,9 @@ export default class CacheImageResourceOperation {
 					const isValid = cachedResource.metadata.dateCreated + cachedResource.metadata.privateTTL > Date.now()
 					if (isValid) {
 						CorrelatedLogger.debug(`Resource found in cache and is valid: ${ctx.id}`, CacheImageResourceOperation.name)
+						// Populate ctx.metaData so fetchHeaders() reuses it instead of a
+						// second cache lookup (which would also double-increment accessCount)
+						ctx.metaData = cachedResource.metadata
 						this.endPhaseAndRecord('resource_exists_check', 'multi-layer', 'hit')
 						return true
 					}
@@ -419,7 +422,11 @@ export default class CacheImageResourceOperation {
 					CorrelatedLogger.warn(`Failed to persist access count to ${resourceMetaPath}: ${(err as Error).message}`, CacheImageResourceOperation.name)
 				})
 
-				await this.cacheManager.set('image', ctx.id, { data, metadata }, this.privateTtl)
+				// Backfill the multi-layer cache fire-and-forget — awaiting here would
+				// block the response on a Redis/memory write on every filesystem hit
+				this.cacheManager.set('image', ctx.id, { data, metadata }, this.privateTtl).catch((err: unknown) => {
+					CorrelatedLogger.warn(`Failed to backfill multi-layer cache for ${ctx.id}: ${(err as Error).message}`, CacheImageResourceOperation.name)
+				})
 
 				CorrelatedLogger.debug(`Resource retrieved from filesystem and cached: ${ctx.id}`, CacheImageResourceOperation.name)
 				this.endPhaseAndRecord('get_cached_resource', 'filesystem', 'hit')

@@ -216,8 +216,14 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 	 * Check if bot bypass is enabled and user agent is a bot.
 	 */
 	private shouldBypassBot(userAgent: string): boolean {
+		// Config read failures must not 500 requests — fail with bypass disabled.
 		if (this.cachedBypassBots === null) {
-			this.cachedBypassBots = this.rateLimitService.getBypassBotsConfig()
+			try {
+				this.cachedBypassBots = this.rateLimitService.getBypassBotsConfig()
+			}
+			catch {
+				this.cachedBypassBots = false
+			}
 		}
 		if (!this.cachedBypassBots) {
 			return false

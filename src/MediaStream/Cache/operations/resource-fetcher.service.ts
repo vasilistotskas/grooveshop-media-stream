@@ -111,7 +111,10 @@ export class ResourceFetcher {
 	}
 
 	private getFormatFromUrl(url: string): string {
-		const extension = url.split('.').pop()?.toLowerCase()
+		// Strip query/fragment first — image.jpg?w=800 must resolve to 'jpg',
+		// not fall through to the (larger) default size limit
+		const path = url.split(/[?#]/, 1)[0]
+		const extension = path.split('.').pop()?.toLowerCase()
 		return extension || 'unknown'
 	}
 }
