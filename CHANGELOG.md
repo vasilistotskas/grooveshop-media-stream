@@ -1,3 +1,10 @@
+## [2.58.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.58.1...v2.58.2) (2026-07-14)
+
+
+### Bug Fixes
+
+* **config:** don't cap monitoring collection intervals (startup crash) ([a528a3a](https://github.com/vasilistotskas/grooveshop-media-stream/commit/a528a3aea2ad3591aa723b868405457b556d9563))
+
 ## [2.58.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.58.0...v2.58.1) (2026-07-13)
 
 
