@@ -2,7 +2,10 @@ services:
   service-media_stream:
     container_name: service-media_stream
     restart: no
-    image: gro0ve/grooveshop-media-stream:v2.58.0
+    # Defaults to the CI-maintained `latest` tag (published on every release) so
+    # this dev compose never drifts a version behind. Pin a specific release for
+    # reproducibility with MEDIA_STREAM_IMAGE_TAG=v2.58.1.
+    image: gro0ve/grooveshop-media-stream:${MEDIA_STREAM_IMAGE_TAG:-latest}
     env_file:
       - ./grooveshop-media-stream/.env.docker
     ports:
