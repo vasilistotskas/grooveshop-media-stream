@@ -66,8 +66,10 @@ describe('appConfigDto', () => {
 				},
 				monitoring: {
 					enabled: true,
-					systemMetricsInterval: 60000,
-					performanceMetricsInterval: 30000,
+					// Production-scale intervals (30-min system / 10-min performance):
+					// these previously exceeded a spurious @Max and crashed startup.
+					systemMetricsInterval: 1800000,
+					performanceMetricsInterval: 600000,
 				},
 				externalServices: {
 					requestTimeout: 30000,

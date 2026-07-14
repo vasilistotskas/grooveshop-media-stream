@@ -145,6 +145,24 @@ describe('configService', () => {
 			await expect(invalidService.validate()).rejects.toThrow('Configuration validation failed')
 		})
 
+		it('should accept production-scale monitoring intervals (regression: startup crash)', async () => {
+			// The production ConfigMap uses 30-min system / 10-min performance
+			// intervals. A spurious @Max on these previously failed validation and
+			// crash-looped the pod once validation ran against the built config.
+			nestConfigService.get.mockImplementation((key: string) => {
+				if (key === 'MONITORING_SYSTEM_METRICS_INTERVAL')
+					return '1800000'
+				if (key === 'MONITORING_PERFORMANCE_METRICS_INTERVAL')
+					return '600000'
+				return mockEnvVars[key as keyof typeof mockEnvVars]
+			})
+
+			const service = new ConfigService(nestConfigService)
+			expect(service.get('monitoring.systemMetricsInterval')).toBe(1800000)
+			expect(service.get('monitoring.performanceMetricsInterval')).toBe(600000)
+			await expect(service.validate()).resolves.not.toThrow()
+		})
+
 		it('should validate processing configuration', async () => {
 			nestConfigService.get.mockImplementation((key: string) => {
 				if (key === 'PROCESSING_CPU_CORES')
