@@ -77,8 +77,6 @@ jobs:
       REDIS_HOST: localhost
       REDIS_PORT: 6379
       REDIS_PASSWORD: ''
-      BULL_REDIS_HOST: localhost
-      BULL_REDIS_PORT: 6379
       CI: true
 
     steps:
@@ -106,8 +104,7 @@ jobs:
         run: pnpm run build
 
       - name: Check TypeScript
-        run: npx tsc --noEmit
-        continue-on-error: true
+        run: pnpm run type-check
 
       - name: Run unit tests with coverage
         run: pnpm run test:coverage

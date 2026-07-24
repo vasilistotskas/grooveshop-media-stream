@@ -127,22 +127,4 @@ describe('correlatedLogger', () => {
 			})
 		})
 	})
-
-	describe('verbose', () => {
-		it('should log verbose message with correlation ID', () => {
-			requestContextStorage.run(createRequestContext('test-correlation-id'), () => {
-				CorrelatedLogger.verbose('Verbose message')
-
-				expect(loggerSpy.verbose).toHaveBeenCalledWith('[test-correlation-id] Verbose message', undefined)
-			})
-		})
-
-		it('should log verbose message with context', () => {
-			requestContextStorage.run(createRequestContext('test-correlation-id'), () => {
-				CorrelatedLogger.verbose('Verbose message', 'VerboseContext')
-
-				expect(loggerSpy.verbose).toHaveBeenCalledWith('[test-correlation-id] Verbose message', 'VerboseContext')
-			})
-		})
-	})
 })

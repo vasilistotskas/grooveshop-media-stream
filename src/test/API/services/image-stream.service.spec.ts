@@ -55,7 +55,7 @@ function createContext(overrides?: Partial<ImageProcessingContext>): ImageProces
 function createOperationContext(): OperationContext {
 	return {
 		request: new CacheImageRequest({ resourceTarget: 'http://backend/test/image.jpg' }),
-		id: { resourceId: 'test-resource', fileExtension: '.webp' },
+		id: 'test-resource',
 		metaData: null,
 	}
 }
@@ -125,6 +125,7 @@ describe('imageStreamService', () => {
 			mockCacheOp.checkResourceExists.mockResolvedValue(true)
 			mockCacheOp.getCachedResource.mockResolvedValue({
 				data: Buffer.from('image-data'),
+				metadata: createHeaders(),
 			})
 
 			await service.processAndStream(context, request, res)
@@ -167,6 +168,7 @@ describe('imageStreamService', () => {
 			mockCacheOp.checkResourceExists.mockResolvedValue(false)
 			mockCacheOp.getCachedResource.mockResolvedValue({
 				data: Buffer.from('processed-image'),
+				metadata: createHeaders(),
 			})
 
 			await service.processAndStream(context, request, res)
@@ -186,6 +188,7 @@ describe('imageStreamService', () => {
 			mockCacheOp.checkResourceExists.mockResolvedValue(false)
 			mockCacheOp.getCachedResource.mockResolvedValue({
 				data: Buffer.from('processed-image'),
+				metadata: createHeaders(),
 			})
 
 			await service.processAndStream(context, request, res)
@@ -283,6 +286,7 @@ describe('imageStreamService', () => {
 			mockCacheOp.checkResourceExists.mockResolvedValue(false)
 			mockCacheOp.getCachedResource.mockResolvedValue({
 				data: Buffer.from('processed-image'),
+				metadata: createHeaders(),
 			})
 
 			await service.processAndStream(context, request, res, req)
@@ -303,6 +307,7 @@ describe('imageStreamService', () => {
 			mockCacheOp.checkResourceExists.mockResolvedValue(false)
 			mockCacheOp.getCachedResource.mockResolvedValue({
 				data: Buffer.from('processed-image'),
+				metadata: createHeaders(),
 			})
 
 			await service.processAndStream(context, request, res)
@@ -322,7 +327,7 @@ describe('imageStreamService', () => {
 			})
 
 			mockCacheOp.checkResourceExists.mockResolvedValue(true)
-			mockCacheOp.fetchHeaders.mockResolvedValue(null)
+			mockCacheOp.fetchHeaders.mockResolvedValue(null as unknown as ResourceMetaData)
 
 			await service.processAndStream(context, request, res)
 
@@ -341,7 +346,7 @@ describe('imageStreamService', () => {
 
 			const imageBuffer = Buffer.from('image-data')
 			mockCacheOp.checkResourceExists.mockResolvedValue(true)
-			mockCacheOp.getCachedResource.mockResolvedValue({ data: imageBuffer })
+			mockCacheOp.getCachedResource.mockResolvedValue({ data: imageBuffer, metadata: createHeaders() })
 
 			await service.processAndStream(context, request, res)
 
@@ -358,7 +363,7 @@ describe('imageStreamService', () => {
 
 			const base64Data = Buffer.from('image-data').toString('base64')
 			mockCacheOp.checkResourceExists.mockResolvedValue(true)
-			mockCacheOp.getCachedResource.mockResolvedValue({ data: base64Data })
+			mockCacheOp.getCachedResource.mockResolvedValue({ data: base64Data as unknown as Buffer, metadata: createHeaders() })
 
 			await service.processAndStream(context, request, res)
 

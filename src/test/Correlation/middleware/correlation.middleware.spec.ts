@@ -41,7 +41,7 @@ describe('correlationMiddleware', () => {
 	describe('use', () => {
 		it('should generate correlation ID when not provided in header', () => {
 			vi.spyOn(correlationService, 'generateCorrelationId').mockReturnValue('generated-id')
-			vi.spyOn(correlationService, 'runWithContext').mockImplementation((context, fn) => fn())
+			vi.spyOn(correlationService, 'runWithContext').mockImplementation((_context, fn) => fn())
 
 			middleware.use(mockRequest as Request, mockResponse as Response, mockNext)
 
@@ -55,7 +55,7 @@ describe('correlationMiddleware', () => {
 			mockRequest.headers = { [CORRELATION_ID_HEADER]: existingId }
 
 			vi.spyOn(correlationService, 'generateCorrelationId')
-			vi.spyOn(correlationService, 'runWithContext').mockImplementation((context, fn) => fn())
+			vi.spyOn(correlationService, 'runWithContext').mockImplementation((_context, fn) => fn())
 
 			middleware.use(mockRequest as Request, mockResponse as Response, mockNext)
 

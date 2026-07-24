@@ -178,11 +178,6 @@ describe('rate Limiting Integration', () => {
 
 				if (response.status !== 200) {
 					console.log(`Request ${i + 1}/${limit} failed with status ${response.status}`)
-					// Add debug info when request fails unexpectedly
-					const debugInfo = (rateLimitService as any).getDebugInfo?.()
-					if (debugInfo) {
-						console.log('Rate limit debug info:', debugInfo)
-					}
 				}
 				expect(response.status).toBe(200)
 			}
@@ -300,14 +295,6 @@ describe('rate Limiting Integration', () => {
 
 				if (response.status !== 200) {
 					console.log(`Request ${i + 1}/${limit} failed with status ${response.status}`)
-
-					// Add debug info when request fails unexpectedly
-
-					const debugInfo = (rateLimitService as any).getDebugInfo?.()
-
-					if (debugInfo) {
-						console.log('Rate limit debug info:', debugInfo)
-					}
 				}
 
 				expect(response.status).toBe(200)
@@ -346,14 +333,6 @@ describe('rate Limiting Integration', () => {
 
 				if (response.status !== 200) {
 					console.log(`Image processing request ${i + 1}/${imageLimit} failed with status ${response.status}`)
-
-					// Add debug info when request fails unexpectedly
-
-					const debugInfo = (rateLimitService as any).getDebugInfo?.()
-
-					if (debugInfo) {
-						console.log('Rate limit debug info:', debugInfo)
-					}
 				}
 
 				expect(response.status).toBe(200)
@@ -373,14 +352,6 @@ describe('rate Limiting Integration', () => {
 
 			if (defaultResponse.status !== 200) {
 				console.log(`Default request failed with status ${defaultResponse.status}`)
-
-				// Add debug info when request fails unexpectedly
-
-				const debugInfo = (rateLimitService as any).getDebugInfo?.()
-
-				if (debugInfo) {
-					console.log('Rate limit debug info:', debugInfo)
-				}
 			}
 
 			expect(defaultResponse.status).toBe(200)
@@ -406,14 +377,6 @@ describe('rate Limiting Integration', () => {
 
 				if (response.status !== 200) {
 					console.log(`Default request ${i + 1}/${limit} failed with status ${response.status}`)
-
-					// Add debug info when request fails unexpectedly
-
-					const debugInfo = (rateLimitService as any).getDebugInfo?.()
-
-					if (debugInfo) {
-						console.log('Rate limit debug info:', debugInfo)
-					}
 				}
 
 				expect(response.status).toBe(200)
@@ -463,12 +426,6 @@ describe('rate Limiting Integration', () => {
 
 				if (response.status !== 200) {
 					console.log(`Request ${i + 1}/${limit} failed with status ${response.status}`)
-
-					const debugInfo = (rateLimitService as any).getDebugInfo?.()
-
-					if (debugInfo) {
-						console.log('Rate limit debug info:', debugInfo)
-					}
 				}
 
 				expect(response.status).toBe(200)
@@ -608,15 +565,11 @@ describe('rate Limiting Integration', () => {
 			process.env.NODE_ENV = 'production'
 
 			try {
-				// Mock high system load
+				// Mock high heap pressure
 
 				vi.spyOn(rateLimitService, 'getSystemLoad').mockResolvedValue({
 
-					cpuUsage: 90, // High CPU
-
 					memoryUsage: 90, // High memory
-
-					activeConnections: 2000, // High connections
 
 				})
 
@@ -644,15 +597,11 @@ describe('rate Limiting Integration', () => {
 			process.env.NODE_ENV = 'production'
 
 			try {
-				// Mock normal system load
+				// Mock normal heap pressure
 
 				vi.spyOn(rateLimitService, 'getSystemLoad').mockResolvedValue({
 
-					cpuUsage: 50, // Normal CPU
-
 					memoryUsage: 60, // Normal memory
-
-					activeConnections: 100, // Normal connections
 
 				})
 

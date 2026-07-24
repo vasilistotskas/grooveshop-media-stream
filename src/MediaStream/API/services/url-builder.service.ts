@@ -1,14 +1,13 @@
 import type { ImageProcessingContext, ImageSourceConfig } from '../types/image-source.types.js'
 import * as process from 'node:process'
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 
 /**
  * Service responsible for building resource URLs from configurations
  */
 @Injectable()
 export class UrlBuilderService {
-	private readonly _logger = new Logger(UrlBuilderService.name)
-
 	/**
 	 * Build a resource URL from source configuration and parameters
 	 */
@@ -27,11 +26,7 @@ export class UrlBuilderService {
 			}
 		}
 
-		this._logger.debug('Built resource URL', {
-			source: source.name,
-			url,
-			correlationId: context.correlationId,
-		})
+		CorrelatedLogger.debug(`Built resource URL for ${source.name}: ${url}`, UrlBuilderService.name)
 
 		return url
 	}

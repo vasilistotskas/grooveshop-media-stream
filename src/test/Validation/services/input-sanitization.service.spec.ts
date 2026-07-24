@@ -26,7 +26,7 @@ describe('inputSanitizationService', () => {
 		// Setup default config responses
 		configService.getOptional.mockImplementation((key, defaultValue) => {
 			const configs: Record<string, any> = {
-				'validation.allowedDomains': 'localhost,127.0.0.1,example.com,test.com,grooveshop.com',
+				'validation.allowedDomains': ['localhost', '127.0.0.1', 'example.com', 'test.com', 'grooveshop.com'],
 				'validation.maxFileSizes': {
 					default: 10 * 1024 * 1024,
 					jpeg: 5 * 1024 * 1024,
@@ -108,7 +108,18 @@ describe('inputSanitizationService', () => {
 				getOptional: (key: string, defaultValue: any) => {
 					// Simulate the built-in config default (no env override)
 					if (key === 'validation.allowedDomains') {
-						return 'localhost,127.0.0.1,backend-service,static-svc,frontend-nuxt-service,media-stream-service,webside.gr,api.webside.gr,assets.webside.gr,static.webside.gr'
+						return [
+							'localhost',
+							'127.0.0.1',
+							'backend-service',
+							'static-svc',
+							'frontend-nuxt-service',
+							'media-stream-service',
+							'webside.gr',
+							'api.webside.gr',
+							'assets.webside.gr',
+							'static.webside.gr',
+						]
 					}
 					return defaultValue
 				},
@@ -140,6 +151,21 @@ describe('inputSanitizationService', () => {
 		it('should accept subdomains of allowed domains', () => {
 			expect(service.validateUrl('https://cdn.example.com/image.jpg')).toBe(true)
 			expect(service.validateUrl('https://api.test.com/resource')).toBe(true)
+		})
+
+		it('should match allowed domains case-insensitively regardless of operator env casing', () => {
+			// Regression: URL.hostname is always lowercase, so a mixed-case
+			// VALIDATION_ALLOWED_DOMAINS value must still match. Fresh service
+			// per test, so this re-mock is read on the first getAllowedDomains call.
+			configService.getOptional.mockImplementation((key, defaultValue) => {
+				if (key === 'validation.allowedDomains')
+					return ['Example.COM', 'API.Webside.GR']
+				return defaultValue
+			})
+
+			expect(service.validateUrl('https://example.com/image.jpg')).toBe(true)
+			expect(service.validateUrl('https://cdn.example.com/image.jpg')).toBe(true)
+			expect(service.validateUrl('https://api.webside.gr/image.jpg')).toBe(true)
 		})
 	})
 

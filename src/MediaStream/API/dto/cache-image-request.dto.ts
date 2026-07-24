@@ -93,13 +93,13 @@ function parseColor(color: string): RGBA {
 }
 
 export class ResizeOptions {
-	width: number | null = null as any
-	height: number | null = null as any
+	width: number | null = null
+	height: number | null = null
 	fit = FitOptions.contain
 	position: PositionOptions | string = PositionOptions.entropy
 	format = SupportedResizeFormats.webp
 	background: Color = BackgroundOptions.white
-	trimThreshold: null | number = null as any
+	trimThreshold: null | number = null
 	quality = 80
 
 	constructor(data?: Partial<ResizeOptions>) {

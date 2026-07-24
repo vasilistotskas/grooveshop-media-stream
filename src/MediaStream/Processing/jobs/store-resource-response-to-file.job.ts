@@ -1,0 +1,54 @@
+import type { AxiosResponse } from 'axios'
+import type { FileHandle } from 'node:fs/promises'
+import { open, unlink } from 'node:fs/promises'
+import { Injectable } from '@nestjs/common'
+import UnableToStoreFetchedResourceException from '#microservice/API/exceptions/unable-to-store-fetched-resource.exception'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
+
+/**
+ * Stores fetched resource responses to the filesystem.
+ * Stateless service - all request data is passed via method parameters.
+ */
+@Injectable()
+export default class StoreResourceResponseToFileJob {
+	async handle(resourceName: string, path: string, response: AxiosResponse): Promise<void> {
+		if (!response.data || typeof response.data.pipe !== 'function') {
+			CorrelatedLogger.error('No data found in response or data is not streamable', undefined, StoreResourceResponseToFileJob.name)
+			throw new UnableToStoreFetchedResourceException(resourceName)
+		}
+
+		let fd: FileHandle | null = null
+		let success = false
+
+		try {
+			fd = await open(path, 'w')
+			const fileStream = fd.createWriteStream()
+
+			response.data.pipe(fileStream)
+			await new Promise<void>((resolve, reject) => {
+				response.data.on('error', (error: Error) => reject(error))
+				fileStream
+					.on('finish', () => resolve())
+					.on('error', error => reject(error))
+			})
+			success = true
+		}
+		catch (e) {
+			CorrelatedLogger.error(`Failed to store ${resourceName} to ${path}: ${(e as Error).message}`, (e as Error).stack, StoreResourceResponseToFileJob.name)
+			throw new UnableToStoreFetchedResourceException(resourceName)
+		}
+		finally {
+			if (fd) {
+				await fd.close().catch((err: unknown) => {
+					CorrelatedLogger.error(`Error closing file descriptor for ${path}: ${(err as Error).message}`, (err as Error).stack, StoreResourceResponseToFileJob.name)
+				})
+			}
+			// Clean up partial temp file on failure (best-effort)
+			if (!success) {
+				await unlink(path).catch((err: unknown) => {
+					CorrelatedLogger.debug(`Could not remove partial temp file ${path}: ${(err as Error).message}`, StoreResourceResponseToFileJob.name)
+				})
+			}
+		}
+	}
+}

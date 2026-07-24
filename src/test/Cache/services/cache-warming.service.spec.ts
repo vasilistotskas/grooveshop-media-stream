@@ -263,7 +263,7 @@ describe('cacheWarmingService', () => {
 				.mockResolvedValueOnce('{"accessCount": 10}') // getPopularFiles file1 meta
 				.mockResolvedValueOnce('{"accessCount": 8}') // getPopularFiles file2 meta
 				.mockResolvedValueOnce(Buffer.from('file content')) // warmupFile file1 content (success)
-				.mockResolvedValueOnce(null) // warmupFile file1 meta (caught internally)
+				.mockResolvedValueOnce(null as unknown as string) // warmupFile file1 meta (caught internally)
 				.mockRejectedValueOnce(new Error('File read error')) // warmupFile file2 content (fails)
 
 			cacheManager.exists.mockResolvedValue(false)

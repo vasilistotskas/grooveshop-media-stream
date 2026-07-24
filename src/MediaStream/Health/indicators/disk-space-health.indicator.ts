@@ -59,6 +59,9 @@ export class DiskSpaceHealthIndicator extends BaseHealthIndicator {
 	}
 
 	private async getDiskSpaceInfo(): Promise<DiskSpaceInfo> {
+		// A statfs failure must propagate: BaseHealthIndicator.isHealthy()
+		// converts it into a 'down' result. Returning zeroed disk info here
+		// would report 0% used and mask a real disk failure as healthy.
 		try {
 			await fs.mkdir(this.storagePath, { recursive: true })
 
@@ -78,25 +81,8 @@ export class DiskSpaceHealthIndicator extends BaseHealthIndicator {
 			}
 		}
 		catch (error: unknown) {
-			// Fallback for systems that don't support statvfs
-			console.error(error)
-			return this.getFallbackDiskInfo()
-		}
-	}
-
-	private async getFallbackDiskInfo(): Promise<DiskSpaceInfo> {
-		try {
-			return {
-				total: 0,
-				free: 0,
-				used: 0,
-				usedPercentage: 0,
-				path: this.storagePath,
-			}
-		}
-		catch (error: unknown) {
-			console.error(error)
-			throw new Error(`Unable to access storage directory: ${this.storagePath}`)
+			this.logger.error(`Unable to read disk space for ${this.storagePath}: ${(error as Error).message}`)
+			throw new Error(`Unable to read disk space for storage directory: ${this.storagePath}`)
 		}
 	}
 

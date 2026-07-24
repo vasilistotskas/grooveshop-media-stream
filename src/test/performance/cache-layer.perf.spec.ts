@@ -125,7 +125,7 @@ describe('memory Cache Performance', () => {
 describe('request Deduplication Performance', () => {
 	it('should deduplicate 100 concurrent identical requests', async () => {
 		const { RequestDeduplicator } = await import('#microservice/common/utils/request-deduplication.util')
-		const dedup = new RequestDeduplicator()
+		const dedup = new RequestDeduplicator<string>()
 
 		let executionCount = 0
 		const work = async () => {

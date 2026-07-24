@@ -1,3 +1,64 @@
+## [2.58.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.58.1...v2.58.2) (2026-07-14)
+
+
+### Bug Fixes
+
+* **config:** don't cap monitoring collection intervals (startup crash) ([a528a3a](https://github.com/vasilistotskas/grooveshop-media-stream/commit/a528a3aea2ad3591aa723b868405457b556d9563))
+
+## [2.58.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.58.0...v2.58.1) (2026-07-13)
+
+
+### Bug Fixes
+
+* address code-review findings on cache hot path and SVG sanitizer ([6926876](https://github.com/vasilistotskas/grooveshop-media-stream/commit/692687668e4589f9b9df2728cd519c19e07fbb08))
+* **api:** ignore unparseable If-Modified-Since headers ([78e97e4](https://github.com/vasilistotskas/grooveshop-media-stream/commit/78e97e4d63fecb41b9ed9e72933153b5856d09ff))
+* **health:** report disk-space check failures as unhealthy ([818454c](https://github.com/vasilistotskas/grooveshop-media-stream/commit/818454c74ef42d7d9dd92daf12eb33d495f40675))
+* **http:** initialize circuit breaker explicitly on module init ([e80724b](https://github.com/vasilistotskas/grooveshop-media-stream/commit/e80724bbdb6ba33ad2d1094c795221c4b2685682))
+* **rate-limit:** wire kill-switch and bypass flags; measure real heap pressure ([394f646](https://github.com/vasilistotskas/grooveshop-media-stream/commit/394f6468055ac403be0d8b5c08a668d297ea1d8a))
+* resolve findings from adversarial pre-merge review ([4f5b079](https://github.com/vasilistotskas/grooveshop-media-stream/commit/4f5b079af8837bfaec34282fadaaa72aeccf903b))
+* **security:** make DOMPurify the sole SVG sanitizer, drop bypassable regex pass ([4e7e947](https://github.com/vasilistotskas/grooveshop-media-stream/commit/4e7e9479a2205b42e82281fd7f91d1ee1e461cdf))
+
+# [2.58.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.57.0...v2.58.0) (2026-07-11)
+
+
+### Features
+
+* Bump Versions ([0557e59](https://github.com/vasilistotskas/grooveshop-media-stream/commit/0557e592537f24892f98e5575e18e2f1b009d23c))
+
+# [2.57.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.56.1...v2.57.0) (2026-07-02)
+
+
+### Features
+
+* Bump Versions ([2a209a6](https://github.com/vasilistotskas/grooveshop-media-stream/commit/2a209a6ab0f53da7de1d284ac147e4d02fd23726))
+
+## [2.56.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.56.0...v2.56.1) (2026-06-29)
+
+
+### Bug Fixes
+
+* **image:** serve AVIF output as image/avif instead of octet-stream ([30e264d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/30e264de3642bc92a239ee33a084c83b2a574832)), closes [lovell/sharp#2504](https://github.com/lovell/sharp/issues/2504)
+
+# [2.56.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.55.0...v2.56.0) (2026-06-28)
+
+
+### Bug Fixes
+
+* **deps:** cap undici override at <8 to keep jsdom working ([35a8ad4](https://github.com/vasilistotskas/grooveshop-media-stream/commit/35a8ad427026a8e3cedcc5fd796291b29a0accc8))
+* **deps:** patch HIGH-severity CVEs flagged by Trivy ([02ff5b6](https://github.com/vasilistotskas/grooveshop-media-stream/commit/02ff5b6015c5259e4a642931c92f01a6511aef4c)), closes [HI#severity](https://github.com/HI/issues/severity)
+
+
+### Features
+
+* Bump Versions ([08a675a](https://github.com/vasilistotskas/grooveshop-media-stream/commit/08a675afdd91e246264636cadbbbe9caa100d8fd))
+
+# [2.55.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.54.0...v2.55.0) (2026-05-26)
+
+
+### Features
+
+* Bump Versions ([18d3f78](https://github.com/vasilistotskas/grooveshop-media-stream/commit/18d3f78abad30308272513289e0d247f899d5e01))
+
 # [2.54.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.53.0...v2.54.0) (2026-05-20)
 
 

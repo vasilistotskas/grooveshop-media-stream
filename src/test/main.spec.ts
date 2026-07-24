@@ -2,7 +2,7 @@ import * as process from 'node:process'
 import { NestFactory } from '@nestjs/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import MediaStreamModule from '#microservice/media-stream.module'
-import { bootstrap } from '../main'
+import { bootstrap } from '../main.js'
 
 vi.mock('@nestjs/core', async () => {
 	const actual = await vi.importActual('@nestjs/core')
@@ -42,7 +42,7 @@ describe('bootstrap', () => {
 					}
 					return undefined
 				}),
-				getOptional: vi.fn().mockImplementation((key: any, defaultValue: any) => {
+				getOptional: vi.fn().mockImplementation((_key: any, defaultValue: any) => {
 					return defaultValue
 				}),
 			}),

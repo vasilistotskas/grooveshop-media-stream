@@ -315,48 +315,6 @@ describe('performanceTracker', () => {
 		})
 	})
 
-	describe('method Decorator', () => {
-		it('should create a working method decorator', async () => {
-			await runWithContext(async () => {
-				class TestClass {
-					@PerformanceTracker.measureMethod('decorated-method')
-					async testMethod(value: string): Promise<string> {
-						await new Promise(resolve => setTimeout(resolve, 10))
-						return `processed-${value}`
-					}
-				}
-
-				const instance = new TestClass()
-				const result = await instance.testMethod('test')
-
-				expect(result).toBe('processed-test')
-
-				const phases = PerformanceTracker.getPhases()
-				expect(phases).toHaveLength(1)
-				expect(phases[0].name).toBe('decorated-method')
-				expect(phases[0].duration).toBeGreaterThan(0)
-			})
-		})
-
-		it('should auto-generate phase name from class and method', async () => {
-			await runWithContext(async () => {
-				class MyService {
-					@PerformanceTracker.measureMethod()
-					async processImage(): Promise<string> {
-						return 'done'
-					}
-				}
-
-				const instance = new MyService()
-				await instance.processImage()
-
-				const phases = PerformanceTracker.getPhases()
-				expect(phases).toHaveLength(1)
-				expect(phases[0].name).toBe('MyService.processImage')
-			})
-		})
-	})
-
 	describe('cleanup', () => {
 		it('should clear all phases for current correlation', () => {
 			runWithContext(() => {

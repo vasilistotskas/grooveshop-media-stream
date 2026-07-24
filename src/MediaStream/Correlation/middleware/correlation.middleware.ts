@@ -3,6 +3,7 @@ import type { NextFunction, Request, Response } from 'express'
 import type { RequestContext } from '../interfaces/correlation.interface.js'
 import * as process from 'node:process'
 import { Injectable } from '@nestjs/common'
+import { getClientIp } from '#microservice/common/utils/ip.util'
 import { CorrelationService } from '../services/correlation.service.js'
 
 export const CORRELATION_ID_HEADER = 'x-correlation-id'
@@ -15,10 +16,14 @@ export class CorrelationMiddleware implements NestMiddleware {
 		const correlationId
 			= (req.headers[CORRELATION_ID_HEADER] as string) || this._correlationService.generateCorrelationId()
 
+		// getClientIp reads req.ip, which Express resolves to the real client IP
+		// from X-Forwarded-For because main.ts sets `trust proxy = 1` (exactly one
+		// hop, i.e. Traefik). Reading the raw XFF header directly would allow an
+		// external client to spoof their apparent address.
 		const context: RequestContext = {
 			correlationId,
 			timestamp: Date.now(),
-			clientIp: this.getClientIp(req),
+			clientIp: getClientIp(req),
 			userAgent: req.headers['user-agent'],
 			method: req.method,
 			url: req.url,
@@ -30,18 +35,5 @@ export class CorrelationMiddleware implements NestMiddleware {
 		this._correlationService.runWithContext(context, () => {
 			next()
 		})
-	}
-
-	/**
-	 * Extract the real client IP.
-	 *
-	 * Now that `app.set('trust proxy', 1)` is configured in main.ts, Express
-	 * resolves `req.ip` to the real client IP from X-Forwarded-For (trusting
-	 * exactly 1 hop, i.e. Traefik).  Reading the raw XFF header directly would
-	 * allow an external client to prepend arbitrary IPs to the header and spoof
-	 * their apparent address.
-	 */
-	private getClientIp(req: Request): string {
-		return (req as any).ip || req.socket?.remoteAddress || 'unknown'
 	}
 }

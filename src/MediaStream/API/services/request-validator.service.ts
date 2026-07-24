@@ -1,5 +1,5 @@
 import type { ImageProcessingContext } from '../types/image-source.types.js'
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import {
 	MAX_IMAGE_HEIGHT,
 	MAX_IMAGE_WIDTH,
@@ -10,6 +10,7 @@ import {
 	MIN_TRIM_THRESHOLD,
 } from '#microservice/common/constants/image-limits.constant'
 import { InvalidRequestError } from '#microservice/common/errors/media-stream.errors'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { InputSanitizationService } from '#microservice/Validation/services/input-sanitization.service'
 import { SecurityCheckerService } from '#microservice/Validation/services/security-checker.service'
 
@@ -44,8 +45,6 @@ const STRING_VALIDATION_RULES: Record<string, { pattern: RegExp }> = {
  */
 @Injectable()
 export class RequestValidatorService {
-	private readonly _logger = new Logger(RequestValidatorService.name)
-
 	constructor(
 		private readonly inputSanitizationService: InputSanitizationService,
 		private readonly securityCheckerService: SecurityCheckerService,
@@ -61,10 +60,7 @@ export class RequestValidatorService {
 		this.validateStringParameters(params, correlationId)
 		this.validateNumericParameters(params, correlationId)
 
-		this._logger.debug('Request validation passed', {
-			params,
-			correlationId,
-		})
+		CorrelatedLogger.debug(`Request validation passed (params: ${JSON.stringify(params)})`, RequestValidatorService.name)
 	}
 
 	/**

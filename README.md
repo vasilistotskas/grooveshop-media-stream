@@ -137,16 +137,14 @@ The project uses Vitest with SWC for fast compilation. Unit tests are in `src/te
 src/MediaStream/
 ├── API/            # Controllers, DTOs, image source config, request validation, URL building, streaming
 ├── Cache/          # Multi-layer caching (Memory → Redis → File), cache warming, eviction
-├── Config/         # Centralized config service, schema-based validation, hot-reload
+├── Config/         # Centralized config service, single-source schema-based validation
 ├── Correlation/    # Request correlation IDs, timing middleware, performance tracking
 ├── Health/         # Health check indicators (disk, memory, Sharp, cache, Redis, HTTP, storage)
 ├── HTTP/           # HTTP client with circuit breaker pattern, retry with exponential backoff
 ├── Metrics/        # Prometheus metrics via prom-client, request/system/cache metrics
-├── Monitoring/     # System monitoring, alert rule engine, performance tracking
-├── Queue/          # Bull/Redis job queue for background image processing
+├── Processing/     # Stateless Sharp jobs (fetch, store, identity, format manipulation)
 ├── RateLimit/      # Adaptive rate limiting guard with domain whitelisting
 ├── Storage/        # File storage management, cleanup, intelligent eviction
-├── Tasks/          # Scheduled tasks via @nestjs/schedule
 ├── Validation/     # Input sanitization, security threat detection
 └── common/         # Shared error classes, exception filter, types, graceful shutdown
 ```

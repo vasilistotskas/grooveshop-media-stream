@@ -2,7 +2,7 @@ import type { OnModuleInit } from '@nestjs/common'
 import type { FileTypeMap } from '#microservice/common/types/common.types'
 import { promises as fs, Stats } from 'node:fs'
 import { extname, join } from 'node:path'
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
@@ -35,7 +35,6 @@ export interface StorageThresholds {
 
 @Injectable()
 export class StorageMonitoringService implements OnModuleInit {
-	private readonly _logger = new Logger(StorageMonitoringService.name)
 	private readonly storageDirectory: string
 	private readonly thresholds: StorageThresholds
 	private accessPatterns = new Map<string, AccessPattern>()
@@ -55,7 +54,7 @@ export class StorageMonitoringService implements OnModuleInit {
 	async onModuleInit(): Promise<void> {
 		await this.ensureStorageDirectory()
 		await this.scanStorageDirectory()
-		this._logger.log('Storage monitoring service initialized')
+		CorrelatedLogger.log('Storage monitoring service initialized', StorageMonitoringService.name)
 	}
 
 	/**
@@ -81,8 +80,8 @@ export class StorageMonitoringService implements OnModuleInit {
 
 			let totalSize = 0
 			let processedFileCount = 0
-			let oldestFile: Date | null = null as any
-			let newestFile: Date | null = null as any
+			let oldestFile: Date | null = null
+			let newestFile: Date | null = null
 			const fileTypes: FileTypeMap = {}
 
 			for (const result of statResults) {

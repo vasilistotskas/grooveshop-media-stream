@@ -26,12 +26,11 @@ export interface RedisConfig {
 	ttl: number
 	maxRetries: number
 	retryDelayOnFailover: number
+	healthCheckCacheTtl: number
 }
 
 export interface FileCacheConfig {
 	directory: string
-	maxSize: number
-	cleanupInterval: number
 }
 
 export interface CacheWarmingConfig {
@@ -40,11 +39,18 @@ export interface CacheWarmingConfig {
 	maxFilesToWarm: number
 	warmupCron: string
 	popularImageThreshold: number
+	baseTtl: number
+}
+
+export interface CachePreloadingConfig {
+	enabled: boolean
+	interval: number
 }
 
 export interface ImageCacheConfig {
 	publicTtl: number
 	privateTtl: number
+	negativeCacheTtl: number
 }
 
 export interface CacheConfig {
@@ -52,27 +58,22 @@ export interface CacheConfig {
 	redis: RedisConfig
 	file: FileCacheConfig
 	warming: CacheWarmingConfig
+	preloading: CachePreloadingConfig
 	image: ImageCacheConfig
 }
 
 export interface ProcessingConfig {
-	maxConcurrent: number
-	timeout: number
-	retries: number
-	maxFileSize: number
-	allowedFormats: string[]
+	cpuCores: number
 }
 
 export interface MonitoringConfig {
 	enabled: boolean
-	metricsPort: number
-	healthPath: string
-	metricsPath: string
+	systemMetricsInterval: number
+	performanceMetricsInterval: number
 }
 
 export interface ExternalServicesConfig {
 	requestTimeout: number
-	maxRetries: number
 }
 
 export interface CircuitBreakerConfig {
@@ -83,11 +84,24 @@ export interface CircuitBreakerConfig {
 	minimumRequests: number
 }
 
+export interface ConnectionPoolConfig {
+	maxSockets: number
+	keepAliveMsecs: number
+}
+
+export interface HttpHealthCheckConfig {
+	urls: string[]
+	timeout: number
+}
+
 export interface HttpConfig {
 	timeout: number
 	maxRetries: number
 	retryDelay: number
+	maxRetryDelay: number
+	connectionPool: ConnectionPoolConfig
 	circuitBreaker: CircuitBreakerConfig
+	healthCheck: HttpHealthCheckConfig
 }
 
 export interface RateLimitThrottlerConfig {
@@ -97,7 +111,6 @@ export interface RateLimitThrottlerConfig {
 
 export interface RateLimitBypassConfig {
 	healthChecks: boolean
-	metricsEndpoint: boolean
 	staticAssets: boolean
 	whitelistedDomains: string
 	bots: boolean
@@ -109,6 +122,47 @@ export interface RateLimitConfig {
 	imageProcessing: RateLimitThrottlerConfig
 	healthCheck: RateLimitThrottlerConfig
 	bypass: RateLimitBypassConfig
+}
+
+export interface ValidationConfig {
+	allowedDomains: string[]
+	maxStringLength: number
+}
+
+export interface StorageCleanupConfig {
+	enabled: boolean
+	cronSchedule: string
+	dryRun: boolean
+	maxDuration: number
+}
+
+export interface StorageEvictionConfig {
+	strategy: string
+	aggressiveness: string
+	preservePopular: boolean
+	minAccessCount: number
+	maxFileAge: number
+}
+
+export interface StorageOptimizationConfig {
+	enabled: boolean
+	strategies: string[]
+	popularThreshold: number
+	compressionLevel: number
+	createBackups: boolean
+	maxTime: number
+}
+
+export interface StorageConfig {
+	maxSize: number
+	maxFileAge: number
+	warningSize: number
+	criticalSize: number
+	warningFileCount: number
+	criticalFileCount: number
+	cleanup: StorageCleanupConfig
+	eviction: StorageEvictionConfig
+	optimization: StorageOptimizationConfig
 }
 
 export interface ShutdownConfig {
@@ -128,6 +182,8 @@ export interface AppConfig {
 	externalServices: ExternalServicesConfig
 	http: HttpConfig
 	rateLimit: RateLimitConfig
+	validation: ValidationConfig
+	storage: StorageConfig
 	shutdown: ShutdownConfig
 	internal: InternalConfig
 }

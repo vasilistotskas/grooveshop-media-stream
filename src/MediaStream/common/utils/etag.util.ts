@@ -78,18 +78,20 @@ export function checkIfModifiedSince(
 		return true // No header means always modified
 	}
 
-	try {
-		const requestDate = new Date(ifModifiedSince).getTime()
-		const resourceDate = typeof lastModified === 'number'
-			? lastModified
-			: lastModified.getTime()
+	const requestDate = new Date(ifModifiedSince).getTime()
+	if (Number.isNaN(requestDate)) {
+		// Date parsing never throws — it yields NaN. Per RFC 7232 an
+		// unparseable If-Modified-Since must be ignored (treat as modified),
+		// otherwise `resourceDate > NaN` would answer 304 for garbage headers.
+		return true
+	}
 
-		// Resource is modified if its date is newer than the request date
-		return resourceDate > requestDate
-	}
-	catch {
-		return true // Invalid date means treat as modified
-	}
+	const resourceDate = typeof lastModified === 'number'
+		? lastModified
+		: lastModified.getTime()
+
+	// Resource is modified if its date is newer than the request date
+	return resourceDate > requestDate
 }
 
 /**

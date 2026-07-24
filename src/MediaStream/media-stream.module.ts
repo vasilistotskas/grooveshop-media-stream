@@ -17,7 +17,6 @@ import { HealthModule } from '#microservice/Health/health.module'
 import { HttpModule } from '#microservice/HTTP/http.module'
 import { MetricsModule } from '#microservice/Metrics/metrics.module'
 import { MetricsMiddleware } from '#microservice/Metrics/middleware/metrics.middleware'
-import { QueueModule } from '#microservice/Queue/queue.module'
 import { AdaptiveRateLimitGuard } from '#microservice/RateLimit/guards/adaptive-rate-limit.guard'
 import { RateLimitModule } from '#microservice/RateLimit/rate-limit.module'
 import { StorageModule } from '#microservice/Storage/storage.module'
@@ -39,7 +38,6 @@ const controllers = [MediaStreamImageController, ConfigController]
 		HealthModule,
 		HttpModule,
 		MetricsModule,
-		QueueModule,
 		RateLimitModule,
 		StorageModule,
 		ValidationModule,

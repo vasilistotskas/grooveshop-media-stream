@@ -188,24 +188,6 @@ export class PerformanceTracker {
 	}
 
 	/**
-	 * Create a decorator for measuring method execution time
-	 */
-	static measureMethod(phaseName?: string, metadata?: Metadata) {
-		return function (target: any, propertyName: string, descriptor: PropertyDescriptor) {
-			const method = descriptor.value
-			const actualPhaseName = phaseName || `${target.constructor.name}.${propertyName}`
-
-			descriptor.value = async function (...args: any[]) {
-				return PerformanceTracker.measure(
-					actualPhaseName,
-					() => method.apply(this, args),
-					metadata,
-				)
-			}
-		}
-	}
-
-	/**
 	 * Log performance summary at the end of a request
 	 */
 	static logSummary(): void {

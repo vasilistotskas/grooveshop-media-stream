@@ -6,6 +6,16 @@ allowBuilds:
   sharp: true
 overrides:
   lodash: '>=4.18.1'
+  # CVE-2026-9697, CVE-2026-6734, CVE-2026-12151 (HIGH) — undici
+  # 7.x line patched in 7.28.0. Capped at <8 because jsdom 29
+  # deep-imports undici/lib/handler/wrap-handler.js, which undici
+  # 8.0 removed — bumping to 8.x breaks the jsdom test env. The
+  # safe 6.x copy is left untouched.
+  'undici@>=7.0.0 <7.28.0': '>=7.28.0 <8'
+  # CVE-2026-5079 (HIGH) — multer DoS, patched in 2.2.0.
+  'multer@<2.2.0': '>=2.2.0'
+  # CVE-2026-12143 (HIGH) — form-data, patched in 4.0.6.
+  'form-data@<4.0.6': '>=4.0.6'
 minimumReleaseAgeExclude:
   - '@types/node@25.9.1'
   - isomorphic-dompurify@3.14.0
@@ -18,3 +28,26 @@ minimumReleaseAgeExclude:
   - '@vitest/spy@4.1.7'
   - '@vitest/utils@4.1.7'
   - vitest@4.1.7
+  - eslint@10.6.0 || 10.7.0
+  - '@img/sharp-darwin-arm64@0.35.3'
+  - '@img/sharp-darwin-x64@0.35.3'
+  - '@img/sharp-freebsd-wasm32@0.35.3'
+  - '@img/sharp-linux-arm64@0.35.3'
+  - '@img/sharp-linux-arm@0.35.3'
+  - '@img/sharp-linux-ppc64@0.35.3'
+  - '@img/sharp-linux-riscv64@0.35.3'
+  - '@img/sharp-linux-s390x@0.35.3'
+  - '@img/sharp-linux-x64@0.35.3'
+  - '@img/sharp-linuxmusl-arm64@0.35.3'
+  - '@img/sharp-linuxmusl-x64@0.35.3'
+  - '@img/sharp-wasm32@0.35.3'
+  - '@img/sharp-webcontainers-wasm32@0.35.3'
+  - '@img/sharp-win32-arm64@0.35.3'
+  - '@img/sharp-win32-ia32@0.35.3'
+  - '@img/sharp-win32-x64@0.35.3'
+  - '@semantic-release/github@12.0.9'
+  - sharp@0.35.3
+  - '@nestjs/cli@11.0.24'
+  - '@vitest/eslint-plugin@1.6.23 || 1.6.24'
+  - semantic-release@25.0.6
+  - '@semantic-release/git@11.0.1'

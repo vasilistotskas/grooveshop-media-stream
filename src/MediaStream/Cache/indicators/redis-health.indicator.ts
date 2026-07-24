@@ -16,7 +16,7 @@ export class RedisHealthIndicator extends BaseHealthIndicator {
 	) {
 		super('redis')
 		// ✅ Load health check cache TTL from configuration (default: 10 seconds)
-		this.healthCheckCacheTtl = this._configService.getOptional('health.redis.cacheTtl', 10000)
+		this.healthCheckCacheTtl = this._configService.getOptional('cache.redis.healthCheckCacheTtl', 10000)
 	}
 
 	protected async performHealthCheck(): Promise<HealthIndicatorResult> {

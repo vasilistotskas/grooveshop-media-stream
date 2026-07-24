@@ -1,9 +1,12 @@
 import type { ExecutionContext } from '@nestjs/common'
 import type { ThrottlerModuleOptions, ThrottlerStorage } from '@nestjs/throttler'
 import * as process from 'node:process'
-import { Inject, Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { getOptionsToken, getStorageToken, ThrottlerException, ThrottlerGuard } from '@nestjs/throttler'
+import { IMAGE } from '#microservice/common/constants/route-prefixes.constant'
+import { getClientIp, isInternalIp } from '#microservice/common/utils/ip.util'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { RateLimitService } from '../services/rate-limit.service.js'
 
@@ -36,9 +39,11 @@ const STATIC_ASSET_RE = /\.(?:css|js|png|jpg|jpeg|gif|ico|svg)$/
  */
 @Injectable()
 export class AdaptiveRateLimitGuard extends ThrottlerGuard {
-	private readonly _logger = new Logger(AdaptiveRateLimitGuard.name)
 	private cachedWhitelistedDomains: string[] | null = null
 	private cachedBypassBots: boolean | null = null
+	private cachedEnabled: boolean | null = null
+	private cachedBypassHealthChecks: boolean | null = null
+	private cachedBypassStaticAssets: boolean | null = null
 
 	constructor(
 		@Inject(getOptionsToken()) options: ThrottlerModuleOptions,
@@ -56,7 +61,21 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 	 */
 	override async canActivate(context: ExecutionContext): Promise<boolean> {
 		if (process.env.NODE_ENV === 'development') {
-			this._logger.debug('Skipping rate limiting in development mode')
+			CorrelatedLogger.debug('Skipping rate limiting in development mode', AdaptiveRateLimitGuard.name)
+			return true
+		}
+
+		// Operator kill-switch (RATE_LIMIT_ENABLED=false disables all limiting).
+		// A config read failure must not 500 requests — default to enabled.
+		if (this.cachedEnabled === null) {
+			try {
+				this.cachedEnabled = this.rateLimitService.isEnabled()
+			}
+			catch {
+				this.cachedEnabled = true
+			}
+		}
+		if (!this.cachedEnabled) {
 			return true
 		}
 
@@ -69,7 +88,7 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 		// Adaptive pre-check: apply Redis-backed counting with load-adjusted
 		// limits BEFORE the ThrottlerGuard in-memory increment.
 		try {
-			const clientIp = this.getClientIp(request)
+			const clientIp = getClientIp(request)
 			const requestType = this.getRequestType(request)
 			const userAgent: string = request.headers['user-agent'] || ''
 
@@ -87,31 +106,19 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 			this.addRateLimitHeaders(response, info, allowed)
 
 			if (!allowed) {
-				this._logger.warn(`Rate limit exceeded for ${clientIp} on ${requestType}`, {
-					clientIp,
-					requestType,
-					current: info.current,
-					limit: info.limit,
-					resetTime: info.resetTime,
-				})
+				CorrelatedLogger.warn(`Rate limit exceeded for ${clientIp} on ${requestType} (${info.current}/${info.limit}, resets ${info.resetTime.toISOString()})`, AdaptiveRateLimitGuard.name)
 
 				throw new ThrottlerException('Rate limit exceeded')
 			}
 
-			this._logger.debug(`Rate limit pre-check passed for ${clientIp} on ${requestType}`, {
-				clientIp,
-				requestType,
-				current: info.current,
-				limit: info.limit,
-				remaining: info.remaining,
-			})
+			CorrelatedLogger.debug(`Rate limit pre-check passed for ${clientIp} on ${requestType} (${info.current}/${info.limit}, ${info.remaining} remaining)`, AdaptiveRateLimitGuard.name)
 		}
 		catch (error: unknown) {
 			if (error instanceof ThrottlerException) {
 				throw error
 			}
 
-			this._logger.error('Error in rate limit adaptive pre-check:', error)
+			CorrelatedLogger.error(`Error in rate limit adaptive pre-check: ${(error as Error).message}`, (error as Error).stack, AdaptiveRateLimitGuard.name)
 			// Do not block on pre-check errors; fall through to ThrottlerGuard.
 		}
 
@@ -134,7 +141,7 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 	 * RateLimitService.generateAdvancedKey.
 	 */
 	protected override async getTracker(req: Record<string, any>): Promise<string> {
-		return this.getClientIp(req)
+		return getClientIp(req)
 	}
 
 	/**
@@ -157,6 +164,24 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 	private shouldSkipRateLimit(request: any): boolean {
 		const url = request.url || ''
 
+		// Config read failures must not 500 requests — fall back to the defaults.
+		if (this.cachedBypassHealthChecks === null) {
+			try {
+				this.cachedBypassHealthChecks = this.rateLimitService.getBypassHealthChecksConfig()
+			}
+			catch {
+				this.cachedBypassHealthChecks = true
+			}
+		}
+		if (this.cachedBypassStaticAssets === null) {
+			try {
+				this.cachedBypassStaticAssets = this.rateLimitService.getBypassStaticAssetsConfig()
+			}
+			catch {
+				this.cachedBypassStaticAssets = true
+			}
+		}
+
 		// Cheapest checks first (string startsWith).
 		// /metrics and POST /health/circuit-breaker/reset are now auth-gated via
 		// InternalSecretGuard; they must NOT be rate-limit-exempt so that the
@@ -165,27 +190,29 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 		// and the circuit-breaker status GET are exempt — they fire every few
 		// seconds and must never be throttled.
 		const method = request.method || 'GET'
-		if (url.startsWith('/health') && !(url === '/health/circuit-breaker/reset' && method === 'POST')) {
+		if (this.cachedBypassHealthChecks && url.startsWith('/health') && !(url === '/health/circuit-breaker/reset' && method === 'POST')) {
 			return true
 		}
 
-		if (STATIC_ASSET_RE.test(url)) {
+		// Static-asset bypass is for genuinely static files served from public/
+		// (default.png, robots.txt, etc). It must NOT match image-processing
+		// routes: those end in `:quality.:format` (e.g. `/…/80.png`), so a png/
+		// jpg/gif/svg output format would otherwise match STATIC_ASSET_RE and
+		// let an attacker skip the image-processing throttle entirely by
+		// choosing a non-webp/avif output format.
+		if (this.cachedBypassStaticAssets && !url.includes(`/${IMAGE}/`) && STATIC_ASSET_RE.test(url)) {
 			return true
 		}
 
 		const userAgent = request.headers['user-agent'] || ''
-		if (this.shouldBypassBot(userAgent) && this.isInternalIp(request)) {
-			this._logger.debug('Skipping rate limiting for bot from internal IP', { userAgent })
+		if (this.shouldBypassBot(userAgent) && isInternalIp(getClientIp(request))) {
+			CorrelatedLogger.debug(`Skipping rate limiting for bot from internal IP: ${userAgent}`, AdaptiveRateLimitGuard.name)
 			return true
 		}
 
 		// Most expensive check last (IP check + URL parsing + domain matching)
 		if (this.isDomainWhitelisted(request)) {
-			this._logger.debug('Skipping rate limiting for internal whitelisted domain', {
-				ip: this.getClientIp(request),
-				referer: request.headers.referer,
-				origin: request.headers.origin,
-			})
+			CorrelatedLogger.debug(`Skipping rate limiting for internal whitelisted domain (ip: ${getClientIp(request)})`, AdaptiveRateLimitGuard.name)
 			return true
 		}
 
@@ -196,58 +223,20 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 	 * Check if bot bypass is enabled and user agent is a bot.
 	 */
 	private shouldBypassBot(userAgent: string): boolean {
+		// Config read failures must not 500 requests — fail with bypass disabled.
 		if (this.cachedBypassBots === null) {
-			this.cachedBypassBots = this.rateLimitService.getBypassBotsConfig()
+			try {
+				this.cachedBypassBots = this.rateLimitService.getBypassBotsConfig()
+			}
+			catch {
+				this.cachedBypassBots = false
+			}
 		}
 		if (!this.cachedBypassBots) {
 			return false
 		}
 
 		return this.rateLimitService.isBot(userAgent)
-	}
-
-	/**
-	 * Returns true only when the connecting IP is a private/loopback address.
-	 * Referer and Origin are attacker-controlled HTTP headers, so the domain
-	 * whitelist is only meaningful for requests that cannot be spoofed from the
-	 * public internet — i.e. requests arriving from within the cluster or from
-	 * localhost.
-	 */
-	private isInternalIp(request: any): boolean {
-		const ip: string = this.getClientIp(request)
-
-		// IPv4 loopback
-		if (ip === '127.0.0.1')
-			return true
-
-		// IPv6 loopback
-		if (ip === '::1' || ip === '::ffff:127.0.0.1')
-			return true
-
-		// Strip IPv4-mapped IPv6 prefix so the checks below work uniformly
-		const bare = ip.startsWith('::ffff:') ? ip.slice(7) : ip
-
-		const parts = bare.split('.').map(Number)
-		if (parts.length !== 4 || parts.some(n => Number.isNaN(n))) {
-			// Not a dotted-decimal IPv4 address — treat as external
-			return false
-		}
-
-		const [a, b] = parts
-
-		// 10.0.0.0/8
-		if (a === 10)
-			return true
-
-		// 172.16.0.0/12
-		if (a === 172 && b >= 16 && b <= 31)
-			return true
-
-		// 192.168.0.0/16
-		if (a === 192 && b === 168)
-			return true
-
-		return false
 	}
 
 	/**
@@ -260,7 +249,7 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 		try {
 			// Guard: only apply the whitelist for internal-network callers.
 			// An external client can trivially forge Referer/Origin headers.
-			if (!this.isInternalIp(request)) {
+			if (!isInternalIp(getClientIp(request))) {
 				return false
 			}
 
@@ -302,7 +291,7 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 			return false
 		}
 		catch (error: unknown) {
-			this._logger.error('Error checking domain whitelist:', error)
+			CorrelatedLogger.error(`Error checking domain whitelist: ${(error as Error).message}`, (error as Error).stack, AdaptiveRateLimitGuard.name)
 			return false
 		}
 	}
@@ -330,21 +319,6 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 		}
 
 		return false
-	}
-
-	/**
-	 * Extract client IP address from request.
-	 * Uses req.ip which reflects the real client IP when trust proxy = 1 is set
-	 * (Express reads the rightmost untrusted address from X-Forwarded-For).
-	 * Falls back to socket address — never trusts raw XFF headers directly.
-	 */
-	private getClientIp(request: any): string {
-		return (
-			request.ip
-			|| request.socket?.remoteAddress
-			|| request.connection?.remoteAddress
-			|| 'unknown'
-		)
 	}
 
 	/**

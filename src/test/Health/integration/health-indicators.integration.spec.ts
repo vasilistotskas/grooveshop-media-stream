@@ -8,7 +8,6 @@ import { HealthModule } from '#microservice/Health/health.module'
 import { DiskSpaceHealthIndicator } from '#microservice/Health/indicators/disk-space-health.indicator'
 import { MemoryHealthIndicator } from '#microservice/Health/indicators/memory-health.indicator'
 import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
-import { JobQueueHealthIndicator } from '#microservice/Queue/indicators/job-queue-health.indicator'
 import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
 
 describe('health Indicators Integration', () => {
@@ -56,12 +55,6 @@ describe('health Indicators Integration', () => {
 			const indicator = module.get<RedisHealthIndicator>(RedisHealthIndicator)
 			expect(indicator).toBeDefined()
 			expect(indicator.key).toBe('redis')
-		})
-
-		it('should register JobQueueHealthIndicator', () => {
-			const indicator = module.get<JobQueueHealthIndicator>(JobQueueHealthIndicator)
-			expect(indicator).toBeDefined()
-			expect(indicator.key).toBe('job-queue')
 		})
 
 		it('should register StorageHealthIndicator', () => {
@@ -138,14 +131,6 @@ describe('health Indicators Integration', () => {
 			expect(() => indicator.key).not.toThrow()
 		})
 
-		it('should resolve dependencies for queue health indicator', () => {
-			const indicator = module.get<JobQueueHealthIndicator>(JobQueueHealthIndicator)
-			expect(indicator).toBeDefined()
-
-			// Should not throw when checking dependencies
-			expect(() => indicator.key).not.toThrow()
-		})
-
 		it('should resolve dependencies for storage health indicator', () => {
 			const indicator = module.get<StorageHealthIndicator>(StorageHealthIndicator)
 			expect(indicator).toBeDefined()
@@ -182,7 +167,6 @@ describe('health Indicators Integration', () => {
 				HttpHealthIndicator,
 				CacheHealthIndicator,
 				RedisHealthIndicator,
-				JobQueueHealthIndicator,
 				StorageHealthIndicator,
 			]
 

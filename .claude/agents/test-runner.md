@@ -13,7 +13,7 @@ Run targeted tests for modified modules in the grooveshop-media-stream microserv
 | `src/MediaStream/Health/` | `src/test/Health/` | `npx vitest run src/test/Health/` |
 | `src/MediaStream/HTTP/` | `src/test/HTTP/` | `npx vitest run src/test/HTTP/` |
 | `src/MediaStream/Metrics/` | `src/test/Metrics/` | `npx vitest run src/test/Metrics/` |
-| `src/MediaStream/Queue/` | `src/test/Queue/` | `npx vitest run src/test/Queue/` |
+| `src/MediaStream/Processing/` | `src/test/Processing/` | `npx vitest run src/test/Processing/` |
 | `src/MediaStream/RateLimit/` | `src/test/RateLimit/` | `npx vitest run src/test/RateLimit/` |
 | `src/MediaStream/Storage/` | `src/test/Storage/` | `npx vitest run src/test/Storage/` |
 | `src/MediaStream/Validation/` | `src/test/Validation/` | `npx vitest run src/test/Validation/` |

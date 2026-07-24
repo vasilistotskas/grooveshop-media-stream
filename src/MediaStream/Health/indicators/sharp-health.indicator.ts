@@ -214,31 +214,4 @@ export class SharpHealthIndicator extends BaseHealthIndicator {
 			}
 		}
 	}
-
-	/**
-	 * Get current Sharp statistics (for debugging/monitoring)
-	 */
-	async getSharpStats(): Promise<{
-		cache: { memory: number, files: number, items: number }
-		counters: { process: number, queue: number }
-		simd: boolean
-		concurrency: number
-	}> {
-		const cache = sharp.cache()
-		const counters = sharp.counters()
-
-		return {
-			cache: {
-				memory: typeof cache.memory === 'object' ? cache.memory.current || 0 : (cache.memory || 0),
-				files: typeof cache.files === 'object' ? cache.files.current || 0 : (cache.files || 0),
-				items: typeof cache.items === 'object' ? cache.items.current || 0 : (cache.items || 0),
-			},
-			counters: {
-				process: counters.process || 0,
-				queue: counters.queue || 0,
-			},
-			simd: sharp.simd(),
-			concurrency: sharp.concurrency(),
-		}
-	}
 }

@@ -1,7 +1,7 @@
 import type { OnModuleInit } from '@nestjs/common'
 import { promises as fs, Stats } from 'node:fs'
 import { join } from 'node:path'
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { SchedulerRegistry } from '@nestjs/schedule'
 import { CronJob } from 'cron'
 import { ConfigService } from '#microservice/Config/config.service'
@@ -42,7 +42,6 @@ export interface CleanupConfig {
 
 @Injectable()
 export class StorageCleanupService implements OnModuleInit {
-	private readonly _logger = new Logger(StorageCleanupService.name)
 	private readonly storageDirectory: string
 	private readonly config: CleanupConfig
 	private lastCleanup: Date = new Date()
@@ -60,11 +59,11 @@ export class StorageCleanupService implements OnModuleInit {
 
 	async onModuleInit(): Promise<void> {
 		if (this.config.enabled) {
-			this._logger.log('Storage cleanup service initialized with policies:', this.config.policies.map(p => p.name))
+			CorrelatedLogger.log(`Storage cleanup service initialized with policies: ${this.config.policies.map(p => p.name).join(', ')}`, StorageCleanupService.name)
 			this.registerCleanupCron()
 		}
 		else {
-			this._logger.log('Storage cleanup service disabled')
+			CorrelatedLogger.log('Storage cleanup service disabled', StorageCleanupService.name)
 		}
 	}
 
@@ -93,7 +92,7 @@ export class StorageCleanupService implements OnModuleInit {
 		this.schedulerRegistry.addCronJob(cronName, job)
 		job.start()
 
-		this._logger.log(`Storage cleanup cron registered with schedule: ${schedule}`)
+		CorrelatedLogger.log(`Storage cleanup cron registered with schedule: ${schedule}`, StorageCleanupService.name)
 	}
 
 	/**

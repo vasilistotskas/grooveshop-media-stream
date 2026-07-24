@@ -1,15 +1,17 @@
 import type { Request, Response } from 'express'
+import type { FileHandle } from 'node:fs/promises'
 import type { OperationContext } from '#microservice/Cache/operations/cache-image-resource.operation'
 import type ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
 import type { ImageProcessingContext } from '../types/image-source.types.js'
 import { Buffer } from 'node:buffer'
 import { open } from 'node:fs/promises'
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import CacheImageResourceOperation from '#microservice/Cache/operations/cache-image-resource.operation'
 import { DefaultImageFallbackError, InvalidRequestError, ResourceStreamingError } from '#microservice/common/errors/media-stream.errors'
 import { getMimeType, getVaryHeader, negotiateImageFormat } from '#microservice/common/utils/content-negotiation.util'
 import { checkETagMatch, checkIfModifiedSince, formatLastModified, generateWeakETag } from '#microservice/common/utils/etag.util'
 import { RequestDeduplicator } from '#microservice/common/utils/request-deduplication.util'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import CacheImageRequest from '../dto/cache-image-request.dto.js'
@@ -42,8 +44,6 @@ function buildCacheControl(publicTTLms: number): string {
  */
 @Injectable()
 export class ImageStreamService {
-	private readonly _logger = new Logger(ImageStreamService.name)
-
 	constructor(
 		private readonly cacheImageResourceOperation: CacheImageResourceOperation,
 		private readonly metricsService: MetricsService,
@@ -143,7 +143,7 @@ export class ImageStreamService {
 			.header('Vary', getVaryHeader())
 			.end()
 
-		this._logger.debug('Sent 304 Not Modified response', { correlationId })
+		CorrelatedLogger.debug('Sent 304 Not Modified response', ImageStreamService.name)
 	}
 
 	/**
@@ -159,7 +159,7 @@ export class ImageStreamService {
 		const headers = cachedHeaders ?? await this.cacheImageResourceOperation.fetchHeaders(opCtx)
 
 		if (!headers) {
-			this._logger.warn('Resource metadata missing', { correlationId })
+			CorrelatedLogger.warn('Resource metadata missing', ImageStreamService.name)
 			await this.serveFallbackImage(request, res, correlationId)
 			return
 		}
@@ -174,7 +174,7 @@ export class ImageStreamService {
 			}
 		}
 		catch (error: unknown) {
-			this._logger.error('Error streaming resource', error, { correlationId })
+			CorrelatedLogger.error(`Error streaming resource: ${(error as Error).message}`, (error as Error).stack, ImageStreamService.name)
 			await this.serveFallbackImage(request, res, correlationId)
 		}
 	}
@@ -207,7 +207,7 @@ export class ImageStreamService {
 			imageData = Buffer.isBuffer(payload) ? payload : Buffer.from(payload)
 		}
 		else {
-			this._logger.warn('Unexpected data type, falling back to file', { correlationId })
+			CorrelatedLogger.warn('Unexpected data type, falling back to file', ImageStreamService.name)
 			await this.streamFromFile(opCtx, headers, res, correlationId)
 			return
 		}
@@ -227,11 +227,11 @@ export class ImageStreamService {
 	): Promise<void> {
 		const filePath = this.cacheImageResourceOperation.getResourcePath(opCtx)
 		PerformanceTracker.startPhase('file_streaming')
-		let fd = null as any
+		let fd: FileHandle | null = null
 		let streamClosed = false
 
 		try {
-			this._logger.debug('Streaming file', { filePath, correlationId })
+			CorrelatedLogger.debug(`Streaming file: ${filePath}`, ImageStreamService.name)
 			fd = await open(filePath, 'r')
 			this.addHeadersToResponse(res, headers, correlationId)
 
@@ -257,7 +257,7 @@ export class ImageStreamService {
 				})
 				fileStream.on('error', (error: unknown) => {
 					cleanup()
-					this._logger.error('Stream error', error, { filePath, correlationId })
+					CorrelatedLogger.error(`Stream error for ${filePath}: ${(error as Error).message}`, (error as Error).stack, ImageStreamService.name)
 					this.metricsService.recordError('file_stream', 'stream_error')
 					reject(new ResourceStreamingError('Error streaming file', { filePath, error, correlationId }))
 				})
@@ -272,7 +272,7 @@ export class ImageStreamService {
 			PerformanceTracker.endPhase('file_streaming')
 			if (fd) {
 				await fd.close().catch((err: unknown) => {
-					this._logger.error('Error closing file descriptor', err, { filePath, correlationId })
+					CorrelatedLogger.error(`Error closing file descriptor for ${filePath}: ${(err as Error).message}`, (err as Error).stack, ImageStreamService.name)
 				})
 			}
 		}
@@ -298,7 +298,7 @@ export class ImageStreamService {
 		}
 		catch (error: unknown) {
 			const errorMessage = error instanceof Error ? error.message : String(error)
-			this._logger.error('Failed to serve fallback image', error, { correlationId })
+			CorrelatedLogger.error(`Failed to serve fallback image: ${errorMessage}`, error instanceof Error ? error.stack : undefined, ImageStreamService.name)
 			this.metricsService.recordError('default_image_fallback', 'fallback_error')
 			throw new DefaultImageFallbackError('Failed to process image request', { error: errorMessage, correlationId })
 		}
@@ -316,11 +316,11 @@ export class ImageStreamService {
 		const errorMessage = (error as Error).message || ''
 
 		if (errorMessage.includes('Circuit breaker is open')) {
-			this._logger.warn('Circuit breaker open, serving fallback', { correlationId })
+			CorrelatedLogger.warn('Circuit breaker open, serving fallback', ImageStreamService.name)
 			this.metricsService.recordError('image_request', 'circuit_breaker_open')
 		}
 		else {
-			this._logger.error('Error processing image request', error, { correlationId })
+			CorrelatedLogger.error(`Error processing image request: ${errorMessage}`, error instanceof Error ? error.stack : undefined, ImageStreamService.name)
 			const errorName = error instanceof Error ? error.constructor.name : 'UnknownError'
 			this.metricsService.recordError('image_request', errorName)
 		}
