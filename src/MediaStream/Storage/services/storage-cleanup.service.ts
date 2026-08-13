@@ -120,7 +120,17 @@ export class StorageCleanupService implements OnModuleInit {
 			const allErrors: string[] = []
 			const appliedPolicies: string[] = []
 
+			const deadline = startTime + this.config.maxCleanupDuration
 			for (const policy of policiesToApply) {
+				// Enforce the configured time budget (STORAGE_CLEANUP_MAX_DURATION)
+				// — previously read into config but never applied, so a runaway
+				// pass had no ceiling.
+				if (Date.now() >= deadline) {
+					const msg = `Cleanup time budget (${this.config.maxCleanupDuration}ms) exhausted; skipping remaining policies`
+					allErrors.push(msg)
+					CorrelatedLogger.warn(msg, StorageCleanupService.name)
+					break
+				}
 				try {
 					const result = await this.applyRetentionPolicy(policy, isDryRun)
 					totalFilesRemoved += result.filesRemoved
@@ -378,14 +388,14 @@ export class StorageCleanupService implements OnModuleInit {
 				filePattern: TEMP_FILE_RE,
 				enabled: true,
 			},
-			{
-				name: 'preserve-recent',
-				description: 'Keep at least 100 most recent files',
-				maxAge: 0,
-				maxSize: 0,
-				preserveCount: 100,
-				enabled: true,
-			},
+			// NOTE: no "preserve-recent" default. It was named as a floor
+			// ("keep at least 100 most recent files") but each policy runs as
+			// an independent DELETION pass — with maxAge 0 it deleted every
+			// file except the newest 100 on each nightly run, contradicting
+			// StorageMonitoringService's own thresholds (up to 5000 files is
+			// healthy). Size-pressure eviction is already handled by the
+			// threshold-gated IntelligentEvictionService pass below in
+			// performCleanup(); the age policies above cover hygiene.
 		]
 
 		return {
