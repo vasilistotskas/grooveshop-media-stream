@@ -1,3 +1,10 @@
+## [2.59.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.59.0...v2.59.1) (2026-08-13)
+
+
+### Bug Fixes
+
+* **storage:** remove the preserve-recent nightly wipe, enforce cleanup time budget ([0ba1519](https://github.com/vasilistotskas/grooveshop-media-stream/commit/0ba15190cba9e1ad85ff5061f091c45af80960bf))
+
 # [2.59.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.58.2...v2.59.0) (2026-08-10)
 
 
