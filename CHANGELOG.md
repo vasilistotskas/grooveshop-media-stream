@@ -1,3 +1,10 @@
+## [2.59.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.59.1...v2.59.2) (2026-08-14)
+
+
+### Bug Fixes
+
+* **validation:** validate single-axis resize dimensions in cache operation ([d70885e](https://github.com/vasilistotskas/grooveshop-media-stream/commit/d70885ec61d3faa39ce3bd7d5b787cfef989508d))
+
 ## [2.59.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.59.0...v2.59.1) (2026-08-13)
 
 
