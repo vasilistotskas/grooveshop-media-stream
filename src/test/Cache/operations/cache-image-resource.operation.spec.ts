@@ -258,6 +258,33 @@ describe('cacheImageResourceOperation', () => {
 			expect(mockMetricsService.recordError).toHaveBeenCalledWith('validation', 'setup')
 		})
 
+		it('validates single-axis resizes too, mapping the null axis to 0', async () => {
+			// Regression guard: a `width && height` condition once skipped
+			// dimension validation entirely for single-axis requests.
+			mockRequest.resizeOptions.height = null
+
+			await operation.setup(mockRequest)
+
+			expect(mockInputSanitizationService.validateImageDimensions).toHaveBeenCalledWith(100, 0)
+		})
+
+		it('rejects an over-limit single-axis resize', async () => {
+			mockRequest.resizeOptions.width = 999999
+			mockRequest.resizeOptions.height = null
+			vi.spyOn(mockInputSanitizationService, 'validateImageDimensions').mockReturnValue(false)
+
+			await expect(operation.setup(mockRequest)).rejects.toThrow('Invalid image dimensions: 999999x0')
+		})
+
+		it('treats both-null dimensions as pass-through (0,0) and still validates', async () => {
+			mockRequest.resizeOptions.width = null
+			mockRequest.resizeOptions.height = null
+
+			await operation.setup(mockRequest)
+
+			expect(mockInputSanitizationService.validateImageDimensions).toHaveBeenCalledWith(0, 0)
+		})
+
 		it('should return operation context with correct id', async () => {
 			opCtx = await operation.setup(mockRequest)
 

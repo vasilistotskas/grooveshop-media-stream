@@ -379,12 +379,29 @@ describe('storageCleanupService', () => {
 			expect(result.filesRemoved).toBe(2)
 		})
 
-		it('should respect preserve count in policies', async () => {
-			// Create many files to test preserve count
+		it('has no preserve-recent default policy (it deleted all but 100 files)', () => {
+			// The old "preserve-recent" default was named as a floor but ran as
+			// an independent deletion pass (maxAge 0 + preserveCount 100 =>
+			// nightly wipe down to 100 files). It must not come back as a
+			// default; size pressure is the IntelligentEvictionService's job.
+			const names = service.getCleanupStatus().policies.map(p => p.name)
+			expect(names).not.toContain('preserve-recent')
+			expect(names).toEqual(['old-cache-files', 'large-images', 'temp-files'])
+		})
+
+		it('still respects preserveCount on a custom policy', async () => {
+			service.updateRetentionPolicy({
+				name: 'custom-trim',
+				description: 'test-only trim policy',
+				maxAge: 0,
+				maxSize: 0,
+				preserveCount: 100,
+				enabled: true,
+			})
 			const manyFiles = Array.from({ length: 150 }, (_, i) => `file${i}.jpg`)
 			mockFs.readdir.mockResolvedValue(manyFiles as any)
 
-			const result = await service.performCleanup(['preserve-recent'])
+			const result = await service.performCleanup(['custom-trim'])
 
 			// Should preserve at least 100 files
 			expect(result.filesRemoved).toBeLessThanOrEqual(50)

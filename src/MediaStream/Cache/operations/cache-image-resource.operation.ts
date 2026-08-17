@@ -253,10 +253,18 @@ export default class CacheImageResourceOperation {
 				throw new Error(`Invalid or disallowed URL: ${sanitizedRequest.resourceTarget}`)
 			}
 
-			if (sanitizedRequest.resizeOptions?.width && sanitizedRequest.resizeOptions?.height) {
-				if (!this.inputSanitizationService.validateImageDimensions(sanitizedRequest.resizeOptions.width, sanitizedRequest.resizeOptions.height)) {
-					throw new Error(`Invalid image dimensions: ${sanitizedRequest.resizeOptions.width}x${sanitizedRequest.resizeOptions.height}`)
-				}
+			// Unconditional: null axes map to 0, which validateImageDimensions
+			// treats per its documented semantics — (0,0) pass-through, single
+			// non-zero axis capped at its per-axis max, both non-zero capped
+			// per-axis AND by total pixels. The previous `width && height`
+			// guard skipped validation entirely for single-axis resizes,
+			// leaving e.g. ?width=999999 unbounded (sanitize() never clamps
+			// numbers). Extreme-aspect derived outputs stay bounded by
+			// Sharp's `limitInputPixels` on the source side.
+			const requestedWidth = sanitizedRequest.resizeOptions?.width ?? 0
+			const requestedHeight = sanitizedRequest.resizeOptions?.height ?? 0
+			if (!this.inputSanitizationService.validateImageDimensions(requestedWidth, requestedHeight)) {
+				throw new Error(`Invalid image dimensions: ${requestedWidth}x${requestedHeight}`)
 			}
 
 			// Use the new validate() method

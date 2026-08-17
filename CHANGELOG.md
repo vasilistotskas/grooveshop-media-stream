@@ -1,3 +1,29 @@
+## [2.59.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.59.1...v2.59.2) (2026-08-14)
+
+
+### Bug Fixes
+
+* **validation:** validate single-axis resize dimensions in cache operation ([d70885e](https://github.com/vasilistotskas/grooveshop-media-stream/commit/d70885ec61d3faa39ce3bd7d5b787cfef989508d))
+
+## [2.59.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.59.0...v2.59.1) (2026-08-13)
+
+
+### Bug Fixes
+
+* **storage:** remove the preserve-recent nightly wipe, enforce cleanup time budget ([0ba1519](https://github.com/vasilistotskas/grooveshop-media-stream/commit/0ba15190cba9e1ad85ff5061f091c45af80960bf))
+
+# [2.59.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.58.2...v2.59.0) (2026-08-10)
+
+
+### Bug Fixes
+
+* **deps:** update brace-expansion to patched versions ([d7c52d3](https://github.com/vasilistotskas/grooveshop-media-stream/commit/d7c52d39130ce3374a8efe609e5bcec64504bc99))
+
+
+### Features
+
+* Bump Versions ([521244d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/521244d240e82abb4ba7b7540c31ebc866f82a8e))
+
 ## [2.58.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.58.1...v2.58.2) (2026-07-14)
 
 
