@@ -1,5 +1,5 @@
-import { InternalSecretGuard } from '#microservice/common/guards/internal-secret.guard'
 import { BadRequestException, Body, Controller, HttpCode, HttpStatus, Logger, Post, UseGuards } from '@nestjs/common'
+import { InternalSecretGuard } from '#microservice/common/guards/internal-secret.guard'
 import { MultiLayerCacheManager } from '../services/multi-layer-cache.manager.js'
 
 /**
