@@ -245,7 +245,7 @@ export default class MediaStreamImageController {
 			// as the ``tenant_schema`` Prometheus label, so we validate
 			// the shape here before it can drive disk paths or metrics
 			// cardinality (H20 in MULTI_TENANT_AUDIT.md).
-			const rawTenantSchema = (params as Record<string, unknown>).tenantSchema
+			const rawTenantSchema = (params as Record<string, unknown> & { tenantSchema?: unknown }).tenantSchema
 			const tenantSchema = typeof rawTenantSchema === 'string'
 				? rawTenantSchema
 				: 'public'
