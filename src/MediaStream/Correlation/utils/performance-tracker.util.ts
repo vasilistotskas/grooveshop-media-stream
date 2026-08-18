@@ -4,7 +4,7 @@ import { requestContextStorage } from '../async-local-storage.js'
 
 import { CorrelatedLogger } from './logger.util.js'
 
-export interface PerformancePhase {
+interface PerformancePhase {
 	name: string
 	startTime: bigint
 	endTime?: bigint

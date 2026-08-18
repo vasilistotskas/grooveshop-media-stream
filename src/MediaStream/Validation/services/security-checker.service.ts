@@ -262,28 +262,6 @@ export class SecurityCheckerService implements ISecurityChecker {
 			})
 	}
 
-	async getRecentEventsFromRedis(limit = 100): Promise<SecurityEvent[]> {
-		const redisClient = this._redisCacheService?.getClient()
-		if (!redisClient) {
-			return []
-		}
-
-		try {
-			const raw = await redisClient.lrange(REDIS_SECURITY_EVENTS_KEY, 0, limit - 1)
-			return raw.map((entry) => {
-				const parsed = JSON.parse(entry) as SecurityEvent
-				if (parsed.timestamp) {
-					parsed.timestamp = new Date(parsed.timestamp)
-				}
-				return parsed
-			})
-		}
-		catch (error: unknown) {
-			CorrelatedLogger.warn(`Failed to read security events from Redis: ${(error as Error).message}`, SecurityCheckerService.name)
-			return []
-		}
-	}
-
 	getSecurityEvents(limit = 100): SecurityEvent[] {
 		return this.securityEvents
 			.slice(-limit)

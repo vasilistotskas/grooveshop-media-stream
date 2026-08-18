@@ -63,22 +63,4 @@ export class SharpConfigService implements OnModuleInit {
 		}
 		this.logger.log(`Sharp initialized: ${JSON.stringify(sharpInfo)}`)
 	}
-
-	/**
-	 * Get current Sharp configuration for monitoring/debugging
-	 */
-	getConfiguration(): {
-		concurrency: number
-		simd: boolean
-		versions: { sharp: string, vips: string }
-	} {
-		return {
-			concurrency: sharp.concurrency(),
-			simd: sharp.simd(),
-			versions: {
-				sharp: sharp.versions.sharp,
-				vips: sharp.versions.vips,
-			},
-		}
-	}
 }

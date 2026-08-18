@@ -82,13 +82,6 @@ export abstract class BaseHealthIndicator implements IHealthIndicator {
 	}
 
 	/**
-	 * Get the last health check metrics
-	 */
-	getLastCheck(): HealthMetrics | undefined {
-		return this.lastCheck
-	}
-
-	/**
 	 * Abstract method that subclasses must implement to perform the actual health check
 	 */
 	protected abstract performHealthCheck(): Promise<HealthIndicatorResult>

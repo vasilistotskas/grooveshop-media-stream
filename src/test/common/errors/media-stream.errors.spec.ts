@@ -4,8 +4,6 @@ import {
 	DefaultImageFallbackError,
 	InvalidRequestError,
 	MediaStreamError,
-	ResourceNotFoundError,
-	ResourceProcessingError,
 	ResourceStreamingError,
 } from '#microservice/common/errors/media-stream.errors'
 
@@ -47,38 +45,6 @@ describe('mediaStreamErrors', () => {
 			expect(json).toHaveProperty('code', 'MEDIA_STREAM_ERROR')
 			expect(json).toHaveProperty('context', {})
 			expect(json).toHaveProperty('stack')
-		})
-	})
-
-	describe('resourceNotFoundError', () => {
-		it('should create a not found error with default values', () => {
-			const error = new ResourceNotFoundError()
-
-			expect(error).toBeInstanceOf(MediaStreamError)
-			expect(error.name).toBe('ResourceNotFoundError')
-			expect(error.message).toBe('Resource not found')
-			expect(error.status).toBe(HttpStatus.NOT_FOUND)
-			expect(error.code).toBe('RESOURCE_NOT_FOUND')
-		})
-
-		it('should create a not found error with custom message and context', () => {
-			const context = { resourceId: '123' }
-			const error = new ResourceNotFoundError('Custom resource not found', context)
-
-			expect(error.message).toBe('Custom resource not found')
-			expect(error.context).toBe(context)
-		})
-	})
-
-	describe('resourceProcessingError', () => {
-		it('should create a processing error with default values', () => {
-			const error = new ResourceProcessingError()
-
-			expect(error).toBeInstanceOf(MediaStreamError)
-			expect(error.name).toBe('ResourceProcessingError')
-			expect(error.message).toBe('Failed to process resource')
-			expect(error.status).toBe(HttpStatus.INTERNAL_SERVER_ERROR)
-			expect(error.code).toBe('RESOURCE_PROCESSING_ERROR')
 		})
 	})
 

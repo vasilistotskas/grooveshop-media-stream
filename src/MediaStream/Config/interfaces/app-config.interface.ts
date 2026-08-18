@@ -25,7 +25,6 @@ export interface RedisConfig {
 	db: number
 	ttl: number
 	maxRetries: number
-	retryDelayOnFailover: number
 	healthCheckCacheTtl: number
 }
 
@@ -178,10 +177,6 @@ export interface ShutdownConfig {
 	forceTimeout: number
 }
 
-export interface InternalConfig {
-	adminSecret?: string
-}
-
 export interface AppConfig {
 	server: ServerConfig
 	cache: CacheConfig
@@ -194,5 +189,4 @@ export interface AppConfig {
 	tenantDomains: TenantDomainsConfig
 	storage: StorageConfig
 	shutdown: ShutdownConfig
-	internal: InternalConfig
 }

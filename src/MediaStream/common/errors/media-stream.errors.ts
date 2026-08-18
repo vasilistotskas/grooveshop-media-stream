@@ -40,30 +40,6 @@ export class MediaStreamError extends Error {
 }
 
 /**
- * Error thrown when a resource is not found
- */
-export class ResourceNotFoundError extends MediaStreamError {
-	constructor(
-		message: string = 'Resource not found',
-		context: Metadata = {},
-	) {
-		super(message, HttpStatus.NOT_FOUND, 'RESOURCE_NOT_FOUND', context)
-	}
-}
-
-/**
- * Error thrown when there's an issue with resource processing
- */
-export class ResourceProcessingError extends MediaStreamError {
-	constructor(
-		message: string = 'Failed to process resource',
-		context: Metadata = {},
-	) {
-		super(message, HttpStatus.INTERNAL_SERVER_ERROR, 'RESOURCE_PROCESSING_ERROR', context)
-	}
-}
-
-/**
  * Error thrown when there's an issue with streaming a resource
  */
 export class ResourceStreamingError extends MediaStreamError {

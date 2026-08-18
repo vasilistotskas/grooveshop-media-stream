@@ -2,18 +2,6 @@
  * ETag generation utility for HTTP caching
  */
 
-import { Buffer } from 'node:buffer'
-import { createHash } from 'node:crypto'
-
-/**
- * Generate a strong ETag from content
- */
-export function generateETag(content: Buffer | string): string {
-	const hash = createHash('md5')
-	hash.update(content)
-	return `"${hash.digest('hex')}"`
-}
-
 /**
  * Generate a weak ETag from metadata (faster, suitable for most cases)
  */

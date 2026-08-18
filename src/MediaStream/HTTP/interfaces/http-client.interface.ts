@@ -1,27 +1,5 @@
 import type { AxiosRequestConfig, AxiosResponse } from 'axios'
 
-export interface CircuitBreakerOptions {
-	/**
-	 * Failure threshold percentage (0-100)
-	 */
-	failureThreshold: number
-
-	/**
-	 * Reset timeout in milliseconds
-	 */
-	resetTimeout: number
-
-	/**
-	 * Rolling window in milliseconds
-	 */
-	rollingWindow: number
-
-	/**
-	 * Minimum number of requests before tripping
-	 */
-	minimumRequests: number
-}
-
 export interface HttpClientStats {
 	/**
 	 * Total number of requests

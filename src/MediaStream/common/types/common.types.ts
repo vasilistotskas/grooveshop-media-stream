@@ -22,24 +22,6 @@ export type StringRecord = Record<string, string>
 export type Metadata = Record<string, any>
 
 /**
- * Tags for categorization and filtering
- * Use for metric tags, alert tags, or resource labels
- */
-export type Tags = Record<string, string>
-
-/**
- * Metrics collection with numeric values
- * Use for performance metrics, health scores, or statistical data
- */
-export type MetricsMap = Record<string, number>
-
-/**
- * Configuration object with flexible structure
- * Use for API keys, integration configs, or dynamic settings
- */
-export type ConfigMap = Record<string, string>
-
-/**
  * Generic details object for health checks or status information
  * Use for health indicator details, diagnostic information, or status reports
  */

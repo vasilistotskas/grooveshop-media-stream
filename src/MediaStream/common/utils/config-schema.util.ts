@@ -118,7 +118,6 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	'cache.redis.db': { env: 'REDIS_DB', default: 0, type: 'number' },
 	'cache.redis.ttl': { env: 'REDIS_TTL', default: 7200, type: 'number' },
 	'cache.redis.maxRetries': { env: 'REDIS_MAX_RETRIES', default: 3, type: 'number' },
-	'cache.redis.retryDelayOnFailover': { env: 'REDIS_RETRY_DELAY', default: 100, type: 'number' },
 	// TTL (ms) for memoising the Redis health probe result
 	'cache.redis.healthCheckCacheTtl': { env: 'REDIS_HEALTH_CACHE_TTL', default: 10000, type: 'number' },
 
@@ -243,7 +242,4 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	// Graceful shutdown configuration
 	'shutdown.timeout': { env: 'SHUTDOWN_TIMEOUT', default: 30000, type: 'number' },
 	'shutdown.forceTimeout': { env: 'SHUTDOWN_FORCE_TIMEOUT', default: 60000, type: 'number' },
-
-	// Internal admin secret for /metrics and /health/circuit-breaker/reset
-	'internal.adminSecret': { env: 'INTERNAL_ADMIN_SECRET', default: undefined, type: 'string' },
 }

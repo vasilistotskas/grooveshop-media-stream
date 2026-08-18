@@ -6,7 +6,7 @@
 import type { Request } from 'express'
 import { SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
 
-export interface NegotiatedFormat {
+interface NegotiatedFormat {
 	format: SupportedResizeFormats
 	quality: number
 	mimeType: string
@@ -94,25 +94,6 @@ export function negotiateImageFormat(
 		quality: requestedQuality || 80,
 		mimeType: 'image/webp',
 	}
-}
-
-const AVIF_RE = /image\/avif/i
-const WEBP_RE = /image\/webp/i
-
-/**
- * Check if client supports AVIF format
- */
-export function supportsAvif(req: Request): boolean {
-	const acceptHeader = req.headers.accept || ''
-	return AVIF_RE.test(acceptHeader)
-}
-
-/**
- * Check if client supports WebP format
- */
-export function supportsWebp(req: Request): boolean {
-	const acceptHeader = req.headers.accept || ''
-	return WEBP_RE.test(acceptHeader)
 }
 
 /**

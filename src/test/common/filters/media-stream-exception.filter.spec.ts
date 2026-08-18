@@ -3,7 +3,7 @@ import type { Mock } from 'vitest'
 import { HttpException, HttpStatus } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MediaStreamError, ResourceNotFoundError } from '#microservice/common/errors/media-stream.errors'
+import { MediaStreamError } from '#microservice/common/errors/media-stream.errors'
 import { MediaStreamExceptionFilter } from '#microservice/common/filters/media-stream-exception.filter'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 
@@ -91,8 +91,8 @@ describe('mediaStreamExceptionFilter', () => {
 			expect(typedErrorResponse.timestamp).toBeDefined()
 		})
 
-		it('should handle ResourceNotFoundError', () => {
-			const error = new ResourceNotFoundError('Resource not found', { resourceId: '123' })
+		it('should handle a MediaStreamError with NOT_FOUND status', () => {
+			const error = new MediaStreamError('Resource not found', HttpStatus.NOT_FOUND, 'RESOURCE_NOT_FOUND', { resourceId: '123' })
 
 			filter.catch(error, mockArgumentsHost)
 
@@ -105,7 +105,7 @@ describe('mediaStreamExceptionFilter', () => {
 
 			const typedErrorResponse = errorResponseArg as Record<string, any>
 
-			expect(typedErrorResponse.name).toBe('ResourceNotFoundError')
+			expect(typedErrorResponse.name).toBe('MediaStreamError')
 			expect(typedErrorResponse.message).toBe('Resource not found')
 			expect(typedErrorResponse.code).toBe('RESOURCE_NOT_FOUND')
 			expect(typedErrorResponse.context).toBeUndefined()

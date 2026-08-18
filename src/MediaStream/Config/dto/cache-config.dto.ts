@@ -51,10 +51,6 @@ export class RedisConfigDto {
 	maxRetries: number = 3
 
 	@IsNumber()
-	@Min(100)
-	retryDelayOnFailover: number = 100
-
-	@IsNumber()
 	@Min(0)
 	healthCheckCacheTtl: number = 10000
 }

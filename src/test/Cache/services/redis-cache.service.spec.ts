@@ -53,7 +53,6 @@ describe('redisCacheService', () => {
 		db: 0,
 		ttl: 7200,
 		maxRetries: 3,
-		retryDelayOnFailover: 100,
 	}
 
 	beforeEach(async () => {

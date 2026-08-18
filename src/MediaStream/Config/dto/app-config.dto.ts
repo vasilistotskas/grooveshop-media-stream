@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer'
-import { IsOptional, IsString, ValidateNested } from 'class-validator'
+import { ValidateNested } from 'class-validator'
 import { CacheConfigDto } from './cache-config.dto.js'
 import { ExternalServicesConfigDto } from './external-services-config.dto.js'
 import { HttpConfigDto } from './http-config.dto.js'
@@ -11,12 +11,6 @@ import { ShutdownConfigDto } from './shutdown-config.dto.js'
 import { StorageConfigDto } from './storage-config.dto.js'
 import { TenantDomainsConfigDto } from './tenant-domains-config.dto.js'
 import { ValidationConfigDto } from './validation-config.dto.js'
-
-export class InternalConfigDto {
-	@IsOptional()
-	@IsString()
-	adminSecret?: string
-}
 
 export class AppConfigDto {
 	@ValidateNested()
@@ -62,8 +56,4 @@ export class AppConfigDto {
 	@ValidateNested()
 	@Type(() => ShutdownConfigDto)
 	shutdown: ShutdownConfigDto = new ShutdownConfigDto()
-
-	@ValidateNested()
-	@Type(() => InternalConfigDto)
-	internal: InternalConfigDto = new InternalConfigDto()
 }

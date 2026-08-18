@@ -1,16 +1,3 @@
-export interface ValidationError {
-	field: string
-	message: string
-	value?: any
-	code?: string
-}
-
-export interface ValidationResult {
-	isValid: boolean
-	errors: ValidationError[]
-	sanitized?: any
-}
-
 export interface ISanitizer<T> {
 	sanitize: (input: T) => Promise<T>
 }

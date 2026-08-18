@@ -1,30 +1,12 @@
-import { Buffer } from 'node:buffer'
 import { describe, expect, it } from 'vitest'
 import {
 	checkETagMatch,
 	checkIfModifiedSince,
 	formatLastModified,
-	generateETag,
 	generateWeakETag,
 } from '#microservice/common/utils/etag.util'
 
 describe('etag.util', () => {
-	describe('generateETag', () => {
-		it('should generate a quoted md5 strong ETag', () => {
-			const etag = generateETag('hello')
-			expect(etag).toMatch(/^"[a-f0-9]{32}"$/)
-		})
-
-		it('should be stable for identical content and differ for different content', () => {
-			expect(generateETag('a')).toBe(generateETag('a'))
-			expect(generateETag('a')).not.toBe(generateETag('b'))
-		})
-
-		it('should accept Buffers', () => {
-			expect(generateETag(Buffer.from('hello'))).toBe(generateETag('hello'))
-		})
-	})
-
 	describe('generateWeakETag', () => {
 		it('should combine size, date, and format', () => {
 			expect(generateWeakETag(1024, 1700000000000, 'webp')).toBe('W/"1024-1700000000000-webp"')

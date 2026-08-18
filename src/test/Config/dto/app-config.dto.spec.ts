@@ -37,7 +37,6 @@ describe('appConfigDto', () => {
 						db: 0,
 						ttl: 7200,
 						maxRetries: 3,
-						retryDelayOnFailover: 100,
 						healthCheckCacheTtl: 10000,
 					},
 					file: {
