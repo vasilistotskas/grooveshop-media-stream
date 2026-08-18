@@ -7,8 +7,8 @@ import MediaStreamModule from '#microservice/media-stream.module'
 
 const TEXT_PLAIN_RE = /text\/plain/
 
-// /metrics{,/health} are protected by ``InternalSecretGuard`` since
-// the audit-hardening pass.  E2E tests load a known secret via
+// /metrics is protected by ``InternalSecretGuard`` since the
+// audit-hardening pass.  E2E tests load a known secret via
 // ``INTERNAL_ADMIN_SECRET`` env var and attach the matching header.
 const TEST_INTERNAL_SECRET = 'test-internal-secret-for-e2e-spec'
 
@@ -74,24 +74,6 @@ describe('MediaStreamModule (e2e)', () => {
 			.expect(200)
 
 			.expect('Content-Type', TEXT_PLAIN_RE)
-	})
-
-	it('/metrics/health (GET)', () => {
-		return request(app.getHttpServer())
-
-			.get('/metrics/health')
-
-			.set('x-internal-secret', TEST_INTERNAL_SECRET)
-
-			.expect(200)
-
-			.expect((res) => {
-				expect(res.body).toHaveProperty('status')
-
-				expect(res.body).toHaveProperty('timestamp')
-
-				expect(res.body).toHaveProperty('service')
-			})
 	})
 
 	it('/health/live (GET)', () => {

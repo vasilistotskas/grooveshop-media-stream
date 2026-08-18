@@ -91,11 +91,8 @@ The application is configured with CORS enabled by default:
 ## API Endpoints
 
 ### Image Processing
-- `GET /media_stream-image/media/uploads/:imagePath+/:width/:height/:fit/:position/:background/:trimThreshold/:quality.:format` — Process uploaded media images
+- `GET /media_stream-image/media/:tenantSchema/uploads/:imagePath+/:width/:height/:fit/:position/:background/:trimThreshold/:quality.:format` — Process uploaded media images
 - `GET /media_stream-image/static/images/:image/:width/:height/:fit/:position/:background/:trimThreshold/:quality.:format` — Process static images
-
-### Configuration
-- `GET /config/image-sources` — Image source configuration and available options
 
 ### Health
 - `GET /health` — Full health check
@@ -107,7 +104,6 @@ The application is configured with CORS enabled by default:
 
 ### Metrics
 - `GET /metrics` — Prometheus-format metrics
-- `GET /metrics/health` — Metrics service health
 
 ## Testing
 

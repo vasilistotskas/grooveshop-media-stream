@@ -76,13 +76,6 @@ export class ConfigService implements OnModuleInit {
 	}
 
 	/**
-	 * Get the entire configuration object
-	 */
-	getAll(): AppConfig {
-		return { ...this.config }
-	}
-
-	/**
 	 * Validate the effective (schema-built) configuration against the DTO
 	 * constraints. Runs on the same object served by get()/getOptional(), so
 	 * what is validated is exactly what the application consumes.

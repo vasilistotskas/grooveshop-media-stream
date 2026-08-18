@@ -304,28 +304,6 @@ describe('rateLimitService', () => {
 		})
 	})
 
-	describe('resetRateLimit', () => {
-		it('should reset rate limit for specific key', async () => {
-			const mockConfig = {
-				windowMs: 60000,
-				max: 1,
-				skipSuccessfulRequests: false,
-				skipFailedRequests: false,
-			}
-
-			// Make request to reach limit
-			await service.checkRateLimit('test-key', mockConfig)
-
-			// Reset the key (now async)
-			await service.resetRateLimit('test-key')
-
-			// Next request should be allowed
-			const result = await service.checkRateLimit('test-key', mockConfig)
-			expect(result.allowed).toBe(true)
-			expect(result.info.current).toBe(1)
-		})
-	})
-
 	describe('isBot', () => {
 		it('should detect Facebook bot', () => {
 			expect(service.isBot('facebookexternalhit/1.1')).toBe(true)

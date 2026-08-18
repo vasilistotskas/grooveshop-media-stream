@@ -43,7 +43,7 @@ describe('generateResourceIdentityFromRequestJob', () => {
 	})
 
 	it('produces different UUIDs for the same URL on different tenants', async () => {
-		// The legacy `/media/uploads/...` route has no tenant segment in
+		// The shared `/static/images/...` route has no tenant segment in
 		// the URL; without `tenantSchema` in the DTO, two tenants
 		// requesting the same path would collide in cache + on disk.
 		// The field goes through JSON.stringify so the hash diverges.
@@ -58,12 +58,12 @@ describe('generateResourceIdentityFromRequestJob', () => {
 			quality: 90,
 		}
 		const requestA = new CacheImageRequest({
-			resourceTarget: 'http://backend-service/media/uploads/logo.png',
+			resourceTarget: 'http://backend-service/static/images/logo.png',
 			resizeOptions,
 			tenantSchema: 'tenant_a',
 		})
 		const requestB = new CacheImageRequest({
-			resourceTarget: 'http://backend-service/media/uploads/logo.png',
+			resourceTarget: 'http://backend-service/static/images/logo.png',
 			resizeOptions,
 			tenantSchema: 'tenant_b',
 		})

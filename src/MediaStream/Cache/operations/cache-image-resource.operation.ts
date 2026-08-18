@@ -73,8 +73,8 @@ export default class CacheImageResourceOperation {
 	 * This makes SCAN-based per-tenant invalidation possible:
 	 *   invalidateNamespace('image:acme') targets exactly ``image:acme:*``.
 	 *
-	 * Falls back to ``image:public`` for shared/static images and for the
-	 * legacy route where no tenant is present in the URL.
+	 * Falls back to ``image:public`` for shared/static images where no
+	 * tenant is present in the URL.
 	 */
 	private cacheNamespace(ctx: OperationContext): string {
 		const schema = ctx.request.tenantSchema || 'public'

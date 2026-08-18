@@ -61,20 +61,6 @@ export class RequestDeduplicator<T = void> implements OnModuleDestroy {
 	}
 
 	/**
-	 * Check if a request is currently pending
-	 */
-	isPending(key: string): boolean {
-		return this.pendingRequests.has(key)
-	}
-
-	/**
-	 * Get the number of pending requests
-	 */
-	getPendingCount(): number {
-		return this.pendingRequests.size
-	}
-
-	/**
 	 * Get statistics about pending requests
 	 */
 	getStats(): { pending: number, keys: string[] } {

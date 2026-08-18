@@ -143,53 +143,6 @@ export class RedisHealthIndicator extends BaseHealthIndicator {
 		return warnings
 	}
 
-	async getDetailedStatus(): Promise<any> {
-		try {
-			const stats = await this.redisCacheService.getStats()
-			const memoryUsage = await this.redisCacheService.getMemoryUsage()
-			const connectionStatus = this.redisCacheService.getConnectionStatus()
-			const keys = await this.redisCacheService.keys()
-
-			return {
-				type: 'redis-cache',
-				status: connectionStatus.connected ? 'operational' : 'disconnected',
-				connection: {
-					connected: connectionStatus.connected,
-					host: this._configService.get('cache.redis.host'),
-					port: this._configService.get('cache.redis.port'),
-					db: this._configService.get('cache.redis.db'),
-				},
-				statistics: {
-					...stats,
-					operations: connectionStatus.stats.operations,
-					errors: connectionStatus.stats.errors,
-				},
-				memory: {
-					...memoryUsage,
-					usedMB: Math.round(memoryUsage.used / 1024 / 1024 * 100) / 100,
-					peakMB: Math.round(memoryUsage.peak / 1024 / 1024 * 100) / 100,
-				},
-				configuration: {
-					host: this._configService.get('cache.redis.host'),
-					port: this._configService.get('cache.redis.port'),
-					db: this._configService.get('cache.redis.db'),
-					ttl: this._configService.get('cache.redis.ttl'),
-					maxRetries: this._configService.get('cache.redis.maxRetries'),
-				},
-				recentKeys: keys.slice(0, 10),
-				lastUpdated: new Date().toISOString(),
-			}
-		}
-		catch (error: unknown) {
-			return {
-				type: 'redis-cache',
-				status: 'error',
-				error: (error as Error).message,
-				lastUpdated: new Date().toISOString(),
-			}
-		}
-	}
-
 	protected getDescription(): string {
 		return 'Redis cache health indicator that tests connection and basic operations'
 	}

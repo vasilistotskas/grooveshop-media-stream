@@ -161,16 +161,6 @@ describe('memoryCacheService', () => {
 			// And should be within the expected TTL range (current time + ttl seconds)
 			expect(keyTtl).toBeLessThanOrEqual(Date.now() + (ttl * 1000))
 		})
-
-		it('should update TTL for existing key', async () => {
-			const key = 'ttl-test'
-			const value = 'test-value'
-
-			await service.set(key, value, 3600)
-			const success = service.setTtl(key, 7200)
-
-			expect(success).toBe(true)
-		})
 	})
 
 	describe('statistics', () => {

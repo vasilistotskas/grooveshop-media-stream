@@ -32,21 +32,11 @@ export interface OptimizationConfig {
 	maxOptimizationTime: number
 }
 
-export interface FileOptimization {
-	originalPath: string
-	optimizedPath: string
-	originalSize: number
-	optimizedSize: number
-	compressionRatio: number
-	strategy: string
-}
-
 @Injectable()
 export class StorageOptimizationService implements OnModuleInit {
 	private readonly storageDirectory: string
 	private readonly config: OptimizationConfig
 	private readonly strategies = new Map<string, OptimizationStrategy>()
-	private optimizationHistory = new Map<string, FileOptimization>()
 	private isOptimizationRunning = false
 
 	constructor(
@@ -190,40 +180,6 @@ export class StorageOptimizationService implements OnModuleInit {
 				StorageOptimizationService.name,
 			)
 		}
-	}
-
-	/**
-	 * Get optimization statistics
-	 */
-	getOptimizationStats(): {
-		enabled: boolean
-		isRunning: boolean
-		totalOptimizations: number
-		totalSizeSaved: number
-		averageCompressionRatio: number
-		strategies: string[]
-	} {
-		const optimizations = Array.from(this.optimizationHistory.values())
-		const totalSizeSaved = optimizations.reduce((sum: any, opt: any) => sum + (opt.originalSize - opt.optimizedSize), 0)
-		const averageCompressionRatio = optimizations.length > 0
-			? optimizations.reduce((sum: any, opt: any) => sum + opt.compressionRatio, 0) / optimizations.length
-			: 0
-
-		return {
-			enabled: this.config.enabled,
-			isRunning: this.isOptimizationRunning,
-			totalOptimizations: optimizations.length,
-			totalSizeSaved,
-			averageCompressionRatio,
-			strategies: this.config.strategies,
-		}
-	}
-
-	/**
-	 * Get optimization history for a specific file
-	 */
-	getFileOptimizationHistory(filename: string): FileOptimization | null {
-		return this.optimizationHistory.get(filename) || null
 	}
 
 	private initializeStrategies(): void {

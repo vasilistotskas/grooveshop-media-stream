@@ -129,21 +129,6 @@ describe('metricsService', () => {
 			expect(metrics).toContain('status="error"')
 			expect(metrics).toContain('mediastream_image_processing_errors_total')
 		})
-
-		it('should update image processing queue size', async () => {
-			service.updateImageProcessingQueueSize(5)
-
-			const metrics = await service.getMetrics()
-			expect(metrics).toContain('mediastream_image_processing_queue_size')
-		})
-
-		it('should record image processing errors', async () => {
-			service.recordImageProcessingError('resize', 'invalid_format')
-
-			const metrics = await service.getMetrics()
-			expect(metrics).toContain('mediastream_image_processing_errors_total')
-			expect(metrics).toContain('error_type="invalid_format"')
-		})
 	})
 
 	describe('tenant_schema label', () => {
@@ -207,24 +192,6 @@ describe('metricsService', () => {
 
 			const metrics = await service.getMetrics()
 			expect(metrics).toContain('mediastream_cache_operation_duration_seconds')
-		})
-
-		it('should record cache evictions', async () => {
-			service.recordCacheEviction('memory', 'size')
-			service.recordCacheEviction('redis', 'ttl')
-
-			const metrics = await service.getMetrics()
-			expect(metrics).toContain('mediastream_cache_evictions_total')
-			expect(metrics).toContain('reason="size"')
-			expect(metrics).toContain('reason="ttl"')
-		})
-
-		it('should update cache size', async () => {
-			service.updateCacheSize('memory', 1024000)
-			service.updateCacheSize('redis', 2048000)
-
-			const metrics = await service.getMetrics()
-			expect(metrics).toContain('mediastream_cache_size_bytes')
 		})
 
 		it('should update cache hit ratio', async () => {
@@ -311,25 +278,6 @@ describe('metricsService', () => {
 			expect(metrics).toContain('period="5m"')
 			expect(metrics).toContain('period="15m"')
 		})
-
-		it('should update file descriptor metrics', async () => {
-			service.updateFileDescriptors(1024, 65536)
-
-			const metrics = await service.getMetrics()
-			expect(metrics).toContain('mediastream_file_descriptors')
-			expect(metrics).toContain('type="open"')
-			expect(metrics).toContain('type="max"')
-		})
-
-		it('should update network connection metrics', async () => {
-			service.updateNetworkConnections(50, 10, 5)
-
-			const metrics = await service.getMetrics()
-			expect(metrics).toContain('mediastream_network_connections')
-			expect(metrics).toContain('state="established"')
-			expect(metrics).toContain('state="listening"')
-			expect(metrics).toContain('state="time_wait"')
-		})
 	})
 
 	describe('metrics Export', () => {
@@ -369,16 +317,6 @@ describe('metricsService', () => {
 	})
 
 	describe('performance Metrics', () => {
-		it('should record garbage collection metrics', async () => {
-			service.recordGarbageCollection('major', 0.05)
-			service.recordGarbageCollection('minor', 0.01)
-
-			const metrics = await service.getMetrics()
-			expect(metrics).toContain('mediastream_gc_duration_seconds')
-			expect(metrics).toContain('type="major"')
-			expect(metrics).toContain('type="minor"')
-		})
-
 		it('should record event loop lag', async () => {
 			service.recordEventLoopLag(0.02)
 

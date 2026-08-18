@@ -201,10 +201,6 @@ export class MemoryCacheService implements ICacheManager {
 		return this.cache.getTtl(key) ?? 0
 	}
 
-	setTtl(key: string, ttl: number): boolean {
-		return this.cache.ttl(key, ttl)
-	}
-
 	getMemoryUsage(): { used: number, total: number } {
 		return {
 			used: this.currentByteSize,

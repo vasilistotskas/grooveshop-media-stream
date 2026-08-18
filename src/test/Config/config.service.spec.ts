@@ -82,17 +82,6 @@ describe('configService', () => {
 			expect(service.getOptional('nonexistent.key' as any, 'default')).toBe('default')
 		})
 
-		it('should return entire configuration object', () => {
-			const config = service.getAll()
-			expect(config).toHaveProperty('server')
-			expect(config).toHaveProperty('cache')
-			expect(config).toHaveProperty('processing')
-			expect(config).toHaveProperty('monitoring')
-			expect(config).toHaveProperty('externalServices')
-			expect(config).toHaveProperty('validation')
-			expect(config).toHaveProperty('storage')
-		})
-
 		it('should throw error for non-existent configuration key', () => {
 			expect(() => service.get('nonexistent.key' as any)).toThrow(
 				'Configuration key \'nonexistent.key\' not found',

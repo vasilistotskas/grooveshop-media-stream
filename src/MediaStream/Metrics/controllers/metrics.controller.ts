@@ -17,20 +17,4 @@ export class MetricsController {
 	async getMetrics(): Promise<string> {
 		return await this.metricsService.getMetrics()
 	}
-
-	/**
-	 * Health check for metrics endpoint
-	 */
-	@Get('health')
-	@HttpCode(HttpStatus.OK)
-	getMetricsHealth(): { status: string, timestamp: number, service: string, registry: { metricsCount: number } } {
-		return {
-			status: 'healthy',
-			timestamp: Date.now(),
-			service: 'metrics',
-			registry: {
-				metricsCount: this.metricsService.getRegistry().getMetricsAsArray().length,
-			},
-		}
-	}
 }

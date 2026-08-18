@@ -3,7 +3,6 @@ import { Module } from '@nestjs/common'
 import { APP_FILTER, APP_GUARD, HttpAdapterHost } from '@nestjs/core'
 import { ScheduleModule } from '@nestjs/schedule'
 import { ApiModule } from '#microservice/API/api.module'
-import { ConfigController } from '#microservice/API/controllers/config.controller'
 import MediaStreamImageController from '#microservice/API/controllers/media-stream-image.controller'
 import { CacheOperationsModule } from '#microservice/Cache/cache-operations.module'
 import { CacheModule } from '#microservice/Cache/cache.module'
@@ -22,7 +21,7 @@ import { RateLimitModule } from '#microservice/RateLimit/rate-limit.module'
 import { StorageModule } from '#microservice/Storage/storage.module'
 import { ValidationModule } from '#microservice/Validation/validation.module'
 
-const controllers = [MediaStreamImageController, ConfigController]
+const controllers = [MediaStreamImageController]
 
 /**
  * The Main module for the MediaStream application

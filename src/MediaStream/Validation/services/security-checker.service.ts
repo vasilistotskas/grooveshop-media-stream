@@ -261,35 +261,4 @@ export class SecurityCheckerService implements ISecurityChecker {
 				CorrelatedLogger.warn(`Failed to persist security event to Redis: ${(error as Error).message}`, SecurityCheckerService.name)
 			})
 	}
-
-	getSecurityEvents(limit = 100): SecurityEvent[] {
-		return this.securityEvents
-			.slice(-limit)
-			.sort((a: any, b: any) => b.timestamp.getTime() - a.timestamp.getTime())
-	}
-
-	getSecurityStats(): {
-		totalEvents: number
-		eventsByType: { [key: string]: number }
-		recentEvents: number
-	} {
-		const now = new Date()
-		const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000)
-
-		const eventsByType: { [key: string]: number } = {}
-		let recentEvents = 0
-
-		for (const event of this.securityEvents) {
-			eventsByType[event.type] = (eventsByType[event.type] || 0) + 1
-			if (event.timestamp && event.timestamp > oneHourAgo) {
-				recentEvents++
-			}
-		}
-
-		return {
-			totalEvents: this.securityEvents.length,
-			eventsByType,
-			recentEvents,
-		}
-	}
 }

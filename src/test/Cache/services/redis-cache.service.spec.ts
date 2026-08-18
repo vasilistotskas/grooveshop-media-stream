@@ -560,25 +560,6 @@ describe('redisCacheService', () => {
 			})
 		})
 
-		describe('setTtl', () => {
-			it('should set TTL for key', async () => {
-				mockRedis.expire.mockResolvedValue(1)
-
-				const result = await service.setTtl('test-key', 3600)
-
-				expect(result).toBe(true)
-				expect(mockRedis.expire).toHaveBeenCalledWith('test-key', 3600)
-			})
-
-			it('should return false when key does not exist', async () => {
-				mockRedis.expire.mockResolvedValue(0)
-
-				const result = await service.setTtl('non-existent-key', 3600)
-
-				expect(result).toBe(false)
-			})
-		})
-
 		describe('getConnectionStatus', () => {
 			it('should return connection status and stats', async () => {
 				const status = service.getConnectionStatus()

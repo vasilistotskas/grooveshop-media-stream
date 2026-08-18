@@ -110,15 +110,4 @@ export class MemoryHealthIndicator extends BaseHealthIndicator {
 	getCurrentMemoryInfo(): MemoryInfo {
 		return this.getMemoryInfo()
 	}
-
-	/**
-	 * Force garbage collection if available (for testing/debugging)
-	 */
-	forceGarbageCollection(): boolean {
-		if (globalThis.gc) {
-			globalThis.gc()
-			return true
-		}
-		return false
-	}
 }

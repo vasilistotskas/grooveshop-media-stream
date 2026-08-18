@@ -64,10 +64,9 @@ The service supports two image route types that map to different cache namespace
 | Route type | URL pattern | Source key | tenantSchema |
 |---|---|---|---|
 | Tenant-scoped | `media/:tenantSchema/uploads/:imagePath+/…` | `UPLOADED_MEDIA` | extracted from URL |
-| Legacy (pre-MT) | `media/uploads/:imagePath+/…` | `UPLOADED_MEDIA_LEGACY` | always `"public"` |
 | Static images | `static/images/:image/…` | `STATIC_IMAGES` | always `"public"` |
 
-The tenant-scoped route must appear first in `IMAGE_SOURCES` (V8 insertion order) so that `media/acme/uploads/…` is matched by `UPLOADED_MEDIA` before `UPLOADED_MEDIA_LEGACY` can swallow `acme` as part of `imagePath`. A regression test in `src/test/API/controllers/media-stream-image.controller.spec.ts` guards this ordering.
+There is no legacy (pre-multi-tenant) route — Django emits schema-prefixed URLs exclusively, so requests to the old `media/uploads/…` shape (no tenant segment) 404 naturally: no `IMAGE_SOURCES` pattern matches them.
 
 **Cache namespace**: keys are stored as `image:{tenantSchema}:{uuid}` in memory and Redis. This allows targeted SCAN-based per-tenant invalidation via `MultiLayerCacheManager.invalidateNamespace('image:acme')`.
 
@@ -94,7 +93,7 @@ Defined in `src/MediaStream/API/config/image-sources.config.ts`. Each source map
 
 ### Multi-Layer Cache
 
-Cache layers checked in parallel: Memory (node-cache, priority 1) → Redis (ioredis, priority 2) → File system (`./storage`, priority 3). Returns first hit from highest-priority layer. Automatic backfill to higher-priority layers on cache hits (fire-and-forget). Cache warming runs every 6 hours for popular images (5+ accesses). Storage files use extensions: `.rsc` (resource data), `.rst` (temp during write), `.rsm` (metadata JSON). Cache TTLs: public 360 days, private 180 days, negative cache 5 min for failed fetches. `RedisCacheService.flushAll()` executes `FLUSHDB` (current database only), not `FLUSHALL` — Redis is shared with Django, Nuxt, and Celery. `ResourceMetaData` includes an `accessCount` field incremented on every cache hit; cache warming uses this for the 5-access threshold and stores `{ data: Buffer, metadata: ResourceMetaData }` shape in both `warmupFile` and `warmupSpecificFile`.
+Cache layers checked in parallel: Memory (node-cache, priority 1) → Redis (ioredis, priority 2) → File system (`./storage`, priority 3). Returns first hit from highest-priority layer. Automatic backfill to higher-priority layers on cache hits (fire-and-forget). Cache warming runs every 6 hours for popular images (5+ accesses). Storage files use extensions: `.rsc` (resource data), `.rst` (temp during write), `.rsm` (metadata JSON). Cache TTLs: public 360 days, private 180 days, negative cache 5 min for failed fetches. `RedisCacheService.flushAll()` executes `FLUSHDB` (current database only), not `FLUSHALL` — Redis is shared with Django, Nuxt, and Celery. `ResourceMetaData` includes an `accessCount` field incremented on every cache hit; cache warming uses this for the 5-access threshold and `warmupFile` stores the `{ data: Buffer, metadata: ResourceMetaData }` shape.
 
 ### Processing Pipeline
 
@@ -106,8 +105,7 @@ Cache layers checked in parallel: Memory (node-cache, priority 1) → Redis (ior
 
 ### Additional Endpoints
 
-- `GET /config/image-sources` — Returns image source configuration, enums (fit, position, background, format), and defaults
-- `GET /metrics` — Prometheus-format metrics, `GET /metrics/health` — Metrics service health
+- `GET /metrics` — Prometheus-format metrics
 
 ### Health Endpoints
 

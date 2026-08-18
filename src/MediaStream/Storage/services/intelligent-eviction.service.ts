@@ -137,35 +137,6 @@ export class IntelligentEvictionService {
 		return this.performEviction(targetReduction)
 	}
 
-	/**
-	 * Get eviction recommendations without executing
-	 */
-	async getEvictionRecommendations(targetSize?: number): Promise<{
-		candidates: AccessPattern[]
-		totalSize: number
-		strategy: string
-		reasoning: string[]
-	}> {
-		const candidates = await this.storageMonitoring.getEvictionCandidates(targetSize)
-		const strategy = this.strategies.get(this.config.strategy)
-
-		if (!strategy) {
-			throw new Error(`Unknown eviction strategy: ${this.config.strategy}`)
-		}
-
-		const finalCandidates = await strategy.execute(candidates, targetSize || 0)
-		const totalSize = finalCandidates.reduce((sum: any, candidate: any) => sum + candidate.size, 0)
-
-		const reasoning = this.generateEvictionReasoning(finalCandidates)
-
-		return {
-			candidates: finalCandidates,
-			totalSize,
-			strategy: this.config.strategy,
-			reasoning,
-		}
-	}
-
 	private initializeStrategies(): void {
 		this.strategies.set('lru', {
 			name: 'LRU',
@@ -294,32 +265,6 @@ export class IntelligentEvictionService {
 			default:
 				return 1.0
 		}
-	}
-
-	private generateEvictionReasoning(candidates: AccessPattern[]): string[] {
-		const reasoning: string[] = []
-
-		if (candidates.length === 0) {
-			reasoning.push('No files selected for eviction')
-			return reasoning
-		}
-
-		const totalSize = candidates.reduce((sum: any, c: any) => sum + c.size, 0)
-		const avgAccessCount = candidates.reduce((sum: any, c: any) => sum + c.accessCount, 0) / candidates.length
-		const oldestAccess = Math.min(...candidates.map(c => c.lastAccessed.getTime()))
-		const daysSinceOldest = (Date.now() - oldestAccess) / (1000 * 60 * 60 * 24)
-
-		reasoning.push(`Selected ${candidates.length} files totaling ${this.formatBytes(totalSize)}`)
-		reasoning.push(`Average access count: ${avgAccessCount.toFixed(1)}`)
-		reasoning.push(`Oldest file last accessed ${daysSinceOldest.toFixed(1)} days ago`)
-
-		if (this.config.preservePopular) {
-			reasoning.push(`Popular files (>${this.config.minAccessCount} accesses) preserved`)
-		}
-
-		reasoning.push(`Strategy: ${this.config.strategy} (${this.config.aggressiveness})`)
-
-		return reasoning
 	}
 
 	private formatBytes(bytes: number): string {

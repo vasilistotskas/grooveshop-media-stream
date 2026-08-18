@@ -18,5 +18,4 @@ export interface CorrelationService {
 	setContext: (context: RequestContext) => void
 	getContext: () => RequestContext | null
 	getCorrelationId: () => string | null
-	clearContext: () => void
 }

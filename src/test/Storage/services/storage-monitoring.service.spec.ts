@@ -209,31 +209,6 @@ describe('storageMonitoringService', () => {
 		})
 	})
 
-	describe('recordFileAccess', () => {
-		beforeEach(async () => {
-			// Initialize access patterns by calling getStorageStats
-			const mockStats = {
-				size: 1024 * 1024,
-				mtime: new Date(),
-				atime: new Date(),
-			}
-			mockFs.stat.mockResolvedValue(mockStats as any)
-			await service.getStorageStats()
-		})
-
-		it('should update access count for existing file', () => {
-			service.recordFileAccess('image1.webp')
-			service.recordFileAccess('image1.webp')
-
-			// Access count should be updated (tested indirectly through getStorageStats)
-			expect(() => service.recordFileAccess('image1.webp')).not.toThrow()
-		})
-
-		it('should handle access recording for non-existent file', () => {
-			expect(() => service.recordFileAccess('nonexistent.jpg')).not.toThrow()
-		})
-	})
-
 	describe('scanStorageDirectory', () => {
 		it('should update access patterns during scan', async () => {
 			const mockStats = {
@@ -245,8 +220,11 @@ describe('storageMonitoringService', () => {
 
 			await service.scanStorageDirectory()
 
-			const lastScanTime = service.getLastScanTime()
-			expect(lastScanTime).toBeInstanceOf(Date)
+			// getLastScanTime/its backing field were removed as test-only
+			// surface; assert the scan's actual effect (populated access
+			// patterns) instead.
+			const patterns = (service as any).accessPatterns as Map<string, unknown>
+			expect(patterns.size).toBeGreaterThan(0)
 		})
 
 		it('should handle scan errors gracefully', async () => {
@@ -268,10 +246,9 @@ describe('storageMonitoringService', () => {
 
 			// Second scan with fewer files
 			mockFs.readdir.mockResolvedValue(['image1.webp', '.gitkeep'] as any)
-			await service.scanStorageDirectory()
 
 			// Should handle the change without errors
-			expect(() => service.getLastScanTime()).not.toThrow()
+			await expect(service.scanStorageDirectory()).resolves.toBeUndefined()
 		})
 	})
 

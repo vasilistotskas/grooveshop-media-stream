@@ -84,11 +84,6 @@ export interface IHttpClient {
 	getStats: () => HttpClientStats
 
 	/**
-	 * Reset client statistics
-	 */
-	resetStats: () => void
-
-	/**
 	 * Check if the circuit breaker is open
 	 */
 	isCircuitOpen: () => boolean

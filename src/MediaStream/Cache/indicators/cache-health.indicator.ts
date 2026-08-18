@@ -120,38 +120,6 @@ export class CacheHealthIndicator extends BaseHealthIndicator {
 		return warnings
 	}
 
-	async getDetailedStatus(): Promise<any> {
-		try {
-			const stats = await this.memoryCacheService.getStats()
-			const memoryUsage = this.memoryCacheService.getMemoryUsage()
-			const warmupStats = await this.cacheWarmingService.getWarmupStats()
-			const keys = await this.memoryCacheService.keys()
-
-			return {
-				type: 'memory-cache',
-				status: 'operational',
-				statistics: stats,
-				memory: memoryUsage,
-				warming: warmupStats,
-				configuration: {
-					maxKeys: this._configService.get('cache.memory.maxKeys') || 1000,
-					defaultTtl: this._configService.get('cache.memory.defaultTtl') || 3600,
-					checkPeriod: this._configService.get('cache.memory.checkPeriod') || 600,
-				},
-				recentKeys: keys.slice(0, 10),
-				lastUpdated: new Date().toISOString(),
-			}
-		}
-		catch (error: unknown) {
-			return {
-				type: 'memory-cache',
-				status: 'error',
-				error: (error as Error).message,
-				lastUpdated: new Date().toISOString(),
-			}
-		}
-	}
-
 	protected getDescription(): string {
 		return 'Memory cache health indicator that tests cache operations and monitors memory usage'
 	}

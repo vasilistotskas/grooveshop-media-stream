@@ -13,7 +13,6 @@ describe('metricsController', () => {
 	beforeEach(async () => {
 		const mockMetricsService = {
 			getMetrics: vi.fn(),
-			getRegistry: vi.fn(),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -65,42 +64,6 @@ mediastream_http_requests_total{method="GET",route="/test",status_code="200"} 1`
 			metricsService.getMetrics.mockRejectedValue(new Error('Metrics error'))
 
 			await expect(controller.getMetrics()).rejects.toThrow('Metrics error')
-		})
-	})
-
-	describe('getMetricsHealth', () => {
-		it('should return health status', () => {
-			const mockRegistry = {
-				getMetricsAsArray: vi.fn().mockReturnValue([
-					{ name: 'metric1' },
-					{ name: 'metric2' },
-				]),
-			}
-
-			metricsService.getRegistry.mockReturnValue(mockRegistry as any)
-
-			const result = controller.getMetricsHealth()
-
-			expect(result).toEqual({
-				status: 'healthy',
-				timestamp: expect.any(Number),
-				service: 'metrics',
-				registry: {
-					metricsCount: 2,
-				},
-			})
-		})
-
-		it('should handle registry errors gracefully', () => {
-			const mockRegistry = {
-				getMetricsAsArray: vi.fn().mockImplementation(() => {
-					throw new Error('Registry error')
-				}),
-			}
-
-			metricsService.getRegistry.mockReturnValue(mockRegistry as any)
-
-			expect(() => controller.getMetricsHealth()).toThrow('Registry error')
 		})
 	})
 })

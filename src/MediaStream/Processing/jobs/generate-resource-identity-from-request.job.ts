@@ -31,8 +31,8 @@ function generateUUIDv5(name: string, namespace: string = NAMESPACE_URL): string
  *
  * Multi-tenant isolation: the CacheImageRequest carries a `tenantSchema`
  * field which is serialized into the JSON input of the hash. That means
- * two tenants requesting the same source URL (e.g. via the legacy
- * `media/uploads/...` route that has no tenant in the URL) produce
+ * two tenants requesting the same source URL (e.g. via the shared
+ * `static/images/...` route that has no tenant in the URL) produce
  * different UUIDs and cannot collide in cache or on disk.
  */
 @Injectable()

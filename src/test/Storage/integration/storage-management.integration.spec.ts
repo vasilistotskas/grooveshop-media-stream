@@ -31,6 +31,20 @@ vi.mock('node:fs', () => ({
 
 const mockFs = fs as MockedObject<typeof fs>
 
+// recordFileAccess was removed from StorageMonitoringService as test-only
+// surface (it was never wired to real request handling — access patterns
+// are populated by scanStorageDirectory/getStorageStats reading fs stats).
+// Reach into the private accessPatterns map directly to simulate access
+// bumps, same as recordFileAccess did internally.
+function bumpAccessCount(monitoring: StorageMonitoringService, filename: string, times = 1): void {
+	const patterns = (monitoring as any).accessPatterns as Map<string, { accessCount: number, lastAccessed: Date }>
+	const pattern = patterns.get(filename)
+	if (pattern) {
+		pattern.accessCount += times
+		pattern.lastAccessed = new Date()
+	}
+}
+
 describe('storage Management Integration', () => {
 	let module: TestingModule
 	let storageMonitoring: StorageMonitoringService
@@ -198,10 +212,7 @@ describe('storage Management Integration', () => {
 
 			// 6. Optimize frequently accessed files
 			// First, simulate popular files by recording access
-			storageMonitoring.recordFileAccess('popular-image.webp')
-			for (let i = 0; i < 15; i++) {
-				storageMonitoring.recordFileAccess('popular-image.webp')
-			}
+			bumpAccessCount(storageMonitoring, 'popular-image.webp', 16)
 
 			const optimizationResult = await storageOptimization.optimizeFrequentlyAccessedFiles()
 			expect(optimizationResult.strategy).toBeDefined()
@@ -237,12 +248,8 @@ describe('storage Management Integration', () => {
 
 		it('should coordinate cleanup and optimization', async () => {
 			// Record access patterns to create popular files
-			for (let i = 0; i < 20; i++) {
-				storageMonitoring.recordFileAccess('popular-image.webp')
-			}
-			for (let i = 0; i < 15; i++) {
-				storageMonitoring.recordFileAccess('recent-image.jpg')
-			}
+			bumpAccessCount(storageMonitoring, 'popular-image.webp', 20)
+			bumpAccessCount(storageMonitoring, 'recent-image.jpg', 15)
 
 			// Run cleanup first
 			const cleanupResult = await storageCleanup.performCleanup()
@@ -253,19 +260,20 @@ describe('storage Management Integration', () => {
 			// Both should have processed files
 			expect(cleanupResult.filesRemoved + optimizationResult.filesOptimized).toBeGreaterThan(0)
 
-			// Get final storage analysis
-			const analysis = await storageHealth.getStorageAnalysis()
-			expect(analysis.stats).toBeDefined()
-			expect(analysis.evictionCandidates).toBeDefined()
-			expect(analysis.cleanupRecommendations).toBeDefined()
+			// Get final storage analysis (getStorageAnalysis was removed from
+			// StorageHealthIndicator as test-only surface; assert the
+			// underlying monitoring data directly instead)
+			const stats = await storageMonitoring.getStorageStats()
+			const evictionCandidates = await storageMonitoring.getEvictionCandidates()
+			expect(stats).toBeDefined()
+			expect(evictionCandidates).toBeDefined()
 		})
 	})
 
 	describe('service Integration', () => {
 		it('should share access pattern data between services', async () => {
 			// Record access in monitoring service
-			storageMonitoring.recordFileAccess('popular-image.webp')
-			storageMonitoring.recordFileAccess('popular-image.webp')
+			bumpAccessCount(storageMonitoring, 'popular-image.webp', 2)
 
 			// Get stats to update patterns
 			await storageMonitoring.getStorageStats()
@@ -281,11 +289,12 @@ describe('storage Management Integration', () => {
 			// Get health status
 			const healthResult = await storageHealth.isHealthy()
 
-			// Get detailed analysis
-			const analysis = await storageHealth.getStorageAnalysis()
+			// Get storage stats directly (getStorageAnalysis was removed from
+			// StorageHealthIndicator as test-only surface)
+			const stats = await storageMonitoring.getStorageStats()
 
 			// Both should reflect same underlying data
-			expect(healthResult.storage.totalFiles).toBe(analysis.stats.totalFiles)
+			expect(healthResult.storage.totalFiles).toBe(stats.totalFiles)
 			expect(healthResult.storage.recommendations).toBeDefined()
 		})
 
@@ -298,9 +307,9 @@ describe('storage Management Integration', () => {
 			const healthResult = await storageHealth.isHealthy()
 			expect(healthResult.storage.cleanupStatus).toBeDefined()
 
-			// Optimization depends on monitoring
-			const optimizationStats = storageOptimization.getOptimizationStats()
-			expect(optimizationStats.enabled).toBe(true)
+			// Optimization depends on monitoring (getOptimizationStats was
+			// removed as test-only surface; assert the private config directly)
+			expect((storageOptimization as any).config.enabled).toBe(true)
 		})
 	})
 
@@ -368,9 +377,9 @@ describe('storage Management Integration', () => {
 		})
 
 		it('should limit resource usage during optimization', async () => {
-			// Optimization should respect time limits
-			const optimizationStats = storageOptimization.getOptimizationStats()
-			expect(optimizationStats.enabled).toBe(true)
+			// Optimization should respect time limits (getOptimizationStats
+			// was removed as test-only surface; assert the private config directly)
+			expect((storageOptimization as any).config.enabled).toBe(true)
 
 			// Should not run concurrent optimizations
 			const firstOptimization = storageOptimization.optimizeFrequentlyAccessedFiles()

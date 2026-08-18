@@ -391,7 +391,10 @@ describe('storageCleanupService', () => {
 		})
 
 		it('still respects preserveCount on a custom policy', async () => {
-			service.updateRetentionPolicy({
+			// updateRetentionPolicy was removed as test-only surface; reach
+			// into the private config directly (same pattern as elsewhere
+			// in the suite) to inject a custom policy for this assertion.
+			(service as any).config.policies.push({
 				name: 'custom-trim',
 				description: 'test-only trim policy',
 				maxAge: 0,
@@ -542,58 +545,6 @@ describe('storageCleanupService', () => {
 			expect(status.nextCleanup).toBeInstanceOf(Date)
 			expect(status.policies).toBeInstanceOf(Array)
 			expect(status.policies.length).toBeGreaterThan(0)
-		})
-	})
-
-	describe('policy management', () => {
-		it('should update existing retention policy', () => {
-			const newPolicy = {
-				name: 'old-cache-files',
-				description: 'Updated policy',
-				maxAge: 15,
-				maxSize: 0,
-				enabled: true,
-			}
-
-			service.updateRetentionPolicy(newPolicy)
-
-			const status = service.getCleanupStatus()
-			const updatedPolicy = status.policies.find(p => p.name === 'old-cache-files')
-			expect(updatedPolicy?.maxAge).toBe(15)
-			expect(updatedPolicy?.description).toBe('Updated policy')
-		})
-
-		it('should add new retention policy', () => {
-			const newPolicy = {
-				name: 'custom-policy',
-				description: 'Custom cleanup policy',
-				maxAge: 10,
-				maxSize: 50 * 1024 * 1024,
-				enabled: true,
-			}
-
-			service.updateRetentionPolicy(newPolicy)
-
-			const status = service.getCleanupStatus()
-			const customPolicy = status.policies.find(p => p.name === 'custom-policy')
-			expect(customPolicy).toBeDefined()
-			expect(customPolicy?.maxAge).toBe(10)
-		})
-
-		it('should remove retention policy', () => {
-			const removed = service.removeRetentionPolicy('old-cache-files')
-
-			expect(removed).toBe(true)
-
-			const status = service.getCleanupStatus()
-			const removedPolicy = status.policies.find(p => p.name === 'old-cache-files')
-			expect(removedPolicy).toBeUndefined()
-		})
-
-		it('should return false when removing non-existent policy', () => {
-			const removed = service.removeRetentionPolicy('non-existent-policy')
-
-			expect(removed).toBe(false)
 		})
 	})
 

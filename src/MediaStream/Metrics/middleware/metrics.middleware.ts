@@ -98,7 +98,7 @@ export class MetricsMiddleware implements NestMiddleware {
 	/**
 	 * Extract the tenant_schema label from the raw (unnormalized) pathname.
 	 * Only the tenant-scoped media route carries a schema; every other route
-	 * (legacy media, static images, health, metrics, admin, ...) is 'public'.
+	 * (static images, health, metrics, admin, ...) is 'public'.
 	 */
 	private getTenantSchema(req: Request): string {
 		const pathname = req.url.split('?')[0]

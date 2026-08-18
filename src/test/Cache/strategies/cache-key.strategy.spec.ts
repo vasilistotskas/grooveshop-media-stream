@@ -43,30 +43,6 @@ describe('defaultCacheKeyStrategy', () => {
 		})
 	})
 
-	describe('parseKey', () => {
-		it('should parse simple key', () => {
-			const parsed = strategy.parseKey('image:test-image')
-			expect(parsed).toEqual({
-				namespace: 'image',
-				identifier: 'test-image',
-				params: undefined,
-			})
-		})
-
-		it('should parse key with hash', () => {
-			const parsed = strategy.parseKey('image:test-image:abc123def456')
-			expect(parsed).toEqual({
-				namespace: 'image',
-				identifier: 'test-image',
-				params: { hash: 'abc123def456' },
-			})
-		})
-
-		it('should throw error for invalid key format', () => {
-			expect(() => strategy.parseKey('invalid-key')).toThrow('Invalid cache key format')
-		})
-	})
-
 	describe('generateHash', () => {
 		it('should generate consistent hash for same input', () => {
 			const hash1 = strategy.generateHash('test-input')

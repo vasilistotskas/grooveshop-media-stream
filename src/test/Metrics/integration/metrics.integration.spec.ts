@@ -45,8 +45,8 @@ describe('metrics Integration', () => {
 		}
 	})
 
-	// Helper: every /metrics{,/health} request must carry the internal
-	// secret header now that InternalSecretGuard protects the controller.
+	// Helper: every /metrics request must carry the internal secret header
+	// now that InternalSecretGuard protects the controller.
 	const metricsRequest = (path: string) =>
 		request(app.getHttpServer())
 			.get(path)
@@ -71,7 +71,7 @@ describe('metrics Integration', () => {
 
 		it('should track HTTP requests when recorded via service', async () => {
 			// Record a request via the metrics service (middleware is registered in root module, not MetricsModule)
-			metricsService.recordHttpRequest('GET', '/metrics/health', 200, 0.05)
+			metricsService.recordHttpRequest('GET', '/metrics', 200, 0.05)
 
 			// Check that the request was tracked
 			const response = await metricsRequest('/metrics').expect(200)
@@ -79,21 +79,6 @@ describe('metrics Integration', () => {
 			expect(response.text).toContain('mediastream_http_requests_total')
 			expect(response.text).toContain('method="GET"')
 			expect(response.text).toContain('status_code="200"')
-		})
-	})
-
-	describe('metrics Health Endpoint', () => {
-		it('should provide health status at /metrics/health', async () => {
-			const response = await metricsRequest('/metrics/health').expect(200)
-
-			expect(response.body).toEqual({
-				status: 'healthy',
-				timestamp: expect.any(Number),
-				service: 'metrics',
-				registry: {
-					metricsCount: expect.any(Number),
-				},
-			})
 		})
 	})
 
@@ -118,14 +103,12 @@ describe('metrics Integration', () => {
 			metricsService.recordCacheOperation('get', 'memory', 'hit', 0.01)
 			metricsService.recordCacheOperation('set', 'redis', 'success', 0.05)
 			metricsService.updateCacheHitRatio('memory', 0.85)
-			metricsService.updateCacheSize('memory', 1024000)
 
 			const response = await metricsRequest('/metrics').expect(200)
 
 			expect(response.text).toContain('mediastream_cache_operations_total')
 			expect(response.text).toContain('mediastream_cache_operation_duration_seconds')
 			expect(response.text).toContain('mediastream_cache_hit_ratio')
-			expect(response.text).toContain('mediastream_cache_size_bytes')
 			expect(response.text).toContain('cache_type="memory"')
 			expect(response.text).toContain('cache_type="redis"')
 		})
@@ -133,13 +116,11 @@ describe('metrics Integration', () => {
 		it('should record and expose image processing metrics', async () => {
 			metricsService.recordImageProcessing('resize', 'webp', 'success', 2.5)
 			metricsService.recordImageProcessing('convert', 'jpg', 'error', 0.1)
-			metricsService.updateImageProcessingQueueSize(3)
 
 			const response = await metricsRequest('/metrics').expect(200)
 
 			expect(response.text).toContain('mediastream_image_processing_total')
 			expect(response.text).toContain('mediastream_image_processing_duration_seconds')
-			expect(response.text).toContain('mediastream_image_processing_queue_size')
 			expect(response.text).toContain('mediastream_image_processing_errors_total')
 			expect(response.text).toContain('operation="resize"')
 			expect(response.text).toContain('operation="convert"')
@@ -189,7 +170,7 @@ describe('metrics Integration', () => {
 			try {
 				// Make sequential requests with small delays to avoid overwhelming the server
 				for (let i = 0; i < requestCount; i++) {
-					await metricsRequest('/metrics/health')
+					await metricsRequest('/metrics')
 						.timeout(5000)
 						.expect(200)
 
@@ -217,12 +198,10 @@ describe('metrics Integration', () => {
 
 	describe('performance Metrics', () => {
 		it('should record performance metrics', async () => {
-			metricsService.recordGarbageCollection('major', 0.05)
 			metricsService.recordEventLoopLag(0.02)
 
 			const response = await metricsRequest('/metrics').expect(200)
 
-			expect(response.text).toContain('mediastream_gc_duration_seconds')
 			expect(response.text).toContain('mediastream_event_loop_lag_seconds')
 		})
 	})

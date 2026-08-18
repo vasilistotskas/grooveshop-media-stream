@@ -64,11 +64,6 @@ describe('rate Limiting Integration', () => {
 		metricsService = moduleFixture.get<MetricsService>(MetricsService)
 		redisCacheService = moduleFixture.get<RedisCacheService>(RedisCacheService)
 
-		// Clear any existing rate limit data before each test
-		if (rateLimitService && typeof rateLimitService.clearAllRateLimits === 'function') {
-			rateLimitService.clearAllRateLimits()
-		}
-
 		// Mock configuration for testing with much higher limits for CI stability
 		vi.spyOn(configService, 'getOptional').mockImplementation((key: string, defaultValue?: any) => {
 			const configs: Record<string, any> = {
@@ -85,11 +80,6 @@ describe('rate Limiting Integration', () => {
 
 		await app.init()
 
-		// Clear rate limit data again after initialization
-		if (rateLimitService && typeof rateLimitService.clearAllRateLimits === 'function') {
-			rateLimitService.clearAllRateLimits()
-		}
-
 		// Flush Redis rate limit keys to ensure clean state between tests
 		// Since all requests now share the same socket IP, Redis counters must be reset
 		try {
@@ -105,11 +95,6 @@ describe('rate Limiting Integration', () => {
 		}
 	})
 	afterEach(async () => {
-		// Clear rate limit data after each test
-		if (rateLimitService && typeof rateLimitService.clearAllRateLimits === 'function') {
-			rateLimitService.clearAllRateLimits()
-		}
-
 		// Flush Redis rate limit keys
 		try {
 			await redisCacheService.flushAll()
@@ -190,12 +175,6 @@ describe('rate Limiting Integration', () => {
 
 		// eslint-disable-next-line test/expect-expect
 		it('should reset rate limit after window expires', async () => {
-			// Clear any existing rate limits first
-
-			if (rateLimitService && typeof rateLimitService.clearAllRateLimits === 'function') {
-				rateLimitService.clearAllRateLimits()
-			}
-
 			// Mock short window for testing
 
 			const originalMock = vi.spyOn(configService, 'getOptional')
@@ -274,12 +253,6 @@ describe('rate Limiting Integration', () => {
 		it('should apply different limits for image processing requests', async () => {
 			const limit = process.env.CI ? 20 : 8 // Use increased limits for better stability
 
-			// Clear any existing rate limits first
-
-			if (rateLimitService && typeof rateLimitService.clearAllRateLimits === 'function') {
-				rateLimitService.clearAllRateLimits()
-			}
-
 			// Add delay in CI for better isolation
 
 			if (process.env.CI) {
@@ -311,12 +284,6 @@ describe('rate Limiting Integration', () => {
 
 		it('should track different request types independently', async () => {
 			const imageLimit = process.env.CI ? 20 : 8 // Use increased limits for better stability
-
-			// Clear any existing rate limits first
-
-			if (rateLimitService && typeof rateLimitService.clearAllRateLimits === 'function') {
-				rateLimitService.clearAllRateLimits()
-			}
 
 			// Add delay in CI for better isolation
 
@@ -403,12 +370,6 @@ describe('rate Limiting Integration', () => {
 	describe('iP-based Rate Limiting', () => {
 		it('should use socket IP for rate limiting (X-Forwarded-For not trusted)', async () => {
 			const limit = process.env.CI ? 30 : 12 // Use increased limits for better stability
-
-			// Clear rate limits first
-
-			if (rateLimitService && typeof rateLimitService.clearAllRateLimits === 'function') {
-				rateLimitService.clearAllRateLimits()
-			}
 
 			// Add delay in CI for better isolation
 

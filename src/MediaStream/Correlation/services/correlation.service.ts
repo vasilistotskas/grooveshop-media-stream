@@ -35,13 +35,6 @@ export class CorrelationService implements ICorrelationService {
 	}
 
 	/**
-	 * Clear the current context (mainly for testing)
-	 */
-	clearContext(): void {
-		requestContextStorage.enterWith(undefined as unknown as RequestContext)
-	}
-
-	/**
 	 * Run a function within a specific correlation context
 	 */
 	runWithContext<T>(context: RequestContext, fn: () => T): T {
@@ -57,21 +50,5 @@ export class CorrelationService implements ICorrelationService {
 			const updatedContext = { ...currentContext, ...updates }
 			this.setContext(updatedContext)
 		}
-	}
-
-	/**
-	 * Get the client IP from the current context
-	 */
-	getClientIp(): string {
-		const context = this.getContext()
-		return context?.clientIp || 'unknown'
-	}
-
-	/**
-	 * Get the user agent from the current context
-	 */
-	getUserAgent(): string {
-		const context = this.getContext()
-		return context?.userAgent || 'unknown'
 	}
 }

@@ -276,32 +276,6 @@ describe('cacheWarmingService', () => {
 		})
 	})
 
-	describe('manual Warmup', () => {
-		it('should manually warm up specific file', async () => {
-			const resourceId = 'test-resource'
-			const content = Buffer.from('test content')
-			const ttl = 3600
-
-			cacheManager.set.mockResolvedValue()
-
-			await service.warmupSpecificFile(resourceId, content, ttl)
-
-			// Namespace is per-tenant since H21 in MULTI_TENANT_AUDIT.md.
-			// ``warmupSpecificFile`` defaults tenantSchema to 'public' when
-			// the caller omits it.
-			expect(cacheManager.set).toHaveBeenCalledWith('image:public', resourceId, expect.objectContaining({ data: content, metadata: expect.any(Object) }), ttl)
-		})
-
-		it('should handle manual warmup errors', async () => {
-			const resourceId = 'test-resource'
-			const content = Buffer.from('test content')
-
-			cacheManager.set.mockRejectedValue(new Error('Cache error'))
-
-			await expect(service.warmupSpecificFile(resourceId, content)).rejects.toThrow('Cache error')
-		})
-	})
-
 	describe('statistics', () => {
 		it('should return warmup statistics', async () => {
 			const stats = await service.getWarmupStats()

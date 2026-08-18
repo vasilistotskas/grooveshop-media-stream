@@ -20,18 +20,13 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	private readonly diskSpaceUsage: promClient.Gauge
 	private readonly cpuUsage: promClient.Gauge
 	private readonly loadAverage: promClient.Gauge
-	private readonly fileDescriptors: promClient.Gauge
-	private readonly networkConnections: promClient.Gauge
 
 	private readonly cacheHitRatio: promClient.Gauge
-	private readonly cacheSize: promClient.Gauge
-	private readonly cacheEvictions: promClient.Counter
 	private readonly cacheOperationsTotal: promClient.Counter
 	private readonly cacheOperationDuration: promClient.Histogram
 
 	private readonly imageProcessingDuration: promClient.Histogram
 	private readonly imageProcessingTotal: promClient.Counter
-	private readonly imageProcessingQueueSize: promClient.Gauge
 	private readonly imageProcessingErrors: promClient.Counter
 
 	private readonly activeConnections: promClient.Gauge
@@ -42,7 +37,6 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	private readonly rateLimitAttemptsTotal: promClient.Counter
 	private readonly rateLimitBlockedTotal: promClient.Counter
 
-	private readonly gcDuration: promClient.Histogram
 	private readonly eventLoopLag: promClient.Histogram
 
 	private readonly tenantDomainsCount: promClient.Gauge
@@ -131,20 +125,6 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			registers: [this.register],
 		})
 
-		this.fileDescriptors = new promClient.Gauge({
-			name: 'mediastream_file_descriptors',
-			help: 'Number of open file descriptors',
-			labelNames: ['type'],
-			registers: [this.register],
-		})
-
-		this.networkConnections = new promClient.Gauge({
-			name: 'mediastream_network_connections',
-			help: 'Number of network connections',
-			labelNames: ['state'],
-			registers: [this.register],
-		})
-
 		this.activeConnections = new promClient.Gauge({
 			name: 'mediastream_active_connections',
 			help: 'Number of active connections',
@@ -164,24 +144,10 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			registers: [this.register],
 		})
 
-		this.imageProcessingQueueSize = new promClient.Gauge({
-			name: 'mediastream_image_processing_queue_size',
-			help: 'Number of items in image processing queue',
-			registers: [this.register],
-		})
-
 		this.imageProcessingErrors = new promClient.Counter({
 			name: 'mediastream_image_processing_errors_total',
 			help: 'Total number of image processing errors',
 			labelNames: ['operation', 'error_type'],
-			registers: [this.register],
-		})
-
-		this.gcDuration = new promClient.Histogram({
-			name: 'mediastream_gc_duration_seconds',
-			help: 'Garbage collection duration in seconds',
-			labelNames: ['type'],
-			buckets: [0.001, 0.01, 0.1, 1, 10],
 			registers: [this.register],
 		})
 
@@ -196,20 +162,6 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			name: 'mediastream_cache_hit_ratio',
 			help: 'Cache hit ratio (0-1)',
 			labelNames: ['cache_type'],
-			registers: [this.register],
-		})
-
-		this.cacheSize = new promClient.Gauge({
-			name: 'mediastream_cache_size_bytes',
-			help: 'Cache size in bytes',
-			labelNames: ['cache_type'],
-			registers: [this.register],
-		})
-
-		this.cacheEvictions = new promClient.Counter({
-			name: 'mediastream_cache_evictions_total',
-			help: 'Total number of cache evictions',
-			labelNames: ['cache_type', 'reason'],
 			registers: [this.register],
 		})
 
@@ -320,7 +272,7 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	 * @param responseSize - Optional response body size in bytes
 	 * @param tenantSchema - Optional tenant schema label for per-tenant observability.
 	 *   Pass the schema extracted from the request URL (e.g. 'acme', 'public').
-	 *   Defaults to 'public' for legacy/shared routes that carry no tenant context.
+	 *   Defaults to 'public' for shared routes that carry no tenant context.
 	 */
 	recordHttpRequest(method: string, route: string, statusCode: number, duration: number, requestSize?: number, responseSize?: number, tenantSchema: string = 'public'): void {
 		const statusCodeStr = statusCode.toString()
@@ -372,20 +324,6 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	/**
-	 * Update image processing queue size
-	 */
-	updateImageProcessingQueueSize(size: number): void {
-		this.imageProcessingQueueSize.set(size)
-	}
-
-	/**
-	 * Record image processing error
-	 */
-	recordImageProcessingError(operation: string, errorType: string): void {
-		this.imageProcessingErrors.inc({ operation, error_type: errorType })
-	}
-
-	/**
 	 * Record cache operation metrics.
 	 *
 	 * @param operation - Cache operation type
@@ -402,20 +340,6 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		if (duration !== undefined) {
 			this.cacheOperationDuration.observe({ operation, cache_type: cacheType, status, tenant_schema: tenantSchema }, duration)
 		}
-	}
-
-	/**
-	 * Record cache eviction
-	 */
-	recordCacheEviction(cacheType: string, reason: 'size' | 'ttl' | 'manual' | 'memory'): void {
-		this.cacheEvictions.inc({ cache_type: cacheType, reason })
-	}
-
-	/**
-	 * Update cache size metrics
-	 */
-	updateCacheSize(cacheType: string, sizeBytes: number): void {
-		this.cacheSize.set({ cache_type: cacheType }, sizeBytes)
 	}
 
 	/**
@@ -519,30 +443,6 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		this.loadAverage.set({ period: '1m' }, load1)
 		this.loadAverage.set({ period: '5m' }, load5)
 		this.loadAverage.set({ period: '15m' }, load15)
-	}
-
-	/**
-	 * Update file descriptor metrics
-	 */
-	updateFileDescriptors(open: number, max: number): void {
-		this.fileDescriptors.set({ type: 'open' }, open)
-		this.fileDescriptors.set({ type: 'max' }, max)
-	}
-
-	/**
-	 * Update network connection metrics
-	 */
-	updateNetworkConnections(established: number, listening: number, timeWait: number): void {
-		this.networkConnections.set({ state: 'established' }, established)
-		this.networkConnections.set({ state: 'listening' }, listening)
-		this.networkConnections.set({ state: 'time_wait' }, timeWait)
-	}
-
-	/**
-	 * Record garbage collection metrics
-	 */
-	recordGarbageCollection(type: string, duration: number): void {
-		this.gcDuration.observe({ type }, duration)
 	}
 
 	/**

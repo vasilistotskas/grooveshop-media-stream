@@ -206,18 +206,6 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	}
 
 	/**
-	 * Reset client statistics
-	 */
-	resetStats(): void {
-		this.stats.totalRequests = 0
-		this.stats.successfulRequests = 0
-		this.stats.failedRequests = 0
-		this.stats.retriedRequests = 0
-		this.stats.averageResponseTime = 0
-		CorrelatedLogger.debug('HTTP client statistics reset', HttpClientService.name)
-	}
-
-	/**
 	 * Check if the circuit breaker is open
 	 */
 	isCircuitOpen(): boolean {

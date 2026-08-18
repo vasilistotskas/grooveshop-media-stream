@@ -1,6 +1,6 @@
 import type { HealthIndicatorResult } from '@nestjs/terminus'
 import type { HealthCheckOptions } from '#microservice/Health/interfaces/health-indicator.interface'
-import type { AccessPattern, StorageStats } from '../services/storage-monitoring.service.js'
+import type { AccessPattern } from '../services/storage-monitoring.service.js'
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '#microservice/Config/config.service'
 import { BaseHealthIndicator } from '#microservice/Health/base/base-health-indicator'
@@ -101,27 +101,6 @@ export class StorageHealthIndicator extends BaseHealthIndicator {
 		return 'Monitors storage usage, file patterns, and cleanup status with intelligent recommendations'
 	}
 
-	/**
-	 * Get detailed storage analysis
-	 */
-	async getStorageAnalysis(): Promise<{
-		stats: any
-		thresholds: any
-		evictionCandidates: any[]
-		cleanupRecommendations: string[]
-	}> {
-		const stats = await this.storageMonitoring.getStorageStats()
-		const thresholdCheck = await this.storageMonitoring.checkThresholds()
-		const evictionRecommendations = await this.storageMonitoring.getEvictionCandidates()
-
-		return {
-			stats,
-			thresholds: thresholdCheck,
-			evictionCandidates: evictionRecommendations.slice(0, 10),
-			cleanupRecommendations: this.generateCleanupRecommendations(stats, thresholdCheck),
-		}
-	}
-
 	private generateRecommendations(
 		thresholdCheck: any,
 		cleanupStatus: any,
@@ -160,37 +139,6 @@ export class StorageHealthIndicator extends BaseHealthIndicator {
 		const lowAccessFiles = thresholdCheck.stats.accessPatterns.filter((p: AccessPattern) => p.accessCount < 2).length
 		if (lowAccessFiles > thresholdCheck.stats.totalFiles * 0.5) {
 			recommendations.push('Over 50% of files have low access counts - consider more aggressive eviction')
-		}
-
-		return recommendations
-	}
-
-	private generateCleanupRecommendations(stats: StorageStats, _thresholdCheck: any): string[] {
-		const recommendations: string[] = []
-
-		const oldFiles = stats.accessPatterns.filter((p: AccessPattern) => {
-			const ageInDays = (Date.now() - p.lastAccessed.getTime()) / (1000 * 60 * 60 * 24)
-			return ageInDays > 30
-		})
-
-		if (oldFiles.length > 0) {
-			const totalOldSize = oldFiles.reduce((sum: number, f: AccessPattern) => sum + f.size, 0)
-			recommendations.push(`${oldFiles.length} files older than 30 days (${this.formatBytes(totalOldSize)})`)
-		}
-
-		const largeFiles = stats.accessPatterns
-			.filter((p: AccessPattern) => p.size > 1024 * 1024)
-			.sort((a: AccessPattern, b: AccessPattern) => b.size - a.size)
-			.slice(0, 10)
-
-		if (largeFiles.length > 0) {
-			recommendations.push(`Top large files: ${largeFiles.map((f: AccessPattern) => `${f.file} (${this.formatBytes(f.size)})`).join(', ')}`)
-		}
-
-		const neverAccessedFiles = stats.accessPatterns.filter((p: AccessPattern) => p.accessCount === 1)
-		if (neverAccessedFiles.length > 0) {
-			const totalNeverAccessedSize = neverAccessedFiles.reduce((sum: number, f: AccessPattern) => sum + f.size, 0)
-			recommendations.push(`${neverAccessedFiles.length} files accessed only once (${this.formatBytes(totalNeverAccessedSize)})`)
 		}
 
 		return recommendations

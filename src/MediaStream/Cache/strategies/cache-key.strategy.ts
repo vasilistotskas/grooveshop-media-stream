@@ -20,20 +20,6 @@ export class DefaultCacheKeyStrategy implements CacheKeyStrategy {
 		return parts.join(this.separator)
 	}
 
-	parseKey(key: string): { namespace: string, identifier: string, params?: StringMap } {
-		const parts = key.split(this.separator)
-
-		if (parts.length < 2) {
-			throw new Error(`Invalid cache key format: ${key}`)
-		}
-
-		return {
-			namespace: parts[0],
-			identifier: parts[1],
-			params: parts.length > 2 ? { hash: parts[2] } : undefined,
-		}
-	}
-
 	/**
 	 * Fast DJB2-based hash — no crypto overhead needed for cache key distribution.
 	 * Returns a 16-char hex string for uniform key distribution.

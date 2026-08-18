@@ -16,14 +16,6 @@ export const IMAGE_SOURCES = {
 		routePattern: 'media/:tenantSchema/uploads/:imagePath+/:width/:height/:fit/:position/:background/:trimThreshold/:quality.:format',
 		routeParams: ['tenantSchema', 'imagePath', 'width', 'height', 'fit', 'position', 'background', 'trimThreshold', 'quality', 'format'],
 	},
-	// Legacy route (pre-multi-tenancy) for backward compatibility during migration
-	UPLOADED_MEDIA_LEGACY: {
-		name: 'uploaded_media_legacy',
-		baseUrl: 'BACKEND_URL',
-		urlPattern: '{baseUrl}/media/uploads/{imagePath}',
-		routePattern: 'media/uploads/:imagePath+/:width/:height/:fit/:position/:background/:trimThreshold/:quality.:format',
-		routeParams: ['imagePath', 'width', 'height', 'fit', 'position', 'background', 'trimThreshold', 'quality', 'format'],
-	},
 	STATIC_IMAGES: {
 		name: 'static_images',
 		baseUrl: 'BACKEND_URL',

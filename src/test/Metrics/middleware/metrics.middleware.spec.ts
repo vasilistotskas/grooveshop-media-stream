@@ -163,8 +163,8 @@ describe('metricsMiddleware', () => {
 			)
 		})
 
-		it('labels the legacy media path as public', () => {
-			runAndFinish('/media_stream-image/media/uploads/banner.jpg/800/600/cover/entropy/transparent/5/80.webp')
+		it('labels the static-image path (no tenant segment) as public', () => {
+			runAndFinish('/media_stream-image/static/images/banner.jpg/800/600/cover/entropy/transparent/5/80.webp')
 
 			expect(metricsService.recordHttpRequest).toHaveBeenCalledWith(
 				'GET',

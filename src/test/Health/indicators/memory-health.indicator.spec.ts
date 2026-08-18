@@ -169,26 +169,6 @@ describe('memoryHealthIndicator', () => {
 		})
 	})
 
-	describe('forceGarbageCollection', () => {
-		it('should return false when gc is not available', () => {
-			const result = indicator.forceGarbageCollection()
-			expect(result).toBe(false)
-		})
-
-		it('should return true when gc is available', () => {
-			// Mock global.gc
-			const originalGc = globalThis.gc
-			globalThis.gc = vi.fn()
-
-			const result = indicator.forceGarbageCollection()
-			expect(result).toBe(true)
-			expect(globalThis.gc).toHaveBeenCalled()
-
-			// Restore original
-			globalThis.gc = originalGc
-		})
-	})
-
 	describe('getDetails', () => {
 		it('should return indicator details', () => {
 			const details = indicator.getDetails()

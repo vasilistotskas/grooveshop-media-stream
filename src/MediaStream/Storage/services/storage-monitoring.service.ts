@@ -38,7 +38,6 @@ export class StorageMonitoringService implements OnModuleInit {
 	private readonly storageDirectory: string
 	private readonly thresholds: StorageThresholds
 	private accessPatterns = new Map<string, AccessPattern>()
-	private lastScanTime: Date = new Date()
 
 	constructor(private readonly _configService: ConfigService) {
 		this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage')
@@ -205,17 +204,6 @@ export class StorageMonitoringService implements OnModuleInit {
 	}
 
 	/**
-	 * Record file access for tracking patterns
-	 */
-	recordFileAccess(filename: string): void {
-		const pattern = this.accessPatterns.get(filename)
-		if (pattern) {
-			pattern.accessCount++
-			pattern.lastAccessed = new Date()
-		}
-	}
-
-	/**
 	 * Scan storage directory and update access patterns
 	 */
 	@Cron(CronExpression.EVERY_HOUR)
@@ -252,7 +240,6 @@ export class StorageMonitoringService implements OnModuleInit {
 				}
 			}
 
-			this.lastScanTime = new Date()
 			CorrelatedLogger.debug(
 				`Storage scan completed. Tracking ${this.accessPatterns.size} files`,
 				StorageMonitoringService.name,
@@ -265,13 +252,6 @@ export class StorageMonitoringService implements OnModuleInit {
 				StorageMonitoringService.name,
 			)
 		}
-	}
-
-	/**
-	 * Get the last scan time
-	 */
-	getLastScanTime(): Date {
-		return this.lastScanTime
 	}
 
 	private updateAccessPattern(filename: string, stats: Stats): void {

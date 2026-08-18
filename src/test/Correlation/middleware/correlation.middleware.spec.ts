@@ -1,6 +1,8 @@
 import type { NextFunction, Request, Response } from 'express'
+import type { RequestContext } from '#microservice/Correlation/interfaces/correlation.interface'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { requestContextStorage } from '#microservice/Correlation/async-local-storage'
 import { CORRELATION_ID_HEADER, CorrelationMiddleware } from '#microservice/Correlation/middleware/correlation.middleware'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 
@@ -35,7 +37,9 @@ describe('correlationMiddleware', () => {
 	})
 
 	afterEach(() => {
-		correlationService.clearContext()
+		// clearContext was removed as test-only surface; reset the shared
+		// AsyncLocalStorage singleton directly instead.
+		requestContextStorage.enterWith(undefined as unknown as RequestContext)
 	})
 
 	describe('use', () => {

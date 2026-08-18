@@ -420,21 +420,6 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 		}
 	}
 
-	async setTtl(key: string, ttl: number): Promise<boolean> {
-		if (!this.isConnected) {
-			return false
-		}
-
-		try {
-			const result = await this.redis.expire(key, ttl)
-			return result === 1
-		}
-		catch (error: unknown) {
-			CorrelatedLogger.error(`Redis EXPIRE error for key ${key}: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
-			return false
-		}
-	}
-
 	/**
 	 * Expose raw ioredis client for atomic operations (e.g., rate limiting pipelines)
 	 */

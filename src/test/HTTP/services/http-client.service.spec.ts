@@ -189,29 +189,6 @@ describe('httpClientService', () => {
 			expect(stats.successfulRequests).toBe(0)
 			expect(stats.failedRequests).toBe(2)
 		}, 15000)
-
-		it('should reset statistics', async () => {
-			const mockResponse: AxiosResponse = {
-				data: { test: 'data' },
-				status: 200,
-				statusText: 'OK',
-				headers: {},
-				config: { url: 'https://example.com', method: 'get' } as any,
-			}
-
-			vi.spyOn(httpService, 'get').mockReturnValue(of(mockResponse))
-
-			// Execute a successful request
-			await service.get('https://example.com')
-
-			// Reset stats
-			service.resetStats()
-
-			const stats = service.getStats()
-			expect(stats.totalRequests).toBe(0)
-			expect(stats.successfulRequests).toBe(0)
-			expect(stats.failedRequests).toBe(0)
-		})
 	})
 
 	describe('concurrency Control', () => {

@@ -66,11 +66,6 @@ export interface CacheKeyStrategy {
 	generateKey: (namespace: string, identifier: string, params?: Record<string, any>) => string
 
 	/**
-	 * Parse a cache key back to its components
-	 */
-	parseKey: (key: string) => { namespace: string, identifier: string, params?: Record<string, any> }
-
-	/**
 	 * Generate a hash for consistent key distribution
 	 */
 	generateHash: (input: string) => string

@@ -24,7 +24,7 @@ import MediaStreamModule from '#microservice/media-stream.module'
 let pngFixture: Buffer
 
 function IMAGE_ROUTE(name: string): string {
-	return `/media_stream-image/media/uploads/${name}/64/64/contain/entropy/transparent/5/80.webp`
+	return `/media_stream-image/media/acme/uploads/${name}/64/64/contain/entropy/transparent/5/80.webp`
 }
 
 describe('image streaming (e2e)', () => {
@@ -47,7 +47,7 @@ describe('image streaming (e2e)', () => {
 		upstreamRequests = []
 		upstream = createServer((req, res) => {
 			upstreamRequests.push(req.url || '')
-			if (req.url?.startsWith('/media/uploads/e2e-test-image')) {
+			if (req.url?.startsWith('/media/acme/uploads/e2e-test-image')) {
 				res.writeHead(200, {
 					'Content-Type': 'image/png',
 					'Content-Length': pngFixture.length,
@@ -133,7 +133,7 @@ describe('image streaming (e2e)', () => {
 	// eslint-disable-next-line test/expect-expect
 	it('rejects out-of-range dimensions with 400', async () => {
 		await request(app.getHttpServer())
-			.get(`/media_stream-image/media/uploads/e2e-test-image.png/999999/64/contain/entropy/transparent/5/80.webp`)
+			.get(`/media_stream-image/media/acme/uploads/e2e-test-image.png/999999/64/contain/entropy/transparent/5/80.webp`)
 			.expect(400)
 	})
 

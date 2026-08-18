@@ -160,6 +160,9 @@ describe('securityCheckerService', () => {
 	})
 
 	describe('logSecurityEvent', () => {
+		// getSecurityEvents/getSecurityStats were removed as test-only surface;
+		// the private in-memory buffer is asserted directly instead (same
+		// reach-in-private pattern used elsewhere in this suite).
 		it('should log security events', async () => {
 			const event = {
 				type: 'malicious_content' as const,
@@ -172,7 +175,7 @@ describe('securityCheckerService', () => {
 
 			await service.logSecurityEvent(event)
 
-			const events = service.getSecurityEvents(1)
+			const events = (service as any).securityEvents as typeof event[]
 			expect(events).toHaveLength(1)
 			expect(events[0]).toMatchObject(event)
 		})
@@ -186,7 +189,7 @@ describe('securityCheckerService', () => {
 
 			await service.logSecurityEvent(event)
 
-			const events = service.getSecurityEvents(1)
+			const events = (service as any).securityEvents
 			expect(events[0].timestamp).toBeInstanceOf(Date)
 		})
 
@@ -200,62 +203,8 @@ describe('securityCheckerService', () => {
 				})
 			}
 
-			const events = service.getSecurityEvents(2000)
+			const events = (service as any).securityEvents
 			expect(events.length).toBeLessThanOrEqual(1000)
-		})
-	})
-
-	describe('getSecurityStats', () => {
-		it('should return security statistics', async () => {
-			// Add some test events
-			await service.logSecurityEvent({
-				type: 'malicious_content',
-				source: 'test',
-				details: {},
-			})
-
-			await service.logSecurityEvent({
-				type: 'invalid_url',
-				source: 'test',
-				details: {},
-			})
-
-			await service.logSecurityEvent({
-				type: 'malicious_content',
-				source: 'test',
-				details: {},
-			})
-
-			const stats = service.getSecurityStats()
-
-			expect(stats.totalEvents).toBe(3)
-			expect(stats.eventsByType.malicious_content).toBe(2)
-			expect(stats.eventsByType.invalid_url).toBe(1)
-			expect(typeof stats.recentEvents).toBe('number')
-		})
-
-		it('should count recent events correctly', async () => {
-			const now = new Date()
-			const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000)
-
-			// Add old event
-			await service.logSecurityEvent({
-				type: 'malicious_content',
-				source: 'test',
-				details: {},
-				timestamp: twoHoursAgo,
-			})
-
-			// Add recent event
-			await service.logSecurityEvent({
-				type: 'invalid_url',
-				source: 'test',
-				details: {},
-				timestamp: now,
-			})
-
-			const stats = service.getSecurityStats()
-			expect(stats.recentEvents).toBe(1) // Only the recent event
 		})
 	})
 })

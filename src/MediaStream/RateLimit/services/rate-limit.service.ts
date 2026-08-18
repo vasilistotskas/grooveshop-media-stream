@@ -328,31 +328,6 @@ export class RateLimitService {
 	}
 
 	/**
-	 * Reset rate limit for a specific key (useful for testing)
-	 */
-	async resetRateLimit(key: string): Promise<void> {
-		this.localRequestCounts.delete(key)
-		try {
-			await this.redisCacheService.delete(`${this.RATE_LIMIT_PREFIX}${key}`)
-		}
-		catch {
-			// Ignore Redis errors during reset
-		}
-	}
-
-	/**
-	 * Clear all rate limits (useful for testing)
-	 */
-	async clearAllRateLimits(): Promise<void> {
-		const entriesCount = this.localRequestCounts.size
-		this.localRequestCounts.clear()
-		if (process.env.NODE_ENV === 'test' && entriesCount > 0) {
-			CorrelatedLogger.debug(`Cleared ${entriesCount} local rate limit entries`, RateLimitService.name)
-		}
-		// Note: Redis entries will expire via TTL
-	}
-
-	/**
 	 * Get whitelisted domains from configuration
 	 */
 	getWhitelistedDomains(): string[] {

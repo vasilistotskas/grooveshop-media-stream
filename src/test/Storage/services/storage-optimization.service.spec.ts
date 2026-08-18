@@ -243,47 +243,6 @@ describe('storageOptimizationService', () => {
 		})
 	})
 
-	describe('getOptimizationStats', () => {
-		it('should return current optimization statistics', () => {
-			const stats = service.getOptimizationStats()
-
-			expect(stats.enabled).toBe(true)
-			expect(stats.isRunning).toBe(false)
-			expect(stats.totalOptimizations).toBe(0)
-			expect(stats.totalSizeSaved).toBe(0)
-			expect(stats.averageCompressionRatio).toBe(0)
-			expect(stats.strategies).toEqual(['deduplication'])
-		})
-
-		it('should report zero optimizations when no file-level history is recorded', async () => {
-			// Deduplication strategy does not write to optimizationHistory
-			await service.optimizeFrequentlyAccessedFiles()
-
-			const stats = service.getOptimizationStats()
-
-			expect(stats.totalOptimizations).toBe(0)
-			expect(stats.totalSizeSaved).toBe(0)
-		})
-	})
-
-	describe('getFileOptimizationHistory', () => {
-		it('should return null for non-optimized file', () => {
-			const history = service.getFileOptimizationHistory('non-existent.jpg')
-
-			expect(history).toBeNull()
-		})
-
-		it('should return optimization history for optimized file', async () => {
-			// Perform optimization first
-			await service.optimizeFrequentlyAccessedFiles()
-
-			// Check if any file has optimization history
-			const stats = service.getOptimizationStats()
-			// This test would need to be more specific based on actual implementation
-			expect(stats.totalOptimizations).toBeGreaterThanOrEqual(0)
-		})
-	})
-
 	describe('scheduledOptimization', () => {
 		it('should not run when disabled', async () => {
 			// Create a new service instance with optimization disabled

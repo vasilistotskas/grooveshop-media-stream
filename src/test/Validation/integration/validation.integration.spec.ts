@@ -57,8 +57,10 @@ describe('validation Integration', () => {
 				details: { pattern: 'xss' },
 			})
 
-			const stats = securityChecker.getSecurityStats()
-			expect(stats.totalEvents).toBeGreaterThan(0)
+			// getSecurityStats was removed as test-only surface; assert the
+			// private in-memory buffer directly instead.
+			const events = (securityChecker as any).securityEvents
+			expect(events.length).toBeGreaterThan(0)
 		})
 	})
 })

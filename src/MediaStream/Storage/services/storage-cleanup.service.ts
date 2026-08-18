@@ -323,37 +323,6 @@ export class StorageCleanupService implements OnModuleInit {
 		}
 	}
 
-	/**
-	 * Add or update a retention policy
-	 */
-	updateRetentionPolicy(policy: RetentionPolicy): void {
-		const existingIndex = this.config.policies.findIndex(p => p.name === policy.name)
-
-		if (existingIndex >= 0) {
-			this.config.policies[existingIndex] = policy
-		}
-		else {
-			this.config.policies.push(policy)
-		}
-
-		CorrelatedLogger.log(`Retention policy '${policy.name}' updated`, StorageCleanupService.name)
-	}
-
-	/**
-	 * Remove a retention policy
-	 */
-	removeRetentionPolicy(policyName: string): boolean {
-		const index = this.config.policies.findIndex(p => p.name === policyName)
-
-		if (index >= 0) {
-			this.config.policies.splice(index, 1)
-			CorrelatedLogger.log(`Retention policy '${policyName}' removed`, StorageCleanupService.name)
-			return true
-		}
-
-		return false
-	}
-
 	private async applyRetentionPolicy(policy: RetentionPolicy, dryRun: boolean): Promise<{
 		filesRemoved: number
 		sizeFreed: number

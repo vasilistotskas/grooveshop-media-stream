@@ -16,7 +16,7 @@ describe('adaptiveRateLimitGuard', () => {
 	let tenantDomainsService: MockedObject<TenantDomainsService>
 
 	const mockRequest = {
-		url: '/media_stream-image/media/uploads/test.jpg/100/100/contain/entropy/transparent/5/80.webp',
+		url: '/media_stream-image/static/images/test.jpg/100/100/contain/entropy/transparent/5/80.webp',
 		method: 'GET',
 		headers: {
 			'user-agent': 'Mozilla/5.0 (Test Browser)',
@@ -204,7 +204,7 @@ describe('adaptiveRateLimitGuard', () => {
 
 			const imagePngContext = {
 				switchToHttp: () => ({
-					getRequest: () => ({ ...mockRequest, url: '/media_stream-image/media/uploads/x.jpg/64/64/contain/entropy/transparent/5/80.png' }),
+					getRequest: () => ({ ...mockRequest, url: '/media_stream-image/static/images/x.jpg/64/64/contain/entropy/transparent/5/80.png' }),
 					getResponse: () => mockResponse,
 				}),
 				getHandler: () => ({}),
@@ -331,7 +331,7 @@ describe('adaptiveRateLimitGuard', () => {
 					testCase.expectedIp,
 					expect.any(String),
 					'image-processing',
-					// mockRequest uses the legacy (pre-multi-tenant) media route, which
+					// mockRequest uses the shared static-image route, which
 					// carries no tenantSchema segment and so resolves to 'public'.
 					'public',
 				)
@@ -400,7 +400,7 @@ describe('adaptiveRateLimitGuard', () => {
 
 		it('should identify different request types correctly', async () => {
 			const testCases = [
-				{ url: '/media_stream-image/media/uploads/test.jpg/100/100/contain/entropy/transparent/5/80.webp', expectedType: 'image-processing' },
+				{ url: '/media_stream-image/media/acme/uploads/test.jpg/100/100/contain/entropy/transparent/5/80.webp', expectedType: 'image-processing' },
 				{ url: '/media_stream-image/static/images/test.jpg/100/100/contain/entropy/transparent/5/80.webp', expectedType: 'image-processing' },
 				{ url: '/health', expectedType: 'health-check' },
 				{ url: '/api/v1/other', expectedType: 'get-default' },

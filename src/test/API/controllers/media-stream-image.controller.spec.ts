@@ -105,7 +105,7 @@ describe('mediaStreamImageController', () => {
 	describe('handleImageRequest', () => {
 		it('should handle uploaded media image request', async () => {
 			const mockRequest = {
-				path: '/media_stream-image/media/uploads/test/image.webp/100/100/contain/entropy/transparent/5/80.webp',
+				path: '/media_stream-image/media/acme/uploads/test/image.webp/100/100/contain/entropy/transparent/5/80.webp',
 			} as any
 
 			await controller.handleImageRequest(mockRequest, mockResponse)
@@ -142,7 +142,7 @@ describe('mediaStreamImageController', () => {
 
 		it('should decode URL-encoded parameters', async () => {
 			const mockRequest = {
-				path: '/media_stream-image/media/uploads/test%20type/image%20name.webp/100/100/contain/entropy/transparent/5/80.webp',
+				path: '/media_stream-image/media/acme/uploads/test%20type/image%20name.webp/100/100/contain/entropy/transparent/5/80.webp',
 			} as any
 
 			await controller.handleImageRequest(mockRequest, mockResponse)
@@ -172,7 +172,7 @@ describe('mediaStreamImageController', () => {
 			// then matches imagePath="test/path/image.webp" via the
 			// :imagePath+ wildcard.
 			const mockRequest = {
-				path: '/media_stream-image/media/uploads/test%252Fpath/image.webp/100/100/contain/entropy/transparent/5/80.webp',
+				path: '/media_stream-image/media/acme/uploads/test%252Fpath/image.webp/100/100/contain/entropy/transparent/5/80.webp',
 			} as any
 
 			await controller.handleImageRequest(mockRequest, mockResponse)
@@ -192,7 +192,7 @@ describe('mediaStreamImageController', () => {
 			// any reasonable input. After the loop the path is the
 			// canonical UTF-8 string.
 			const mockRequest = {
-				path: '/media_stream-image/media/uploads/blog/%2525CF%252584_cover.png/100/100/cover/entropy/transparent/5/80.webp',
+				path: '/media_stream-image/media/acme/uploads/blog/%2525CF%252584_cover.png/100/100/cover/entropy/transparent/5/80.webp',
 			} as any
 
 			await controller.handleImageRequest(mockRequest, mockResponse)
@@ -226,7 +226,7 @@ describe('mediaStreamImageController', () => {
 			// ``%ZZ`` is not valid percent-encoding — decodeURIComponent
 			// throws, and we surface it as a 400.
 			const mockRequest = {
-				path: '/media_stream-image/media/uploads/test%ZZpath/image.webp/100/100/contain/entropy/transparent/5/80.webp',
+				path: '/media_stream-image/media/acme/uploads/test%ZZpath/image.webp/100/100/contain/entropy/transparent/5/80.webp',
 			} as any
 
 			await expect(controller.handleImageRequest(mockRequest, mockResponse))
@@ -239,7 +239,7 @@ describe('mediaStreamImageController', () => {
 			// URL: /media/uploads/blog/πωσ_cover.png/1200/630/cover/entropy/transparent/5/80.png
 			// Encoded: /media/uploads/blog/%CF%80%CF%89%CF%83_cover.png/1200/630/cover/entropy/transparent/5/80.png
 			const mockRequest = {
-				path: '/media_stream-image/media/uploads/blog/%CF%80%CF%89%CF%83_cover.png/1200/630/cover/entropy/transparent/5/80.png',
+				path: '/media_stream-image/media/acme/uploads/blog/%CF%80%CF%89%CF%83_cover.png/1200/630/cover/entropy/transparent/5/80.png',
 			} as any
 
 			await controller.handleImageRequest(mockRequest, mockResponse)
@@ -258,7 +258,7 @@ describe('mediaStreamImageController', () => {
 				new Error('Invalid parameters'),
 			)
 			const mockRequest = {
-				path: '/media_stream-image/media/uploads/test/image.webp/100/100/contain/entropy/transparent/5/80.webp',
+				path: '/media_stream-image/media/acme/uploads/test/image.webp/100/100/contain/entropy/transparent/5/80.webp',
 			} as any
 
 			await expect(controller.handleImageRequest(mockRequest, mockResponse))
@@ -273,7 +273,7 @@ describe('mediaStreamImageController', () => {
 				throw new Error('URL building failed')
 			})
 			const mockRequest = {
-				path: '/media_stream-image/media/uploads/test/image.webp/100/100/contain/entropy/transparent/5/80.webp',
+				path: '/media_stream-image/media/acme/uploads/test/image.webp/100/100/contain/entropy/transparent/5/80.webp',
 			} as any
 
 			await expect(controller.handleImageRequest(mockRequest, mockResponse))
@@ -296,7 +296,7 @@ describe('mediaStreamImageController', () => {
 
 		it('should handle null width and height', async () => {
 			const mockRequest = {
-				path: '/media_stream-image/media/uploads/test/image.webp/null/null/contain/entropy/transparent/5/80.webp',
+				path: '/media_stream-image/media/acme/uploads/test/image.webp/null/null/contain/entropy/transparent/5/80.webp',
 			} as any
 
 			await controller.handleImageRequest(mockRequest, mockResponse)
@@ -312,17 +312,7 @@ describe('mediaStreamImageController', () => {
 		})
 	})
 
-	describe('route ordering — UPLOADED_MEDIA matched before UPLOADED_MEDIA_LEGACY', () => {
-		/**
-		 * Regression guard for the IMAGE_SOURCES insertion-order contract.
-		 *
-		 * A multi-tenant URL like ``media/acme/uploads/banner.jpg/…`` must match
-		 * UPLOADED_MEDIA (which captures ``tenantSchema = "acme"``) and NOT
-		 * UPLOADED_MEDIA_LEGACY (which would swallow ``acme`` as part of
-		 * ``imagePath``, losing the tenant context entirely).
-		 *
-		 * If IMAGE_SOURCES is ever reordered, this test will fail loudly.
-		 */
+	describe('uploaded media route requires a tenant segment', () => {
 		it('should match UPLOADED_MEDIA for multi-tenant URLs, capturing tenantSchema', async () => {
 			const mockRequest = {
 				path: '/media_stream-image/media/acme/uploads/banner.jpg/800/600/cover/entropy/transparent/5/80.webp',
@@ -339,18 +329,18 @@ describe('mediaStreamImageController', () => {
 			)
 		})
 
-		it('should match UPLOADED_MEDIA_LEGACY for legacy URLs without tenant segment', async () => {
+		it('should 404 the pre-multi-tenant URL shape (no tenant segment)', async () => {
+			// The legacy `media/uploads/...` route (UPLOADED_MEDIA_LEGACY) was
+			// removed once every URL emitted by Django carried a tenant
+			// segment. There is no special-casing — this shape simply fails
+			// to match any IMAGE_SOURCES pattern and 404s naturally.
 			const mockRequest = {
 				path: '/media_stream-image/media/uploads/banner.jpg/800/600/cover/entropy/transparent/5/80.webp',
 			} as any
 
-			await controller.handleImageRequest(mockRequest, mockResponse)
-
-			expect(mockRequestValidatorService.validateRequest).toHaveBeenCalledWith(
-				expect.objectContaining({
-					source: expect.objectContaining({ name: 'uploaded_media_legacy' }),
-				}),
-			)
+			await expect(controller.handleImageRequest(mockRequest, mockResponse))
+				.rejects
+				.toThrow(NotFoundException)
 		})
 	})
 })

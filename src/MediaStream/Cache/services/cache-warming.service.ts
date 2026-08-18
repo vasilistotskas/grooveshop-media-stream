@@ -1,5 +1,4 @@
 import type { OnModuleInit } from '@nestjs/common'
-import { Buffer } from 'node:buffer'
 import { access, readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { cwd } from 'node:process'
@@ -270,27 +269,6 @@ export class CacheWarmingService implements OnModuleInit {
 	private extractResourceId(filePath: string): string {
 		const filename = filePath.split('/').pop() || filePath.split('\\').pop()
 		return filename?.replace(FILE_EXTENSION_RE, '') || ''
-	}
-
-	async warmupSpecificFile(resourceId: string, content: Buffer, ttl?: number, tenantSchema: string = 'public'): Promise<void> {
-		try {
-			const metadata = new ResourceMetaData({
-				size: content.length.toString(),
-				dateCreated: Date.now(),
-				tenantSchema,
-			})
-			// `ttl` is intentionally optional: undefined and 0 both fall through to
-			// the configured default TTL inside RedisCacheService.set() (see fix #1
-			// in redis-cache.service.ts). Callers that want a specific lifetime pass
-			// an explicit positive value; callers that omit it rely on the config default.
-			const namespace = `image:${tenantSchema || 'public'}`
-			await this.cacheManager.set(namespace, resourceId, { data: content, metadata }, ttl)
-			CorrelatedLogger.debug(`Manually warmed up resource: ${resourceId} (ns=${namespace})`, CacheWarmingService.name)
-		}
-		catch (error: unknown) {
-			CorrelatedLogger.error(`Failed to manually warm up resource ${resourceId}: ${(error as Error).message}`, (error as Error).stack, CacheWarmingService.name)
-			throw error
-		}
 	}
 
 	async getWarmupStats(): Promise<{

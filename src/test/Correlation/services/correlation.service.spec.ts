@@ -1,6 +1,7 @@
 import type { RequestContext } from '#microservice/Correlation/interfaces/correlation.interface'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { requestContextStorage } from '#microservice/Correlation/async-local-storage'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 
 describe('correlationService', () => {
@@ -15,7 +16,10 @@ describe('correlationService', () => {
 	})
 
 	afterEach(() => {
-		service.clearContext()
+		// clearContext was removed as test-only surface; reset the shared
+		// AsyncLocalStorage singleton directly (it's exported for exactly
+		// this purpose, shared with PerformanceTracker/CorrelatedLogger).
+		requestContextStorage.enterWith(undefined as unknown as RequestContext)
 	})
 
 	describe('generateCorrelationId', () => {
@@ -131,25 +135,6 @@ describe('correlationService', () => {
 		})
 	})
 
-	describe('clearContext', () => {
-		it('should clear existing context', () => {
-			const mockContext: RequestContext = {
-				correlationId: 'test-correlation-id',
-				timestamp: Date.now(),
-				clientIp: '127.0.0.1',
-				method: 'GET',
-				url: '/test',
-				startTime: BigInt(Date.now() * 1000000),
-			}
-
-			service.setContext(mockContext)
-			expect(service.getContext()).toEqual(mockContext)
-
-			service.clearContext()
-			expect(service.getContext()).toBeNull()
-		})
-	})
-
 	describe('context Isolation', () => {
 		it('should isolate contexts between concurrent async operations', async () => {
 			const context1: RequestContext = {
@@ -214,45 +199,6 @@ describe('correlationService', () => {
 				// Outer context restored after inner scope
 				expect(service.getCorrelationId()).toBe('outer')
 			})
-		})
-	})
-
-	describe('helper Methods', () => {
-		it('should return client IP from context', () => {
-			const mockContext: RequestContext = {
-				correlationId: 'test-id',
-				timestamp: Date.now(),
-				clientIp: '192.168.1.100',
-				method: 'GET',
-				url: '/test',
-				startTime: BigInt(Date.now() * 1000000),
-			}
-
-			service.setContext(mockContext)
-			expect(service.getClientIp()).toBe('192.168.1.100')
-		})
-
-		it('should return "unknown" for client IP when no context', () => {
-			expect(service.getClientIp()).toBe('unknown')
-		})
-
-		it('should return user agent from context', () => {
-			const mockContext: RequestContext = {
-				correlationId: 'test-id',
-				timestamp: Date.now(),
-				clientIp: '127.0.0.1',
-				userAgent: 'Mozilla/5.0 Test',
-				method: 'GET',
-				url: '/test',
-				startTime: BigInt(Date.now() * 1000000),
-			}
-
-			service.setContext(mockContext)
-			expect(service.getUserAgent()).toBe('Mozilla/5.0 Test')
-		})
-
-		it('should return "unknown" for user agent when no context', () => {
-			expect(service.getUserAgent()).toBe('unknown')
 		})
 	})
 })

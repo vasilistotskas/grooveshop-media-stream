@@ -137,22 +137,10 @@ export default class MediaStreamImageController {
 	/**
 	 * Find matching image source and extract parameters.
 	 *
-	 * **Route ordering contract** — patterns are tested in V8 insertion order of
-	 * the IMAGE_SOURCES object literal.  The current order is:
-	 *
-	 *   1. UPLOADED_MEDIA  — ``media/:tenantSchema/uploads/:imagePath+/…``
-	 *   2. UPLOADED_MEDIA_LEGACY — ``media/uploads/:imagePath+/…``
-	 *   3. STATIC_IMAGES   — ``static/images/:image/…``
-	 *
-	 * UPLOADED_MEDIA **must** come before UPLOADED_MEDIA_LEGACY; otherwise a
-	 * multi-tenant URL like ``media/acme/uploads/…`` could be matched by the
-	 * legacy pattern, silently mapping ``acme`` as the start of ``imagePath``
-	 * and losing the tenant schema.  The patterns are distinct enough that no
-	 * ambiguity exists between UPLOADED_MEDIA and STATIC_IMAGES.
-	 *
-	 * Regression guard: see the unit test
-	 * ``src/test/API/controllers/media-stream-image.controller.spec.ts``
-	 * → "route ordering — UPLOADED_MEDIA matched before UPLOADED_MEDIA_LEGACY"
+	 * Patterns are tested in V8 insertion order of the IMAGE_SOURCES object
+	 * literal: UPLOADED_MEDIA (``media/:tenantSchema/uploads/:imagePath+/…``)
+	 * then STATIC_IMAGES (``static/images/:image/…``). The patterns are
+	 * distinct enough that no ambiguity exists between the two.
 	 */
 	private findMatchingSource(path: string): { sourceKey: ImageSourceKey, params: ImageProcessingParams } | null {
 		for (const [key, config] of Object.entries(IMAGE_SOURCES)) {
@@ -239,9 +227,9 @@ export default class MediaStreamImageController {
 			const resizeOptions = this.buildResizeOptions(params)
 
 			// tenantSchema is extracted from route params when the URL pattern
-			// includes it (UPLOADED_MEDIA). For the legacy route and shared
-			// sources (STATIC_IMAGES), fall back to "public" so keys remain
-			// stable. Used downstream as part of the cache namespace AND
+			// includes it (UPLOADED_MEDIA). For shared sources (STATIC_IMAGES),
+			// fall back to "public" so keys remain stable. Used downstream as
+			// part of the cache namespace AND
 			// as the ``tenant_schema`` Prometheus label, so we validate
 			// the shape here before it can drive disk paths or metrics
 			// cardinality (H20 in MULTI_TENANT_AUDIT.md).

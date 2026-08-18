@@ -213,32 +213,6 @@ describe('intelligentEvictionService', () => {
 		})
 	})
 
-	describe('getEvictionRecommendations', () => {
-		it('should return eviction recommendations without executing', async () => {
-			const recommendations = await service.getEvictionRecommendations()
-
-			expect(recommendations.candidates).toBeDefined()
-			expect(recommendations.totalSize).toBeGreaterThan(0)
-			expect(recommendations.strategy).toBe('intelligent')
-			expect(recommendations.reasoning).toBeInstanceOf(Array)
-			expect(recommendations.reasoning.length).toBeGreaterThan(0)
-		})
-
-		it('should provide detailed reasoning for recommendations', async () => {
-			const recommendations = await service.getEvictionRecommendations(1024 * 1024)
-
-			expect(recommendations.reasoning).toContainEqual(
-				expect.stringMatching(/Selected \d+ files totaling/),
-			)
-			expect(recommendations.reasoning).toContainEqual(
-				expect.stringMatching(/Average access count:/),
-			)
-			expect(recommendations.reasoning).toContainEqual(
-				expect.stringMatching(/Strategy: intelligent/),
-			)
-		})
-	})
-
 	describe('eviction strategies', () => {
 		it('should apply LRU strategy correctly', async () => {
 			// Mock config to use LRU strategy

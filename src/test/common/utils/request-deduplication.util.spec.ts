@@ -70,8 +70,6 @@ describe('requestDeduplicator', () => {
 			return 'done'
 		})
 
-		expect(dedup.isPending('slow')).toBe(true)
-		expect(dedup.getPendingCount()).toBe(1)
 		expect(dedup.getStats()).toEqual({ pending: 1, keys: ['slow'] })
 
 		release()
@@ -82,9 +80,9 @@ describe('requestDeduplicator', () => {
 		const never = new Promise<string>(() => {})
 		void dedup.execute('stuck', () => never)
 
-		expect(dedup.getPendingCount()).toBe(1)
+		expect(dedup.getStats().pending).toBe(1)
 		dedup.clear()
-		expect(dedup.getPendingCount()).toBe(0)
+		expect(dedup.getStats().pending).toBe(0)
 	})
 
 	it('should stop its cleanup interval on destroy', () => {
