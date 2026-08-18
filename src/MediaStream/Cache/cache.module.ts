@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { InternalSecretGuard } from '#microservice/common/guards/internal-secret.guard'
 import { ConfigModule } from '#microservice/Config/config.module'
 import { MetricsModule } from '#microservice/Metrics/metrics.module'
+import { StorageModule } from '#microservice/Storage/storage.module'
 import { AdminCacheController } from './controllers/admin-cache.controller.js'
 import { CacheHealthIndicator } from './indicators/cache-health.indicator.js'
 import { RedisHealthIndicator } from './indicators/redis-health.indicator.js'
@@ -17,6 +18,7 @@ import { DefaultCacheKeyStrategy } from './strategies/cache-key.strategy.js'
 	imports: [
 		ConfigModule,
 		MetricsModule,
+		StorageModule,
 	],
 	controllers: [
 		AdminCacheController,

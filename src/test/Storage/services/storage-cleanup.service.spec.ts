@@ -14,6 +14,7 @@ vi.mock('node:fs', () => ({
 		readdir: vi.fn(),
 		stat: vi.fn(),
 		unlink: vi.fn().mockResolvedValue(undefined),
+		readFile: vi.fn(),
 	},
 }))
 
@@ -405,6 +406,129 @@ describe('storageCleanupService', () => {
 
 			// Should preserve at least 100 files
 			expect(result.filesRemoved).toBeLessThanOrEqual(50)
+		})
+	})
+
+	describe('removeTenantFiles', () => {
+		// FIX 1: MultiLayerCacheManager only invalidates memory + Redis. This
+		// sweep is what removes the matching on-disk .rsm/.rsc pairs so a
+		// flushed resource doesn't resurrect from disk on the next request.
+		function mockMetaContent(tenantSchema?: string): string {
+			return JSON.stringify({
+				version: 1,
+				size: '1000',
+				format: 'webp',
+				dateCreated: Date.now(),
+				privateTTL: 1000,
+				publicTTL: 1000,
+				accessCount: 0,
+				...(tenantSchema !== undefined ? { tenantSchema } : {}),
+			})
+		}
+
+		it('removes only the .rsm/.rsc pair belonging to the flushed tenant schema', async () => {
+			mockFs.readdir.mockResolvedValue([
+				'uuid-tenant-a.rsm',
+				'uuid-tenant-a.rsc',
+				'uuid-tenant-b.rsm',
+				'uuid-tenant-b.rsc',
+				'default_optimized_abc.webp',
+			] as any)
+
+			mockFs.readFile.mockImplementation((filePath: any) => {
+				const filename = filePath.split(/[/\\]/).pop()
+				if (filename === 'uuid-tenant-a.rsm')
+					return Promise.resolve(mockMetaContent('tenant_a'))
+				if (filename === 'uuid-tenant-b.rsm')
+					return Promise.resolve(mockMetaContent('tenant_b'))
+				return Promise.reject(new Error(`unexpected readFile: ${filename}`))
+			})
+
+			const result = await service.removeTenantFiles('tenant_a')
+
+			expect(result.filesRemoved).toBe(1)
+			expect(result.errors).toEqual([])
+			expect(mockFs.unlink).toHaveBeenCalledWith(expect.stringContaining('uuid-tenant-a.rsm'))
+			expect(mockFs.unlink).toHaveBeenCalledWith(expect.stringContaining('uuid-tenant-a.rsc'))
+			expect(mockFs.unlink).not.toHaveBeenCalledWith(expect.stringContaining('uuid-tenant-b.rsm'))
+			expect(mockFs.unlink).not.toHaveBeenCalledWith(expect.stringContaining('uuid-tenant-b.rsc'))
+		})
+
+		it('treats legacy .rsm sidecars without a tenantSchema field as "public"', async () => {
+			mockFs.readdir.mockResolvedValue(['legacy-uuid.rsm', 'legacy-uuid.rsc'] as any)
+			mockFs.readFile.mockResolvedValue(mockMetaContent(undefined))
+
+			const result = await service.removeTenantFiles('public')
+
+			expect(result.filesRemoved).toBe(1)
+			expect(mockFs.unlink).toHaveBeenCalledWith(expect.stringContaining('legacy-uuid.rsm'))
+			expect(mockFs.unlink).toHaveBeenCalledWith(expect.stringContaining('legacy-uuid.rsc'))
+		})
+
+		it('never reads the .rsc file contents (only unlinks it)', async () => {
+			mockFs.readdir.mockResolvedValue(['uuid-tenant-a.rsm', 'uuid-tenant-a.rsc'] as any)
+			mockFs.readFile.mockResolvedValue(mockMetaContent('tenant_a'))
+
+			await service.removeTenantFiles('tenant_a')
+
+			expect(mockFs.readFile).toHaveBeenCalledTimes(1)
+			expect(mockFs.readFile).toHaveBeenCalledWith(expect.stringContaining('uuid-tenant-a.rsm'), 'utf8')
+		})
+
+		it('continues the sweep past a corrupt .rsm file and reports it as an error', async () => {
+			mockFs.readdir.mockResolvedValue(['corrupt.rsm', 'uuid-tenant-a.rsm', 'uuid-tenant-a.rsc'] as any)
+			mockFs.readFile.mockImplementation((filePath: any) => {
+				const filename = filePath.split(/[/\\]/).pop()
+				if (filename === 'corrupt.rsm')
+					return Promise.resolve('{not valid json')
+				return Promise.resolve(mockMetaContent('tenant_a'))
+			})
+
+			const result = await service.removeTenantFiles('tenant_a')
+
+			expect(result.filesRemoved).toBe(1)
+			expect(result.errors).toHaveLength(1)
+			expect(result.errors[0]).toContain('corrupt.rsm')
+			expect(mockFs.unlink).toHaveBeenCalledWith(expect.stringContaining('uuid-tenant-a.rsm'))
+		})
+
+		it('does not unlink anything when no .rsm files match the tenant schema', async () => {
+			mockFs.readdir.mockResolvedValue(['uuid-tenant-b.rsm', 'uuid-tenant-b.rsc'] as any)
+			mockFs.readFile.mockResolvedValue(mockMetaContent('tenant_b'))
+
+			const result = await service.removeTenantFiles('tenant_a')
+
+			expect(result.filesRemoved).toBe(0)
+			expect(result.errors).toEqual([])
+			expect(mockFs.unlink).not.toHaveBeenCalled()
+		})
+
+		it('handles a storage directory read failure gracefully', async () => {
+			mockFs.readdir.mockRejectedValue(new Error('Permission denied'))
+
+			const result = await service.removeTenantFiles('tenant_a')
+
+			expect(result.filesRemoved).toBe(0)
+			expect(result.errors[0]).toContain('Permission denied')
+		})
+
+		it('tolerates a missing .rsc file (ENOENT) for a matched tenant .rsm', async () => {
+			mockFs.readdir.mockResolvedValue(['uuid-tenant-a.rsm'] as any)
+			mockFs.readFile.mockResolvedValue(mockMetaContent('tenant_a'))
+			mockFs.unlink.mockImplementation((filePath: any) => {
+				const filename = filePath.split(/[/\\]/).pop()
+				if (filename === 'uuid-tenant-a.rsc') {
+					const err: NodeJS.ErrnoException = new Error('no such file')
+					err.code = 'ENOENT'
+					return Promise.reject(err)
+				}
+				return Promise.resolve(undefined)
+			})
+
+			const result = await service.removeTenantFiles('tenant_a')
+
+			expect(result.filesRemoved).toBe(1)
+			expect(result.errors).toEqual([])
 		})
 	})
 

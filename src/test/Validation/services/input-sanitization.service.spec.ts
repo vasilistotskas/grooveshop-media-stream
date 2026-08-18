@@ -100,6 +100,61 @@ describe('inputSanitizationService', () => {
 			const result = await service.sanitize(longString)
 			expect(result.length).toBeLessThanOrEqual(2048)
 		})
+
+		describe('tenantSchema and resourceTarget field exemptions (multi-tenant regression)', () => {
+			it('preserves a tenantSchema equal to a bare reserved word ("data")', async () => {
+				// Before the fix, DANGEROUS_PROTOCOL_WORD_RE stripped bare "data"/
+				// "file"/"javascript"/etc. from every string, including tenantSchema —
+				// collapsing a tenant literally named "data" to "" and merging its
+				// cache identity with image:public.
+				const result = await service.sanitize({ tenantSchema: 'data' })
+				expect(result.tenantSchema).toBe('data')
+			})
+
+			it('preserves a tenantSchema equal to each other bare reserved word', async () => {
+				for (const schema of ['file', 'ftp', 'about', 'vbscript', 'javascript']) {
+					const result = await service.sanitize({ tenantSchema: schema })
+					expect(result.tenantSchema).toBe(schema)
+				}
+			})
+
+			it('keeps resourceTarget path segments that are bare reserved words intact', async () => {
+				const input = { resourceTarget: 'http://backend/media/data/uploads/about.png' }
+				const result = await service.sanitize(input)
+				expect(result.resourceTarget).toBe('http://backend/media/data/uploads/about.png')
+			})
+
+			it('keeps resourceTarget path segments containing "eval"/"expression" as substrings intact', async () => {
+				const input = { resourceTarget: 'http://backend/media/uploads/eval-report.pdf' }
+				const result = await service.sanitize(input)
+				expect(result.resourceTarget).toBe('http://backend/media/uploads/eval-report.pdf')
+			})
+
+			it('still neutralizes a javascript: scheme resourceTarget completely', async () => {
+				const input = { resourceTarget: 'javascript:alert(1)' }
+				const result = await service.sanitize(input)
+				expect(result.resourceTarget).toBe('')
+			})
+
+			it('still neutralizes a data: scheme resourceTarget completely', async () => {
+				const input = { resourceTarget: 'data:text/html,<script>alert(1)</script>' }
+				const result = await service.sanitize(input)
+				expect(result.resourceTarget).toBe('')
+			})
+
+			it('still strips <script> tags from resourceTarget (defense-in-depth unchanged)', async () => {
+				const input = { resourceTarget: 'http://backend/<script>alert(1)</script>image.jpg' }
+				const result = await service.sanitize(input)
+				expect(result.resourceTarget).toBe('http://backend/alert(1)image.jpg')
+			})
+
+			it('does not weaken bare-word stripping for other, non-exempt string fields', async () => {
+				// Regression guard: the exemption must be scoped to tenantSchema/
+				// resourceTarget only — arbitrary fields still get full sanitization.
+				const result = await service.sanitize({ someOtherField: 'data' })
+				expect(result.someOtherField).toBe('')
+			})
+		})
 	})
 
 	describe('validateUrl', () => {

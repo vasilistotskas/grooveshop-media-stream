@@ -1,6 +1,7 @@
 import { BadRequestException, Body, Controller, HttpCode, HttpStatus, Logger, Post, UseGuards } from '@nestjs/common'
 import { TENANT_SCHEMA_PATTERN } from '#microservice/common/constants/tenant.constant'
 import { InternalSecretGuard } from '#microservice/common/guards/internal-secret.guard'
+import { StorageCleanupService } from '#microservice/Storage/services/storage-cleanup.service'
 import { MultiLayerCacheManager } from '../services/multi-layer-cache.manager.js'
 
 export interface FlushTenantBody {
@@ -16,15 +17,22 @@ export interface FlushTenantBody {
 export class AdminCacheController {
 	private readonly _logger = new Logger(AdminCacheController.name)
 
-	constructor(private readonly cacheManager: MultiLayerCacheManager) {}
+	constructor(
+		private readonly cacheManager: MultiLayerCacheManager,
+		private readonly storageCleanupService: StorageCleanupService,
+	) {}
 
 	/**
 	 * Flush all cache entries that belong to a specific tenant.
 	 *
 	 * Cache keys are stored under the namespace ``image:{tenantSchema}``, so this
 	 * performs a targeted SCAN-based invalidation of the ``image:{tenantSchema}:*``
-	 * key range across every active cache layer (memory + Redis).  Keys from other
-	 * tenants are not touched.
+	 * key range across every active cache layer (memory + Redis), and additionally
+	 * sweeps the on-disk storage tier for matching ``.rsm``/``.rsc`` pairs (the file
+	 * system layer is read directly by CacheImageResourceOperation and is not covered
+	 * by MultiLayerCacheManager — without this sweep, flushed resources would
+	 * resurrect from disk on the next request). Keys/files from other tenants are
+	 * not touched.
 	 *
 	 * Body: ``{ "tenantSchema": "acme" }``
 	 *
@@ -56,6 +64,12 @@ export class AdminCacheController {
 		this._logger.log(`Flushing cache for tenant namespace: ${namespace}`)
 
 		await this.cacheManager.invalidateNamespace(namespace)
+
+		const diskResult = await this.storageCleanupService.removeTenantFiles(tenantSchema)
+		this._logger.log(
+			`Disk sweep for tenant namespace ${namespace}: ${diskResult.filesRemoved} file pair(s) removed${
+				diskResult.errors.length ? `, ${diskResult.errors.length} error(s)` : ''}`,
+		)
 
 		this._logger.log(`Cache flush complete for tenant namespace: ${namespace}`)
 

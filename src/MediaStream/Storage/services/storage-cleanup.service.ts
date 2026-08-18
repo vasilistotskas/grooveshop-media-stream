@@ -189,6 +189,100 @@ export class StorageCleanupService implements OnModuleInit {
 	}
 
 	/**
+	 * Remove on-disk cache file pairs (``.rsm`` + ``.rsc``) belonging to a
+	 * specific tenant schema.
+	 *
+	 * ``MultiLayerCacheManager.invalidateNamespace`` only knows about the
+	 * memory and Redis layers — the file system tier is read directly by
+	 * ``CacheImageResourceOperation`` and is otherwise untouched by a tenant
+	 * cache flush. Without this sweep, a flushed resource resurrects from
+	 * disk on the next request (stale bytes served, and the disk hit
+	 * backfills Redis/memory again with the same stale data).
+	 *
+	 * Storage filenames are flat UUIDs with no tenant information encoded —
+	 * the tenant lives inside each ``.rsm`` metadata JSON's ``tenantSchema``
+	 * field (legacy sidecars written before multi-tenancy omit it, which
+	 * ``ResourceMetaData`` defaults to ``'public'``). This scans every
+	 * ``.rsm`` file, parses it, and removes the ``.rsm`` + matching ``.rsc``
+	 * pair when the metadata's tenant matches. Per-file read/parse/unlink
+	 * errors are logged and skipped rather than aborting the sweep — file
+	 * counts here are small so no bounded-concurrency limiter is needed.
+	 */
+	async removeTenantFiles(tenantSchema: string): Promise<{ filesRemoved: number, errors: string[] }> {
+		const errors: string[] = []
+		let filesRemoved = 0
+
+		let allFiles: string[]
+		try {
+			allFiles = await fs.readdir(this.storageDirectory)
+		}
+		catch (error: unknown) {
+			const msg = `Failed to read storage directory for tenant sweep: ${(error as Error).message}`
+			CorrelatedLogger.warn(msg, StorageCleanupService.name)
+			return { filesRemoved: 0, errors: [msg] }
+		}
+
+		const metaFiles = allFiles.filter(f => f.endsWith('.rsm'))
+
+		const results = await Promise.allSettled(metaFiles.map(async (metaFile) => {
+			const metaPath = join(this.storageDirectory, metaFile)
+
+			let content: string
+			try {
+				content = await fs.readFile(metaPath, 'utf8')
+			}
+			catch (error: unknown) {
+				throw new Error(`Failed to read metadata ${metaFile}: ${(error as Error).message}`)
+			}
+
+			let metadata: { tenantSchema?: string }
+			try {
+				metadata = JSON.parse(content)
+			}
+			catch (error: unknown) {
+				throw new Error(`Failed to parse metadata ${metaFile}: ${(error as Error).message}`)
+			}
+
+			if ((metadata.tenantSchema || 'public') !== tenantSchema) {
+				return false
+			}
+
+			const resourcePath = join(this.storageDirectory, metaFile.replace(/\.rsm$/, '.rsc'))
+			await Promise.all([
+				fs.unlink(metaPath),
+				fs.unlink(resourcePath).catch((error: unknown) => {
+					// .rsc may already be gone (e.g. a metadata-only leftover) — not fatal
+					if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+						throw error
+					}
+				}),
+			])
+			return true
+		}))
+
+		for (let i = 0; i < results.length; i++) {
+			const result = results[i]
+			if (result.status === 'fulfilled') {
+				if (result.value) {
+					filesRemoved++
+				}
+			}
+			else {
+				const msg = `Tenant file sweep failed for ${metaFiles[i]}: ${(result.reason as Error).message}`
+				errors.push(msg)
+				CorrelatedLogger.warn(msg, StorageCleanupService.name)
+			}
+		}
+
+		CorrelatedLogger.log(
+			`Tenant disk sweep for schema "${tenantSchema}": ${filesRemoved} file pair(s) removed, ${errors.length} error(s)`,
+			StorageCleanupService.name,
+		)
+
+		return { filesRemoved, errors }
+	}
+
+	/**
 	 * Scheduled cleanup — invoked by the dynamically registered cron job
 	 * (schedule comes from config.cronSchedule, registered in onModuleInit).
 	 */

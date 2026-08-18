@@ -89,7 +89,17 @@ export class InputSanitizationService implements ISanitizer<any> {
 		return input
 	}
 
-	private sanitizeString(str: string): string {
+	/**
+	 * @param str - The string to sanitize.
+	 * @param stripBareWords - Whether to strip standalone reserved words (bare
+	 * `data`, `file`, `ftp`, `about`, `javascript`, `vbscript`, `expression`,
+	 * `eval` with no colon/paren). Defaults to true for the general-purpose
+	 * path. Callers sanitizing values that legitimately contain these words
+	 * as substrings — e.g. URL path segments like `/uploads/about.png` —
+	 * pass `false` so only the actual injection vectors (scheme-with-colon,
+	 * `expression(...)`/`eval(...)` calls) are neutralized.
+	 */
+	private sanitizeString(str: string, stripBareWords: boolean = true): string {
 		const lowerStr = str.toLowerCase()
 		for (const protocol of DANGEROUS_PROTOCOLS) {
 			if (lowerStr.startsWith(protocol)) {
@@ -113,7 +123,7 @@ export class InputSanitizationService implements ISanitizer<any> {
 			previousLength = sanitized.length
 			iterations++
 
-			sanitized = this.performSanitizationPass(sanitized)
+			sanitized = this.performSanitizationPass(sanitized, stripBareWords)
 		}
 
 		sanitized = sanitized.trim()
@@ -126,13 +136,13 @@ export class InputSanitizationService implements ISanitizer<any> {
 		return sanitized
 	}
 
-	private performSanitizationPass(input: string): string {
+	private performSanitizationPass(input: string, stripBareWords: boolean = true): string {
 		let result = input
 		result = this.removeHtmlTags(result)
 		result = this.removeEventHandlers(result)
 		result = this.removeStyleAttributes(result)
-		result = this.removeDangerousProtocols(result)
-		result = this.removeDangerousJavaScript(result)
+		result = this.removeDangerousProtocols(result, stripBareWords)
+		result = this.removeDangerousJavaScript(result, stripBareWords)
 		result = this.removeHtmlEntities(result)
 		return result
 	}
@@ -142,6 +152,32 @@ export class InputSanitizationService implements ISanitizer<any> {
 
 		for (const [key, value] of Object.entries(obj)) {
 			const sanitizedKey = this.sanitizeString(String(key))
+
+			// tenantSchema drives the cache namespace and storage paths, and is
+			// already strictly validated against TENANT_SCHEMA_PATTERN
+			// (`/^[a-z_][a-z0-9_]{0,62}$/`) before a CacheImageRequest is ever
+			// built (see media-stream-image.controller.ts / admin-cache.controller.ts).
+			// That character class cannot contain HTML/script/protocol injection
+			// vectors, so it is exempt from string sanitization entirely — running
+			// it through the generic pipeline would strip bare reserved words
+			// (e.g. a tenant literally named "data" or "file") down to '', collapsing
+			// its cache identity onto image:public and causing cross-tenant serves.
+			if (key === 'tenantSchema' && typeof value === 'string') {
+				sanitized[sanitizedKey] = value
+				continue
+			}
+
+			// resourceTarget is a full upstream URL/path (validated separately by
+			// validateUrl's domain whitelist). Bare-word stripping inside a URL
+			// path is not a real injection vector — `javascript`/`data`/`file`/
+			// `about`/etc. are only dangerous as a URL *scheme* (`javascript:`),
+			// which the scheme-anchored checks below still catch. Stripping them
+			// as standalone words instead mangles legitimate filenames/segments
+			// (`/uploads/about.png` -> `/uploads/.png` -> 404).
+			if (key === 'resourceTarget' && typeof value === 'string') {
+				sanitized[sanitizedKey] = this.sanitizeString(value, false)
+				continue
+			}
 
 			sanitized[sanitizedKey] = await this.sanitize(value)
 		}
@@ -321,7 +357,7 @@ export class InputSanitizationService implements ISanitizer<any> {
 		return result.join('')
 	}
 
-	private removeDangerousProtocols(input: string): string {
+	private removeDangerousProtocols(input: string, stripBareWords: boolean = true): string {
 		let result = input
 		let previousResult = ''
 
@@ -332,13 +368,15 @@ export class InputSanitizationService implements ISanitizer<any> {
 
 			result = result.replace(DANGEROUS_PROTOCOL_RE, '')
 
-			result = result.replace(DANGEROUS_PROTOCOL_WORD_RE, '')
+			if (stripBareWords) {
+				result = result.replace(DANGEROUS_PROTOCOL_WORD_RE, '')
+			}
 		}
 
 		return result
 	}
 
-	private removeDangerousJavaScript(input: string): string {
+	private removeDangerousJavaScript(input: string, stripBareWords: boolean = true): string {
 		let result = input
 		let previousResult = ''
 
@@ -346,7 +384,9 @@ export class InputSanitizationService implements ISanitizer<any> {
 			previousResult = result
 			result = result.replace(DANGEROUS_JS_CALL_RE, '')
 			result = result.replace(DANGEROUS_JS_OPEN_RE, '')
-			result = result.replace(DANGEROUS_JS_WORD_RE, '')
+			if (stripBareWords) {
+				result = result.replace(DANGEROUS_JS_WORD_RE, '')
+			}
 		}
 
 		return result

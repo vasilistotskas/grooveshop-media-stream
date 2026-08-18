@@ -83,7 +83,7 @@ Content-Type: application/json
 { "tenantSchema": "acme" }
 ```
 
-Invalidates all `image:acme:*` cache entries across memory and Redis layers. Keys from other tenants are not touched. Returns `{ flushed: true, tenantSchema, namespace, timestamp }`.
+Invalidates all `image:acme:*` cache entries across memory and Redis layers, and sweeps the on-disk storage tier (`StorageCleanupService.removeTenantFiles`) for `.rsm`/`.rsc` pairs whose metadata `tenantSchema` matches — the file system layer is read directly by `CacheImageResourceOperation` and is not covered by `MultiLayerCacheManager`. Keys/files from other tenants are not touched. Returns `{ flushed: true, tenantSchema, namespace, timestamp }`.
 
 - `tenantSchema` must match `/^[a-z_][a-z0-9_]{0,62}$/`
 - Requires `INTERNAL_ADMIN_SECRET` env var to be set (endpoint is fail-closed without it)

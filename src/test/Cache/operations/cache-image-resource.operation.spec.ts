@@ -31,6 +31,7 @@ import WebpImageManipulationJob from '#microservice/Processing/jobs/webp-image-m
 import ValidateCacheImageRequestResizeTargetRule from '#microservice/Validation/rules/validate-cache-image-request-resize-target.rule'
 import ValidateCacheImageRequestRule from '#microservice/Validation/rules/validate-cache-image-request.rule'
 import { InputSanitizationService } from '#microservice/Validation/services/input-sanitization.service'
+import { TenantDomainsService } from '#microservice/Validation/services/tenant-domains.service'
 
 vi.mock('node:fs/promises')
 vi.mock('node:process', () => ({
@@ -292,6 +293,69 @@ describe('cacheImageResourceOperation', () => {
 			expect(opCtx.id).toBe('mock-resource-id')
 			expect(opCtx.request).toBeDefined()
 			expect(opCtx.metaData).toBeNull()
+		})
+	})
+
+	describe('regression: multi-tenant identity isolation through the real sanitizer', () => {
+		// The outer suite mocks InputSanitizationService as a pass-through and
+		// GenerateResourceIdentityFromRequestJob as a fixed 'mock-resource-id',
+		// which cannot catch a real sanitizer bug. This block wires the REAL
+		// InputSanitizationService + GenerateResourceIdentityFromRequestJob
+		// (as setup() actually does in production) to guard against the bare-word
+		// stripper collapsing tenant schemas like "data"/"file" into "" and
+		// producing identical resource IDs across tenants (cross-tenant cache hit).
+		let realOperation: CacheImageResourceOperation
+
+		beforeEach(async () => {
+			const stubConfigService = {
+				get: vi.fn(),
+				getOptional: vi.fn().mockImplementation((_key: string, defaultValue: any) => defaultValue),
+			}
+			const stubTenantDomainsService = {
+				isAllowed: vi.fn().mockReturnValue(false),
+				getDomains: vi.fn().mockReturnValue(new Set()),
+			}
+
+			const realModuleRef = await Test.createTestingModule({
+				providers: [
+					CacheImageResourceOperation,
+					InputSanitizationService,
+					GenerateResourceIdentityFromRequestJob,
+					{ provide: TenantDomainsService, useValue: stubTenantDomainsService },
+					{ provide: ValidateCacheImageRequestRule, useValue: mockValidateCacheImageRequestRule },
+					{ provide: ResourceFetcher, useValue: {} },
+					{ provide: ImageFormatProcessor, useValue: {} },
+					{ provide: MultiLayerCacheManager, useValue: mockCacheManager },
+					{ provide: MetricsService, useValue: mockMetricsService },
+					{ provide: ConfigService, useValue: stubConfigService },
+				],
+			}).compile()
+
+			realOperation = await realModuleRef.resolve(CacheImageResourceOperation)
+		})
+
+		it('produces different resource IDs for tenants "data" and "file" (bare reserved words)', async () => {
+			const buildRequest = (tenantSchema: string) => {
+				const request = new CacheImageRequest()
+				// 'localhost' is in InputSanitizationService's built-in default
+				// allowlist, so this passes the real validateUrl() check below.
+				request.resourceTarget = 'https://localhost/image.jpg'
+				request.tenantSchema = tenantSchema
+				request.resizeOptions = new ResizeOptions()
+				request.resizeOptions.width = 100
+				request.resizeOptions.height = 100
+				return request
+			}
+
+			const ctxData = await realOperation.setup(buildRequest('data'))
+			const ctxFile = await realOperation.setup(buildRequest('file'))
+
+			// Before the fix, sanitize() stripped both "data" and "file" down to
+			// "", so both tenants hashed to the identical resource ID and would
+			// have shared the same image:public cache entry.
+			expect(ctxData.request.tenantSchema).toBe('data')
+			expect(ctxFile.request.tenantSchema).toBe('file')
+			expect(ctxData.id).not.toBe(ctxFile.id)
 		})
 	})
 
