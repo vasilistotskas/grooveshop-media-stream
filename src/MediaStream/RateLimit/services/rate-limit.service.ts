@@ -61,13 +61,17 @@ export class RateLimitService {
 
 	/**
 	 * Generate key based on IP and user agent for more granular control
-	 * For critical endpoints (image-processing), use IP-only to prevent UA spoofing bypass
+	 * For critical endpoints (image-processing), use IP-only (plus tenant schema) to
+	 * prevent UA spoofing bypass
 	 */
-	generateAdvancedKey(ip: string, userAgent: string, requestType: string): string {
-		// For image processing, use IP-only key to prevent user-agent spoofing bypass
-		// This is a security measure as user-agent can be easily spoofed
+	generateAdvancedKey(ip: string, userAgent: string, requestType: string, tenantSchema: string = 'public'): string {
+		// For image processing, use a tenant-scoped, IP-based key to prevent
+		// user-agent spoofing bypass (UA is easily spoofed) AND to stop one
+		// tenant's traffic spike from starving every other tenant behind the
+		// same shared SSR egress IP — all tenant-scoped media requests share a
+		// single upstream IP, so the bucket must be keyed per tenant too.
 		if (requestType === 'image-processing') {
-			return `${ip}:${requestType}`
+			return `${tenantSchema}:${ip}:${requestType}`
 		}
 
 		// For other request types, include hashed user-agent for more granular control

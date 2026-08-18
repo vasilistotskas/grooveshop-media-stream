@@ -1,4 +1,6 @@
 import type { CanActivate, ExecutionContext } from '@nestjs/common'
+import { Buffer } from 'node:buffer'
+import { timingSafeEqual } from 'node:crypto'
 import { Injectable, UnauthorizedException } from '@nestjs/common'
 import { ConfigService as NestConfigService } from '@nestjs/config'
 
@@ -25,10 +27,28 @@ export class InternalSecretGuard implements CanActivate {
 
 		const request = context.switchToHttp().getRequest()
 		const provided = request.headers['x-internal-secret']
-		if (provided !== expected) {
+		if (typeof provided !== 'string' || !this.secretMatches(provided, expected)) {
 			throw new UnauthorizedException()
 		}
 
 		return true
+	}
+
+	/**
+	 * Constant-time comparison to avoid leaking the secret's contents via
+	 * response-time side channels. `timingSafeEqual` requires equal-length
+	 * buffers and throws otherwise, so a length mismatch is checked upfront
+	 * and rejected immediately — that early return is itself a (unavoidable
+	 * and standard) length-only timing leak, never a content leak.
+	 */
+	private secretMatches(provided: string, expected: string): boolean {
+		const providedBuffer = Buffer.from(provided)
+		const expectedBuffer = Buffer.from(expected)
+
+		if (providedBuffer.length !== expectedBuffer.length) {
+			return false
+		}
+
+		return timingSafeEqual(providedBuffer, expectedBuffer)
 	}
 }

@@ -5,6 +5,7 @@ import { CacheModule } from '#microservice/Cache/cache.module'
 import { ConfigModule } from '#microservice/Config/config.module'
 import { ConfigService } from '#microservice/Config/config.service'
 import { MetricsModule } from '#microservice/Metrics/metrics.module'
+import { ValidationModule } from '#microservice/Validation/validation.module'
 import { AdaptiveRateLimitGuard } from './guards/adaptive-rate-limit.guard.js'
 import { RateLimitService } from './services/rate-limit.service.js'
 
@@ -13,6 +14,9 @@ import { RateLimitService } from './services/rate-limit.service.js'
 		ConfigModule,
 		MetricsModule,
 		CacheModule,
+		// TenantDomainsService (dynamic per-tenant domain allowlist) is unioned
+		// into the rate-limit bypass whitelist check — see AdaptiveRateLimitGuard.
+		ValidationModule,
 		// ThrottlerModule registers THROTTLER_OPTIONS and ThrottlerStorage providers.
 		// AdaptiveRateLimitGuard extends ThrottlerGuard and injects both tokens.
 		// The ThrottlerStorageService (in-memory) acts as a per-process secondary
@@ -48,6 +52,12 @@ import { RateLimitService } from './services/rate-limit.service.js'
 	// Reflector must be listed here so NestJS injects it into AdaptiveRateLimitGuard
 	// via the ThrottlerGuard base-class constructor.
 	providers: [Reflector, RateLimitService, AdaptiveRateLimitGuard],
-	exports: [RateLimitService, AdaptiveRateLimitGuard],
+	// ValidationModule is re-exported (not just imported) so that TenantDomainsService
+	// stays resolvable for consumers who apply AdaptiveRateLimitGuard via
+	// `@UseGuards(AdaptiveRateLimitGuard)` on a controller declared OUTSIDE this
+	// module — Nest's dependency resolution (especially TestingModule's
+	// stricter injector) only walks one level of re-exports, so a bare provider
+	// token export is not enough; the owning module itself must be re-exported.
+	exports: [RateLimitService, AdaptiveRateLimitGuard, ValidationModule],
 })
 export class RateLimitModule {}

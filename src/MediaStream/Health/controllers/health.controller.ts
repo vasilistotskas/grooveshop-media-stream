@@ -16,6 +16,7 @@ import { isShuttingDown } from '#microservice/common/utils/graceful-shutdown.uti
 import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
+import { TenantDomainsHealthIndicator } from '#microservice/Validation/indicators/tenant-domains-health.indicator'
 import { HealthDetailGuard } from '../guards/health-detail.guard.js'
 import { DiskSpaceHealthIndicator } from '../indicators/disk-space-health.indicator.js'
 import { MemoryHealthIndicator } from '../indicators/memory-health.indicator.js'
@@ -32,6 +33,7 @@ export class HealthController {
 		private readonly redisHealthIndicator: RedisHealthIndicator,
 		private readonly storageHealthIndicator: StorageHealthIndicator,
 		private readonly sharpHealthIndicator: SharpHealthIndicator,
+		private readonly tenantDomainsHealthIndicator: TenantDomainsHealthIndicator,
 		private readonly httpClientService: HttpClientService,
 	) {}
 
@@ -46,6 +48,7 @@ export class HealthController {
 			() => this.redisHealthIndicator.isHealthy(),
 			() => this.storageHealthIndicator.isHealthy(),
 			() => this.sharpHealthIndicator.isHealthy(),
+			() => this.tenantDomainsHealthIndicator.isHealthy(),
 		])
 	}
 
@@ -72,6 +75,7 @@ export class HealthController {
 			() => this.redisHealthIndicator.isHealthy(),
 			() => this.storageHealthIndicator.isHealthy(),
 			() => this.sharpHealthIndicator.isHealthy(),
+			() => this.tenantDomainsHealthIndicator.isHealthy(),
 		])
 
 		const diskInfo = await this.diskSpaceIndicator.getCurrentDiskInfo()
@@ -145,6 +149,7 @@ export class HealthController {
 			() => this.httpHealthIndicator.isHealthy(),
 			() => this.cacheHealthIndicator.isHealthy(),
 			() => this.storageHealthIndicator.isHealthy(),
+			() => this.tenantDomainsHealthIndicator.isHealthy(),
 		])
 	}
 

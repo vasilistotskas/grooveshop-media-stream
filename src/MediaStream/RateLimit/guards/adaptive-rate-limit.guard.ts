@@ -6,8 +6,10 @@ import { Reflector } from '@nestjs/core'
 import { getOptionsToken, getStorageToken, ThrottlerException, ThrottlerGuard } from '@nestjs/throttler'
 import { IMAGE } from '#microservice/common/constants/route-prefixes.constant'
 import { getClientIp, isInternalIp } from '#microservice/common/utils/ip.util'
+import { extractTenantSchemaFromPath } from '#microservice/common/utils/tenant-path.util'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
+import { TenantDomainsService } from '#microservice/Validation/services/tenant-domains.service'
 import { RateLimitService } from '../services/rate-limit.service.js'
 
 const STATIC_ASSET_RE = /\.(?:css|js|png|jpg|jpeg|gif|ico|svg)$/
@@ -51,6 +53,7 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 		reflector: Reflector,
 		private readonly rateLimitService: RateLimitService,
 		private readonly metricsService: MetricsService,
+		private readonly tenantDomainsService: TenantDomainsService,
 	) {
 		super(options, storageService, reflector)
 	}
@@ -91,8 +94,9 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 			const clientIp = getClientIp(request)
 			const requestType = this.getRequestType(request)
 			const userAgent: string = request.headers['user-agent'] || ''
+			const tenantSchema = extractTenantSchemaFromPath((request.url || '').split('?')[0])
 
-			const rateLimitKey = this.rateLimitService.generateAdvancedKey(clientIp, userAgent, requestType)
+			const rateLimitKey = this.rateLimitService.generateAdvancedKey(clientIp, userAgent, requestType, tenantSchema)
 			const config = this.rateLimitService.getRateLimitConfig(requestType)
 			const adaptiveLimit = await this.rateLimitService.calculateAdaptiveLimit(config.max)
 			const adaptiveConfig = { ...config, max: adaptiveLimit }
@@ -244,6 +248,15 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 	 * Only trusted for requests arriving from internal/private IP ranges —
 	 * Referer and Origin are fully attacker-controlled HTTP headers and MUST NOT
 	 * be used to bypass rate limiting for requests from public IP addresses.
+	 *
+	 * Union semantics (mirrors InputSanitizationService.validateUrl): a hostname
+	 * bypasses rate limiting if it matches the static, process-lifetime env list
+	 * (`RATE_LIMIT_BYPASS_WHITELISTED_DOMAINS` — cluster-internal service names
+	 * like backend-service/frontend-nuxt-service, which never change at runtime
+	 * and so are safe to cache once) OR the dynamic per-tenant domain set kept
+	 * live by TenantDomainsService (refreshed from Django's tenant feed without
+	 * a restart). The dynamic side is deliberately NOT cached here so newly
+	 * onboarded tenant domains bypass immediately.
 	 */
 	private isDomainWhitelisted(request: any): boolean {
 		try {
@@ -258,15 +271,11 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 			}
 			const whitelistedDomains = this.cachedWhitelistedDomains
 
-			if (!whitelistedDomains || whitelistedDomains.length === 0) {
-				return false
-			}
-
 			const referer = request.headers.referer
 			if (referer) {
 				try {
 					const refererUrl = new URL(referer)
-					if (this.matchesDomain(refererUrl.hostname, whitelistedDomains)) {
+					if (this.isHostnameWhitelisted(refererUrl.hostname, whitelistedDomains)) {
 						return true
 					}
 				}
@@ -279,7 +288,7 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 			if (origin) {
 				try {
 					const originUrl = new URL(origin)
-					if (this.matchesDomain(originUrl.hostname, whitelistedDomains)) {
+					if (this.isHostnameWhitelisted(originUrl.hostname, whitelistedDomains)) {
 						return true
 					}
 				}
@@ -294,6 +303,18 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 			CorrelatedLogger.error(`Error checking domain whitelist: ${(error as Error).message}`, (error as Error).stack, AdaptiveRateLimitGuard.name)
 			return false
 		}
+	}
+
+	/**
+	 * Union of the static env-configured whitelist and the dynamic tenant
+	 * domain set. See isDomainWhitelisted() for the rationale.
+	 */
+	private isHostnameWhitelisted(hostname: string, whitelistedDomains: string[] | null): boolean {
+		if (whitelistedDomains && whitelistedDomains.length > 0 && this.matchesDomain(hostname, whitelistedDomains)) {
+			return true
+		}
+
+		return this.tenantDomainsService.isAllowed(hostname)
 	}
 
 	/**

@@ -1,6 +1,7 @@
 import type { MockedObject } from 'vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConfigService } from '#microservice/Config/config.service'
+import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { TenantDomainsService } from '#microservice/Validation/services/tenant-domains.service'
 
 function jsonResponse(body: unknown, ok = true, status = 200): Response {
@@ -15,9 +16,10 @@ describe('tenantDomainsService', () => {
 	let configService: MockedObject<ConfigService>
 	let configValues: Record<string, any>
 	let fetchMock: ReturnType<typeof vi.fn>
+	let metricsService: MockedObject<MetricsService>
 
 	function createService(): TenantDomainsService {
-		return new TenantDomainsService(configService)
+		return new TenantDomainsService(configService, metricsService)
 	}
 
 	beforeEach(() => {
@@ -34,6 +36,10 @@ describe('tenantDomainsService', () => {
 		fetchMock = vi.fn()
 		vi.stubGlobal('fetch', fetchMock)
 		process.env.BACKEND_URL = 'http://backend.internal:8000'
+
+		metricsService = {
+			updateTenantDomainsMetrics: vi.fn(),
+		} as unknown as MockedObject<MetricsService>
 	})
 
 	afterEach(() => {
@@ -57,6 +63,14 @@ describe('tenantDomainsService', () => {
 			await service.refresh()
 
 			expect(fetchMock).not.toHaveBeenCalled()
+		})
+
+		it('reports isEnabled() = false and getLastSuccessfulRefresh() = undefined', async () => {
+			const service = createService()
+			await service.onModuleInit()
+
+			expect(service.isEnabled()).toBe(false)
+			expect(service.getLastSuccessfulRefresh()).toBeUndefined()
 		})
 	})
 
@@ -101,6 +115,20 @@ describe('tenantDomainsService', () => {
 			await service.onModuleInit()
 
 			expect(fetchMock).toHaveBeenCalledWith('https://internal.override/domains-feed', expect.anything())
+		})
+
+		it('records isEnabled() = true, sets getLastSuccessfulRefresh(), and reports the gauges via MetricsService on success', async () => {
+			fetchMock.mockResolvedValue(jsonResponse({ domains: ['acme.example', 'api.acme.example'] }))
+			const before = Date.now()
+
+			const service = createService()
+			await service.onModuleInit()
+
+			expect(service.isEnabled()).toBe(true)
+			const lastRefresh = service.getLastSuccessfulRefresh()
+			expect(lastRefresh).toBeDefined()
+			expect(lastRefresh!).toBeGreaterThanOrEqual(before)
+			expect(metricsService.updateTenantDomainsMetrics).toHaveBeenCalledWith(2, lastRefresh)
 		})
 	})
 
@@ -152,6 +180,29 @@ describe('tenantDomainsService', () => {
 
 			await expect(service.onModuleInit()).resolves.toBeUndefined()
 			expect(service.getDomains().size).toBe(0)
+		})
+
+		it('leaves getLastSuccessfulRefresh() undefined when the very first fetch fails (never-succeeded state for the health indicator)', async () => {
+			fetchMock.mockRejectedValue(new Error('wrong secret'))
+			const service = createService()
+			await service.onModuleInit()
+
+			expect(service.getLastSuccessfulRefresh()).toBeUndefined()
+			expect(metricsService.updateTenantDomainsMetrics).toHaveBeenCalledWith(0, undefined)
+		})
+
+		it('does NOT advance getLastSuccessfulRefresh() when a later refresh fails, but keeps reporting the last known-good timestamp to metrics', async () => {
+			fetchMock.mockResolvedValueOnce(jsonResponse({ domains: ['acme.example'] }))
+			const service = createService()
+			await service.onModuleInit()
+			const firstRefresh = service.getLastSuccessfulRefresh()
+			expect(firstRefresh).toBeDefined()
+
+			fetchMock.mockRejectedValueOnce(new Error('network down'))
+			await service.refresh()
+
+			expect(service.getLastSuccessfulRefresh()).toBe(firstRefresh)
+			expect(metricsService.updateTenantDomainsMetrics).toHaveBeenLastCalledWith(1, firstRefresh)
 		})
 	})
 

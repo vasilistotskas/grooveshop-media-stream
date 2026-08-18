@@ -45,6 +45,9 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	private readonly gcDuration: promClient.Histogram
 	private readonly eventLoopLag: promClient.Histogram
 
+	private readonly tenantDomainsCount: promClient.Gauge
+	private readonly tenantDomainsLastRefreshTimestamp: promClient.Gauge
+
 	private startTime: number = Date.now()
 	private requestsInFlightCount: number = 0
 	private systemMetricsInterval?: NodeJS.Timeout
@@ -260,6 +263,18 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			labelNames: ['type', 'operation'],
 			registers: [this.register],
 		})
+
+		this.tenantDomainsCount = new promClient.Gauge({
+			name: 'mediastream_tenant_domains_count',
+			help: 'Number of hostnames currently in the dynamic per-tenant domain allowlist (TenantDomainsService)',
+			registers: [this.register],
+		})
+
+		this.tenantDomainsLastRefreshTimestamp = new promClient.Gauge({
+			name: 'mediastream_tenant_domains_last_refresh_timestamp_seconds',
+			help: 'Unix timestamp (seconds) of the last successful TenantDomainsService feed refresh, 0 if it has never succeeded',
+			registers: [this.register],
+		})
 	}
 
 	async onModuleInit(): Promise<void> {
@@ -460,6 +475,18 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		this.diskSpaceUsage.set({ type: 'total', path }, total)
 		this.diskSpaceUsage.set({ type: 'used', path }, used)
 		this.diskSpaceUsage.set({ type: 'free', path }, free)
+	}
+
+	/**
+	 * Update the dynamic tenant-domain allowlist metrics (TenantDomainsService).
+	 * Called after every refresh attempt (success or failure) so the gauges
+	 * always reflect current state; `lastSuccessfulRefreshAt` of `undefined`
+	 * (never successfully refreshed) is reported as `0`, the Prometheus
+	 * convention for "no value yet" on a timestamp gauge.
+	 */
+	updateTenantDomainsMetrics(domainCount: number, lastSuccessfulRefreshAt: number | undefined): void {
+		this.tenantDomainsCount.set(domainCount)
+		this.tenantDomainsLastRefreshTimestamp.set(lastSuccessfulRefreshAt ? lastSuccessfulRefreshAt / 1000 : 0)
 	}
 
 	/**

@@ -9,6 +9,7 @@ import { DiskSpaceHealthIndicator } from '#microservice/Health/indicators/disk-s
 import { MemoryHealthIndicator } from '#microservice/Health/indicators/memory-health.indicator'
 import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
 import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
+import { TenantDomainsHealthIndicator } from '#microservice/Validation/indicators/tenant-domains-health.indicator'
 
 describe('health Indicators Integration', () => {
 	let module: TestingModule
@@ -62,6 +63,12 @@ describe('health Indicators Integration', () => {
 			expect(indicator).toBeDefined()
 			expect(indicator.key).toBe('storage')
 		})
+
+		it('should register TenantDomainsHealthIndicator', () => {
+			const indicator = module.get<TenantDomainsHealthIndicator>(TenantDomainsHealthIndicator)
+			expect(indicator).toBeDefined()
+			expect(indicator.key).toBe('tenant_domains')
+		})
 	})
 
 	describe('health Check Execution', () => {
@@ -90,6 +97,18 @@ describe('health Indicators Integration', () => {
 			const result = await Promise.allSettled([indicator.isHealthy()])
 			expect(result).toBeDefined()
 			expect(result.length).toBe(1)
+		})
+
+		it('should report tenant_domains as up (does not degrade health) when INTERNAL_DOMAINS_SECRET is unconfigured', async () => {
+			// No INTERNAL_DOMAINS_SECRET is set in the test environment, so
+			// TenantDomainsService runs in its deliberate "disabled" mode —
+			// this must never fail the aggregate health check.
+			const indicator = module.get<TenantDomainsHealthIndicator>(TenantDomainsHealthIndicator)
+
+			const result = await indicator.isHealthy()
+
+			expect(result.tenant_domains.status).toBe('up')
+			expect(result.tenant_domains.configured).toBe(false)
 		})
 	})
 
@@ -168,6 +187,7 @@ describe('health Indicators Integration', () => {
 				CacheHealthIndicator,
 				RedisHealthIndicator,
 				StorageHealthIndicator,
+				TenantDomainsHealthIndicator,
 			]
 
 			indicators.forEach((IndicatorClass) => {

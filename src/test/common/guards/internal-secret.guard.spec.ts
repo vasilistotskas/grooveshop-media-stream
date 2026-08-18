@@ -61,4 +61,32 @@ describe('internalSecretGuard', () => {
 		expect(() => guard.canActivate(createContext({ 'x-internal-secret': '' })))
 			.toThrow(UnauthorizedException)
 	})
+
+	it('should reject a header shorter than the configured secret (timingSafeEqual length guard)', () => {
+		configGet.mockReturnValue('top-secret')
+
+		expect(() => guard.canActivate(createContext({ 'x-internal-secret': 'short' })))
+			.toThrow(UnauthorizedException)
+	})
+
+	it('should reject a header longer than the configured secret (timingSafeEqual length guard)', () => {
+		configGet.mockReturnValue('top-secret')
+
+		expect(() => guard.canActivate(createContext({ 'x-internal-secret': 'top-secret-and-then-some' })))
+			.toThrow(UnauthorizedException)
+	})
+
+	it('should reject a same-length header that differs only in the last byte (exercises full timingSafeEqual comparison, not just a length check)', () => {
+		configGet.mockReturnValue('top-secret')
+
+		expect(() => guard.canActivate(createContext({ 'x-internal-secret': 'top-secreX' })))
+			.toThrow(UnauthorizedException)
+	})
+
+	it('should reject a non-string header value (e.g. a repeated header parsed as an array)', () => {
+		configGet.mockReturnValue('top-secret')
+
+		expect(() => guard.canActivate(createContext({ 'x-internal-secret': ['top-secret', 'top-secret'] as unknown as string })))
+			.toThrow(UnauthorizedException)
+	})
 })

@@ -7,11 +7,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { AdaptiveRateLimitGuard } from '#microservice/RateLimit/guards/adaptive-rate-limit.guard'
 import { RateLimitService } from '#microservice/RateLimit/services/rate-limit.service'
+import { TenantDomainsService } from '#microservice/Validation/services/tenant-domains.service'
 
 describe('adaptiveRateLimitGuard', () => {
 	let guard: AdaptiveRateLimitGuard
 	let rateLimitService: MockedObject<RateLimitService>
 	let metricsService: MockedObject<MetricsService>
+	let tenantDomainsService: MockedObject<TenantDomainsService>
 
 	const mockRequest = {
 		url: '/media_stream-image/media/uploads/test.jpg/100/100/contain/entropy/transparent/5/80.webp',
@@ -58,6 +60,10 @@ describe('adaptiveRateLimitGuard', () => {
 			recordRateLimitAttempt: vi.fn(),
 		}
 
+		const mockTenantDomainsService = {
+			isAllowed: vi.fn().mockReturnValue(false),
+		}
+
 		// AdaptiveRateLimitGuard extends ThrottlerGuard which requires these tokens.
 		// The options must be in the format ThrottlerGuard expects: array of throttler configs
 		// with `ttl` (seconds) and `limit`. ThrottlerGuard.onModuleInit() sets this.throttlers.
@@ -72,6 +78,7 @@ describe('adaptiveRateLimitGuard', () => {
 				AdaptiveRateLimitGuard,
 				{ provide: RateLimitService, useValue: mockRateLimitService },
 				{ provide: MetricsService, useValue: mockMetricsService },
+				{ provide: TenantDomainsService, useValue: mockTenantDomainsService },
 				{ provide: getOptionsToken(), useValue: mockThrottlerOptions },
 				{ provide: getStorageToken(), useValue: mockThrottlerStorage },
 				Reflector,
@@ -84,9 +91,11 @@ describe('adaptiveRateLimitGuard', () => {
 		guard = module.get<AdaptiveRateLimitGuard>(AdaptiveRateLimitGuard)
 		rateLimitService = module.get(RateLimitService)
 		metricsService = module.get(MetricsService)
+		tenantDomainsService = module.get(TenantDomainsService)
 		rateLimitService.getWhitelistedDomains.mockReturnValue([])
 		rateLimitService.getBypassBotsConfig.mockReturnValue(true)
 		rateLimitService.isBot.mockReturnValue(false)
+		tenantDomainsService.isAllowed.mockReturnValue(false)
 	})
 
 	afterEach(() => {
@@ -322,13 +331,71 @@ describe('adaptiveRateLimitGuard', () => {
 					testCase.expectedIp,
 					expect.any(String),
 					'image-processing',
+					// mockRequest uses the legacy (pre-multi-tenant) media route, which
+					// carries no tenantSchema segment and so resolves to 'public'.
+					'public',
 				)
 
 				vi.clearAllMocks()
 				rateLimitService.getWhitelistedDomains.mockReturnValue([])
 				rateLimitService.getBypassBotsConfig.mockReturnValue(true)
 				rateLimitService.isBot.mockReturnValue(false)
+				tenantDomainsService.isAllowed.mockReturnValue(false)
 			}
+		})
+
+		it('should key the image-processing bucket by tenant schema extracted from the tenant-scoped media route', async () => {
+			const mockConfig = { windowMs: 60000, max: 50, skipSuccessfulRequests: false, skipFailedRequests: false }
+			const mockInfo = { limit: 50, current: 1, remaining: 49, resetTime: new Date() }
+
+			rateLimitService.generateAdvancedKey.mockReturnValue('acme:192.168.1.1:image-processing')
+			rateLimitService.getRateLimitConfig.mockReturnValue(mockConfig)
+			rateLimitService.calculateAdaptiveLimit.mockResolvedValue(50)
+			rateLimitService.checkRateLimit.mockResolvedValue({ allowed: true, info: mockInfo })
+
+			const tenantScopedContext = {
+				switchToHttp: () => ({
+					getRequest: () => ({ ...mockRequest, url: '/media_stream-image/media/acme/uploads/test.jpg/100/100/contain/entropy/transparent/5/80.webp' }),
+					getResponse: () => mockResponse,
+				}),
+				getHandler: () => ({}),
+				getClass: () => ({}),
+			} as unknown as ExecutionContext
+
+			const result = await guard.canActivate(tenantScopedContext)
+
+			expect(result).toBe(true)
+			expect(rateLimitService.generateAdvancedKey).toHaveBeenCalledWith(
+				'192.168.1.1',
+				expect.any(String),
+				'image-processing',
+				'acme',
+			)
+		})
+
+		it('should key different tenants on the same egress IP into different buckets (via distinct generateAdvancedKey calls)', async () => {
+			const mockConfig = { windowMs: 60000, max: 50, skipSuccessfulRequests: false, skipFailedRequests: false }
+			const mockInfo = { limit: 50, current: 1, remaining: 49, resetTime: new Date() }
+
+			rateLimitService.getRateLimitConfig.mockReturnValue(mockConfig)
+			rateLimitService.calculateAdaptiveLimit.mockResolvedValue(50)
+			rateLimitService.checkRateLimit.mockResolvedValue({ allowed: true, info: mockInfo })
+			rateLimitService.generateAdvancedKey.mockImplementation((ip: string, _ua: string, type: string, tenantSchema?: string) => `${tenantSchema}:${ip}:${type}`)
+
+			const makeContext = (tenant: string) => ({
+				switchToHttp: () => ({
+					getRequest: () => ({ ...mockRequest, url: `/media_stream-image/media/${tenant}/uploads/test.jpg/100/100/contain/entropy/transparent/5/80.webp` }),
+					getResponse: () => mockResponse,
+				}),
+				getHandler: () => ({}),
+				getClass: () => ({}),
+			} as unknown as ExecutionContext)
+
+			await guard.canActivate(makeContext('tenant_a'))
+			await guard.canActivate(makeContext('tenant_b'))
+
+			expect(rateLimitService.checkRateLimit).toHaveBeenNthCalledWith(1, 'tenant_a:192.168.1.1:image-processing', expect.anything())
+			expect(rateLimitService.checkRateLimit).toHaveBeenNthCalledWith(2, 'tenant_b:192.168.1.1:image-processing', expect.anything())
 		})
 
 		it('should identify different request types correctly', async () => {
@@ -369,6 +436,83 @@ describe('adaptiveRateLimitGuard', () => {
 
 				vi.clearAllMocks()
 			}
+		})
+
+		describe('domain whitelist bypass (union with dynamic tenant domains)', () => {
+			const internalRequestWithReferer = (referer: string) => ({
+				switchToHttp: () => ({
+					getRequest: () => ({ ...mockRequest, ip: '192.168.1.50', headers: { ...mockRequest.headers, referer } }),
+					getResponse: () => mockResponse,
+				}),
+				getHandler: () => ({}),
+				getClass: () => ({}),
+			} as unknown as ExecutionContext)
+
+			it('should NOT bypass when the referer domain is neither statically whitelisted nor dynamically known', async () => {
+				rateLimitService.getWhitelistedDomains.mockReturnValue([])
+				tenantDomainsService.isAllowed.mockReturnValue(false)
+				rateLimitService.generateAdvancedKey.mockReturnValue('public:192.168.1.50:image-processing')
+				rateLimitService.getRateLimitConfig.mockReturnValue({ windowMs: 60000, max: 50, skipSuccessfulRequests: false, skipFailedRequests: false })
+				rateLimitService.calculateAdaptiveLimit.mockResolvedValue(50)
+				rateLimitService.checkRateLimit.mockResolvedValue({ allowed: true, info: { limit: 50, current: 1, remaining: 49, resetTime: new Date() } })
+
+				const result = await guard.canActivate(internalRequestWithReferer('https://new-tenant.example.com/page'))
+
+				expect(result).toBe(true)
+				expect(rateLimitService.checkRateLimit).toHaveBeenCalled()
+			})
+
+			it('should bypass once TenantDomainsService reports the referer domain as allowed — no restart/guard recreation needed', async () => {
+				// Static whitelist stays empty/cached the whole test; only the dynamic
+				// tenant-domain set "changes" (simulating a background refresh cycle),
+				// proving the union check is re-evaluated per-request rather than
+				// memoized alongside the static list.
+				rateLimitService.getWhitelistedDomains.mockReturnValue([])
+				tenantDomainsService.isAllowed.mockReturnValue(false)
+				rateLimitService.generateAdvancedKey.mockReturnValue('public:192.168.1.50:image-processing')
+				rateLimitService.getRateLimitConfig.mockReturnValue({ windowMs: 60000, max: 50, skipSuccessfulRequests: false, skipFailedRequests: false })
+				rateLimitService.calculateAdaptiveLimit.mockResolvedValue(50)
+				rateLimitService.checkRateLimit.mockResolvedValue({ allowed: true, info: { limit: 50, current: 1, remaining: 49, resetTime: new Date() } })
+
+				// First call: domain not yet known dynamically -> throttle runs.
+				await guard.canActivate(internalRequestWithReferer('https://new-tenant.example.com/page'))
+				expect(rateLimitService.checkRateLimit).toHaveBeenCalledTimes(1)
+
+				// Simulate TenantDomainsService picking up the new tenant domain on its
+				// next periodic refresh (no new guard instance, no process restart).
+				tenantDomainsService.isAllowed.mockImplementation((domain: string) => domain === 'new-tenant.example.com')
+
+				await guard.canActivate(internalRequestWithReferer('https://new-tenant.example.com/page'))
+
+				// Bypass fired this time, so the throttle count did not advance again.
+				expect(rateLimitService.checkRateLimit).toHaveBeenCalledTimes(1)
+				expect(tenantDomainsService.isAllowed).toHaveBeenCalledWith('new-tenant.example.com')
+			})
+
+			it('should not consult the domain whitelist for external (non-internal) IPs even if dynamically allowed', async () => {
+				tenantDomainsService.isAllowed.mockReturnValue(true)
+				rateLimitService.getWhitelistedDomains.mockReturnValue([])
+				rateLimitService.generateAdvancedKey.mockReturnValue('public:203.0.113.9:image-processing')
+				rateLimitService.getRateLimitConfig.mockReturnValue({ windowMs: 60000, max: 50, skipSuccessfulRequests: false, skipFailedRequests: false })
+				rateLimitService.calculateAdaptiveLimit.mockResolvedValue(50)
+				rateLimitService.checkRateLimit.mockResolvedValue({ allowed: true, info: { limit: 50, current: 1, remaining: 49, resetTime: new Date() } })
+
+				const externalContext = {
+					switchToHttp: () => ({
+						getRequest: () => ({ ...mockRequest, ip: '203.0.113.9', headers: { ...mockRequest.headers, referer: 'https://new-tenant.example.com/page' } }),
+						getResponse: () => mockResponse,
+					}),
+					getHandler: () => ({}),
+					getClass: () => ({}),
+				} as unknown as ExecutionContext
+
+				const result = await guard.canActivate(externalContext)
+
+				expect(result).toBe(true)
+				// External IP -> isDomainWhitelisted() short-circuits before ever
+				// consulting TenantDomainsService; the throttle still ran.
+				expect(rateLimitService.checkRateLimit).toHaveBeenCalled()
+			})
 		})
 	})
 })

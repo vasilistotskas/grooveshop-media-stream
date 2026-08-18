@@ -56,20 +56,31 @@ describe('rateLimitService', () => {
 	})
 
 	describe('generateAdvancedKey', () => {
-		it('should generate an advanced key with user agent hash', () => {
-			// For image-processing endpoint, we use IP-only to prevent UA spoofing bypass
+		it('should generate an advanced key with the default (public) tenant schema when none is given', () => {
+			// For image-processing endpoint, we use IP-only (+ tenant schema) to prevent UA spoofing bypass
 			const key = service.generateAdvancedKey('192.168.1.1', 'Mozilla/5.0', 'image-processing')
-			expect(key).toBe('192.168.1.1:image-processing')
+			expect(key).toBe('public:192.168.1.1:image-processing')
 		})
 
 		it('should handle empty user agent', () => {
-			// For image-processing endpoint, we use IP-only to prevent UA spoofing bypass
+			// For image-processing endpoint, we use IP-only (+ tenant schema) to prevent UA spoofing bypass
 			const key = service.generateAdvancedKey('192.168.1.1', '', 'image-processing')
-			expect(key).toBe('192.168.1.1:image-processing')
+			expect(key).toBe('public:192.168.1.1:image-processing')
 		})
 
-		it('should include user agent hash for non-image-processing endpoints', () => {
-			const key = service.generateAdvancedKey('192.168.1.1', 'Mozilla/5.0', 'default')
+		it('should include the tenant schema in the image-processing key so tenants get independent buckets', () => {
+			const acmeKey = service.generateAdvancedKey('192.168.1.1', 'Mozilla/5.0', 'image-processing', 'acme')
+			const otherKey = service.generateAdvancedKey('192.168.1.1', 'Mozilla/5.0', 'image-processing', 'other_tenant')
+
+			expect(acmeKey).toBe('acme:192.168.1.1:image-processing')
+			expect(otherKey).toBe('other_tenant:192.168.1.1:image-processing')
+			// Same IP, different tenant -> different bucket key, so one tenant's
+			// spike cannot starve another tenant sharing the same egress IP.
+			expect(acmeKey).not.toBe(otherKey)
+		})
+
+		it('should include user agent hash for non-image-processing endpoints (tenant schema is ignored)', () => {
+			const key = service.generateAdvancedKey('192.168.1.1', 'Mozilla/5.0', 'default', 'acme')
 			expect(key).toMatch(/^192\.168\.1\.1:[a-z0-9]+:default$/)
 		})
 	})

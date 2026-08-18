@@ -3,6 +3,7 @@ import * as process from 'node:process'
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
+import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 
 interface TenantDomainsFeedResponse {
 	domains?: unknown
@@ -30,8 +31,21 @@ export class TenantDomainsService implements OnModuleInit, OnModuleDestroy {
 	private readonly secret: string
 	private readonly refreshUrl: string
 	private readonly refreshIntervalMs: number
+	/**
+	 * Wall-clock time (ms since epoch) of the last refresh() call that
+	 * completed without error. `undefined` until the very first success —
+	 * distinct from an empty `domains` set, which can legitimately happen
+	 * on a successful refresh of a feed with zero tenants. Consumed by
+	 * TenantDomainsHealthIndicator to detect a permanently broken feed
+	 * (e.g. a misconfigured INTERNAL_DOMAINS_SECRET) that would otherwise
+	 * only ever surface as a WARN log line.
+	 */
+	private lastSuccessfulRefreshAt?: number
 
-	constructor(private readonly _configService: ConfigService) {
+	constructor(
+		private readonly _configService: ConfigService,
+		private readonly _metricsService: MetricsService,
+	) {
 		this.secret = this._configService.getOptional<string>('tenantDomains.secret', '')
 		this.enabled = this.secret.length > 0
 
@@ -76,6 +90,19 @@ export class TenantDomainsService implements OnModuleInit, OnModuleDestroy {
 		return this.domains
 	}
 
+	/** Whether dynamic refresh is configured (INTERNAL_DOMAINS_SECRET set). */
+	isEnabled(): boolean {
+		return this.enabled
+	}
+
+	/**
+	 * Wall-clock time (ms since epoch) of the last successful refresh, or
+	 * `undefined` if a refresh has never succeeded since process start.
+	 */
+	getLastSuccessfulRefresh(): number | undefined {
+		return this.lastSuccessfulRefreshAt
+	}
+
 	async refresh(): Promise<void> {
 		if (!this.enabled) {
 			return
@@ -104,6 +131,7 @@ export class TenantDomainsService implements OnModuleInit, OnModuleDestroy {
 					.filter((domain): domain is string => typeof domain === 'string' && domain.length > 0)
 					.map(domain => domain.toLowerCase()),
 			)
+			this.lastSuccessfulRefreshAt = Date.now()
 
 			CorrelatedLogger.debug(
 				`Refreshed dynamic tenant domain allowlist: ${this.domains.size} domains`,
@@ -119,6 +147,7 @@ export class TenantDomainsService implements OnModuleInit, OnModuleDestroy {
 			)
 		}
 		finally {
+			this._metricsService.updateTenantDomainsMetrics(this.domains.size, this.lastSuccessfulRefreshAt)
 			clearTimeout(timeoutHandle)
 		}
 	}
