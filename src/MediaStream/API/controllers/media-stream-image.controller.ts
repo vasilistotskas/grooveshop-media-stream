@@ -3,6 +3,7 @@ import type { ImageSourceKey } from '../config/image-sources.config.js'
 import type { ImageProcessingContext, ImageProcessingParams } from '../types/image-source.types.js'
 import { BadRequestException, Controller, Get, NotFoundException, Req, Res } from '@nestjs/common'
 import { IMAGE } from '#microservice/common/constants/route-prefixes.constant'
+import { TENANT_SCHEMA_PATTERN } from '#microservice/common/constants/tenant.constant'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
@@ -25,15 +26,12 @@ const PARAM_DOT_PARAM_RE = /:([^/.]+)\.([^/.]+)/g
 const PARAM_RE = /:([^/]+)/g
 const SLASH_RE = /\//g
 
-// PostgreSQL identifier rules: lowercase letter or underscore, followed
-// by up to 62 lowercase alphanumeric or underscore characters. The
-// route regex already constrains the segment to ``[^/]+``, so any value
-// that reaches the controller is non-empty — this guard catches
-// uppercase, hyphens, dots, and over-length values before they reach
-// the cache namespace or the Prometheus ``tenant_schema`` label
-// (H20 in MULTI_TENANT_AUDIT.md). The same pattern is enforced by
-// ``admin-cache.controller.ts``.
-const TENANT_SCHEMA_PATTERN = /^[a-z_][a-z0-9_]{0,62}$/
+// The route regex already constrains the tenantSchema segment to
+// ``[^/]+``, so any value that reaches the controller is non-empty —
+// TENANT_SCHEMA_PATTERN (shared with admin-cache.controller.ts and
+// RequestValidatorService) catches uppercase, hyphens, dots, and
+// over-length values before they reach the cache namespace or the
+// Prometheus ``tenant_schema`` label (H20 in MULTI_TENANT_AUDIT.md).
 
 /**
  * Controller for image streaming with dynamic route matching

@@ -87,6 +87,7 @@ describe('metricsMiddleware', () => {
 				expect.any(Number),
 				100,
 				0,
+				'public',
 			)
 			expect(metricsService.decrementRequestsInFlight).toHaveBeenCalledTimes(1)
 		})
@@ -129,6 +130,93 @@ describe('metricsMiddleware', () => {
 			middleware.use(mockRequest as Request, mockResponse as Response, nextFunction)
 
 			expect(metricsService.incrementRequestsInFlight).toHaveBeenCalledTimes(1)
+		})
+	})
+
+	describe('tenant_schema label', () => {
+		function runAndFinish(url: string): void {
+			mockRequest.url = url
+
+			const finishCallback = vi.fn()
+			mockResponse.on = vi.fn((event: string, callback: (...args: any[]) => any) => {
+				if (event === 'finish') {
+					finishCallback.mockImplementation(callback)
+				}
+				return {} as any
+			})
+
+			middleware.use(mockRequest as Request, mockResponse as Response, nextFunction)
+			finishCallback()
+		}
+
+		it('extracts the tenant schema from a tenant-scoped media path', () => {
+			runAndFinish('/media_stream-image/media/acme/uploads/banner.jpg/800/600/cover/entropy/transparent/5/80.webp')
+
+			expect(metricsService.recordHttpRequest).toHaveBeenCalledWith(
+				'GET',
+				expect.any(String),
+				200,
+				expect.any(Number),
+				100,
+				0,
+				'acme',
+			)
+		})
+
+		it('labels the legacy media path as public', () => {
+			runAndFinish('/media_stream-image/media/uploads/banner.jpg/800/600/cover/entropy/transparent/5/80.webp')
+
+			expect(metricsService.recordHttpRequest).toHaveBeenCalledWith(
+				'GET',
+				expect.any(String),
+				200,
+				expect.any(Number),
+				100,
+				0,
+				'public',
+			)
+		})
+
+		it('labels the static images path as public', () => {
+			runAndFinish('/media_stream-image/static/images/logo.png/800/600/cover/entropy/transparent/5/80.webp')
+
+			expect(metricsService.recordHttpRequest).toHaveBeenCalledWith(
+				'GET',
+				expect.any(String),
+				200,
+				expect.any(Number),
+				100,
+				0,
+				'public',
+			)
+		})
+
+		it('labels an invalid tenant schema segment as public', () => {
+			runAndFinish('/media_stream-image/media/ACME/uploads/banner.jpg/800/600/cover/entropy/transparent/5/80.webp')
+
+			expect(metricsService.recordHttpRequest).toHaveBeenCalledWith(
+				'GET',
+				expect.any(String),
+				200,
+				expect.any(Number),
+				100,
+				0,
+				'public',
+			)
+		})
+
+		it('labels unrelated routes (e.g. health checks) as public', () => {
+			runAndFinish('/health')
+
+			expect(metricsService.recordHttpRequest).toHaveBeenCalledWith(
+				'GET',
+				expect.any(String),
+				200,
+				expect.any(Number),
+				100,
+				0,
+				'public',
+			)
 		})
 	})
 })

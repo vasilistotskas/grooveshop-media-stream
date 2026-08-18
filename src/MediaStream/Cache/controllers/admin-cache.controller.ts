@@ -1,14 +1,7 @@
 import { BadRequestException, Body, Controller, HttpCode, HttpStatus, Logger, Post, UseGuards } from '@nestjs/common'
+import { TENANT_SCHEMA_PATTERN } from '#microservice/common/constants/tenant.constant'
 import { InternalSecretGuard } from '#microservice/common/guards/internal-secret.guard'
 import { MultiLayerCacheManager } from '../services/multi-layer-cache.manager.js'
-
-/**
- * Validates a tenant schema string against the canonical pattern.
- * Must match the pattern used in RequestValidatorService and
- * CacheOperationsProcessor: lowercase letter or underscore at the start,
- * followed by up to 62 lowercase alphanumeric or underscore characters.
- */
-const TENANT_SCHEMA_PATTERN = /^[a-z_][a-z0-9_]{0,62}$/
 
 export interface FlushTenantBody {
 	tenantSchema: string

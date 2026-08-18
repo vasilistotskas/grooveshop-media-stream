@@ -2,11 +2,21 @@ import type { NestMiddleware } from '@nestjs/common'
 import type { NextFunction, Request, Response } from 'express'
 import { Buffer } from 'node:buffer'
 import { Injectable, Logger } from '@nestjs/common'
+import { IMAGE } from '#microservice/common/constants/route-prefixes.constant'
+import { TENANT_SCHEMA_SEGMENT } from '#microservice/common/constants/tenant.constant'
 import { MetricsService } from '../services/metrics.service.js'
 
 const UUID_RE = /\/[a-f0-9-]{36}/g
 const OBJECT_ID_RE = /\/[a-f0-9]{24}/g
 const NUMERIC_ID_RE = /\/\d+/g
+
+// Matches the tenant-scoped media route only: /media_stream-image/media/{tenantSchema}/uploads/...
+// (see IMAGE_SOURCES.UPLOADED_MEDIA in API/config/image-sources.config.ts). The legacy route
+// (`media/uploads/...`) and static-image route deliberately do NOT match, so their requests keep
+// the default 'public' tenant_schema label. Unanchored TENANT_SCHEMA_SEGMENT already rejects
+// anything that isn't a valid schema identifier, so an invalid/malformed segment falls through
+// to 'public' too — no separate validation needed here.
+const TENANT_MEDIA_PATH_RE = new RegExp(`^/${IMAGE}/media/(${TENANT_SCHEMA_SEGMENT})/uploads/`)
 
 @Injectable()
 export class MetricsMiddleware implements NestMiddleware {
@@ -36,6 +46,7 @@ export class MetricsMiddleware implements NestMiddleware {
 			try {
 				const duration = (Date.now() - startTime) / 1000
 				const route = this.getRoute(req)
+				const tenantSchema = this.getTenantSchema(req)
 
 				this.metricsService.recordHttpRequest(
 					req.method,
@@ -44,6 +55,7 @@ export class MetricsMiddleware implements NestMiddleware {
 					duration,
 					requestSize,
 					responseSize,
+					tenantSchema,
 				)
 
 				this.metricsService.decrementRequestsInFlight()
@@ -90,5 +102,16 @@ export class MetricsMiddleware implements NestMiddleware {
 		// Cap depth and collapse unmatched paths to prevent cardinality explosion on 404s
 		const segments = normalized.split('/').slice(0, 5)
 		return segments.join('/') || '/'
+	}
+
+	/**
+	 * Extract the tenant_schema label from the raw (unnormalized) pathname.
+	 * Only the tenant-scoped media route carries a schema; every other route
+	 * (legacy media, static images, health, metrics, admin, ...) is 'public'.
+	 */
+	private getTenantSchema(req: Request): string {
+		const pathname = req.url.split('?')[0]
+		const match = TENANT_MEDIA_PATH_RE.exec(pathname)
+		return match ? match[1] : 'public'
 	}
 }

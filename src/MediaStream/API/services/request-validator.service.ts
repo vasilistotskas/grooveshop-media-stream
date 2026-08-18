@@ -9,6 +9,7 @@ import {
 	MIN_QUALITY,
 	MIN_TRIM_THRESHOLD,
 } from '#microservice/common/constants/image-limits.constant'
+import { TENANT_SCHEMA_PATTERN } from '#microservice/common/constants/tenant.constant'
 import { InvalidRequestError } from '#microservice/common/errors/media-stream.errors'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { InputSanitizationService } from '#microservice/Validation/services/input-sanitization.service'
@@ -32,9 +33,6 @@ const VALIDATION_RULES: Record<string, ValidationRule> = {
 	quality: { min: MIN_QUALITY, max: MAX_QUALITY },
 	trimThreshold: { min: MIN_TRIM_THRESHOLD, max: MAX_TRIM_THRESHOLD },
 }
-
-/** PostgreSQL schema name: lowercase letter/underscore start, alphanumeric + underscore, 1-63 chars */
-const TENANT_SCHEMA_PATTERN = /^[a-z_][a-z0-9_]{0,62}$/
 
 const STRING_VALIDATION_RULES: Record<string, { pattern: RegExp }> = {
 	tenantSchema: { pattern: TENANT_SCHEMA_PATTERN },
