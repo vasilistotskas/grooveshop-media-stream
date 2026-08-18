@@ -3,25 +3,33 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConfigService } from '#microservice/Config/config.service'
 import { InputSanitizationService } from '#microservice/Validation/services/input-sanitization.service'
+import { TenantDomainsService } from '#microservice/Validation/services/tenant-domains.service'
 
 describe('inputSanitizationService', () => {
 	let service: InputSanitizationService
 	let configService: MockedObject<ConfigService>
+	let tenantDomainsService: MockedObject<TenantDomainsService>
 
 	beforeEach(async () => {
 		const mockConfigService = {
 			getOptional: vi.fn(),
+		}
+		const mockTenantDomainsService = {
+			isAllowed: vi.fn().mockReturnValue(false),
+			getDomains: vi.fn().mockReturnValue(new Set()),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [
 				InputSanitizationService,
 				{ provide: ConfigService, useValue: mockConfigService },
+				{ provide: TenantDomainsService, useValue: mockTenantDomainsService },
 			],
 		}).compile()
 
 		service = module.get<InputSanitizationService>(InputSanitizationService)
 		configService = module.get(ConfigService)
+		tenantDomainsService = module.get(TenantDomainsService)
 
 		// Setup default config responses
 		configService.getOptional.mockImplementation((key, defaultValue) => {
@@ -123,7 +131,7 @@ describe('inputSanitizationService', () => {
 					}
 					return defaultValue
 				},
-			} as any)
+			} as any, { isAllowed: () => false } as any)
 
 			expect(serviceWithProductionDefaults.validateUrl('https://webside.gr/media/public/uploads/image.jpg')).toBe(true)
 			expect(serviceWithProductionDefaults.validateUrl('https://api.webside.gr/media/tenant/uploads/img.jpg')).toBe(true)
@@ -166,6 +174,25 @@ describe('inputSanitizationService', () => {
 			expect(service.validateUrl('https://example.com/image.jpg')).toBe(true)
 			expect(service.validateUrl('https://cdn.example.com/image.jpg')).toBe(true)
 			expect(service.validateUrl('https://api.webside.gr/image.jpg')).toBe(true)
+		})
+
+		it('accepts a hostname allowed only by the dynamic tenant domain set (union semantics)', () => {
+			tenantDomainsService.isAllowed.mockImplementation((domain: string) => domain === 'acme.example')
+
+			expect(service.validateUrl('https://acme.example/media/acme/uploads/banner.jpg')).toBe(true)
+			expect(tenantDomainsService.isAllowed).toHaveBeenCalledWith('acme.example')
+		})
+
+		it('still rejects a hostname absent from both the static and dynamic allowlists', () => {
+			tenantDomainsService.isAllowed.mockReturnValue(false)
+
+			expect(service.validateUrl('https://not-a-tenant.example/image.jpg')).toBe(false)
+		})
+
+		it('accepts a hostname present in the static list even when the dynamic set is disabled/empty', () => {
+			tenantDomainsService.isAllowed.mockReturnValue(false)
+
+			expect(service.validateUrl('https://example.com/image.jpg')).toBe(true)
 		})
 	})
 

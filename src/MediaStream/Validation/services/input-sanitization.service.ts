@@ -9,6 +9,7 @@ import {
 } from '#microservice/common/constants/image-limits.constant'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
+import { TenantDomainsService } from './tenant-domains.service.js'
 
 const EMPTY_STRING_PATTERNS: RegExp[] = [
 	/^\s*on\w+\s*=.*$/i,
@@ -37,7 +38,10 @@ const HTML_ENTITY_CHAR_RE = /[#\w]/
 export class InputSanitizationService implements ISanitizer<any> {
 	private allowedDomains: string[] | null = null
 
-	constructor(private readonly _configService: ConfigService) {
+	constructor(
+		private readonly _configService: ConfigService,
+		private readonly _tenantDomainsService: TenantDomainsService,
+	) {
 	}
 
 	private getAllowedDomains(): string[] {
@@ -167,10 +171,15 @@ export class InputSanitizationService implements ISanitizer<any> {
 				return false
 			}
 
+			// Union semantics: a hostname passes if it's in the static
+			// configured/default allowlist OR the dynamic set refreshed from
+			// Django's tenant feed. The static list is always the baseline —
+			// it keeps working when the feed is disabled (no
+			// INTERNAL_DOMAINS_SECRET) or Django is unreachable.
 			const allowedDomains = this.getAllowedDomains()
 			const isAllowed = allowedDomains.some(domain =>
 				urlObj.hostname === domain || urlObj.hostname.endsWith(`.${domain}`),
-			)
+			) || this._tenantDomainsService.isAllowed(urlObj.hostname)
 
 			if (!isAllowed) {
 				CorrelatedLogger.warn(`URL blocked - not in whitelist: ${urlObj.hostname}`, InputSanitizationService.name)

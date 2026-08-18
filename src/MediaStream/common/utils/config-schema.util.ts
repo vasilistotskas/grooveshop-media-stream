@@ -203,6 +203,14 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	},
 	'validation.maxStringLength': { env: 'VALIDATION_MAX_STRING_LENGTH', default: 10000, type: 'number' },
 
+	// Dynamic tenant-domain allowlist, polled from Django. Empty secret disables the
+	// feature entirely — the static validation.allowedDomains list keeps working.
+	// Empty refreshUrl means "derive from BACKEND_URL" (computed in TenantDomainsService,
+	// since BACKEND_URL itself is read directly from process.env, not this schema).
+	'tenantDomains.refreshUrl': { env: 'TENANT_DOMAINS_REFRESH_URL', default: '', type: 'string' },
+	'tenantDomains.secret': { env: 'INTERNAL_DOMAINS_SECRET', default: '', type: 'string' },
+	'tenantDomains.refreshIntervalMs': { env: 'TENANT_DOMAINS_REFRESH_INTERVAL_MS', default: 300000, type: 'number' },
+
 	// Storage monitoring thresholds (bytes / file counts / days)
 	'storage.maxSize': { env: 'STORAGE_MAX_SIZE', default: 1073741824, type: 'number' },
 	'storage.maxFileAge': { env: 'STORAGE_MAX_FILE_AGE_DAYS', default: 30, type: 'number' },

@@ -9,6 +9,7 @@ import { RateLimitConfigDto } from './rate-limit-config.dto.js'
 import { ServerConfigDto } from './server-config.dto.js'
 import { ShutdownConfigDto } from './shutdown-config.dto.js'
 import { StorageConfigDto } from './storage-config.dto.js'
+import { TenantDomainsConfigDto } from './tenant-domains-config.dto.js'
 import { ValidationConfigDto } from './validation-config.dto.js'
 
 export class InternalConfigDto {
@@ -49,6 +50,10 @@ export class AppConfigDto {
 	@ValidateNested()
 	@Type(() => ValidationConfigDto)
 	validation: ValidationConfigDto = new ValidationConfigDto()
+
+	@ValidateNested()
+	@Type(() => TenantDomainsConfigDto)
+	tenantDomains: TenantDomainsConfigDto = new TenantDomainsConfigDto()
 
 	@ValidateNested()
 	@Type(() => StorageConfigDto)

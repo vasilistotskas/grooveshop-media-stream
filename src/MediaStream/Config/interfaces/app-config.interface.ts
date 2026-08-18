@@ -129,6 +129,14 @@ export interface ValidationConfig {
 	maxStringLength: number
 }
 
+export interface TenantDomainsConfig {
+	/** Empty means "derive from BACKEND_URL" — see TenantDomainsService. */
+	refreshUrl: string
+	/** Empty disables the dynamic-domain feature entirely. */
+	secret: string
+	refreshIntervalMs: number
+}
+
 export interface StorageCleanupConfig {
 	enabled: boolean
 	cronSchedule: string
@@ -183,6 +191,7 @@ export interface AppConfig {
 	http: HttpConfig
 	rateLimit: RateLimitConfig
 	validation: ValidationConfig
+	tenantDomains: TenantDomainsConfig
 	storage: StorageConfig
 	shutdown: ShutdownConfig
 	internal: InternalConfig
