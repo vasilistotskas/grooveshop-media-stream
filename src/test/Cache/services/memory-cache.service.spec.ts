@@ -309,4 +309,47 @@ describe('memoryCacheService', () => {
 			expect(metricsService.updateCacheHitRatio).toHaveBeenCalledWith('memory', expect.any(Number))
 		})
 	})
+
+	describe('tenant-fair eviction', () => {
+		it('evicts the writing tenant\'s own entries before other tenants\'', async () => {
+			// Tiny budget so a handful of string values force eviction.
+			// estimateSize: string → length * 2 bytes.
+			const smallModule: TestingModule = await Test.createTestingModule({
+				providers: [
+					MemoryCacheService,
+					{
+						provide: ConfigService,
+						useValue: {
+							get: vi.fn().mockImplementation((key: string) =>
+								key === 'cache.memory'
+									? { defaultTtl: 3600, checkPeriod: 600, maxKeys: 1000, maxSize: 2000 }
+									: undefined),
+						},
+					},
+					{
+						provide: MetricsService,
+						useValue: { recordCacheOperation: vi.fn(), updateCacheHitRatio: vi.fn() },
+					},
+				],
+			}).compile()
+			const small = smallModule.get<MemoryCacheService>(MemoryCacheService)
+
+			const payload = 'x'.repeat(300) // 600 bytes each
+			await small.set('image:hot:1', payload, 3600)
+			await small.set('image:hot:2', payload, 3600)
+			await small.set('image:quiet:1', payload, 3600)
+			// Budget now 1800/2000 — the next hot write must evict, and it
+			// must evict HOT entries (the writer's own namespace), never
+			// the quiet tenant's.
+			await small.set('image:hot:3', payload, 3600)
+
+			expect(await small.get('image:quiet:1')).toBe(payload)
+			expect(await small.get('image:hot:3')).toBe(payload)
+			const hot1 = await small.get('image:hot:1')
+			const hot2 = await small.get('image:hot:2')
+			expect([hot1, hot2]).toContain(null)
+
+			await small.clear()
+		})
+	})
 })

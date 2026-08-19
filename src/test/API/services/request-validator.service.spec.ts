@@ -95,6 +95,40 @@ describe('requestValidatorService', () => {
 				.resolves
 				.toBeUndefined()
 		})
+
+		it.each([
+			['width', 'null'],
+			['height', 'null'],
+			['quality', 'null'],
+			['trimThreshold', 'null'],
+		])('rejects the literal string "null" for numeric param %s (sentinel removed)', async (key, value) => {
+			await expect(service.validateRequest(createContext({ [key]: value })))
+				.rejects
+				.toThrow(InvalidRequestError)
+		})
+
+		it.each([
+			['fit', 'null'],
+			['fit', 'banana'],
+			['position', 'null'],
+			['position', 'url(javascript:1)'],
+			['format', 'null'],
+			['format', 'exe'],
+		])('rejects invalid enum param %s=%s with 400 instead of letting Sharp 500', async (key, value) => {
+			await expect(service.validateRequest(createContext({ [key]: value })))
+				.rejects
+				.toThrow(InvalidRequestError)
+		})
+
+		it.each([
+			['fit', 'cover'],
+			['position', 'attention'],
+			['format', 'avif'],
+		])('accepts valid enum param %s=%s', async (key, value) => {
+			await expect(service.validateRequest(createContext({ [key]: value })))
+				.resolves
+				.toBeUndefined()
+		})
 	})
 
 	describe('validateUrl', () => {

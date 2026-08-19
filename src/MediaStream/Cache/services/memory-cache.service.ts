@@ -92,7 +92,7 @@ export class MemoryCacheService implements ICacheManager {
 			}
 
 			// Evict entries until we have space
-			this.evictIfNeeded(valueSize)
+			this.evictIfNeeded(valueSize, key)
 
 			const success = ttl !== undefined ? this.cache.set(key, value, ttl) : this.cache.set(key, value)
 			if (success) {
@@ -246,9 +246,32 @@ export class MemoryCacheService implements ICacheManager {
 	}
 
 	/**
-	 * Evict entries (oldest TTL first) until we have enough space for the new value.
+	 * Tenant-fairness: derive the namespace prefix of a cache key
+	 * (`image:{schema}:` for image entries). Returns null for keys
+	 * without at least two segments.
 	 */
-	private evictIfNeeded(requiredSpace: number): void {
+	private namespacePrefix(key: string): string | null {
+		const first = key.indexOf(':')
+		if (first === -1) {
+			return null
+		}
+		const second = key.indexOf(':', first + 1)
+		if (second === -1) {
+			return null
+		}
+		return key.slice(0, second + 1)
+	}
+
+	/**
+	 * Evict entries until we have enough space for the new value.
+	 *
+	 * Fairness policy: the WRITER's own namespace is evicted first
+	 * (TTL-ascending), and only when that is exhausted does eviction
+	 * fall back to the global TTL order. Without this, one hot tenant
+	 * flooding the shared byte budget evicted every other tenant's
+	 * entries — the aggressor pays for its own pressure first.
+	 */
+	private evictIfNeeded(requiredSpace: number, forKey?: string): void {
 		if (this.currentByteSize + requiredSpace <= this.maxByteSize) {
 			return
 		}
@@ -265,8 +288,16 @@ export class MemoryCacheService implements ICacheManager {
 			.map(key => ({ key, ttl: this.cache.getTtl(key) ?? Infinity }))
 			.sort((a, b) => a.ttl - b.ttl)
 
+		const ownPrefix = forKey ? this.namespacePrefix(forKey) : null
+		const ordered = ownPrefix
+			? [
+					...keysByTtl.filter(e => e.key.startsWith(ownPrefix)),
+					...keysByTtl.filter(e => !e.key.startsWith(ownPrefix)),
+				]
+			: keysByTtl
+
 		let evicted = 0
-		for (const { key } of keysByTtl) {
+		for (const { key } of ordered) {
 			if (this.currentByteSize + requiredSpace <= this.maxByteSize) {
 				break
 			}

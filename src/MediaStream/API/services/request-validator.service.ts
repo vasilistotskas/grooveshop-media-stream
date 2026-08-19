@@ -14,6 +14,11 @@ import { InvalidRequestError } from '#microservice/common/errors/media-stream.er
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { InputSanitizationService } from '#microservice/Validation/services/input-sanitization.service'
 import { SecurityCheckerService } from '#microservice/Validation/services/security-checker.service'
+import {
+	FitOptions,
+	PositionOptions,
+	SupportedResizeFormats,
+} from '../dto/cache-image-request.dto.js'
 
 /**
  * Validation rules for image processing parameters
@@ -36,6 +41,18 @@ const VALIDATION_RULES: Record<string, ValidationRule> = {
 
 const STRING_VALIDATION_RULES: Record<string, { pattern: RegExp }> = {
 	tenantSchema: { pattern: TENANT_SCHEMA_PATTERN },
+}
+
+// Enum-valued resize params. Anything Sharp would choke on must die
+// here as a 400 instead of a 500 — including the literal string
+// "null", which was historically coerced to "absent" by a sentinel the
+// route layer no longer applies. ``background`` is deliberately NOT
+// listed: parseColor() already normalizes arbitrary values to opaque
+// white (the C18 fix).
+const ENUM_VALIDATION_RULES: Record<string, ReadonlySet<string>> = {
+	fit: new Set(Object.values(FitOptions)),
+	position: new Set(Object.values(PositionOptions)),
+	format: new Set(Object.values(SupportedResizeFormats)),
 }
 
 /**
@@ -88,6 +105,18 @@ export class RequestValidatorService {
 			if (!rule.pattern.test(String(value))) {
 				throw new InvalidRequestError(
 					`Invalid ${key} parameter: format not allowed`,
+					{ correlationId, [key]: value },
+				)
+			}
+		}
+
+		for (const [key, allowed] of Object.entries(ENUM_VALIDATION_RULES)) {
+			const value = params[key]
+			if (value === null || value === undefined)
+				continue
+			if (!allowed.has(String(value))) {
+				throw new InvalidRequestError(
+					`Invalid ${key} parameter: not an allowed value`,
 					{ correlationId, [key]: value },
 				)
 			}

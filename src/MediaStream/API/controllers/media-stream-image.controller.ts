@@ -189,8 +189,15 @@ export default class MediaStreamImageController {
 
 		const params: ImageProcessingParams = {}
 		paramNames.forEach((name, index) => {
-			const value = match[index + 1]
-			params[name] = value === 'null' ? null : value
+			// Segments are kept VERBATIM. The former "null"→null sentinel
+			// is gone end-to-end: no client emits it (the Nuxt provider
+			// always sends concrete values — verified) and no stored
+			// content carries such URLs. Worse, coercing
+			// `media/null/uploads/…` turned tenantSchema into null and
+			// the controller fell back to the PUBLIC namespace — an
+			// unvalidated tenant bypass. A literal "null" resize segment
+			// now fails validation (400) like any other garbage value.
+			params[name] = match[index + 1]
 		})
 
 		return params

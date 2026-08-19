@@ -294,7 +294,11 @@ describe('mediaStreamImageController', () => {
 			expect(mockResponse.locals.originalUrl).toBeDefined()
 		})
 
-		it('should handle null width and height', async () => {
+		it('passes literal "null" segments through verbatim (no sentinel coercion)', async () => {
+			// The "null"→null sentinel is removed end-to-end: no client
+			// emits it and no stored content carries such URLs. The
+			// validator receives the raw string and rejects it as a
+			// non-numeric width/height (400) — never a silent default.
 			const mockRequest = {
 				path: '/media_stream-image/media/acme/uploads/test/image.webp/null/null/contain/entropy/transparent/5/80.webp',
 			} as any
@@ -304,8 +308,8 @@ describe('mediaStreamImageController', () => {
 			expect(mockRequestValidatorService.validateRequest).toHaveBeenCalledWith(
 				expect.objectContaining({
 					params: expect.objectContaining({
-						width: null,
-						height: null,
+						width: 'null',
+						height: 'null',
 					}),
 				}),
 			)
@@ -313,6 +317,26 @@ describe('mediaStreamImageController', () => {
 	})
 
 	describe('uploaded media route requires a tenant segment', () => {
+		it('keeps a literal "null" tenant segment as a string (no public fallback)', async () => {
+			// `media/null/uploads/…` used to coerce tenantSchema to null via
+			// the legacy "null" sentinel (meant for OPTIONAL RESIZE params
+			// only), and the controller then fell back to the PUBLIC cache
+			// namespace — an unvalidated tenant bypass. The segment must
+			// stay the literal string and flow through validation like any
+			// other unknown schema.
+			const mockRequest = {
+				path: '/media_stream-image/media/null/uploads/banner.jpg/800/600/cover/entropy/transparent/5/80.webp',
+			} as any
+
+			await controller.handleImageRequest(mockRequest, mockResponse)
+
+			expect(mockRequestValidatorService.validateRequest).toHaveBeenCalledWith(
+				expect.objectContaining({
+					params: expect.objectContaining({ tenantSchema: 'null' }),
+				}),
+			)
+		})
+
 		it('should match UPLOADED_MEDIA for multi-tenant URLs, capturing tenantSchema', async () => {
 			const mockRequest = {
 				path: '/media_stream-image/media/acme/uploads/banner.jpg/800/600/cover/entropy/transparent/5/80.webp',
