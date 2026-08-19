@@ -10,6 +10,11 @@ import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 export class MemoryCacheService implements ICacheManager {
 	protected readonly cache: NodeCache
 	private readonly maxByteSize: number
+	// Mirrors the NodeCache maxKeys ceiling so eviction can act on key
+	// COUNT as well as bytes — node-cache throws ECACHEFULL at the
+	// count limit, which the byte budget never reaches for typical
+	// image payloads.
+	private readonly maxKeys: number
 	private currentByteSize = 0
 	private readonly sizeMap = new Map<string, number>()
 
@@ -19,13 +24,14 @@ export class MemoryCacheService implements ICacheManager {
 	) {
 		const config = this._configService.get('cache.memory') || {}
 		this.maxByteSize = config.maxSize || 100 * 1024 * 1024 // 100MB default
+		this.maxKeys = config.maxKeys || 1000
 
 		this.cache = new NodeCache({
 			stdTTL: config.defaultTtl || 3600,
 			checkperiod: config.checkPeriod || 600,
 			useClones: false,
 			deleteOnExpire: true,
-			maxKeys: config.maxKeys || 1000,
+			maxKeys: this.maxKeys,
 		})
 
 		this.cache.on('set', (key: string, _value: any) => {
@@ -86,9 +92,15 @@ export class MemoryCacheService implements ICacheManager {
 				return
 			}
 
-			// Remove existing entry size if overwriting
+			// Remove the existing entry's accounting if overwriting.
+			// Delete the sizeMap row too: leaving it meant a later
+			// delete/expire subtracted the same bytes a SECOND time, and
+			// repeated often enough currentByteSize went negative — at
+			// which point evictIfNeeded early-returns forever and the
+			// byte ceiling stops being enforced entirely.
 			if (this.sizeMap.has(key)) {
 				this.currentByteSize -= this.sizeMap.get(key)!
+				this.sizeMap.delete(key)
 			}
 
 			// Evict entries until we have space
@@ -272,11 +284,26 @@ export class MemoryCacheService implements ICacheManager {
 	 * entries — the aggressor pays for its own pressure first.
 	 */
 	private evictIfNeeded(requiredSpace: number, forKey?: string): void {
-		if (this.currentByteSize + requiredSpace <= this.maxByteSize) {
+		const allKeys = this.cache.keys()
+
+		// node-cache throws ECACHEFULL once stats.keys reaches maxKeys —
+		// including on overwrite — so the key COUNT is a hard wall, not
+		// just the byte budget. Image entries are written with the
+		// 180-day private TTL, so nothing expires out on its own: at
+		// typical processed-webp sizes the pod hits 1000 keys well under
+		// the 100MB budget, every later set throws (swallowed one layer
+		// up as a warn), and whichever tenant warmed the pod first owns
+		// the entire memory tier for the pod's lifetime. That is exactly
+		// the noisy-neighbour outcome the fairness ordering below exists
+		// to prevent, so count pressure has to trigger it too.
+		const overKeyLimit = allKeys.length >= this.maxKeys
+		if (
+			!overKeyLimit
+			&& this.currentByteSize + requiredSpace <= this.maxByteSize
+		) {
 			return
 		}
 
-		const allKeys = this.cache.keys()
 		if (allKeys.length === 0) {
 			return
 		}
@@ -296,9 +323,16 @@ export class MemoryCacheService implements ICacheManager {
 				]
 			: keysByTtl
 
+		// Free one slot beyond the limit so the pending set has room.
+		const keysToFree = overKeyLimit
+			? allKeys.length - this.maxKeys + 1
+			: 0
+
 		let evicted = 0
 		for (const { key } of ordered) {
-			if (this.currentByteSize + requiredSpace <= this.maxByteSize) {
+			const bytesOk
+				= this.currentByteSize + requiredSpace <= this.maxByteSize
+			if (bytesOk && evicted >= keysToFree) {
 				break
 			}
 

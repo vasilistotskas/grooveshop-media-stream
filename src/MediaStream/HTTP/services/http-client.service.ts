@@ -272,7 +272,20 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 					tap({
 						error: (error: unknown) => {
 							this.stats.failedRequests++
-							if (this.circuitBreakerEnabled) {
+							// Only UPSTREAM HEALTH counts toward the breaker.
+							// axios rejects on every 4xx, so a tenant with a few
+							// hundred broken media references booked one failure
+							// per cache miss; the rate crossed the 50% threshold
+							// and the breaker opened for EVERY tenant, serving
+							// default.png platform-wide. The open state is
+							// persisted to one global Redis key, so a freshly
+							// rolled pod restored it. A 404 is a normal negative
+							// result with its own 5-minute negative cache, not a
+							// sign the upstream is unwell.
+							if (
+								this.circuitBreakerEnabled
+								&& this.isUpstreamFailure(error)
+							) {
 								this.circuitBreaker.recordFailure()
 								CorrelatedLogger.debug(
 									'Circuit breaker recorded failure',
@@ -309,6 +322,23 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 		finally {
 			this.stats.activeRequests--
 		}
+	}
+
+	/**
+	 * Does this error indicate the UPSTREAM is unhealthy?
+	 *
+	 * Network faults and 5xx do. Client errors (404 for a missing
+	 * image, 400 for a malformed request) do not — they are answers,
+	 * not outages, and counting them let one tenant's broken references
+	 * trip a breaker that is global across tenants and pods.
+	 */
+	private isUpstreamFailure(error: any): boolean {
+		const status = error?.response?.status
+		if (typeof status === 'number') {
+			return status >= 500
+		}
+		// No response at all: connection refused, DNS failure, timeout.
+		return true
 	}
 
 	/**

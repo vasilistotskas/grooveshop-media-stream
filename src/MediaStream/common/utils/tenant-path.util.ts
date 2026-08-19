@@ -12,14 +12,46 @@ import { TENANT_SCHEMA_SEGMENT } from '#microservice/common/constants/tenant.con
 const TENANT_MEDIA_PATH_RE = new RegExp(`^/${IMAGE}/media/(${TENANT_SCHEMA_SEGMENT})/uploads/`)
 
 /**
- * Extract the tenantSchema from a raw (unnormalized) request pathname.
+ * Maximum percent-decoding passes, matching the controller's own loop
+ * (MediaStreamImageController). TinyMCE-authored URLs arrive
+ * double-encoded, so one pass is not enough.
+ */
+const MAX_DECODE_PASSES = 3
+
+/**
+ * Extract the tenantSchema from a request pathname.
  * Only the tenant-scoped media route carries a schema; every other route
  * (static images, health, metrics, admin, ...) is 'public'.
+ *
+ * Decodes first, because the CONTROLLER decodes: `/media/%77ebside/...`
+ * and `/media/webside/...` are the same image to it (verified — both
+ * return identical bytes and cache under image:webside), but this
+ * matcher saw the raw form and reported 'public'. That split the
+ * per-tenant rate-limit bucket introduced in 21a810d: alternating
+ * spellings bought a second full quota per IP, and the encoded half
+ * landed in the shared 'public' bucket that static images use, so one
+ * tenant's burst could throttle static assets for everyone on that IP.
+ * The tenant_schema metric under-reported the same traffic.
  *
  * Single source of truth shared by MetricsMiddleware (tenant_schema label)
  * and RateLimit (per-tenant image-processing bucket key).
  */
 export function extractTenantSchemaFromPath(pathname: string): string {
-	const match = TENANT_MEDIA_PATH_RE.exec(pathname)
+	let path = pathname
+	for (let i = 0; i < MAX_DECODE_PASSES && path.includes('%'); i++) {
+		let decoded: string
+		try {
+			decoded = decodeURIComponent(path)
+		}
+		catch {
+			// Malformed encoding: the controller rejects it, and an
+			// unmatched path is 'public' either way.
+			break
+		}
+		if (decoded === path)
+			break
+		path = decoded
+	}
+	const match = TENANT_MEDIA_PATH_RE.exec(path)
 	return match ? match[1] : 'public'
 }
