@@ -1,3 +1,31 @@
+# [2.60.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.59.2...v2.60.0) (2026-08-20)
+
+
+### Bug Fixes
+
+* add tenantSchema format validation for multi-tenant security ([6fbe66d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/6fbe66df17bfd7de0b09fb55890fd917ec0a113c))
+* **cache,http:** stop one tenant degrading the others ([1468228](https://github.com/vasilistotskas/grooveshop-media-stream/commit/1468228eb84b72dcda24949d46e3889589d6028a))
+* **cache:** validate tenant schema in extractTenantSchemaFromUrl ([7745bab](https://github.com/vasilistotskas/grooveshop-media-stream/commit/7745babba954c1c716c81828b890262b95fb4dfb))
+* **lint:** add missing [@param](https://github.com/param) docs and rename unused variable ([a469445](https://github.com/vasilistotskas/grooveshop-media-stream/commit/a469445135d4711bc6cddb798d3bd38811211ade))
+* **metrics:** label tenant media requests with real tenant_schema ([275c780](https://github.com/vasilistotskas/grooveshop-media-stream/commit/275c780ccc4c6a4b76d5d77adc8e243a40e416c0))
+* **tenant:** cache-warming extracts tenant schema from image URL ([9cfed5d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/9cfed5d4db21edf469d9c8c38a3e29fc6e15d6ae))
+* **tenant:** cache-warming respects per-tenant namespace ([dc1d729](https://github.com/vasilistotskas/grooveshop-media-stream/commit/dc1d729d12d3081319af478857f76e551dae0a78))
+* **tenant:** remove the "null" URL sentinel; validate enum params; fair memory-cache eviction ([e2eac57](https://github.com/vasilistotskas/grooveshop-media-stream/commit/e2eac57a8575b3ee7018fc3be4a58599ffe96631))
+* **tenant:** sweep the disk tier on tenant flush; stop sanitizer mangling tenant identity ([5a12f97](https://github.com/vasilistotskas/grooveshop-media-stream/commit/5a12f973b77f2dde7184eb368f5e485996eddf03))
+* **tenant:** validate tenantSchema regex at controller boundary ([88083e0](https://github.com/vasilistotskas/grooveshop-media-stream/commit/88083e0b82022d18f577f82aeedc4ce86f7752ea))
+* **types:** intersection type for the route-param tenantSchema access ([fa2883a](https://github.com/vasilistotskas/grooveshop-media-stream/commit/fa2883a43b46658bc67bbdfd59e310c8ecfd55ae))
+* **validation:** restore webside domains in default allowed-domains list ([fa5e71d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/fa5e71d1deb7af3fab42d7210a357962c418cd0f))
+
+
+### Features
+
+* **cache:** per-tenant cache flush endpoint ([acafcf1](https://github.com/vasilistotskas/grooveshop-media-stream/commit/acafcf1441932819cd9850b6627745c938931339))
+* Init ([4637bdf](https://github.com/vasilistotskas/grooveshop-media-stream/commit/4637bdfecade4602c313a43e00a24765edb71c45))
+* **metrics:** tenant_schema label on counters and histograms ([566d798](https://github.com/vasilistotskas/grooveshop-media-stream/commit/566d7980ec68322bdbb083c2d4a617ac726e0bb6))
+* **tenant:** fold tenantSchema into cache identity hash ([db23004](https://github.com/vasilistotskas/grooveshop-media-stream/commit/db23004d2c5464bc6d16678527b6f7b1a810d6f7))
+* **tenant:** per-tenant rate limiting, domains-feed observability, timing-safe guard ([21a810d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/21a810d55d1dee9d37ca952f07b001135b814ba2))
+* **validation:** union in dynamic tenant domains from Django's internal feed ([5367029](https://github.com/vasilistotskas/grooveshop-media-stream/commit/53670299b208c6a3ac2be46f67ddb8ebf3d507ce))
+
 ## [2.59.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.59.1...v2.59.2) (2026-08-14)
 
 
