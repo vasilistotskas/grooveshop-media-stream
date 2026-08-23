@@ -1,3 +1,10 @@
+## [2.60.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.60.0...v2.60.1) (2026-08-23)
+
+
+### Bug Fixes
+
+* **logging:** log 4xx image errors at WARN, not ERROR ([c43ce3f](https://github.com/vasilistotskas/grooveshop-media-stream/commit/c43ce3f125085c05e2e222adaaa659b27e96f4e2))
+
 # [2.60.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.59.2...v2.60.0) (2026-08-20)
 
 
