@@ -30,6 +30,25 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 		private readonly _correlationService: CorrelationService,
 	) {}
 
+	/**
+	 * Log an exception at a level matched to its HTTP status.
+	 *
+	 * 5xx are genuine server faults → ERROR. 4xx are CLIENT errors (a bad
+	 * path or params, or an unknown image — e.g. a stale pre-multi-tenant
+	 * ``media/uploads/...`` URL, missing the tenant segment, requested by
+	 * an external crawler after the URL scheme changed) → WARN, so the
+	 * ERROR stream (and any alerting on it) stays reserved for real
+	 * server-side problems and isn't drowned by expected 404/400s.
+	 */
+	private static logByStatus(status: HttpStatus, message: string, detail: string): void {
+		if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+			CorrelatedLogger.error(message, detail, MediaStreamExceptionFilter.name)
+		}
+		else {
+			CorrelatedLogger.warn(`${message} ${detail}`, MediaStreamExceptionFilter.name)
+		}
+	}
+
 	catch(exception: Error, host: ArgumentsHost): void {
 		const { httpAdapter } = this.httpAdapterHost
 		const ctx = host.switchToHttp()
@@ -42,7 +61,7 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 		if (exception instanceof MediaStreamError) {
 			status = exception.status
 			errorResponse = this.formatErrorResponse(exception, request)
-			CorrelatedLogger.error(`MediaStream Error: ${exception.message}`, JSON.stringify(exception.toJSON()), MediaStreamExceptionFilter.name)
+			MediaStreamExceptionFilter.logByStatus(status, `MediaStream Error: ${exception.message}`, JSON.stringify(exception.toJSON()))
 		}
 		else if (exception instanceof HttpException) {
 			status = exception.getStatus()
@@ -62,7 +81,7 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 				},
 			}, request)
 
-			CorrelatedLogger.error(`HTTP Exception: ${exception.message}`, JSON.stringify(errorResponse), MediaStreamExceptionFilter.name)
+			MediaStreamExceptionFilter.logByStatus(status, `HTTP Exception: ${exception.message}`, JSON.stringify(errorResponse))
 		}
 		else {
 			status = HttpStatus.INTERNAL_SERVER_ERROR

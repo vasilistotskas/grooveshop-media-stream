@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MediaStreamError } from '#microservice/common/errors/media-stream.errors'
 import { MediaStreamExceptionFilter } from '#microservice/common/filters/media-stream-exception.filter'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 
 describe('mediaStreamExceptionFilter', () => {
 	let filter: MediaStreamExceptionFilter
@@ -169,6 +170,54 @@ describe('mediaStreamExceptionFilter', () => {
 			expect(typedErrorResponse.name).toBe('InternalServerError')
 			expect(typedErrorResponse.message).toBe('An unexpected error occurred')
 			expect(typedErrorResponse.code).toBe('INTERNAL_SERVER_ERROR')
+		})
+	})
+
+	describe('log level by status', () => {
+		let warnSpy: Mock
+		let errorSpy: Mock
+
+		beforeEach(() => {
+			warnSpy = vi.spyOn(CorrelatedLogger, 'warn').mockImplementation(() => {}) as unknown as Mock
+			errorSpy = vi.spyOn(CorrelatedLogger, 'error').mockImplementation(() => {}) as unknown as Mock
+		})
+
+		it('logs a 4xx HttpException at WARN, not ERROR', () => {
+			// A stale pre-multi-tenant media path from a crawler surfaces as
+			// a 404 — an expected client error, not a server fault.
+			filter.catch(new HttpException('No image source matches path: media/uploads/blog/x.png', HttpStatus.NOT_FOUND), mockArgumentsHost)
+
+			expect(warnSpy).toHaveBeenCalledTimes(1)
+			expect(errorSpy).not.toHaveBeenCalled()
+		})
+
+		it('logs a 400 HttpException at WARN, not ERROR', () => {
+			filter.catch(new HttpException('Bad params', HttpStatus.BAD_REQUEST), mockArgumentsHost)
+
+			expect(warnSpy).toHaveBeenCalledTimes(1)
+			expect(errorSpy).not.toHaveBeenCalled()
+		})
+
+		it('logs a 5xx HttpException at ERROR, not WARN', () => {
+			filter.catch(new HttpException('Upstream down', HttpStatus.BAD_GATEWAY), mockArgumentsHost)
+
+			expect(errorSpy).toHaveBeenCalledTimes(1)
+			expect(warnSpy).not.toHaveBeenCalled()
+		})
+
+		it('logs an unknown (500) error at ERROR, not WARN', () => {
+			filter.catch(new Error('boom'), mockArgumentsHost)
+
+			expect(errorSpy).toHaveBeenCalledTimes(1)
+			expect(warnSpy).not.toHaveBeenCalled()
+		})
+
+		it('logs a 4xx MediaStreamError at WARN', () => {
+			const err = new MediaStreamError('bad input', HttpStatus.BAD_REQUEST, 'BAD_INPUT')
+			filter.catch(err, mockArgumentsHost)
+
+			expect(warnSpy).toHaveBeenCalledTimes(1)
+			expect(errorSpy).not.toHaveBeenCalled()
 		})
 	})
 })
