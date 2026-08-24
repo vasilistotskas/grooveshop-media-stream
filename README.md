@@ -13,14 +13,13 @@ This service provides image processing capabilities for the Grooveshop platform,
 - Prometheus metrics and health check endpoints
 - Circuit breaker pattern for upstream requests
 - Adaptive rate limiting
-- Background job queue for large image processing
 
 ## Setup and Installation
 
 ### Prerequisites
 - Node.js >= 24.12.0
 - pnpm >= 10.30.2
-- Redis (required for queue and cache layer)
+- Redis (required for the cache layer)
 
 ### Environment Setup
 1. Clone the repository:
@@ -41,13 +40,12 @@ This service provides image processing capabilities for the Grooveshop platform,
 ### Key Environment Variables
 - `PORT`: Port for the NestJS application (default: 3003)
 - `BACKEND_URL`: URL for the upstream image server
-- `REDIS_HOST` / `REDIS_PORT`: Redis connection (required for queue and cache)
+- `REDIS_HOST` / `REDIS_PORT`: Redis connection (required for cache)
 - `CACHE_MEMORY_MAX_SIZE`: Memory cache limit (default: 100MB)
 - `CACHE_MEMORY_TTL`: Memory cache TTL in seconds (default: 3600)
 - `REDIS_TTL`: Redis cache TTL in seconds (default: 7200)
 - `CACHE_FILE_DIRECTORY`: File cache directory (default: `./storage`)
-- `PROCESSING_MAX_CONCURRENT`: Max concurrent image processing (default: 10)
-- `PROCESSING_TIMEOUT`: Processing timeout in ms (default: 30000)
+- `PROCESSING_CPU_CORES`: Sharp concurrency, CPU cores (fractions allowed, default: 1.5)
 - `MONITORING_ENABLED`: Enable monitoring (default: true)
 - `CORS_ORIGIN`: CORS origin (default: `*`)
 - `CORS_METHODS`: Allowed HTTP methods (default: `GET`)
@@ -99,11 +97,15 @@ The application is configured with CORS enabled by default:
 - `GET /health/detailed` — System info and resource details
 - `GET /health/ready` — Lightweight readiness check
 - `GET /health/live` — Liveness check
+- `GET /health/dependencies` — External dependency health
 - `GET /health/circuit-breaker` — Circuit breaker status
 - `POST /health/circuit-breaker/reset` — Reset circuit breaker
 
 ### Metrics
 - `GET /metrics` — Prometheus-format metrics
+
+### Admin
+- `POST /admin/cache/flush-tenant` — Flush all cache entries (memory, Redis, file system) for a tenant. Protected by `InternalSecretGuard` (`x-internal-secret` header matching `INTERNAL_ADMIN_SECRET`)
 
 ## Testing
 
@@ -174,7 +176,5 @@ src/MediaStream/
 
 ```bash
 pnpm run cache:clear                  # Clear Redis + file system cache
-node scripts/analyze-imports.cjs      # Detect incorrect import patterns
-node scripts/fix-imports.cjs          # Auto-fix internal imports to relative paths
 node scripts/inject-version.cjs       # Inject version into public/index.html (runs as prebuild)
 ```
