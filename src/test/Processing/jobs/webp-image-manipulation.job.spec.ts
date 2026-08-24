@@ -234,6 +234,55 @@ describe('webpImageManipulationJob', () => {
 			expect(result.buffer).toBe(testBuffer)
 		})
 
+		// Regression: handleSvgFormat() created its sharp() pipelines without
+		// destroy()ing them in a finally block, unlike processRaster() — a Sharp
+		// lifecycle/resource-cleanup inconsistency between the two code paths.
+		describe('svg format handling — Sharp pipeline cleanup', () => {
+			it('destroys the sharp pipeline after resizing an SVG source to PNG', async () => {
+				const filePathFrom = 'test.svg'
+				mockManipulation.toBuffer.mockResolvedValue({ data: testBuffer, info: { size: 1000, format: 'png' } })
+				const options = new ResizeOptions({
+					width: 800,
+					height: 600,
+					fit: FitOptions.contain,
+					position: PositionOptions.entropy,
+					background: BackgroundOptions.transparent,
+					format: SupportedResizeFormats.svg,
+					quality: 80,
+				})
+
+				const result = await job.handle(filePathFrom, options)
+
+				expect(mockManipulation.resize).toHaveBeenCalled()
+				expect(mockManipulation.png).toHaveBeenCalledWith({ quality: 80 })
+				expect(mockManipulation.destroy).toHaveBeenCalledTimes(1)
+				expect(result.format).toBe('png')
+			})
+
+			it('destroys the sharp pipeline when converting a non-SVG source to PNG (SVG output requested)', async () => {
+				// No .svg extension and no on-disk file to sniff a header from —
+				// fs.open() rejects (ENOENT), which handleSvgFormat() already
+				// treats as "not SVG" and falls through to this conversion branch.
+				const filePathFrom = 'test-does-not-exist-on-disk.jpg'
+				mockManipulation.toBuffer.mockResolvedValue({ data: testBuffer, info: { size: 1000, format: 'png' } })
+				const options = new ResizeOptions({
+					width: 800,
+					height: 600,
+					fit: FitOptions.contain,
+					position: PositionOptions.entropy,
+					background: BackgroundOptions.transparent,
+					format: SupportedResizeFormats.svg,
+					quality: 80,
+				})
+
+				const result = await job.handle(filePathFrom, options)
+
+				expect(mockManipulation.png).toHaveBeenCalledWith({ quality: 80 })
+				expect(mockManipulation.destroy).toHaveBeenCalledTimes(1)
+				expect(result.format).toBe('png')
+			})
+		})
+
 		it('should handle default format when not specified', async () => {
 			const filePathFrom = 'test.webp'
 			const options = new ResizeOptions({

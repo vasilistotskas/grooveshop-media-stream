@@ -582,6 +582,53 @@ describe('cacheImageResourceOperation', () => {
 			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'miss', expect.any(Number), expect.any(String))
 		})
 
+		// Regression: the access-count persist used to writeFile() directly to
+		// the live .rsm path, bypassing the write-temp-then-rename atomic
+		// pattern the rest of this class uses (see processImageSynchronously's
+		// resourcePath/resourceMetaPath writes) — a concurrent reader of the
+		// .rsm file could observe a torn/partial write mid-update. It must now
+		// go through the same tmp-write + rename() sequence.
+		it('persists the incremented access count atomically via tmp-write + rename, not a direct write to the live .rsm path', async () => {
+			vi.spyOn(mockCacheManager, 'get').mockResolvedValue(null)
+			const mockedFs = vi.mocked(fs)
+			mockedFs.readFile
+				.mockResolvedValueOnce(Buffer.from('file-data'))
+				.mockResolvedValueOnce(JSON.stringify({
+					version: 1,
+					size: '1000',
+					format: 'webp',
+					dateCreated: Date.now(),
+					publicTTL: 12 * 30 * 24 * 60 * 60 * 1000,
+					privateTTL: 6 * 30 * 24 * 60 * 60 * 1000,
+					accessCount: 4,
+				}))
+			mockedFs.writeFile.mockResolvedValue()
+			mockedFs.rename.mockResolvedValue()
+
+			await operation.getCachedResource(opCtx)
+
+			const resourceMetaPath = operation.getResourceMetaPath(opCtx)
+			const tmpPath = `${resourceMetaPath}.tmp`
+
+			// The persist is fire-and-forget (not awaited by getCachedResource),
+			// so poll rather than assert immediately after the outer await.
+			await vi.waitFor(() => {
+				expect(mockedFs.rename).toHaveBeenCalledWith(tmpPath, resourceMetaPath)
+			})
+
+			expect(mockedFs.writeFile).toHaveBeenCalledWith(
+				tmpPath,
+				expect.stringContaining('"accessCount":5'),
+				'utf8',
+			)
+			// Never a direct writeFile() straight to the live .rsm path.
+			expect(mockedFs.writeFile).not.toHaveBeenCalledWith(
+				resourceMetaPath,
+				expect.anything(),
+				expect.anything(),
+			)
+		})
+
 		it('should handle errors gracefully', async () => {
 			vi.spyOn(mockCacheManager, 'get').mockRejectedValue(new Error('Cache error'))
 

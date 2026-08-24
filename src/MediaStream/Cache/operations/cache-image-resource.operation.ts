@@ -103,6 +103,23 @@ export default class CacheImageResourceOperation {
 	}
 
 	/**
+	 * Atomically persist resource metadata to its `.rsm` path: write to a
+	 * sibling `.tmp` file, then rename() over the live path. rename() is
+	 * atomic on POSIX within the same filesystem, so a concurrent reader of
+	 * resourceMetaPath always sees either the old complete file or the new
+	 * complete file — never a partially-written/torn one. Mirrors the
+	 * write-temp-then-rename pattern used for the primary write in
+	 * processImageSynchronously() (see the comment there); this is the
+	 * shared implementation so every `.rsm` writer goes through the same
+	 * atomic path instead of some using a direct writeFile().
+	 */
+	private async persistMetadataAtomic(resourceMetaPath: string, metadata: ResourceMetaData): Promise<void> {
+		const tmpPath = `${resourceMetaPath}.tmp`
+		await writeFile(tmpPath, JSON.stringify(metadata), 'utf8')
+		await rename(tmpPath, resourceMetaPath)
+	}
+
+	/**
 	 * End a performance phase and record the cache operation metric in one step.
 	 */
 	private endPhaseAndRecord(phase: string, layer: string, result: 'hit' | 'miss' | 'error', tenantSchema: string): void {
@@ -444,7 +461,7 @@ export default class CacheImageResourceOperation {
 
 				// Increment access count and persist back to the .rsm file (fire-and-forget)
 				metadata.accessCount = (metadata.accessCount || 0) + 1
-				writeFile(resourceMetaPath, JSON.stringify(metadata), 'utf8').catch((err: unknown) => {
+				this.persistMetadataAtomic(resourceMetaPath, metadata).catch((err: unknown) => {
 					CorrelatedLogger.warn(`Failed to persist access count to ${resourceMetaPath}: ${(err as Error).message}`, CacheImageResourceOperation.name)
 				})
 

@@ -80,6 +80,51 @@ export default class WebpImageManipulationJob {
 			// SVG that needs resizing → resize first, then convert to PNG
 			const manipulation = sharp(filePathFrom, { limitInputPixels: 268402689 })
 
+			try {
+				const resizeScales: { width?: number, height?: number } = {}
+				if (options.width !== null && !Number.isNaN(options.width) && options.width > 0) {
+					resizeScales.width = Number(options.width)
+				}
+				if (options.height !== null && !Number.isNaN(options.height) && options.height > 0) {
+					resizeScales.height = Number(options.height)
+				}
+
+				if (Object.keys(resizeScales).length > 0) {
+					manipulation.resize({
+						...resizeScales,
+						fit: options.fit,
+						position: options.position,
+						background: options.background,
+					})
+				}
+
+				// Format conversion last
+				manipulation.png({ quality: options.quality })
+
+				const { data, info } = await manipulation.toBuffer({ resolveWithObject: true })
+				const result = new ManipulationJobResult({
+					size: String(info.size),
+					format: 'png',
+					buffer: data,
+				})
+				CorrelatedLogger.debug(`SVG resized to PNG. Result: ${JSON.stringify({ size: result.size, format: result.format })}`, WebpImageManipulationJob.name)
+				return result
+			}
+			finally {
+				try {
+					manipulation.destroy()
+				}
+				catch {
+					// Ignore destroy errors
+				}
+			}
+		}
+
+		// Non-SVG source with SVG output requested → convert to PNG
+		CorrelatedLogger.debug('Non-SVG source with SVG output requested, converting to PNG', WebpImageManipulationJob.name)
+		const manipulation = sharp(filePathFrom, { limitInputPixels: 268402689 })
+
+		try {
 			const resizeScales: { width?: number, height?: number } = {}
 			if (options.width !== null && !Number.isNaN(options.width) && options.width > 0) {
 				resizeScales.width = Number(options.width)
@@ -88,7 +133,16 @@ export default class WebpImageManipulationJob {
 				resizeScales.height = Number(options.height)
 			}
 
+			CorrelatedLogger.debug(`Resize scales: ${JSON.stringify(resizeScales)}`, WebpImageManipulationJob.name)
+
 			if (Object.keys(resizeScales).length > 0) {
+				if (options.trimThreshold !== null && !Number.isNaN(options.trimThreshold)) {
+					manipulation.trim({
+						background: options.background,
+						threshold: Number(options.trimThreshold),
+					})
+				}
+
 				manipulation.resize({
 					...resizeScales,
 					fit: options.fit,
@@ -101,56 +155,22 @@ export default class WebpImageManipulationJob {
 			manipulation.png({ quality: options.quality })
 
 			const { data, info } = await manipulation.toBuffer({ resolveWithObject: true })
-			const result = new ManipulationJobResult({
+			CorrelatedLogger.debug(`Manipulation complete. Result format: png, size: ${info.size}`, WebpImageManipulationJob.name)
+
+			return new ManipulationJobResult({
 				size: String(info.size),
 				format: 'png',
 				buffer: data,
 			})
-			CorrelatedLogger.debug(`SVG resized to PNG. Result: ${JSON.stringify({ size: result.size, format: result.format })}`, WebpImageManipulationJob.name)
-			return result
 		}
-
-		// Non-SVG source with SVG output requested → convert to PNG
-		CorrelatedLogger.debug('Non-SVG source with SVG output requested, converting to PNG', WebpImageManipulationJob.name)
-		const manipulation = sharp(filePathFrom, { limitInputPixels: 268402689 })
-
-		const resizeScales: { width?: number, height?: number } = {}
-		if (options.width !== null && !Number.isNaN(options.width) && options.width > 0) {
-			resizeScales.width = Number(options.width)
-		}
-		if (options.height !== null && !Number.isNaN(options.height) && options.height > 0) {
-			resizeScales.height = Number(options.height)
-		}
-
-		CorrelatedLogger.debug(`Resize scales: ${JSON.stringify(resizeScales)}`, WebpImageManipulationJob.name)
-
-		if (Object.keys(resizeScales).length > 0) {
-			if (options.trimThreshold !== null && !Number.isNaN(options.trimThreshold)) {
-				manipulation.trim({
-					background: options.background,
-					threshold: Number(options.trimThreshold),
-				})
+		finally {
+			try {
+				manipulation.destroy()
 			}
-
-			manipulation.resize({
-				...resizeScales,
-				fit: options.fit,
-				position: options.position,
-				background: options.background,
-			})
+			catch {
+				// Ignore destroy errors
+			}
 		}
-
-		// Format conversion last
-		manipulation.png({ quality: options.quality })
-
-		const { data, info } = await manipulation.toBuffer({ resolveWithObject: true })
-		CorrelatedLogger.debug(`Manipulation complete. Result format: png, size: ${info.size}`, WebpImageManipulationJob.name)
-
-		return new ManipulationJobResult({
-			size: String(info.size),
-			format: 'png',
-			buffer: data,
-		})
 	}
 
 	private async processRaster(
