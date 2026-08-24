@@ -1,3 +1,12 @@
+## [2.60.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.60.1...v2.60.2) (2026-08-24)
+
+
+### Bug Fixes
+
+* **cache:** make the .rsm access-count persist atomic; destroy SVG Sharp pipelines ([73ce6f7](https://github.com/vasilistotskas/grooveshop-media-stream/commit/73ce6f7b268b93def4b4f46200f0ee1469035b29))
+* **cache:** stop the streaming size guard from leaking the upstream socket ([dc8e52e](https://github.com/vasilistotskas/grooveshop-media-stream/commit/dc8e52e07b221d26dabc8bd27ce6b93862598fa2))
+* **http:** add a single-canary gate to the circuit breaker's half-open state ([7952137](https://github.com/vasilistotskas/grooveshop-media-stream/commit/7952137ed3b436f2deaa7f5a4f7c901a90e014e3))
+
 ## [2.60.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.60.0...v2.60.1) (2026-08-23)
 
 
