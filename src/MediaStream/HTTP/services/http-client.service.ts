@@ -14,7 +14,7 @@ import { retry, tap } from 'rxjs/operators'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
-import { CircuitBreaker } from '../utils/circuit-breaker.js'
+import { CircuitBreaker, CircuitState } from '../utils/circuit-breaker.js'
 
 // eslint-disable-next-line no-control-regex
 const NON_ASCII_RE = /[^\u0000-\u007F]/
@@ -224,14 +224,20 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 	 */
 	private async executeRequest<T>(requestFn: () => any): Promise<AxiosResponse<T>> {
 		// Skip circuit breaker check if disabled
+		// Tracks whether THIS call claimed the HALF_OPEN canary slot (i.e. it
+		// is the one recovery trial), so the finally block below only ever
+		// releases a claim it actually owns — never a different concurrent
+		// request's in-flight trial.
+		let isHalfOpenTrial = false
 		if (this.circuitBreakerEnabled) {
-			if (this.circuitBreaker.isOpen()) {
+			if (!this.circuitBreaker.allowRequest()) {
 				CorrelatedLogger.warn(
 					'Circuit breaker is open, rejecting request',
 					HttpClientService.name,
 				)
 				throw new Error('Circuit breaker is open')
 			}
+			isHalfOpenTrial = this.circuitBreaker.getState() === CircuitState.HALF_OPEN
 		}
 		else {
 			CorrelatedLogger.debug(
@@ -321,6 +327,15 @@ export class HttpClientService implements IHttpClient, OnModuleInit, OnModuleDes
 		}
 		finally {
 			this.stats.activeRequests--
+			// Safety net: recordSuccess()/recordFailure() above already release
+			// the HALF_OPEN claim as part of reset()/trip(), but only when they
+			// are actually invoked — the tap(error) handler skips recordFailure()
+			// for outcomes isUpstreamFailure() doesn't count (e.g. a normal
+			// 404). Without this, that outcome would leave the canary slot
+			// claimed forever and deadlock recovery.
+			if (isHalfOpenTrial) {
+				this.circuitBreaker.releaseHalfOpenTrial()
+			}
 		}
 	}
 

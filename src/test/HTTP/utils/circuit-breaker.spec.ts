@@ -236,6 +236,109 @@ describe('circuitBreaker', () => {
 		})
 	})
 
+	describe('half-open canary gate (allowRequest)', () => {
+		beforeEach(() => {
+			vi.useFakeTimers()
+		})
+
+		afterEach(() => {
+			vi.useRealTimers()
+		})
+
+		function tripAndEnterHalfOpen(): void {
+			for (let i = 0; i < 5; i++) {
+				circuitBreaker.recordFailure()
+			}
+			expect(circuitBreaker.getState()).toBe(CircuitState.OPEN)
+			vi.advanceTimersByTime(1000)
+		}
+
+		it('allows exactly one caller through as the canary and rejects concurrent callers', () => {
+			tripAndEnterHalfOpen()
+
+			// First caller becomes the canary trial.
+			expect(circuitBreaker.allowRequest()).toBe(true)
+			expect(circuitBreaker.getState()).toBe(CircuitState.HALF_OPEN)
+
+			// Every other concurrent caller is rejected while the trial is in flight —
+			// this is the thundering-herd guard: before this fix, isOpen() returned
+			// false (allowed) for ALL of these once the state flipped to HALF_OPEN.
+			expect(circuitBreaker.allowRequest()).toBe(false)
+			expect(circuitBreaker.allowRequest()).toBe(false)
+			expect(circuitBreaker.allowRequest()).toBe(false)
+		})
+
+		it('allows a new trial after the canary succeeds', () => {
+			tripAndEnterHalfOpen()
+
+			expect(circuitBreaker.allowRequest()).toBe(true)
+			expect(circuitBreaker.allowRequest()).toBe(false)
+
+			circuitBreaker.recordSuccess()
+			expect(circuitBreaker.getState()).toBe(CircuitState.CLOSED)
+
+			// Circuit is closed again — normal traffic flows without claiming.
+			expect(circuitBreaker.allowRequest()).toBe(true)
+			expect(circuitBreaker.allowRequest()).toBe(true)
+		})
+
+		it('re-opens and rejects everyone when the canary fails, then allows exactly one new canary after the next reset timeout', () => {
+			tripAndEnterHalfOpen()
+
+			expect(circuitBreaker.allowRequest()).toBe(true)
+			circuitBreaker.recordFailure()
+			expect(circuitBreaker.getState()).toBe(CircuitState.OPEN)
+
+			// Circuit re-opened — no one is allowed through until the next reset timeout.
+			expect(circuitBreaker.allowRequest()).toBe(false)
+
+			vi.advanceTimersByTime(1000)
+
+			// Fresh half-open episode: exactly one new canary is allowed again.
+			expect(circuitBreaker.allowRequest()).toBe(true)
+			expect(circuitBreaker.allowRequest()).toBe(false)
+		})
+
+		it('releaseHalfOpenTrial() frees the slot without affecting failure/success statistics', () => {
+			tripAndEnterHalfOpen()
+
+			expect(circuitBreaker.allowRequest()).toBe(true)
+			expect(circuitBreaker.allowRequest()).toBe(false)
+
+			circuitBreaker.releaseHalfOpenTrial()
+
+			// Still half-open (statistics untouched), but the slot is free again —
+			// this is the safety net HttpClientService relies on for outcomes that
+			// don't call recordSuccess()/recordFailure() (e.g. a filtered-out 4xx).
+			expect(circuitBreaker.getState()).toBe(CircuitState.HALF_OPEN)
+			expect(circuitBreaker.allowRequest()).toBe(true)
+		})
+
+		it('isOpen() does not claim the canary slot (safe for status polling)', () => {
+			tripAndEnterHalfOpen()
+
+			// Repeated pure status reads must never consume the trial slot.
+			expect(circuitBreaker.isOpen()).toBe(false)
+			expect(circuitBreaker.isOpen()).toBe(false)
+			expect(circuitBreaker.isOpen()).toBe(false)
+
+			// A real request can still claim it afterwards.
+			expect(circuitBreaker.allowRequest()).toBe(true)
+		})
+
+		it('execute() only runs the trial function for the first half-open caller and rejects concurrent ones', async () => {
+			tripAndEnterHalfOpen()
+
+			const mockFn = vi.fn().mockResolvedValue('success')
+
+			const first = circuitBreaker.execute(mockFn)
+			await expect(circuitBreaker.execute(mockFn)).rejects.toThrow('Circuit breaker is open')
+
+			await expect(first).resolves.toBe('success')
+			expect(mockFn).toHaveBeenCalledTimes(1)
+		})
+	})
+
 	describe('rolling Window', () => {
 		beforeEach(() => {
 			vi.useFakeTimers()

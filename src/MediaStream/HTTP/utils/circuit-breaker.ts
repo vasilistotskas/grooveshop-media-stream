@@ -37,6 +37,10 @@ export class CircuitBreaker {
 	private readonly requestWindow: Array<{ timestamp: number, success: boolean }> = []
 	private windowFailureCount = 0
 	private persistenceTimer?: NodeJS.Timeout
+	// HALF_OPEN canary gate: exactly one in-flight "trial" request is allowed
+	// through while recovering; every other concurrent caller is rejected
+	// until the trial settles. See allowRequest()/releaseHalfOpenTrial().
+	private halfOpenTrialInFlight = false
 
 	constructor(options: CircuitBreakerOptions) {
 		this.options = {
@@ -138,7 +142,7 @@ export class CircuitBreaker {
 	 * Execute a function with circuit breaker protection
 	 */
 	async execute<T>(fn: () => Promise<T>, fallback?: () => Promise<T>): Promise<T> {
-		if (this.isOpen()) {
+		if (!this.allowRequest()) {
 			if (fallback) {
 				CorrelatedLogger.warn('Circuit is open, using fallback', 'CircuitBreaker')
 				return fallback()
@@ -208,7 +212,16 @@ export class CircuitBreaker {
 	}
 
 	/**
-	 * Check if the circuit is open
+	 * Check if the circuit is open.
+	 *
+	 * Pure status read for reporting (health indicators, `/health/circuit-breaker`):
+	 * besides the OPEN→HALF_OPEN time-based transition (an intentional,
+	 * idempotent lazy-evaluation side effect — repeated calls are safe), this
+	 * does NOT claim the HALF_OPEN canary slot. Callers that are about to
+	 * make a real gated request must use allowRequest() instead, or a status
+	 * poll (e.g. a liveness probe hitting the health indicator with no
+	 * configured health-check URLs) would silently consume the one recovery
+	 * trial and starve every real request behind it.
 	 */
 	isOpen(): boolean {
 		if (this.state === CircuitState.OPEN) {
@@ -222,6 +235,51 @@ export class CircuitBreaker {
 			return true
 		}
 		return false
+	}
+
+	/**
+	 * Decide whether a NEW request attempt may proceed right now — the method
+	 * application code should call immediately before making the real gated
+	 * call (HttpClientService.executeRequest, execute() above).
+	 *
+	 * Unlike isOpen(), this claims a slot: in HALF_OPEN, exactly one caller is
+	 * let through as the recovery canary and every other concurrent caller is
+	 * rejected until that trial settles (releaseHalfOpenTrial(), or
+	 * recordSuccess()/recordFailure() transitioning the breaker via
+	 * reset()/trip()). This is the standard half-open behavior used by
+	 * circuit breakers such as opossum/Polly/Hystrix — recovery is probed
+	 * with a single trial request, not a burst of concurrent ones.
+	 */
+	allowRequest(): boolean {
+		if (this.isOpen()) {
+			return false
+		}
+
+		if (this.state === CircuitState.HALF_OPEN) {
+			if (this.halfOpenTrialInFlight) {
+				return false
+			}
+			this.halfOpenTrialInFlight = true
+			return true
+		}
+
+		return true
+	}
+
+	/**
+	 * Release the in-flight HALF_OPEN trial claim, if any, without affecting
+	 * failure/success statistics.
+	 *
+	 * recordSuccess()/recordFailure() already release the claim as part of
+	 * their own HALF_OPEN handling (reset()/trip()) — but only when they are
+	 * actually called. Callers that filter which outcomes count toward the
+	 * breaker (e.g. HttpClientService only counts 5xx/network errors as
+	 * upstream failures, not a normal 404) must call this unconditionally
+	 * once the gated attempt settles, or an outcome that isn't counted would
+	 * leave the canary slot claimed forever and deadlock recovery.
+	 */
+	releaseHalfOpenTrial(): void {
+		this.halfOpenTrialInFlight = false
 	}
 
 	/**
@@ -266,6 +324,7 @@ export class CircuitBreaker {
 		this.nextAttempt = 0
 		this.requestWindow.length = 0
 		this.windowFailureCount = 0
+		this.halfOpenTrialInFlight = false
 		CorrelatedLogger.log('Circuit breaker reset', 'CircuitBreaker')
 	}
 
@@ -276,6 +335,7 @@ export class CircuitBreaker {
 		this.state = CircuitState.OPEN
 		this.lastStateChange = Date.now()
 		this.nextAttempt = Date.now() + this.options.resetTimeout
+		this.halfOpenTrialInFlight = false
 	}
 
 	/**
