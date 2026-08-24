@@ -2,6 +2,7 @@ import type CacheImageRequest from '#microservice/API/dto/cache-image-request.dt
 import type { ResourceIdentifierKP } from '#microservice/common/constants/key-properties.constant'
 import { Buffer } from 'node:buffer'
 import { Transform } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
 import { Injectable } from '@nestjs/common'
 import UnableToFetchResourceException from '#microservice/API/exceptions/unable-to-fetch-resource.exception'
 import { MAX_FILE_SIZES } from '#microservice/common/constants/image-limits.constant'
@@ -92,11 +93,25 @@ export class ResourceFetcher {
 			},
 		})
 
-		// Wrap the axios stream with the guard transform
+		// Wrap the axios stream with the guard transform via pipeline() instead
+		// of a manual `.pipe()` chain. Node's `readable.pipe(dest)` does NOT
+		// destroy the source when the destination errors — when the guard trips
+		// (limit exceeded), the raw axios/socket stream was left dangling,
+		// leaking the upstream connection back to the HTTP agent pool.
+		// pipeline() destroys every stream passed to it, in both directions, as
+		// soon as any one of them errors (see
+		// https://nodejs.org/api/stream.html#streampipelinesource-transforms-destination-options).
+		// Its returned promise only resolves once sizeGuardTransform's readable
+		// side is fully drained by the downstream reader
+		// (StoreResourceResponseToFileJob, below), so we don't await it inline
+		// — we just need to observe/absorb its rejection so a guard trip (or an
+		// upstream network error) doesn't surface as an unhandled promise
+		// rejection. The authoritative error is the one StoreResourceResponseToFileJob
+		// observes via response.data's 'error' event and rejects on, which is
+		// what the catch block below inspects via `limitExceeded`.
 		const originalStream = response.data
-		response.data = originalStream.pipe(sizeGuardTransform)
-		// Forward stream errors so StoreResourceResponseToFileJob rejects cleanly
-		originalStream.on('error', (err: Error) => sizeGuardTransform.destroy(err))
+		pipeline(originalStream, sizeGuardTransform).catch(() => {})
+		response.data = sizeGuardTransform
 
 		try {
 			await this.storeResourceResponseToFileJob.handle(request.resourceTarget, tempPath, response)

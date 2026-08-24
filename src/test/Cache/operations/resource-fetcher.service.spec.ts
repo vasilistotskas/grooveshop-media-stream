@@ -1,3 +1,5 @@
+import { Buffer } from 'node:buffer'
+import { PassThrough } from 'node:stream'
 import { Test, TestingModule } from '@nestjs/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CacheImageRequest, { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
@@ -133,5 +135,91 @@ describe('resourceFetcher — negative-cache tenant namespacing', () => {
 			expect.objectContaining({ status: 404 }),
 			expect.any(Number),
 		)
+	})
+})
+
+// Regression coverage for the socket-leak fix: fetchToTempFile() used to
+// wire the upstream axios stream into the streaming size-guard Transform
+// with a plain `.pipe()`. Node's `readable.pipe(dest)` does NOT destroy the
+// source when the destination errors, so when the guard tripped, the raw
+// upstream/socket stream was left dangling — never released back to the
+// HTTP agent's connection pool. fetchToTempFile() now wires the two streams
+// together with `stream.pipeline()`, which destroys every stream it is
+// given as soon as any one of them errors.
+describe('resourceFetcher — streaming size guard destroys the upstream stream on trip', () => {
+	let fetcher: ResourceFetcher
+	let mockFetchResourceResponseJob: FetchResourceResponseJob
+	let mockStoreResourceResponseToFileJob: StoreResourceResponseToFileJob
+
+	beforeEach(async () => {
+		mockFetchResourceResponseJob = { handle: vi.fn() } as unknown as FetchResourceResponseJob
+		mockStoreResourceResponseToFileJob = { handle: vi.fn() } as unknown as StoreResourceResponseToFileJob
+
+		const mockCacheManager = {
+			get: vi.fn().mockResolvedValue(null),
+			set: vi.fn().mockResolvedValue(undefined),
+			delete: vi.fn(),
+		} as unknown as MultiLayerCacheManager
+
+		const mockInputSanitizationService = {
+			validateFileSize: vi.fn().mockReturnValue(true),
+		} as unknown as InputSanitizationService
+
+		const module: TestingModule = await Test.createTestingModule({
+			providers: [
+				ResourceFetcher,
+				{ provide: FetchResourceResponseJob, useValue: mockFetchResourceResponseJob },
+				{ provide: StoreResourceResponseToFileJob, useValue: mockStoreResourceResponseToFileJob },
+				{ provide: MultiLayerCacheManager, useValue: mockCacheManager },
+				{ provide: InputSanitizationService, useValue: mockInputSanitizationService },
+				{
+					provide: ConfigService,
+					useValue: {
+						getOptional: vi.fn().mockImplementation((_key: string, defaultValue: any) => defaultValue),
+					},
+				},
+			],
+		}).compile()
+
+		fetcher = await module.resolve(ResourceFetcher)
+	})
+
+	it('destroys the upstream stream when the streaming size limit trips (no socket leak)', async () => {
+		const originalStream = new PassThrough()
+		// `response` is the SAME object instance fetchToTempFile() mutates
+		// (`response.data = sizeGuardTransform`), so we can inspect it
+		// afterwards to assert the guard's own Transform was destroyed too.
+		const response = { status: 200, headers: {}, data: originalStream }
+		vi.spyOn(mockFetchResourceResponseJob, 'handle').mockResolvedValue(response as any)
+
+		// Mirrors StoreResourceResponseToFileJob's real behaviour closely
+		// enough for this regression: read response.data to completion and
+		// reject/resolve based on what it emits.
+		vi.spyOn(mockStoreResourceResponseToFileJob, 'handle').mockImplementation(
+			(_name: string, _path: string, resp: any) => {
+				return new Promise<void>((resolve, reject) => {
+					resp.data.on('error', (err: Error) => reject(err))
+					resp.data.on('end', () => resolve())
+					resp.data.resume()
+				})
+			},
+		)
+
+		const request = new CacheImageRequest({
+			resourceTarget: 'https://example.com/huge.svg',
+			resizeOptions: new ResizeOptions(),
+			tenantSchema: 'acme',
+		})
+
+		const fetchPromise = fetcher.fetchToTempFile(request, 'huge-id', '/tmp/huge.rst')
+
+		// SVG's format limit is 1MB (MAX_FILE_SIZES.svg) — write more than
+		// that in one chunk so the guard trips deterministically.
+		originalStream.write(Buffer.alloc(1024 * 1024 + 1))
+
+		await expect(fetchPromise).rejects.toThrow(/exceeds limit for format svg/)
+
+		expect(originalStream.destroyed).toBe(true)
+		expect((response.data as any).destroyed).toBe(true)
 	})
 })
