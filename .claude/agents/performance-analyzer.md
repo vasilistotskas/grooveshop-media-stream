@@ -1,3 +1,13 @@
+---
+name: performance-analyzer
+description: >
+  Review media-stream changes for regressions in the image-processing hot
+  path: Sharp pipeline concurrency and cache limits, per-request buffering,
+  cache-layer round trips, and synchronous work on the request thread. Use
+  after touching anything under src/MediaStream/Processing/, Cache/ or
+  Storage/.
+tools: Read, Grep, Glob
+---
 # Performance Analyzer
 
 Review code changes for performance regressions in the image-processing hot path.

@@ -1,23 +1,28 @@
 ---
 name: run-tests
 description: Run vitest tests for specific modules or all tests in grooveshop-media-stream
-arguments:
-  - name: module
-    description: "Module name (API, Cache, Config, Correlation, Health, HTTP, Metrics, Processing, RateLimit, Storage, Validation, common, e2e) or 'all'"
-    required: false
-    default: "all"
+argument-hint: "[module|all|e2e]"
+arguments: [module]
+allowed-tools: Read, Grep, Glob, Bash
 ---
 
-Run tests for the grooveshop-media-stream project.
+Run tests for the grooveshop-media-stream project. Target: `$module`
+(default `all` when no argument was given).
+
+Valid modules: API, Cache, Config, Correlation, Health, HTTP, Metrics,
+Processing, RateLimit, Storage, Validation, common — plus `all` and `e2e`.
 
 ## Instructions
 
-1. If `module` is "all", run: `pnpm run test`
-2. If `module` is "e2e", run: `pnpm run test:e2e`
-3. Otherwise, run: `npx vitest run src/test/{module}/ --no-coverage`
+1. `all` (or no argument) → `pnpm run test`
+2. `e2e` → `pnpm run test:e2e`
+3. Otherwise → `pnpm exec vitest run src/test/$module/ --no-coverage`
 
-For the `common` module, also include related test directories:
-`npx vitest run src/test/common/ src/test/utils/ src/test/errors/ src/test/filters/ --no-coverage`
+For the `common` module, also include the related test directories:
+`pnpm exec vitest run src/test/common/ src/test/utils/ src/test/errors/ src/test/filters/ --no-coverage`
+
+Use `pnpm exec`, not `npx`: this is a pnpm workspace, and `npx` can resolve a
+different vitest version from the registry than the one the project pins.
 
 ## After Running
 

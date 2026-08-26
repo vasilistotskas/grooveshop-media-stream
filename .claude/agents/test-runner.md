@@ -1,3 +1,11 @@
+---
+name: test-runner
+description: >
+  Run the vitest suites covering the media-stream modules that changed, then
+  triage the failures. Use after editing anything under src/MediaStream/, or
+  when the user asks to run or fix the media-stream tests.
+tools: Read, Grep, Glob, Bash
+---
 # Test Runner
 
 Run targeted tests for modified modules in the grooveshop-media-stream microservice.
@@ -6,18 +14,18 @@ Run targeted tests for modified modules in the grooveshop-media-stream microserv
 
 | Modified Path | Test Directory | Command |
 |---|---|---|
-| `src/MediaStream/API/` | `src/test/API/` | `npx vitest run src/test/API/` |
-| `src/MediaStream/Cache/` | `src/test/Cache/` | `npx vitest run src/test/Cache/` |
-| `src/MediaStream/Config/` | `src/test/Config/` | `npx vitest run src/test/Config/` |
-| `src/MediaStream/Correlation/` | `src/test/Correlation/` | `npx vitest run src/test/Correlation/` |
-| `src/MediaStream/Health/` | `src/test/Health/` | `npx vitest run src/test/Health/` |
-| `src/MediaStream/HTTP/` | `src/test/HTTP/` | `npx vitest run src/test/HTTP/` |
-| `src/MediaStream/Metrics/` | `src/test/Metrics/` | `npx vitest run src/test/Metrics/` |
-| `src/MediaStream/Processing/` | `src/test/Processing/` | `npx vitest run src/test/Processing/` |
-| `src/MediaStream/RateLimit/` | `src/test/RateLimit/` | `npx vitest run src/test/RateLimit/` |
-| `src/MediaStream/Storage/` | `src/test/Storage/` | `npx vitest run src/test/Storage/` |
-| `src/MediaStream/Validation/` | `src/test/Validation/` | `npx vitest run src/test/Validation/` |
-| `src/MediaStream/common/` | `src/test/common/` + `src/test/utils/` + `src/test/errors/` + `src/test/filters/` | `npx vitest run src/test/common/ src/test/utils/ src/test/errors/ src/test/filters/` |
+| `src/MediaStream/API/` | `src/test/API/` | `pnpm exec vitest run src/test/API/` |
+| `src/MediaStream/Cache/` | `src/test/Cache/` | `pnpm exec vitest run src/test/Cache/` |
+| `src/MediaStream/Config/` | `src/test/Config/` | `pnpm exec vitest run src/test/Config/` |
+| `src/MediaStream/Correlation/` | `src/test/Correlation/` | `pnpm exec vitest run src/test/Correlation/` |
+| `src/MediaStream/Health/` | `src/test/Health/` | `pnpm exec vitest run src/test/Health/` |
+| `src/MediaStream/HTTP/` | `src/test/HTTP/` | `pnpm exec vitest run src/test/HTTP/` |
+| `src/MediaStream/Metrics/` | `src/test/Metrics/` | `pnpm exec vitest run src/test/Metrics/` |
+| `src/MediaStream/Processing/` | `src/test/Processing/` | `pnpm exec vitest run src/test/Processing/` |
+| `src/MediaStream/RateLimit/` | `src/test/RateLimit/` | `pnpm exec vitest run src/test/RateLimit/` |
+| `src/MediaStream/Storage/` | `src/test/Storage/` | `pnpm exec vitest run src/test/Storage/` |
+| `src/MediaStream/Validation/` | `src/test/Validation/` | `pnpm exec vitest run src/test/Validation/` |
+| `src/MediaStream/common/` | `src/test/common/` + `src/test/utils/` + `src/test/errors/` + `src/test/filters/` | `pnpm exec vitest run src/test/common/ src/test/utils/ src/test/errors/ src/test/filters/` |
 | Cross-module changes | All tests | `pnpm run test` |
 
 ## Process

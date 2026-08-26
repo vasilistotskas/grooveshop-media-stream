@@ -1,3 +1,13 @@
+---
+name: observability-reviewer
+description: >
+  Audit media-stream changes against the project's correlation, logging and
+  metrics conventions: CorrelatedLogger instead of console.* or a bare Nest
+  Logger, correlation-ID propagation, and Prometheus metric naming and label
+  cardinality. Use after adding or changing a service, controller,
+  interceptor or metric.
+tools: Read, Grep, Glob
+---
 # Observability Reviewer
 
 Audit new code for compliance with the project's correlation, logging, and metrics conventions.

@@ -14,7 +14,7 @@ const filePath = input.tool_input?.file_path
 
 if (filePath && /\.(ts|mts|js|mjs|cjs)$/.test(filePath)) {
   try {
-    execSync(`pnpm exec eslint --fix ${JSON.stringify(filePath)}`, { stdio: 'pipe' })
+    execSync(`pnpm exec eslint --fix ${JSON.stringify(filePath)}`, { cwd: process.env.CLAUDE_PROJECT_DIR || process.cwd(), stdio: 'pipe' })
   }
   catch {
     // ESLint errors are non-blocking

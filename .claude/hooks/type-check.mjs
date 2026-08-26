@@ -20,9 +20,19 @@ if (!filePath || !/\.(ts|mts)$/.test(filePath)) {
   process.exit(0)
 }
 
+// Test files belong to the spec project; checking them against the default
+// tsconfig reports phantom errors for vitest globals and test-only paths.
+// This mirrors `pnpm run type-check`, which runs both projects.
+const isSpec = /\.(spec|e2e-spec|test)\.(ts|mts)$/.test(filePath)
+  || /[\\/]test[\\/]/.test(filePath)
+const project = isSpec ? ['-p', 'tsconfig.spec.json'] : []
+
 let output = ''
 try {
-  execSync('pnpm exec tsc --noEmit --incremental --pretty false', { stdio: 'pipe' })
+  execSync(['pnpm', 'exec', 'tsc', '--noEmit', '--incremental', '--pretty', 'false', ...project].join(' '), {
+    stdio: 'pipe',
+    timeout: 300_000,
+  })
   process.exit(0)
 }
 catch (err) {
@@ -40,7 +50,15 @@ const matches = output
   .slice(0, 20)
 
 if (matches.length > 0) {
-  process.stderr.write(`type-check errors in ${fileName}:\n${matches.join('\n')}\n`)
+  // Reported via `additionalContext`, not stderr: stderr from a PostToolUse
+  // hook that exits 0 only reaches the debug log, so the previous version's
+  // findings never actually surfaced.
+  process.stdout.write(JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: 'PostToolUse',
+      additionalContext: `type-check errors in ${fileName}:\n${matches.join('\n')}`,
+    },
+  }))
 }
 
 process.exit(0)
