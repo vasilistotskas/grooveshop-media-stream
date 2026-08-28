@@ -120,7 +120,7 @@ export class ConfigService implements OnModuleInit {
 			if (!corsOrigin.trim()) {
 				throw new Error(
 					'Configuration error: CORS_ORIGIN must be set in production. '
-					+ 'Set it to the allowed origin(s) for this service (e.g. https://webside.gr).',
+					+ 'Set it to the allowed origin(s) for this service (e.g. https://store.example.com).',
 				)
 			}
 		}

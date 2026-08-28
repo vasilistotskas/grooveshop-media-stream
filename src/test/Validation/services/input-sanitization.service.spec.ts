@@ -163,10 +163,11 @@ describe('inputSanitizationService', () => {
 			expect(service.validateUrl('http://localhost:3000/test.png')).toBe(true)
 		})
 
-		it('should accept webside.gr production hostnames when using built-in default domain list', () => {
-			// Regression test for the production failure where the webside.gr family was
-			// dropped from the default — any upstream fetch from those hosts must be
-			// accepted even without VALIDATION_ALLOWED_DOMAINS in the environment.
+		it('should accept every hostname supplied by the configured domain list', () => {
+			// Regression test for the production failure where configured public
+			// hostnames were dropped — any upstream fetch from a host the operator
+			// listed must be accepted. The list is configuration (both overlays set
+			// VALIDATION_ALLOWED_DOMAINS in full), never a source constant.
 			const serviceWithProductionDefaults = new InputSanitizationService({
 				getOptional: (key: string, defaultValue: any) => {
 					// Simulate the built-in config default (no env override)
@@ -178,20 +179,20 @@ describe('inputSanitizationService', () => {
 							'static-svc',
 							'frontend-nuxt-service',
 							'media-stream-service',
-							'webside.gr',
-							'api.webside.gr',
-							'assets.webside.gr',
-							'static.webside.gr',
+							'store.example.com',
+							'api.example.com',
+							'assets.example.com',
+							'static.example.com',
 						]
 					}
 					return defaultValue
 				},
 			} as any, { isAllowed: () => false } as any)
 
-			expect(serviceWithProductionDefaults.validateUrl('https://webside.gr/media/public/uploads/image.jpg')).toBe(true)
-			expect(serviceWithProductionDefaults.validateUrl('https://api.webside.gr/media/tenant/uploads/img.jpg')).toBe(true)
-			expect(serviceWithProductionDefaults.validateUrl('https://assets.webside.gr/static/images/logo.png')).toBe(true)
-			expect(serviceWithProductionDefaults.validateUrl('https://static.webside.gr/static/images/hero.webp')).toBe(true)
+			expect(serviceWithProductionDefaults.validateUrl('https://store.example.com/media/public/uploads/image.jpg')).toBe(true)
+			expect(serviceWithProductionDefaults.validateUrl('https://api.example.com/media/tenant/uploads/img.jpg')).toBe(true)
+			expect(serviceWithProductionDefaults.validateUrl('https://assets.example.com/static/images/logo.png')).toBe(true)
+			expect(serviceWithProductionDefaults.validateUrl('https://static.example.com/static/images/hero.webp')).toBe(true)
 		})
 
 		it('should reject URLs from non-allowed domains', () => {
@@ -222,13 +223,13 @@ describe('inputSanitizationService', () => {
 			// per test, so this re-mock is read on the first getAllowedDomains call.
 			configService.getOptional.mockImplementation((key, defaultValue) => {
 				if (key === 'validation.allowedDomains')
-					return ['Example.COM', 'API.Webside.GR']
+					return ['Example.COM', 'API.Example.NET']
 				return defaultValue
 			})
 
 			expect(service.validateUrl('https://example.com/image.jpg')).toBe(true)
 			expect(service.validateUrl('https://cdn.example.com/image.jpg')).toBe(true)
-			expect(service.validateUrl('https://api.webside.gr/image.jpg')).toBe(true)
+			expect(service.validateUrl('https://api.example.net/image.jpg')).toBe(true)
 		})
 
 		it('accepts a hostname allowed only by the dynamic tenant domain set (union semantics)', () => {

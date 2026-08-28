@@ -184,16 +184,19 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	'rateLimit.bypass.bots': { env: 'RATE_LIMIT_BYPASS_BOTS', default: true, type: 'boolean' },
 
 	// Input validation configuration
+	// Deployment-neutral default: loopback plus the in-cluster Service
+	// names, which are identical in every environment. Public hostnames
+	// are DEPLOYMENT DATA and arrive via VALIDATION_ALLOWED_DOMAINS (set
+	// in full by both overlays); tenant storefront hosts arrive via the
+	// dynamic allowlist below. Naming a tenant's domains here made the
+	// first store's DNS a source-code constant that every later tenant
+	// inherited and none of them could use.
 	'validation.allowedDomains': {
 		env: 'VALIDATION_ALLOWED_DOMAINS',
 		default: [
 			'localhost',
 			'127.0.0.1',
 			'backend-service',
-			'webside.gr',
-			'assets.webside.gr',
-			'api.webside.gr',
-			'static.webside.gr',
 			'static-svc',
 			'frontend-nuxt-service',
 			'media-stream-service',

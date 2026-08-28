@@ -49,14 +49,13 @@ export class InputSanitizationService implements ISanitizer<any> {
 			// Lowercase every configured domain: hostnames are case-insensitive
 			// (RFC 4343) and URL.hostname is always lowercase, so the comparison
 			// in validateUrl must not depend on the operator's env-var casing.
+			// Deployment-neutral, and identical to the schema default in
+			// config-schema.util.ts — see the rationale there. Public
+			// hostnames are configuration, never source constants.
 			this.allowedDomains = this._configService.getOptional<string[]>('validation.allowedDomains', [
 				'localhost',
 				'127.0.0.1',
 				'backend-service',
-				'webside.gr',
-				'assets.webside.gr',
-				'api.webside.gr',
-				'static.webside.gr',
 				'static-svc',
 				'frontend-nuxt-service',
 				'media-stream-service',

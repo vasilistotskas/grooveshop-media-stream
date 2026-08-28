@@ -74,7 +74,7 @@ describe('appConfigDto', () => {
 					requestTimeout: 30000,
 				},
 				validation: {
-					allowedDomains: ['localhost', 'webside.gr'],
+					allowedDomains: ['localhost', 'store.example.com'],
 					maxStringLength: 10000,
 				},
 				storage: {

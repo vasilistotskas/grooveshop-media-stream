@@ -183,20 +183,26 @@ describe('configService', () => {
 			await expect(serviceWithDefaults.validate()).resolves.not.toThrow()
 		})
 
-		it('should include webside.gr production hostnames in the default allowed-domains list', () => {
+		it('should keep the default allowed-domains list deployment-neutral', () => {
 			const emptyNestConfigService = {
 				get: vi.fn(() => undefined),
 			}
 
 			const serviceWithDefaults = new ConfigService(emptyNestConfigService as any)
-			const allowedDomains: string = serviceWithDefaults.get('validation.allowedDomains')
+			const allowedDomains: string[] = serviceWithDefaults.get('validation.allowedDomains')
 
-			// The built-in fallback must include all four webside.gr family hostnames
-			// so that upstream fetches work even when VALIDATION_ALLOWED_DOMAINS is absent.
-			expect(allowedDomains).toContain('webside.gr')
-			expect(allowedDomains).toContain('api.webside.gr')
-			expect(allowedDomains).toContain('assets.webside.gr')
-			expect(allowedDomains).toContain('static.webside.gr')
+			// The built-in fallback covers loopback and the in-cluster Service
+			// names only — those are identical in every environment. Public
+			// hostnames are deployment data (VALIDATION_ALLOWED_DOMAINS, set in
+			// full by both overlays) and tenant storefronts arrive via the
+			// dynamic allowlist, so no tenant's DNS may be a source constant.
+			expect(allowedDomains).toContain('localhost')
+			expect(allowedDomains).toContain('127.0.0.1')
+			expect(allowedDomains).toContain('backend-service')
+			expect(allowedDomains).toContain('static-svc')
+			expect(allowedDomains).toContain('frontend-nuxt-service')
+			expect(allowedDomains).toContain('media-stream-service')
+			expect(allowedDomains.some(domain => domain.includes('.gr'))).toBe(false)
 		})
 	})
 
