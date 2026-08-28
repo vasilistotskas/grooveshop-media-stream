@@ -1,3 +1,10 @@
+## [2.60.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.60.2...v2.60.3) (2026-08-28)
+
+
+### Bug Fixes
+
+* **config:** stop hardcoding tenant [#1](https://github.com/vasilistotskas/grooveshop-media-stream/issues/1) hostnames in the default allowlist ([2776c3b](https://github.com/vasilistotskas/grooveshop-media-stream/commit/2776c3b83287ba83c0e81ddad32cb33197f033b4))
+
 ## [2.60.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.60.1...v2.60.2) (2026-08-24)
 
 
