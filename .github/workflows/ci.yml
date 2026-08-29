@@ -40,7 +40,9 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Run Trivy filesystem scan
-        uses: aquasecurity/trivy-action@v0.36.0
+        # SHA-pinned: trivy-action's mutable tags were hijacked in the
+        # 2026-03 supply-chain incident, so tags are not trusted.
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -153,16 +155,6 @@ jobs:
           path: coverage/
           retention-days: 7
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: build-artifacts
-          path: |
-            build/dist/
-            package.json
-            pnpm-lock.yaml
-          retention-days: 7
-
   release:
     name: Release
     needs: [ci, security-scan]
@@ -198,30 +190,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Download build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: build-artifacts
-          path: ./
-
+      # No release assets: the deployable is the Docker image built by
+      # docker.yml on the published release. Uploading build/dist as
+      # per-file GitHub release assets cost ~6.5 min per release and
+      # nothing consumed them.
       - name: Run semantic-release
-        id: release
         env:
           GITHUB_TOKEN: ${{ secrets.MEDIA_STREAM_GITHUB_TOKEN }}
         run: pnpm run semantic-release
-
-      - name: Upload release artifacts
-        if: steps.release.outputs.new_release_published == 'true'
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-${{ steps.release.outputs.new_release_version }}
-          path: |
-            build/dist/
-            CHANGELOG.md
-          retention-days: 90
-
-      - name: Create Docker image tag
-        if: steps.release.outputs.new_release_published == 'true'
-        run: |
-          echo "New version: ${{ steps.release.outputs.new_release_version }}"
-          echo "IMAGE_TAG=${{ steps.release.outputs.new_release_version }}" >> $GITHUB_ENV
