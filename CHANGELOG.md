@@ -1,3 +1,10 @@
+## [2.60.4](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.60.3...v2.60.4) (2026-08-30)
+
+
+### Bug Fixes
+
+* enforce optimization time budget, correct docker/pnpm setup, drop dead config knobs ([1990289](https://github.com/vasilistotskas/grooveshop-media-stream/commit/19902897aa90f6066f820c824f11f9d710e64c7f))
+
 ## [2.60.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.60.2...v2.60.3) (2026-08-28)
 
 
