@@ -234,12 +234,10 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	'storage.eviction.minAccessCount': { env: 'STORAGE_EVICTION_MIN_ACCESS_COUNT', default: 5, type: 'number' },
 	'storage.eviction.maxFileAge': { env: 'STORAGE_EVICTION_MAX_FILE_AGE_DAYS', default: 7, type: 'number' },
 
-	// Storage optimization (compression / deduplication, every 6 hours)
+	// Storage optimization (deduplication, every 6 hours)
 	'storage.optimization.enabled': { env: 'STORAGE_OPTIMIZATION_ENABLED', default: true, type: 'boolean' },
 	'storage.optimization.strategies': { env: 'STORAGE_OPTIMIZATION_STRATEGIES', default: ['deduplication'], type: 'array' },
 	'storage.optimization.popularThreshold': { env: 'STORAGE_OPTIMIZATION_POPULAR_THRESHOLD', default: 10, type: 'number' },
-	'storage.optimization.compressionLevel': { env: 'STORAGE_OPTIMIZATION_COMPRESSION_LEVEL', default: 6, type: 'number' },
-	'storage.optimization.createBackups': { env: 'STORAGE_OPTIMIZATION_CREATE_BACKUPS', default: false, type: 'boolean' },
 	'storage.optimization.maxTime': { env: 'STORAGE_OPTIMIZATION_MAX_TIME', default: 600000, type: 'number' },
 
 	// Graceful shutdown configuration

@@ -1,15 +1,21 @@
 ARG NODE_VERSION=24.19.0
 
-FROM node:${NODE_VERSION}-slim AS build
+FROM node:${NODE_VERSION}-slim AS base
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 
-RUN npm install -g pnpm@latest
+RUN corepack enable
 
 WORKDIR /usr/src/app
 
 COPY . .
+
+FROM base AS prod-deps
+
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile --prefer-offline
+
+FROM base AS build
 
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile --prefer-offline
 
@@ -22,7 +28,7 @@ WORKDIR /usr/src/app
 COPY --from=build --chown=node:node /usr/src/app/build ./build
 COPY --from=build --chown=node:node /usr/src/app/scripts ./scripts
 COPY --from=build --chown=node:node /usr/src/app/public ./public
-COPY --from=build --chown=node:node /usr/src/app/node_modules ./node_modules
+COPY --from=prod-deps --chown=node:node /usr/src/app/node_modules ./node_modules
 COPY --from=build --chown=node:node /usr/src/app/package*.json ./
 COPY --from=build --chown=node:node /usr/src/app/pnpm*.yaml ./
 COPY --from=build --chown=node:node /usr/src/app/nest-cli.json ./

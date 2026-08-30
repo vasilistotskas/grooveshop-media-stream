@@ -96,7 +96,6 @@ describe('storage Management Integration', () => {
 					'storage.optimization.strategies': ['compression', 'deduplication'],
 					'storage.optimization.popularityThreshold': 10,
 					'storage.optimization.compressionRatio': 0.7,
-					'storage.optimization.createBackups': true,
 				}
 				return (defaults as any)[key] || defaultValue
 			}),

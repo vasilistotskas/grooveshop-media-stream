@@ -86,7 +86,6 @@ describe('storageOptimizationService', () => {
 					'storage.optimization.enabled': true,
 					'storage.optimization.strategies': ['deduplication'],
 					'storage.optimization.popularThreshold': 10,
-					'storage.optimization.createBackups': false,
 				}
 				return defaults[key] || defaultValue
 			}),
@@ -122,8 +121,6 @@ describe('storageOptimizationService', () => {
 				'storage.optimization.enabled': true,
 				'storage.optimization.strategies': ['deduplication'],
 				'storage.optimization.popularThreshold': 10,
-				'storage.optimization.compressionLevel': 6,
-				'storage.optimization.createBackups': false,
 				'storage.optimization.maxTime': 600000,
 			}
 			return defaults[key] || defaultValue
@@ -319,8 +316,6 @@ describe('storageOptimizationService', () => {
 					const defaults: Record<string, any> = {
 						'storage.optimization.enabled': true,
 						'storage.optimization.popularThreshold': 10,
-						'storage.optimization.compressionLevel': 6,
-						'storage.optimization.createBackups': false,
 						'storage.optimization.maxTime': 600000,
 					}
 					return defaults[key] || defaultValue
@@ -361,8 +356,6 @@ describe('storageOptimizationService', () => {
 					const defaults: Record<string, any> = {
 						'storage.optimization.enabled': true,
 						'storage.optimization.popularThreshold': 10,
-						'storage.optimization.compressionLevel': 6,
-						'storage.optimization.createBackups': false,
 						'storage.optimization.maxTime': 600000,
 					}
 					return defaults[key] || defaultValue
@@ -404,8 +397,6 @@ describe('storageOptimizationService', () => {
 					const defaults: Record<string, any> = {
 						'storage.optimization.enabled': true,
 						'storage.optimization.strategies': ['deduplication'],
-						'storage.optimization.compressionLevel': 6,
-						'storage.optimization.createBackups': false,
 						'storage.optimization.maxTime': 600000,
 					}
 					return defaults[key] || defaultValue

@@ -101,8 +101,6 @@ describe('appConfigDto', () => {
 						enabled: true,
 						strategies: ['deduplication'],
 						popularThreshold: 10,
-						compressionLevel: 6,
-						createBackups: false,
 						maxTime: 600000,
 					},
 				},

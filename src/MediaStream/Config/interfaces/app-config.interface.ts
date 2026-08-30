@@ -155,8 +155,6 @@ export interface StorageOptimizationConfig {
 	enabled: boolean
 	strategies: string[]
 	popularThreshold: number
-	compressionLevel: number
-	createBackups: boolean
 	maxTime: number
 }
 

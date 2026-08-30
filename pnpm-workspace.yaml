@@ -17,18 +17,6 @@ overrides:
   # CVE-2026-12143 (HIGH) — form-data, patched in 4.0.6.
   'form-data@<4.0.6': '>=4.0.6'
 minimumReleaseAgeExclude:
-  - '@types/node@25.9.1'
-  - isomorphic-dompurify@3.14.0
-  - '@vitest/coverage-v8@4.1.7'
-  - '@vitest/expect@4.1.7'
-  - '@vitest/mocker@4.1.7'
-  - '@vitest/pretty-format@4.1.7'
-  - '@vitest/runner@4.1.7'
-  - '@vitest/snapshot@4.1.7'
-  - '@vitest/spy@4.1.7'
-  - '@vitest/utils@4.1.7'
-  - vitest@4.1.7
-  - eslint@10.6.0 || 10.7.0
   - '@img/sharp-darwin-arm64@0.35.3'
   - '@img/sharp-darwin-x64@0.35.3'
   - '@img/sharp-freebsd-wasm32@0.35.3'
@@ -49,9 +37,4 @@ minimumReleaseAgeExclude:
   - sharp@0.35.3
   - '@nestjs/cli@11.0.24'
   - '@vitest/eslint-plugin@1.6.23 || 1.6.24 || 1.6.27'
-  - semantic-release@25.0.6
   - '@semantic-release/git@11.0.1'
-  - '@nestjs/common@11.1.29'
-  - '@nestjs/core@11.1.29'
-  - '@nestjs/platform-express@11.1.29'
-  - '@nestjs/testing@11.1.29'

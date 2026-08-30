@@ -3,6 +3,7 @@ set -e
 
 cd /mnt/app
 
-npm i
+corepack enable
+pnpm install --frozen-lockfile
 
-npm run dev
+pnpm run dev

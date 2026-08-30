@@ -24,6 +24,10 @@ lerna-debug.log*
 # Tests
 coverage
 .nyc_output
+test-cache
+
+# NestJS REPL history
+.nestjs_repl_history
 
 # IDEs and editors
 /.idea

@@ -15,7 +15,7 @@ services:
 
   redis:
     container_name: redis
-    image: redis
+    image: redis:8-alpine
     ports:
       - "6379:6379"
     networks:

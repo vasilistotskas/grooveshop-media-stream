@@ -159,7 +159,7 @@ src/MediaStream/
 ### Rate Limiting
 - Adaptive rate limiting based on system load
 - IP + user-agent + request type keying
-- Bypasses for health checks, metrics, whitelisted domains, and bots
+- Bypasses for health checks, static assets, whitelisted domains, and bots (bot bypass requires the request to originate from an internal IP). `/metrics` is deliberately NOT exempt — it stays behind the rate limiter as defence-in-depth alongside its own internal-secret guard.
 
 ### Error Handling
 - Global exception filter with correlation ID enrichment

@@ -134,7 +134,7 @@ Two-tier timeout: soft (30s) waits for active requests, force (60s) calls `proce
 
 ### Storage Eviction & Optimization
 
-Five eviction strategies: LRU, LFU, size-based, age-based, and **intelligent** (combines access patterns, preserves files with 5+ accesses). Configurable aggressiveness: conservative (0.8x), moderate (1.0x), aggressive (1.5x). Access-weighted cache TTL: `baseTtl × (1 + min(accessCount/10, 5))` — popular files get up to 6x longer lifetime. Default retention policies: old cache files (30d), large images (7d, 100MB max), temp files (1d). Storage optimization (compression, deduplication via MD5 hard-linking) runs every 6 hours. `StorageCleanupService` runs daily at 2 AM with dry-run support.
+Five eviction strategies: LRU, LFU, size-based, age-based, and **intelligent** (combines access patterns, preserves files with 5+ accesses). Configurable aggressiveness: conservative (0.8x), moderate (1.0x), aggressive (1.5x). Access-weighted cache TTL: `baseTtl × (1 + min(accessCount/10, 5))` — popular files get up to 6x longer lifetime. Default retention policies: old cache files (30d), large images (7d, 100MB max), temp files (1d). Storage optimization (deduplication via MD5 hard-linking, bounded by a per-run time budget) runs every 6 hours. `StorageCleanupService` runs daily at 2 AM with dry-run support.
 
 ### Utility Scripts
 
@@ -143,7 +143,7 @@ Five eviction strategies: LRU, LFU, size-based, age-based, and **intelligent** (
 
 ### Key Environment Variables
 
-Copy `.env.example` to `.env`. Critical ones: `PORT` (default 3003), `BACKEND_URL` (upstream image server), `REDIS_HOST`/`REDIS_PORT` (required for cache), `CACHE_WARMING_CRON` (cache warming schedule), `STORAGE_CLEANUP_CRON` (storage cleanup schedule). Every env var maps to a key in `APP_CONFIG_SCHEMA` (`common/utils/config-schema.util.ts`) — `.env.example` mirrors the schema 1:1. `cron` is a direct dependency (not just transitive via `@nestjs/schedule`) because `SchedulerRegistry.addCronJob()` uses `CronJob` from it directly.
+Copy `.env.example` to `.env`. Critical ones: `PORT` (default 3003), `BACKEND_URL` (upstream image server), `REDIS_HOST`/`REDIS_PORT` (required for cache), `CACHE_WARMING_CRON` (cache warming schedule), `STORAGE_CLEANUP_CRON` (storage cleanup schedule). Every env var maps to a key in `APP_CONFIG_SCHEMA` (`common/utils/config-schema.util.ts`) — `.env.example` mirrors the schema 1:1, except `BACKEND_URL`, `INTERNAL_ADMIN_SECRET`, and `NODE_ENV`, which are read directly from `process.env` and have no schema entry. `cron` is a direct dependency (not just transitive via `@nestjs/schedule`) because `SchedulerRegistry.addCronJob()` uses `CronJob` from it directly.
 
 ## Code Style
 

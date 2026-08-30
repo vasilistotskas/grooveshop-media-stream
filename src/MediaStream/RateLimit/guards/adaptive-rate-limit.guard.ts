@@ -19,9 +19,10 @@ const STATIC_ASSET_RE = /\.(?:css|js|png|jpg|jpeg|gif|ico|svg)$/
  * storage (registered via ThrottlerModule.forRootAsync) is the counting backend.
  *
  * Layer structure:
- *   1. shouldSkip() — fast-path bypass for dev, health/metrics, bots from
- *      internal IPs, and whitelisted domains.  If any bypass fires, the
- *      NestJS ThrottlerGuard counting is skipped entirely.
+ *   1. shouldSkip() — fast-path bypass for dev, health checks, static
+ *      assets, bots from internal IPs, and whitelisted domains. `/metrics`
+ *      is deliberately NOT exempt (see shouldSkipRateLimit()). If any bypass
+ *      fires, the NestJS ThrottlerGuard counting is skipped entirely.
  *   2. Adaptive pre-check — when system load is high the effective limit is
  *      reduced; if that reduced limit is already exceeded by our own Redis
  *      counter we throw 429 immediately without going through the Throttler
@@ -132,8 +133,9 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 	}
 
 	/**
-	 * Override shouldSkip so that health/metrics, static assets, whitelisted
-	 * domains, and bot UAs from internal IPs all bypass the Throttler counters.
+	 * Override shouldSkip so that health checks, static assets, whitelisted
+	 * domains, and bot UAs from internal IPs all bypass the Throttler
+	 * counters. `/metrics` is deliberately NOT exempt.
 	 */
 	protected override async shouldSkip(context: ExecutionContext): Promise<boolean> {
 		const request = context.switchToHttp().getRequest()

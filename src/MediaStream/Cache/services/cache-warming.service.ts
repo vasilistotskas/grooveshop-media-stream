@@ -242,7 +242,7 @@ export class CacheWarmingService implements OnModuleInit {
 			// The `image` namespace was previously hard-coded here, which
 			// meant warmed entries landed under `image:{id}` while every
 			// request path read `image:{tenantSchema}:{id}` — warming
-			// was a no-op for tenant content (H21 in MULTI_TENANT_AUDIT.md).
+			// was a no-op for tenant content.
 			// `metadata.tenantSchema` was persisted at write time by
 			// `cache-image-resource.operation.ts`; legacy entries that
 			// pre-date this field default to `'public'` via the DTO.

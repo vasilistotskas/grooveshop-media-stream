@@ -12,7 +12,7 @@ import { StorageMonitoringService } from './storage-monitoring.service.js'
 export interface OptimizationStrategy {
 	name: string
 	description: string
-	execute: (files: AccessPattern[]) => Promise<OptimizationResult>
+	execute: (files: AccessPattern[], deadline: number) => Promise<OptimizationResult>
 }
 
 export interface OptimizationResult {
@@ -27,8 +27,6 @@ export interface OptimizationConfig {
 	enabled: boolean
 	strategies: string[]
 	popularFileThreshold: number
-	compressionLevel: number
-	createBackups: boolean
 	maxOptimizationTime: number
 }
 
@@ -51,8 +49,6 @@ export class StorageOptimizationService implements OnModuleInit {
 			// (STORAGE_OPTIMIZATION_STRATEGIES=Deduplication) still resolves.
 			strategies: this._configService.getOptional<string[]>('storage.optimization.strategies', ['deduplication']).map(s => s.toLowerCase()),
 			popularFileThreshold: this._configService.getOptional('storage.optimization.popularThreshold', 10),
-			compressionLevel: this._configService.getOptional('storage.optimization.compressionLevel', 6),
-			createBackups: this._configService.getOptional('storage.optimization.createBackups', false),
 			maxOptimizationTime: this._configService.getOptional('storage.optimization.maxTime', 600000),
 		}
 
@@ -114,16 +110,19 @@ export class StorageOptimizationService implements OnModuleInit {
 			let totalSizeReduced = 0
 			const allErrors: string[] = []
 			const appliedStrategies: string[] = []
+			const deadline = startTime + this.config.maxOptimizationTime
 
 			for (const strategyName of this.config.strategies) {
 				const strategy = this.strategies.get(strategyName)
 				if (!strategy) {
-					allErrors.push(`Unknown strategy: ${strategyName}`)
+					const msg = `Unknown strategy: ${strategyName}`
+					allErrors.push(msg)
+					CorrelatedLogger.warn(msg, StorageOptimizationService.name)
 					continue
 				}
 
 				try {
-					const result = await strategy.execute(popularFiles)
+					const result = await strategy.execute(popularFiles, deadline)
 					totalFilesOptimized += result.filesOptimized
 					totalSizeReduced += result.sizeReduced
 					allErrors.push(...result.errors)
@@ -186,14 +185,15 @@ export class StorageOptimizationService implements OnModuleInit {
 		this.strategies.set('deduplication', {
 			name: 'Deduplication',
 			description: 'Remove duplicate files and create hard links',
-			execute: async (files: AccessPattern[]) => {
+			execute: async (files: AccessPattern[], deadline: number) => {
 				let filesOptimized = 0
 				let sizeReduced = 0
 				const errors: string[] = []
 
-				const duplicates = await this.findDuplicateFiles(files)
+				const { groups, errors: budgetErrors } = await this.findDuplicateFiles(files, deadline)
+				errors.push(...budgetErrors)
 
-				for (const duplicateGroup of duplicates) {
+				for (const duplicateGroup of groups) {
 					try {
 						const result = await this.deduplicateFiles(duplicateGroup)
 						filesOptimized += result.filesProcessed
@@ -213,27 +213,30 @@ export class StorageOptimizationService implements OnModuleInit {
 				}
 			},
 		})
-
-		this.strategies.set('prefetch', {
-			name: 'Prefetch',
-			description: 'Not implemented — returns zero counts',
-			execute: async (_files: AccessPattern[]) => {
-				return {
-					filesOptimized: 0,
-					sizeReduced: 0,
-					errors: ['prefetch strategy is not implemented'],
-					strategy: 'prefetch',
-					duration: 0,
-				}
-			},
-		})
 	}
 
-	private async findDuplicateFiles(files: AccessPattern[]): Promise<AccessPattern[][]> {
+	/**
+	 * Hashes each file to find duplicates, bounded by `deadline` (an absolute
+	 * Date.now() timestamp). The 6-hourly cron streams MD5 over every popular
+	 * file, which can grow unbounded with the popular-file count — once the
+	 * budget is exhausted, remaining files are skipped cleanly rather than
+	 * letting the run stall the next scheduled pass.
+	 */
+	private async findDuplicateFiles(files: AccessPattern[], deadline: number): Promise<{ groups: AccessPattern[][], errors: string[] }> {
 		const hashMap = new Map<string, AccessPattern[]>()
 		const crypto = await import('node:crypto')
+		const errors: string[] = []
 
-		for (const file of files) {
+		for (let i = 0; i < files.length; i++) {
+			if (Date.now() >= deadline) {
+				const skipped = files.length - i
+				const msg = `Optimization time budget (${this.config.maxOptimizationTime}ms) exhausted; skipping remaining ${skipped} file(s)`
+				errors.push(msg)
+				CorrelatedLogger.warn(msg, StorageOptimizationService.name)
+				break
+			}
+
+			const file = files[i]
 			try {
 				const filePath = join(this.storageDirectory, file.file)
 
@@ -258,7 +261,7 @@ export class StorageOptimizationService implements OnModuleInit {
 			}
 		}
 
-		return Array.from(hashMap.values()).filter(group => group.length > 1)
+		return { groups: Array.from(hashMap.values()).filter(group => group.length > 1), errors }
 	}
 
 	private async deduplicateFiles(duplicateGroup: AccessPattern[]): Promise<{

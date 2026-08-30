@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer'
-import { IsArray, IsBoolean, IsIn, IsNumber, IsString, Max, Min, ValidateNested } from 'class-validator'
+import { IsArray, IsBoolean, IsIn, IsNumber, IsString, Min, ValidateNested } from 'class-validator'
 
 export class StorageCleanupConfigDto {
 	@IsBoolean()
@@ -46,14 +46,6 @@ export class StorageOptimizationConfigDto {
 	@IsNumber()
 	@Min(1)
 	popularThreshold: number = 10
-
-	@IsNumber()
-	@Min(0)
-	@Max(9)
-	compressionLevel: number = 6
-
-	@IsBoolean()
-	createBackups: boolean = false
 
 	@IsNumber()
 	@Min(1000)
