@@ -1,5 +1,4 @@
 import type { MockedObject } from 'vitest'
-import { HealthCheckError } from '@nestjs/terminus'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConfigService } from '#microservice/Config/config.service'
@@ -180,13 +179,12 @@ describe('storageHealthIndicator', () => {
 				new Error('Storage unavailable'),
 			)
 
-			// BaseHealthIndicator.isHealthy() throws HealthCheckError when check fails
-			const err = await indicator.isHealthy().catch((e: unknown) => e)
-			expect(err).toBeInstanceOf(HealthCheckError)
-			const hce = err as HealthCheckError
-			expect(hce.causes).toHaveProperty('storage')
-			expect((hce.causes as any).storage.status).toBe('down')
-			expect(hce.message).toContain('Storage unavailable')
+			// BaseHealthIndicator.isHealthy() resolves with a `down` result when the check
+			// fails — terminus 12 rethrows anything an indicator throws as a 500.
+			const failed = await indicator.isHealthy()
+			expect(failed).toHaveProperty('storage')
+			expect(failed.storage.status).toBe('down')
+			expect(failed.storage.message).toContain('Storage unavailable')
 		})
 	})
 
@@ -302,25 +300,23 @@ describe('storageHealthIndicator', () => {
 
 			storageMonitoring.checkThresholds.mockResolvedValue(mockThresholds)
 
-			// BaseHealthIndicator.isHealthy() throws HealthCheckError when check fails
-			const err = await indicator.isHealthy().catch((e: unknown) => e)
-			expect(err).toBeInstanceOf(HealthCheckError)
-			const hce = err as HealthCheckError
-			expect(hce.causes).toHaveProperty('storage')
-			expect((hce.causes as any).storage.status).toBe('down')
-			expect(hce.message).toContain('Cleanup service unavailable')
+			// BaseHealthIndicator.isHealthy() resolves with a `down` result when the check
+			// fails — terminus 12 rethrows anything an indicator throws as a 500.
+			const failed = await indicator.isHealthy()
+			expect(failed).toHaveProperty('storage')
+			expect(failed.storage.status).toBe('down')
+			expect(failed.storage.message).toContain('Cleanup service unavailable')
 		})
 
 		it('should handle threshold check errors', async () => {
 			storageMonitoring.checkThresholds.mockRejectedValue(new Error('Storage unavailable'))
 
-			// BaseHealthIndicator.isHealthy() throws HealthCheckError when check fails
-			const err = await indicator.isHealthy().catch((e: unknown) => e)
-			expect(err).toBeInstanceOf(HealthCheckError)
-			const hce = err as HealthCheckError
-			expect(hce.causes).toHaveProperty('storage')
-			expect((hce.causes as any).storage.status).toBe('down')
-			expect(hce.message).toContain('Storage unavailable')
+			// BaseHealthIndicator.isHealthy() resolves with a `down` result when the check
+			// fails — terminus 12 rethrows anything an indicator throws as a 500.
+			const failed = await indicator.isHealthy()
+			expect(failed).toHaveProperty('storage')
+			expect(failed.storage.status).toBe('down')
+			expect(failed.storage.message).toContain('Storage unavailable')
 		})
 	})
 })

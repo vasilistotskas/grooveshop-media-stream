@@ -4,7 +4,6 @@
     "outDir": "./build/dist",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "allowJs": true,
     "verbatimModuleSyntax": true,
     "noEmitOnError": true,
     "strict": true,
@@ -27,15 +26,10 @@
     "useDefineForClassFields": false,
     "removeComments": true,
     "sourceMap": true,
-    "esModuleInterop": true,
     "types": [
       "node",
       "express",
-      "compression",
-      "supertest"
-    ],
-    "typeRoots": [
-      "node_modules/@types"
+      "compression"
     ]
   },
   "watchOptions": {

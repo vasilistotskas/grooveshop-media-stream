@@ -2,7 +2,6 @@ import type { MockedObject } from 'vitest'
 import { Buffer } from 'node:buffer'
 import { promises as fs } from 'node:fs'
 import { ScheduleModule } from '@nestjs/schedule'
-import { HealthCheckError } from '@nestjs/terminus'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConfigService } from '#microservice/Config/config.service'
@@ -350,14 +349,13 @@ describe('storage Management Integration', () => {
 			expect(stats.totalSize).toBe(0)
 
 			// Simulate readdir failure for health check.
-			// BaseHealthIndicator.isHealthy() throws HealthCheckError when the check fails.
+			// BaseHealthIndicator.isHealthy() resolves with a `down` result when the check
+			// fails — terminus 12 rethrows anything an indicator throws as a 500.
 			mockFs.readdir.mockRejectedValue(new Error('Disk full'))
-			const err = await storageHealth.isHealthy().catch((e: unknown) => e)
-			expect(err).toBeInstanceOf(HealthCheckError)
-			const hce = err as HealthCheckError
-			expect(hce.causes).toHaveProperty('storage')
-			expect((hce.causes as any).storage.status).toBe('down')
-			expect(hce.message).toContain('Disk full')
+			const failed = await storageHealth.isHealthy()
+			expect(failed).toHaveProperty('storage')
+			expect(failed.storage.status).toBe('down')
+			expect(failed.storage.message).toContain('Disk full')
 		})
 	})
 

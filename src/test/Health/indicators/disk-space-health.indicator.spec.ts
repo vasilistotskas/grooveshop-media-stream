@@ -1,5 +1,4 @@
 import type { MockedObject } from 'vitest'
-import { HealthCheckError } from '@nestjs/terminus'
 import { Test, TestingModule } from '@nestjs/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConfigService } from '#microservice/Config/config.service'
@@ -92,13 +91,12 @@ describe('diskSpaceHealthIndicator', () => {
 		it('should handle errors gracefully', async () => {
 			vi.spyOn(indicator as any, 'getDiskSpaceInfo').mockRejectedValue(new Error('Disk access error'))
 
-			// BaseHealthIndicator.isHealthy() throws HealthCheckError when the check fails
-			const err = await indicator.isHealthy().catch((e: unknown) => e)
-			expect(err).toBeInstanceOf(HealthCheckError)
-			const hce = err as HealthCheckError
-			expect(hce.causes).toHaveProperty('disk_space')
-			expect((hce.causes as any).disk_space.status).toBe('down')
-			expect(hce.message).toContain('Disk access error')
+			// BaseHealthIndicator.isHealthy() resolves with a `down` result when the check
+			// fails — terminus 12 rethrows anything an indicator throws as a 500.
+			const failed = await indicator.isHealthy()
+			expect(failed).toHaveProperty('disk_space')
+			expect(failed.disk_space.status).toBe('down')
+			expect(failed.disk_space.message).toContain('Disk access error')
 		})
 
 		it('should timeout if check takes too long', async () => {
@@ -106,13 +104,12 @@ describe('diskSpaceHealthIndicator', () => {
 				new Promise(resolve => setTimeout(resolve, 5000)), // 5 second delay
 			)
 
-			// BaseHealthIndicator.isHealthy() throws HealthCheckError on timeout
-			const err = await indicator.isHealthy().catch((e: unknown) => e)
-			expect(err).toBeInstanceOf(HealthCheckError)
-			const hce = err as HealthCheckError
-			expect(hce.causes).toHaveProperty('disk_space')
-			expect((hce.causes as any).disk_space.status).toBe('down')
-			expect(hce.message).toContain('timeout')
+			// BaseHealthIndicator.isHealthy() resolves with a `down` result when the check
+			// fails — terminus 12 rethrows anything an indicator throws as a 500.
+			const failed = await indicator.isHealthy()
+			expect(failed).toHaveProperty('disk_space')
+			expect(failed.disk_space.status).toBe('down')
+			expect(failed.disk_space.message).toContain('timeout')
 		}, 10000)
 	})
 

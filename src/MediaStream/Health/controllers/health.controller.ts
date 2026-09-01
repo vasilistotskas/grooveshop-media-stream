@@ -8,7 +8,7 @@ import type { MemoryInfo } from '../indicators/memory-health.indicator.js'
 import * as process from 'node:process'
 import * as v8 from 'node:v8'
 import { Controller, Get, HttpCode, HttpStatus, Post, ServiceUnavailableException, UseGuards } from '@nestjs/common'
-import { HealthCheck, HealthCheckError, HealthCheckService } from '@nestjs/terminus'
+import { HealthCheck, HealthCheckService } from '@nestjs/terminus'
 import { CacheHealthIndicator } from '#microservice/Cache/indicators/cache-health.indicator'
 import { RedisHealthIndicator } from '#microservice/Cache/indicators/redis-health.indicator'
 import { InternalSecretGuard } from '#microservice/common/guards/internal-secret.guard'
@@ -131,10 +131,17 @@ export class HealthController {
 			}
 		}
 		catch (error: unknown) {
+			// Terminus 12 dropped HealthCheckError; HealthCheckService now signals
+			// failure with a ServiceUnavailableException whose response body is the
+			// HealthCheckResult itself.
+			const result = error instanceof ServiceUnavailableException
+				? error.getResponse() as HealthCheckResult
+				: undefined
+
 			throw new ServiceUnavailableException({
 				status: 'not ready',
 				timestamp: new Date().toISOString(),
-				checks: error instanceof HealthCheckError ? error.causes : undefined,
+				checks: result?.details,
 			})
 		}
 	}
