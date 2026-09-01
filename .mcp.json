@@ -2,7 +2,10 @@
   "mcpServers": {
     "context7": {
       "command": "npx",
-      "args": ["-y", "@upstash/context7-mcp@latest"]
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@4.0.4"
+      ]
     },
     "github": {
       "type": "http",
@@ -12,7 +15,7 @@
       "command": "uvx",
       "args": [
         "--from",
-        "redis-mcp-server@latest",
+        "redis-mcp-server==0.5.1",
         "redis-mcp-server",
         "--url",
         "${REDIS_URL:-redis://localhost:6379/0}"
