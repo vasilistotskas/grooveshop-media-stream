@@ -1,3 +1,10 @@
+## [2.60.6](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.60.5...v2.60.6) (2026-09-01)
+
+
+### Bug Fixes
+
+* **health:** keep the health report on failing aggregate endpoints ([#8](https://github.com/vasilistotskas/grooveshop-media-stream/issues/8)) ([beea867](https://github.com/vasilistotskas/grooveshop-media-stream/commit/beea867503a95ce1684609c4d36d802de8a746b3))
+
 ## [2.60.5](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.60.4...v2.60.5) (2026-09-01)
 
 
