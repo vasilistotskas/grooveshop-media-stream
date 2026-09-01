@@ -1,18 +1,21 @@
 import type {
 	HealthCheckResult,
 	HealthCheckStatus,
+	HealthIndicatorFunction,
 	HealthIndicatorResult,
 } from '@nestjs/terminus'
+import type { Response } from 'express'
 import type { DiskSpaceInfo } from '../indicators/disk-space-health.indicator.js'
 import type { MemoryInfo } from '../indicators/memory-health.indicator.js'
 import * as process from 'node:process'
 import * as v8 from 'node:v8'
-import { Controller, Get, HttpCode, HttpStatus, Post, ServiceUnavailableException, UseGuards } from '@nestjs/common'
+import { Controller, Get, HttpCode, HttpStatus, Post, Res, ServiceUnavailableException, UseGuards } from '@nestjs/common'
 import { HealthCheck, HealthCheckService } from '@nestjs/terminus'
 import { CacheHealthIndicator } from '#microservice/Cache/indicators/cache-health.indicator'
 import { RedisHealthIndicator } from '#microservice/Cache/indicators/redis-health.indicator'
 import { InternalSecretGuard } from '#microservice/common/guards/internal-secret.guard'
 import { isShuttingDown } from '#microservice/common/utils/graceful-shutdown.util'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
@@ -37,10 +40,40 @@ export class HealthController {
 		private readonly httpClientService: HttpClientService,
 	) {}
 
+	/**
+	 * Run an aggregate health check and always answer with the health report.
+	 *
+	 * HealthCheckService signals failure by throwing a ServiceUnavailableException
+	 * that carries the HealthCheckResult, and the global MediaStreamExceptionFilter
+	 * rewrites every HttpException into a flat error envelope — which discarded the
+	 * per-indicator breakdown exactly when something was down and an operator
+	 * needed it. Unwrapping the report here and setting the status on the response
+	 * keeps the 503 while preserving the body. These endpoints already return the
+	 * same report with 200 when healthy, so nothing new is exposed.
+	 */
+	private async runCheck(
+		res: Response,
+		indicators: HealthIndicatorFunction[],
+	): Promise<HealthCheckResult> {
+		try {
+			return await this.health.check(indicators)
+		}
+		catch (error: unknown) {
+			if (error instanceof ServiceUnavailableException) {
+				const payload = error.getResponse()
+				if (typeof payload === 'object' && payload !== null && 'details' in payload) {
+					res.status(HttpStatus.SERVICE_UNAVAILABLE)
+					return payload as HealthCheckResult
+				}
+			}
+			throw error
+		}
+	}
+
 	@Get()
 	@HealthCheck()
-	async check(): Promise<HealthCheckResult> {
-		return this.health.check([
+	async check(@Res({ passthrough: true }) res: Response): Promise<HealthCheckResult> {
+		return this.runCheck(res, [
 			() => this.diskSpaceIndicator.isHealthy(),
 			() => this.memoryIndicator.isHealthy(),
 			() => this.httpHealthIndicator.isHealthy(),
@@ -54,7 +87,7 @@ export class HealthController {
 
 	@Get('detailed')
 	@UseGuards(HealthDetailGuard)
-	async getDetailedHealth(): Promise<{
+	async getDetailedHealth(@Res({ passthrough: true }) res: Response): Promise<{
 		status: HealthCheckStatus
 		info: HealthIndicatorResult
 		error: HealthIndicatorResult
@@ -63,11 +96,11 @@ export class HealthController {
 		uptime: number
 		environment: string
 		resources: {
-			disk: DiskSpaceInfo
-			memory: MemoryInfo
+			disk: DiskSpaceInfo | null
+			memory: MemoryInfo | null
 		}
 	}> {
-		const healthResults = await this.health.check([
+		const healthResults = await this.runCheck(res, [
 			() => this.diskSpaceIndicator.isHealthy(),
 			() => this.memoryIndicator.isHealthy(),
 			() => this.httpHealthIndicator.isHealthy(),
@@ -78,8 +111,27 @@ export class HealthController {
 			() => this.tenantDomainsHealthIndicator.isHealthy(),
 		])
 
-		const diskInfo = await this.diskSpaceIndicator.getCurrentDiskInfo()
-		const memoryInfo = this.memoryIndicator.getCurrentMemoryInfo()
+		// These read the resources directly, outside the indicator machinery, so
+		// an unreadable disk used to throw straight out of the handler and take
+		// the whole diagnostic response with it — losing the health report too.
+		// A snapshot that cannot be taken is reported as null; the corresponding
+		// indicator above already carries the failure detail.
+		const [diskInfo, memoryInfo] = await Promise.all([
+			this.diskSpaceIndicator.getCurrentDiskInfo().catch((error: unknown) => {
+				CorrelatedLogger.warn(
+					`Detailed health: disk snapshot unavailable: ${(error as Error).message}`,
+					HealthController.name,
+				)
+				return null
+			}),
+			Promise.resolve().then(() => this.memoryIndicator.getCurrentMemoryInfo()).catch((error: unknown) => {
+				CorrelatedLogger.warn(
+					`Detailed health: memory snapshot unavailable: ${(error as Error).message}`,
+					HealthController.name,
+				)
+				return null
+			}),
+		])
 
 		return {
 			status: healthResults.status,
@@ -97,16 +149,20 @@ export class HealthController {
 	}
 
 	@Get('ready')
-	async readiness(): Promise<{ status: string, timestamp: string, checks?: any }> {
+	async readiness(@Res({ passthrough: true }) res: Response): Promise<{ status: string, timestamp: string, checks?: HealthIndicatorResult }> {
 		// Drain traffic during shutdown: failing readiness here makes the K8s
 		// Service stop routing new requests to this pod while existing
 		// in-flight requests finish. Liveness stays passing so kubelet does
 		// not race the graceful-shutdown sequence with SIGKILL.
+		// Status is set on the response rather than thrown: the global
+		// MediaStreamExceptionFilter rewrites every HttpException into a flat
+		// error envelope, which would strip this body on the way out.
 		if (isShuttingDown()) {
-			throw new ServiceUnavailableException({
+			res.status(HttpStatus.SERVICE_UNAVAILABLE)
+			return {
 				status: 'shutting-down',
 				timestamp: new Date().toISOString(),
-			})
+			}
 		}
 
 		try {
@@ -134,24 +190,25 @@ export class HealthController {
 			// Terminus 12 dropped HealthCheckError; HealthCheckService now signals
 			// failure with a ServiceUnavailableException whose response body is the
 			// HealthCheckResult itself.
-			const result = error instanceof ServiceUnavailableException
+			const payload = error instanceof ServiceUnavailableException
 				? error.getResponse() as HealthCheckResult
 				: undefined
 
-			throw new ServiceUnavailableException({
+			res.status(HttpStatus.SERVICE_UNAVAILABLE)
+			return {
 				status: 'not ready',
 				timestamp: new Date().toISOString(),
-				checks: result?.details,
-			})
+				checks: payload?.details,
+			}
 		}
 	}
 
 	@Get('dependencies')
-	async dependencies(): Promise<HealthCheckResult> {
+	async dependencies(@Res({ passthrough: true }) res: Response): Promise<HealthCheckResult> {
 		// External-dependency diagnostic endpoint. Separate from /health/ready
 		// so ops can observe Redis/upstream HTTP state without coupling it to
 		// K8s readiness gating.
-		return this.health.check([
+		return this.runCheck(res, [
 			() => this.redisHealthIndicator.isHealthy(),
 			() => this.httpHealthIndicator.isHealthy(),
 			() => this.cacheHealthIndicator.isHealthy(),

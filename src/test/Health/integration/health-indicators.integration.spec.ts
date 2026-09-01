@@ -1,5 +1,4 @@
-import type { HealthCheckResult } from '@nestjs/terminus'
-import { ServiceUnavailableException } from '@nestjs/common'
+import type { Response } from 'express'
 import { ScheduleModule } from '@nestjs/schedule'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -12,6 +11,22 @@ import { MemoryHealthIndicator } from '#microservice/Health/indicators/memory-he
 import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
 import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
 import { TenantDomainsHealthIndicator } from '#microservice/Validation/indicators/tenant-domains-health.indicator'
+
+/**
+ * The aggregate health endpoints set their HTTP status on the response instead
+ * of throwing, so the global exception filter cannot strip the health report.
+ * This captures whatever status they set.
+ */
+function mockRes(): { res: Response, statusCode: () => number | undefined } {
+	let code: number | undefined
+	const res = {
+		status(c: number) {
+			code = c
+			return this
+		},
+	} as unknown as Response
+	return { res, statusCode: () => code }
+}
 
 describe('health Indicators Integration', () => {
 	let module: TestingModule
@@ -122,14 +137,14 @@ describe('health Indicators Integration', () => {
 		it('should execute comprehensive health check', async () => {
 			// This tests that all health indicators are properly integrated
 			// Health checks might fail in test environment, but should not throw module errors
-			const result = await Promise.allSettled([healthController.check()])
+			const result = await Promise.allSettled([healthController.check(mockRes().res)])
 			expect(result).toBeDefined()
 			expect(result.length).toBe(1)
 		})
 
 		it('should provide detailed health information', async () => {
 			// Detailed health might fail in test environment
-			const result = await Promise.allSettled([healthController.getDetailedHealth()])
+			const result = await Promise.allSettled([healthController.getDetailedHealth(mockRes().res)])
 			expect(result).toBeDefined()
 			expect(result.length).toBe(1)
 		})
@@ -178,27 +193,49 @@ describe('health Indicators Integration', () => {
 			expect(results.length).toBe(indicators.length)
 		})
 
-		it('should surface a thrown indicator failure as a 503 carrying the health payload', async () => {
-			// Terminus 12 rethrows whatever an indicator throws, which would escape
-			// HealthCheckService as a bare 500 with no body. BaseHealthIndicator
-			// converts the throw into a `down` result instead, so the aggregate
-			// check still answers 503 and the failing key stays in `details`.
+		it('should answer 503 AND keep the per-indicator report when a check fails', async () => {
+			// Two regressions guarded at once:
+			//  1. Terminus 12 rethrows whatever an indicator throws, which would
+			//     escape as a bare 500. BaseHealthIndicator converts it to `down`.
+			//  2. The global MediaStreamExceptionFilter rewrites every
+			//     HttpException into a flat envelope, which used to discard the
+			//     breakdown exactly when an operator needed it. The controller now
+			//     sets the status on the response and returns the report instead.
 			const indicator = module.get<DiskSpaceHealthIndicator>(DiskSpaceHealthIndicator)
 			const spy = vi
 				.spyOn(indicator as any, 'getDiskSpaceInfo')
 				.mockRejectedValue(new Error('statfs exploded'))
 
 			try {
-				const error = await healthController.check().then(() => null, (e: unknown) => e)
+				const { res, statusCode } = mockRes()
+				const payload = await healthController.check(res)
 
-				expect(error).toBeInstanceOf(ServiceUnavailableException)
-				const serviceUnavailable = error as ServiceUnavailableException
-				expect(serviceUnavailable.getStatus()).toBe(503)
-
-				const payload = serviceUnavailable.getResponse() as HealthCheckResult
+				expect(statusCode()).toBe(503)
 				expect(payload.status).toBe('error')
 				expect(payload.details.disk_space.status).toBe('down')
 				expect(payload.details.disk_space.message).toContain('statfs exploded')
+			}
+			finally {
+				spy.mockRestore()
+			}
+		})
+
+		it('should keep the report on /health/detailed, the diagnostic endpoint', async () => {
+			// /health/detailed exists to diagnose failures and is IP-guarded to the
+			// cluster, so it must not lose its body precisely when something is down.
+			const indicator = module.get<DiskSpaceHealthIndicator>(DiskSpaceHealthIndicator)
+			const spy = vi
+				.spyOn(indicator as any, 'getDiskSpaceInfo')
+				.mockRejectedValue(new Error('statfs exploded'))
+
+			try {
+				const { res, statusCode } = mockRes()
+				const detailed = await healthController.getDetailedHealth(res)
+
+				expect(statusCode()).toBe(503)
+				expect(detailed.status).toBe('error')
+				expect(detailed.details.disk_space.status).toBe('down')
+				expect(detailed.error.disk_space.status).toBe('down')
 			}
 			finally {
 				spy.mockRestore()
