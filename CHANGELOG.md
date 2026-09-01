@@ -1,3 +1,10 @@
+## [2.60.5](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.60.4...v2.60.5) (2026-09-01)
+
+
+### Bug Fixes
+
+* migrate to NestJS 12 and restore health-check 503 semantics ([#7](https://github.com/vasilistotskas/grooveshop-media-stream/issues/7)) ([5a3991d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/5a3991d245d1bf523eeecc02013c9545cf3f8260))
+
 ## [2.60.4](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.60.3...v2.60.4) (2026-08-30)
 
 
