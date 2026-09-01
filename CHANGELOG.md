@@ -1,3 +1,10 @@
+## [2.60.7](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.60.6...v2.60.7) (2026-09-01)
+
+
+### Bug Fixes
+
+* **health:** restrict /health/dependencies to internal callers ([#9](https://github.com/vasilistotskas/grooveshop-media-stream/issues/9)) ([e2f2ede](https://github.com/vasilistotskas/grooveshop-media-stream/commit/e2f2ede7fee22256b3cab3fa990277287f0d7201))
+
 ## [2.60.6](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.60.5...v2.60.6) (2026-09-01)
 
 
