@@ -204,10 +204,17 @@ export class HealthController {
 	}
 
 	@Get('dependencies')
+	@UseGuards(HealthDetailGuard)
 	async dependencies(@Res({ passthrough: true }) res: Response): Promise<HealthCheckResult> {
 		// External-dependency diagnostic endpoint. Separate from /health/ready
 		// so ops can observe Redis/upstream HTTP state without coupling it to
 		// K8s readiness gating.
+		//
+		// Internal-IP only, same as /health/detailed: the report names the Redis
+		// host/port and the upstream URLs media-stream fetches from, which is
+		// internal topology. No K8s probe uses this route (they use /health/live
+		// and /health/ready), and the ingress only routes /media_stream-image, so
+		// restricting it costs nothing operationally.
 		return this.runCheck(res, [
 			() => this.redisHealthIndicator.isHealthy(),
 			() => this.httpHealthIndicator.isHealthy(),

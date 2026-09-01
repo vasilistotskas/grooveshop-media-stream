@@ -1,6 +1,7 @@
 import type { ExecutionContext } from '@nestjs/common'
 import { ForbiddenException } from '@nestjs/common'
 import { describe, expect, it } from 'vitest'
+import { HealthController } from '#microservice/Health/controllers/health.controller'
 import { HealthDetailGuard } from '#microservice/Health/guards/health-detail.guard'
 
 function createContext(ip?: string): ExecutionContext {
@@ -35,5 +36,32 @@ describe('healthDetailGuard', () => {
 
 	it('should reject when no IP can be determined', () => {
 		expect(() => guard.canActivate(createContext(undefined))).toThrow(ForbiddenException)
+	})
+})
+
+describe('routes protected by HealthDetailGuard', () => {
+	// The guard is only worth anything if it is actually attached. Both routes
+	// return internal topology — Redis host/port, the upstream URLs media-stream
+	// fetches from, disk paths — so a silent removal here would leak it to any
+	// caller that can reach the pod.
+	it.each([
+		['getDetailedHealth'],
+		['dependencies'],
+	])('should apply the guard to %s', (method) => {
+		const handler = (HealthController.prototype as unknown as Record<string, object>)[method]
+		const guards = (Reflect.getMetadata('__guards__', handler) ?? []) as unknown[]
+
+		expect(guards).toContain(HealthDetailGuard)
+	})
+
+	it.each([
+		['check'],
+		['readiness'],
+		['liveness'],
+	])('should leave %s unguarded so probes and uptime checks still work', (method) => {
+		const handler = (HealthController.prototype as unknown as Record<string, object>)[method]
+		const guards = (Reflect.getMetadata('__guards__', handler) ?? []) as unknown[]
+
+		expect(guards).not.toContain(HealthDetailGuard)
 	})
 })
