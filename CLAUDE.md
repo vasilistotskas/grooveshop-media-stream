@@ -111,6 +111,8 @@ Cache layers checked in parallel: Memory (node-cache, priority 1) → Redis (ior
 
 `GET /health` (full), `/health/detailed` (system info, internal IPs only), `/health/ready` (lightweight), `/health/live` (liveness), `/health/dependencies` (external deps), `/health/circuit-breaker` (status), `POST /health/circuit-breaker/reset`. Health indicators: disk space, memory, Sharp, cache, Redis, HTTP, storage.
 
+**Indicators must never throw.** Terminus 12 removed `HealthCheckError` and rethrows anything an indicator rejects with, which escapes as a 500 with no body. `BaseHealthIndicator.isHealthy()` therefore catches and *returns* a `down` result; only a returned `down` makes `HealthCheckService` answer 503. Subclasses implement `performHealthCheck()` and may throw freely — the base class converts it.
+
 ### Security
 
 - `InputSanitizationService`: URL domain whitelist (configurable via `validation.allowedDomains`), XSS/HTML sanitization with multi-pass stripping

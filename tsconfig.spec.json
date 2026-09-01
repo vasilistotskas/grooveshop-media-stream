@@ -4,7 +4,15 @@
     // Test assertions constantly read index-signatured results
     // (HealthIndicatorResult, config maps); bracket-access adds noise
     // without safety in specs. All other strict flags stay inherited.
-    "noPropertyAccessFromIndexSignature": false
+    "noPropertyAccessFromIndexSignature": false,
+    // supertest is test-only, so it lives here rather than in the base config
+    // where tsconfig.build.json would inherit it into the production project.
+    "types": [
+      "node",
+      "express",
+      "compression",
+      "supertest"
+    ]
   },
   "include": [
     "src/**/*"

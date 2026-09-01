@@ -1,6 +1,7 @@
 import { ScheduleModule } from '@nestjs/schedule'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { ConfigModule } from '#microservice/Config/config.module'
 import { CorrelationModule } from '#microservice/Correlation/correlation.module'
 import { InputSanitizationService } from '#microservice/Validation/services/input-sanitization.service'
@@ -33,6 +34,18 @@ describe('validation Integration', () => {
 	it('should be defined', () => {
 		expect(sanitizationService).toBeDefined()
 		expect(securityChecker).toBeDefined()
+	})
+
+	it('should inject RedisCacheService into SecurityCheckerService', () => {
+		// The `RedisCacheService | null` union erases design:paramtypes to
+		// `Object`, so without the explicit @Inject token Nest has nothing to
+		// resolve and @Optional() quietly injects undefined — which disables
+		// cross-replica security-event persistence with no error anywhere.
+		const injected = (securityChecker as unknown as {
+			_redisCacheService: RedisCacheService | null
+		})._redisCacheService
+
+		expect(injected).toBeInstanceOf(RedisCacheService)
 	})
 
 	describe('security Features', () => {

@@ -2,7 +2,6 @@ import type { HealthIndicatorResult } from '@nestjs/terminus'
 import type { DetailsMap } from '#microservice/common/types/common.types'
 import type { HealthCheckOptions, HealthMetrics, IHealthIndicator } from '../interfaces/health-indicator.interface.js'
 import { Injectable, Logger } from '@nestjs/common'
-import { HealthCheckError } from '@nestjs/terminus'
 
 @Injectable()
 export abstract class BaseHealthIndicator implements IHealthIndicator {
@@ -33,14 +32,25 @@ export abstract class BaseHealthIndicator implements IHealthIndicator {
 			const result = await this.performHealthCheck()
 			const responseTime = Date.now() - startTime
 
+			// performHealthCheck() may legitimately *return* a `down` result via
+			// createUnhealthyResult() instead of throwing, so record what it
+			// actually reported rather than assuming the check passed.
+			const reported = result[this.key]
+			const isDown = reported?.status === 'down'
+
 			this.lastCheck = {
 				timestamp: Date.now(),
-				status: 'healthy',
+				status: isDown ? 'unhealthy' : 'healthy',
 				responseTime,
-				details: result[this.key] || {},
+				details: reported || {},
 			}
 
-			this.logger.debug(`Health check passed for ${this.key} in ${responseTime}ms`)
+			if (isDown) {
+				this.logger.warn(`Health check reported down for ${this.key} in ${responseTime}ms`)
+			}
+			else {
+				this.logger.debug(`Health check passed for ${this.key} in ${responseTime}ms`)
+			}
 			return result
 		}
 		catch (error: unknown) {
@@ -56,6 +66,10 @@ export abstract class BaseHealthIndicator implements IHealthIndicator {
 
 			this.logger.warn(`Health check failed for ${this.key}: ${message}`)
 
+			// Terminus 12 removed HealthCheckError: its executor rethrows any
+			// rejected indicator promise, which escapes HealthCheckService as a
+			// 500 with no health payload. Returning the `down` result keeps the
+			// failure inside the aggregated report so /health still answers 503.
 			const downResult: HealthIndicatorResult = {
 				[this.key]: {
 					status: 'down',
@@ -65,7 +79,7 @@ export abstract class BaseHealthIndicator implements IHealthIndicator {
 				},
 			}
 
-			throw new HealthCheckError(message, downResult)
+			return downResult
 		}
 	}
 

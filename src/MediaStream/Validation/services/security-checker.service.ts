@@ -1,5 +1,5 @@
 import type { ISecurityChecker, SecurityEvent } from '../interfaces/validator.interface.js'
-import { Injectable, Optional } from '@nestjs/common'
+import { Inject, Injectable, Optional } from '@nestjs/common'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
@@ -53,7 +53,11 @@ export class SecurityCheckerService implements ISecurityChecker {
 
 	constructor(
 		private readonly _configService: ConfigService,
-		@Optional() private readonly _redisCacheService: RedisCacheService | null,
+		// The `| null` union erases design:paramtypes to `Object`, so Nest has no
+		// token to resolve and @Optional() would silently inject undefined —
+		// disabling Redis persistence entirely. The explicit token fixes that;
+		// @Optional() still covers contexts without CacheModule (unit specs).
+		@Optional() @Inject(RedisCacheService) private readonly _redisCacheService: RedisCacheService | null,
 	) {
 		this.suspiciousPatterns = SUSPICIOUS_PATTERNS
 		this.maxStringLength = this._configService.getOptional('validation.maxStringLength', 10000)

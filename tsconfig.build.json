@@ -1,5 +1,15 @@
 {
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // The only project that is ever emitted (nest-cli.json -> tsConfigPath).
+    // TypeScript 6.0 changed the `rootDir` default from "inferred from the
+    // input files" to "the tsconfig directory", so an unset rootDir now fails
+    // emit with TS5011 and would move output to build/dist/src/main.js. "./src"
+    // is what TS <6 inferred, keeping the layout the `imports` map and the
+    // `prod` script depend on. Not set in the base config: tsconfig.spec.json
+    // extends it and legitimately reaches outside src (root vitest.config.ts).
+    "rootDir": "./src"
+  },
   "exclude": [
     "node_modules",
     "build",

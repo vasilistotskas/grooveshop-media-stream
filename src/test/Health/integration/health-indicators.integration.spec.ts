@@ -1,6 +1,8 @@
+import type { HealthCheckResult } from '@nestjs/terminus'
+import { ServiceUnavailableException } from '@nestjs/common'
 import { ScheduleModule } from '@nestjs/schedule'
 import { Test, TestingModule } from '@nestjs/testing'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { CacheHealthIndicator } from '#microservice/Cache/indicators/cache-health.indicator'
 import { RedisHealthIndicator } from '#microservice/Cache/indicators/redis-health.indicator'
 import { HealthController } from '#microservice/Health/controllers/health.controller'
@@ -174,6 +176,33 @@ describe('health Indicators Integration', () => {
 
 			expect(results).toBeDefined()
 			expect(results.length).toBe(indicators.length)
+		})
+
+		it('should surface a thrown indicator failure as a 503 carrying the health payload', async () => {
+			// Terminus 12 rethrows whatever an indicator throws, which would escape
+			// HealthCheckService as a bare 500 with no body. BaseHealthIndicator
+			// converts the throw into a `down` result instead, so the aggregate
+			// check still answers 503 and the failing key stays in `details`.
+			const indicator = module.get<DiskSpaceHealthIndicator>(DiskSpaceHealthIndicator)
+			const spy = vi
+				.spyOn(indicator as any, 'getDiskSpaceInfo')
+				.mockRejectedValue(new Error('statfs exploded'))
+
+			try {
+				const error = await healthController.check().then(() => null, (e: unknown) => e)
+
+				expect(error).toBeInstanceOf(ServiceUnavailableException)
+				const serviceUnavailable = error as ServiceUnavailableException
+				expect(serviceUnavailable.getStatus()).toBe(503)
+
+				const payload = serviceUnavailable.getResponse() as HealthCheckResult
+				expect(payload.status).toBe('error')
+				expect(payload.details.disk_space.status).toBe('down')
+				expect(payload.details.disk_space.message).toContain('statfs exploded')
+			}
+			finally {
+				spy.mockRestore()
+			}
 		})
 	})
 
