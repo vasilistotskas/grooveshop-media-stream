@@ -18,7 +18,7 @@ This service provides image processing capabilities for the Grooveshop platform,
 
 ### Prerequisites
 - Node.js >= 24.12.0
-- pnpm >= 10.30.2
+- pnpm (the version is pinned by `packageManager` in `package.json`)
 - Redis (required for the cache layer)
 
 ### Environment Setup
@@ -42,7 +42,7 @@ This service provides image processing capabilities for the Grooveshop platform,
 - `BACKEND_URL`: URL for the upstream image server
 - `REDIS_HOST` / `REDIS_PORT`: Redis connection (required for cache)
 - `CACHE_MEMORY_MAX_SIZE`: Memory cache limit (default: 100MB)
-- `CACHE_MEMORY_TTL`: Memory cache TTL in seconds (default: 3600)
+- `CACHE_MEMORY_DEFAULT_TTL`: Memory cache TTL in seconds (default: 3600)
 - `REDIS_TTL`: Redis cache TTL in seconds (default: 7200)
 - `CACHE_FILE_DIRECTORY`: File cache directory (default: `./storage`)
 - `PROCESSING_CPU_CORES`: Sharp concurrency, CPU cores (fractions allowed, default: 1.5)
@@ -76,7 +76,7 @@ docker build -f docker/Dockerfile -t grooveshop-media-stream .
 docker run -p 3003:3003 --env-file .env grooveshop-media-stream
 ```
 
-Multi-architecture images are published to Docker Hub (`gro0ve/grooveshop-media-stream`) and GitHub Container Registry on each release.
+Images are published to Docker Hub (`gro0ve/grooveshop-media-stream`) and GitHub Container Registry on each release.
 
 ### CORS Configuration
 
@@ -116,14 +116,17 @@ pnpm run test
 # Run end-to-end tests
 pnpm run test:e2e
 
-# Run tests with coverage
+# Run tests with coverage (enforces the floors in vitest.config.ts)
 pnpm run test:coverage
 
+# Run the performance specs (wall-clock assertions; excluded from the default run)
+pnpm run test:perf
+
 # Run a single test file
-npx vitest run src/test/Cache/services/memory-cache.service.spec.ts
+pnpm exec vitest run src/test/Cache/services/memory-cache.service.spec.ts --no-coverage
 ```
 
-Tests require Redis running locally. CI uses Redis 8 Alpine.
+Tests require Redis running locally (integration and e2e suites). CI uses Redis 8 Alpine.
 
 ### Test Organization
 
@@ -137,12 +140,12 @@ src/MediaStream/
 ├── Cache/          # Multi-layer caching (Memory → Redis → File), cache warming, eviction
 ├── Config/         # Centralized config service, single-source schema-based validation
 ├── Correlation/    # Request correlation IDs, timing middleware, performance tracking
-├── Health/         # Health check indicators (disk, memory, Sharp, cache, Redis, HTTP, storage)
+├── Health/         # Health check indicators (disk, memory, Sharp, cache, Redis, HTTP, storage, tenant domains)
 ├── HTTP/           # HTTP client with circuit breaker pattern, retry with exponential backoff
 ├── Metrics/        # Prometheus metrics via prom-client, request/system/cache metrics
 ├── Processing/     # Stateless Sharp jobs (fetch, store, identity, format manipulation)
 ├── RateLimit/      # Adaptive rate limiting guard with domain whitelisting
-├── Storage/        # File storage management, cleanup, intelligent eviction
+├── Storage/        # On-disk cache inventory and nightly cleanup (TTL expiry, orphan sweep, threshold eviction)
 ├── Validation/     # Input sanitization, security threat detection
 └── common/         # Shared error classes, exception filter, types, graceful shutdown
 ```
@@ -176,5 +179,4 @@ src/MediaStream/
 
 ```bash
 pnpm run cache:clear                  # Clear Redis + file system cache
-node scripts/inject-version.cjs       # Inject version into public/index.html (runs as prebuild)
 ```

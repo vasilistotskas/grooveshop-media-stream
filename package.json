@@ -19,27 +19,26 @@
     "#microservice/*": {
       "types": "./src/MediaStream/*.ts",
       "default": "./build/dist/MediaStream/*.js"
-    },
-    "#storage/*": "./var/*"
+    }
   },
   "scripts": {
-    "prebuild": "rimraf build/dist && node scripts/inject-version.cjs",
+    "prebuild": "rimraf build/dist",
     "build": "nest build",
     "start": "nest start",
     "dev": "nest start --watch",
-    "dev:all": "ncu -u && pnpm i && pnpm run build && pnpm run lint && pnpm run dev",
     "debug": "nest start --debug --watch",
     "prod": "node build/dist/main",
     "repl": "nest start --watch --entryFile repl",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "lint": "eslint . --fix",
+    "lint:ci": "eslint .",
     "type-check": "tsc --noEmit && tsc --noEmit -p tsconfig.spec.json",
     "type-check:watch": "tsc --noEmit --watch",
     "test": "vitest run",
     "test:e2e": "vitest run --config src/test/vitest.e2e.ts",
+    "test:perf": "vitest run --config src/test/vitest.perf.ts",
     "test:coverage": "vitest run --coverage",
     "cache:clear": "node scripts/clear-cache.cjs",
-    "semantic-release": "semantic-release",
-    "trivy-scan": "trivy fs . --severity HIGH,CRITICAL --skip-dirs node_modules,dist,build --exit-code 1"
+    "semantic-release": "semantic-release"
   },
   "dependencies": {
     "@nestjs/axios": "12.0.0",
@@ -49,7 +48,6 @@
     "@nestjs/platform-express": "12.0.1",
     "@nestjs/schedule": "12.0.1",
     "@nestjs/terminus": "12.0.0",
-    "@nestjs/throttler": "6.5.0",
     "axios": "1.20.0",
     "class-transformer": "0.5.1",
     "class-validator": "0.15.1",
@@ -68,7 +66,6 @@
   "devDependencies": {
     "@antfu/eslint-config": "9.3.0",
     "@nestjs/cli": "12.0.0",
-    "@nestjs/schematics": "12.0.0",
     "@nestjs/testing": "12.0.1",
     "@semantic-release/changelog": "7.0.0",
     "@semantic-release/commit-analyzer": "13.0.1",

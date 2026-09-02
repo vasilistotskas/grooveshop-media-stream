@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import CacheImageRequest, { BackgroundOptions, FitOptions, PositionOptions, ResizeOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
-import ResourceMetaData, {
-	defaultPrivateTTL,
-	defaultPublicTTL,
-	resourceMetaVersion,
-} from '#microservice/HTTP/dto/resource-meta-data.dto'
+import ResourceMetaData, { resourceMetaVersion } from '#microservice/HTTP/dto/resource-meta-data.dto'
 import ManipulationJobResult from '#microservice/Processing/dto/manipulation-job-result.dto'
 
 describe('resizeOptions', () => {
@@ -51,11 +47,11 @@ describe('resizeOptions', () => {
 		expect(resizeOptions.background).toEqual({ r: 0, g: 0, b: 0, alpha: 0 })
 	})
 
-	it('should delete width and height when set to null', () => {
+	it('should keep null width and height as null', () => {
 		const resizeOptions = new ResizeOptions({ width: null, height: null })
 
-		expect(resizeOptions.width).toBeUndefined()
-		expect(resizeOptions.height).toBeUndefined()
+		expect(resizeOptions.width).toBeNull()
+		expect(resizeOptions.height).toBeNull()
 	})
 
 	it('should handle default values for quality and trimThreshold', () => {
@@ -71,7 +67,7 @@ describe('cacheImageRequest', () => {
 		const cacheImageRequest = new CacheImageRequest()
 
 		expect(cacheImageRequest.resourceTarget).toBe('')
-		expect(cacheImageRequest.ttl).toBeUndefined()
+		expect(cacheImageRequest.tenantSchema).toBe('public')
 		expect(cacheImageRequest.resizeOptions).toBeDefined()
 	})
 
@@ -79,14 +75,14 @@ describe('cacheImageRequest', () => {
 		const resizeOptions = new ResizeOptions({ width: 100, height: 200 })
 		const customRequest = {
 			resourceTarget: 'http://example.com/image.jpg',
-			ttl: 3600,
 			resizeOptions,
+			tenantSchema: 'acme',
 		}
 
 		const cacheImageRequest = new CacheImageRequest(customRequest)
 
 		expect(cacheImageRequest.resourceTarget).toBe('http://example.com/image.jpg')
-		expect(cacheImageRequest.ttl).toBe(3600)
+		expect(cacheImageRequest.tenantSchema).toBe('acme')
 		expect(cacheImageRequest.resizeOptions).toBe(resizeOptions)
 	})
 
@@ -98,13 +94,12 @@ describe('cacheImageRequest', () => {
 		const cacheImageRequest = new CacheImageRequest(customRequest)
 
 		expect(cacheImageRequest.resourceTarget).toBe('http://example.com/image.jpg')
-		expect(cacheImageRequest.ttl).toBeUndefined()
 		expect(cacheImageRequest.resizeOptions).toBeDefined()
 	})
 })
 
-// C18 — Background-color injection: only transparent/#RGB/#RRGGBB/#RRGGBBAA accepted
-describe('parseColor security (C18)', () => {
+// Background-color injection: only transparent/#RGB/#RRGGBB/#RRGGBBAA accepted
+describe('parseColor security', () => {
 	it('should reject url() values and fall back to white', () => {
 		const opt = new ResizeOptions({ background: 'url(http://evil.com)' })
 		expect(opt.background).toEqual({ r: 255, g: 255, b: 255, alpha: 1 })
@@ -177,8 +172,9 @@ describe('resourceMetaData', () => {
 		const metaData = new ResourceMetaData()
 
 		expect(metaData.version).toBe(resourceMetaVersion)
-		expect(metaData.publicTTL).toBe(defaultPublicTTL)
-		expect(metaData.privateTTL).toBe(defaultPrivateTTL)
+		// No baked-in TTL: an instance without one is expired by construction
+		expect(metaData.publicTTL).toBe(0)
+		expect(metaData.privateTTL).toBe(0)
 		expect(metaData.size).toBe('')
 		expect(metaData.format).toBe('')
 		expect(metaData.dateCreated).toBeDefined()
@@ -211,8 +207,9 @@ describe('resourceMetaData', () => {
 		expect(metaData.size).toBe('4096')
 		expect(metaData.format).toBe('jpeg')
 		expect(metaData.version).toBe(resourceMetaVersion)
-		expect(metaData.publicTTL).toBe(defaultPublicTTL)
-		expect(metaData.privateTTL).toBe(defaultPrivateTTL)
+		// No baked-in TTL: an instance without one is expired by construction
+		expect(metaData.publicTTL).toBe(0)
+		expect(metaData.privateTTL).toBe(0)
 		expect(metaData.dateCreated).toBeDefined()
 	})
 })

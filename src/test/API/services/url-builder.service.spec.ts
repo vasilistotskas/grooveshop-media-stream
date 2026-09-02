@@ -1,13 +1,12 @@
-import type { ImageProcessingContext } from '#microservice/API/types/image-source.types'
-import * as process from 'node:process'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import type { ImageProcessingContext, ImageProcessingParams } from '#microservice/API/types/image-source.types'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { UrlBuilderService } from '#microservice/API/services/url-builder.service'
+import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 
-function createContext(overrides: Partial<ImageProcessingContext['source']> = {}, params: Record<string, string | null> = {}): ImageProcessingContext {
+function createContext(overrides: Partial<ImageProcessingContext['source']> = {}, params: ImageProcessingParams = {}): ImageProcessingContext {
 	return {
 		source: {
 			name: 'test-source',
-			baseUrl: 'http://backend:8000',
 			urlPattern: '{baseUrl}/media/uploads/{imagePath}',
 			routePattern: 'media/uploads/:imagePath+',
 			routeParams: ['imagePath'],
@@ -22,14 +21,10 @@ describe('urlBuilderService', () => {
 	let service: UrlBuilderService
 
 	beforeEach(() => {
-		service = new UrlBuilderService()
+		service = new UrlBuilderService(createConfigServiceMock({ 'backend.url': 'http://backend:8000' }))
 	})
 
-	afterEach(() => {
-		delete process.env.TEST_URL_BUILDER_BACKEND
-	})
-
-	it('should substitute baseUrl and params into the URL pattern', () => {
+	it('should substitute backend.url and params into the URL pattern', () => {
 		const url = service.buildResourceUrl(createContext())
 		expect(url).toBe('http://backend:8000/media/uploads/blog%2Fcover.jpg')
 	})
@@ -39,24 +34,13 @@ describe('urlBuilderService', () => {
 		expect(url).toBe(`http://backend:8000/media/uploads/${encodeURIComponent('φωτογραφία.jpg')}`)
 	})
 
-	it('should skip null and undefined params', () => {
-		const url = service.buildResourceUrl(createContext({ urlPattern: '{baseUrl}/x/{a}/{b}' }, { a: 'v', b: null }))
+	it('should leave placeholders for undefined params', () => {
+		const url = service.buildResourceUrl(createContext({ urlPattern: '{baseUrl}/x/{a}/{b}' }, { a: 'v', b: undefined }))
 		expect(url).toBe('http://backend:8000/x/v/{b}')
 	})
 
-	it('should resolve baseUrl from an environment variable key', () => {
-		process.env.TEST_URL_BUILDER_BACKEND = 'https://assets.example.com'
-		const url = service.buildResourceUrl(createContext({ baseUrl: 'TEST_URL_BUILDER_BACKEND' }))
-		expect(url).toBe('https://assets.example.com/media/uploads/blog%2Fcover.jpg')
-	})
-
-	it('should throw when the environment variable is missing', () => {
-		expect(() => service.buildResourceUrl(createContext({ baseUrl: 'DOES_NOT_EXIST_ENV_KEY' })))
-			.toThrow(/Environment variable 'DOES_NOT_EXIST_ENV_KEY' not found/)
-	})
-
-	it('should throw when the source has no baseUrl', () => {
-		expect(() => service.buildResourceUrl(createContext({ baseUrl: '' })))
-			.toThrow(/must specify a baseUrl/)
+	it('should not mangle path segments that start with reserved-looking words', () => {
+		const url = service.buildResourceUrl(createContext({}, { imagePath: 'online/styles/about.png' }))
+		expect(url).toBe(`http://backend:8000/media/uploads/${encodeURIComponent('online/styles/about.png')}`)
 	})
 })

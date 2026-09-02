@@ -1,18 +1,15 @@
 import type { MockedObject } from 'vitest'
-import { Buffer } from 'node:buffer'
 import { promises as fs } from 'node:fs'
 import { ScheduleModule } from '@nestjs/schedule'
 import { Test, TestingModule } from '@nestjs/testing'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConfigService } from '#microservice/Config/config.service'
 import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
-import { IntelligentEvictionService } from '#microservice/Storage/services/intelligent-eviction.service'
 import { StorageCleanupService } from '#microservice/Storage/services/storage-cleanup.service'
 import { StorageMonitoringService } from '#microservice/Storage/services/storage-monitoring.service'
-import { StorageOptimizationService } from '#microservice/Storage/services/storage-optimization.service'
 import { StorageModule } from '#microservice/Storage/storage.module'
+import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 
-// Mock fs module for integration tests
 vi.mock('node:fs', () => ({
 	promises: {
 		readdir: vi.fn(),
@@ -20,369 +17,191 @@ vi.mock('node:fs', () => ({
 		unlink: vi.fn(),
 		mkdir: vi.fn(),
 		readFile: vi.fn(),
-		writeFile: vi.fn(),
-		copyFile: vi.fn(),
-		link: vi.fn(),
 	},
-	existsSync: vi.fn().mockReturnValue(true),
-	readFileSync: vi.fn().mockReturnValue(''),
 }))
 
 const mockFs = fs as MockedObject<typeof fs>
 
-// recordFileAccess was removed from StorageMonitoringService as test-only
-// surface (it was never wired to real request handling — access patterns
-// are populated by scanStorageDirectory/getStorageStats reading fs stats).
-// Reach into the private accessPatterns map directly to simulate access
-// bumps, same as recordFileAccess did internally.
-function bumpAccessCount(monitoring: StorageMonitoringService, filename: string, times = 1): void {
-	const patterns = (monitoring as any).accessPatterns as Map<string, { accessCount: number, lastAccessed: Date }>
-	const pattern = patterns.get(filename)
-	if (pattern) {
-		pattern.accessCount += times
-		pattern.lastAccessed = new Date()
-	}
+const MB = 1024 * 1024
+const DAY = 24 * 60 * 60 * 1000
+const HOUR = 60 * 60 * 1000
+const NOW = new Date('2026-09-01T12:00:00.000Z').getTime()
+
+interface DiskFile {
+	size: number
+	mtime?: number
+	content?: string
 }
 
-describe('storage Management Integration', () => {
+function fileName(filePath: unknown): string {
+	return String(filePath).split(/[/\\]/).pop() ?? ''
+}
+
+function metaJson(dateCreated: number, privateTTL: number, accessCount = 0): string {
+	return JSON.stringify({ version: 1, size: '1', format: 'webp', dateCreated, privateTTL, publicTTL: privateTTL * 2, accessCount, tenantSchema: 'acme' })
+}
+
+let disk: Record<string, DiskFile> = {}
+
+function useDisk(files: Record<string, DiskFile>): void {
+	disk = files
+	mockFs.readdir.mockImplementation(async () => Object.keys(disk) as any)
+	mockFs.stat.mockImplementation((filePath: any) => {
+		const file = disk[fileName(filePath)]
+		return file
+			? Promise.resolve({ size: file.size, mtimeMs: file.mtime ?? NOW, isFile: () => true } as any)
+			: Promise.reject(new Error('ENOENT'))
+	})
+	mockFs.readFile.mockImplementation((filePath: any) => {
+		const content = disk[fileName(filePath)]?.content
+		return content !== undefined ? Promise.resolve(content) : Promise.reject(new Error('ENOENT'))
+	})
+	mockFs.unlink.mockImplementation(async (filePath: any) => {
+		delete disk[fileName(filePath)]
+	})
+}
+
+describe('storage management integration', () => {
 	let module: TestingModule
 	let storageMonitoring: StorageMonitoringService
-	let intelligentEviction: IntelligentEvictionService
 	let storageCleanup: StorageCleanupService
-	let storageOptimization: StorageOptimizationService
 	let storageHealth: StorageHealthIndicator
 
-	const testStorageDir = '/test/storage'
-	const mockFiles = [
-		'popular-image.webp',
-		'old-cache.json',
-		'recent-image.jpg',
-		'temp-file.tmp',
-		'large-image.png',
-	]
-
-	beforeAll(async () => {
-		const mockConfigService = {
-			get: vi.fn().mockImplementation((key: string) => {
-				if (key === 'cache.file.directory')
-					return testStorageDir
-				return undefined
-			}),
-			getOptional: vi.fn().mockImplementation((key: string, defaultValue: any) => {
-				const defaults = {
-					// Storage monitoring
-					'storage.warningSize': 800 * 1024 * 1024,
-					'storage.criticalSize': 1024 * 1024 * 1024,
-					'storage.warningFileCount': 5000,
-					'storage.criticalFileCount': 10000,
-					'storage.maxFileAge': 30,
-
-					// Eviction
-					'storage.eviction.strategy': 'intelligent',
-					'storage.eviction.aggressiveness': 'moderate',
-					'storage.eviction.preservePopular': true,
-					'storage.eviction.minAccessCount': 5,
-					'storage.eviction.maxFileAge': 7,
-
-					// Cleanup
-					'storage.cleanup.enabled': true,
-					'storage.cleanup.cronSchedule': '0 2 * * *',
-					'storage.cleanup.dryRun': false,
-					'storage.cleanup.maxDuration': 300000,
-
-					// Optimization
-					'storage.optimization.enabled': true,
-					'storage.optimization.strategies': ['compression', 'deduplication'],
-					'storage.optimization.popularityThreshold': 10,
-					'storage.optimization.compressionRatio': 0.7,
-				}
-				return (defaults as any)[key] || defaultValue
-			}),
-		}
+	// A module per test: the monitoring snapshot lives 30 s and time is frozen.
+	beforeEach(async () => {
+		vi.useFakeTimers()
+		vi.setSystemTime(NOW)
+		mockFs.mkdir.mockResolvedValue(undefined)
 
 		module = await Test.createTestingModule({
 			imports: [StorageModule, ScheduleModule.forRoot()],
 		})
 			.overrideProvider(ConfigService)
-			.useValue(mockConfigService)
+			.useValue(createConfigServiceMock({
+				'cache.file.directory': '/test/storage',
+				'storage.warningSize': 10 * MB,
+				'storage.criticalSize': 20 * MB,
+				'storage.warningFileCount': 100,
+				'storage.criticalFileCount': 200,
+				'storage.cleanup.enabled': true,
+				'storage.cleanup.cronSchedule': '0 2 * * *',
+				'storage.cleanup.dryRun': false,
+				'storage.cleanup.maxDuration': 300000,
+				'storage.eviction.minAccessCount': 5,
+			}))
 			.compile()
 
-		storageMonitoring = module.get<StorageMonitoringService>(StorageMonitoringService)
-		intelligentEviction = module.get<IntelligentEvictionService>(IntelligentEvictionService)
-		storageCleanup = module.get<StorageCleanupService>(StorageCleanupService)
-		storageOptimization = module.get<StorageOptimizationService>(StorageOptimizationService)
-		storageHealth = module.get<StorageHealthIndicator>(StorageHealthIndicator)
-
-		// Setup fs mocks
-		mockFs.mkdir.mockResolvedValue(undefined)
-		mockFs.readdir.mockResolvedValue(mockFiles as any)
-		mockFs.unlink.mockResolvedValue(undefined)
-		mockFs.readFile.mockResolvedValue(Buffer.from('test file content'))
-		mockFs.writeFile.mockResolvedValue(undefined)
-		mockFs.copyFile.mockResolvedValue(undefined)
-		mockFs.link.mockResolvedValue(undefined)
+		storageMonitoring = module.get(StorageMonitoringService)
+		storageCleanup = module.get(StorageCleanupService)
+		storageHealth = module.get(StorageHealthIndicator)
 	})
 
-	beforeEach(() => {
-		vi.clearAllMocks()
-
-		// Setup file stats with different characteristics
-		mockFs.stat.mockImplementation((filePath: any) => {
-			const filename = filePath.split(/[/\\]/).pop()
-			let stats: any
-
-			switch (filename) {
-				case 'popular-image.webp':
-					stats = {
-						size: 2 * 1024 * 1024, // 2MB
-						mtime: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days old
-						atime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // Accessed 1 day ago
-					}
-					break
-				case 'old-cache.json':
-					stats = {
-						size: 512 * 1024, // 512KB
-						mtime: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000), // 25 days old (within 30 day threshold)
-						atime: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000),
-					}
-					break
-				case 'recent-image.jpg':
-					stats = {
-						size: 1024 * 1024, // 1MB
-						mtime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days old
-						atime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-					}
-					break
-				case 'temp-file.tmp':
-					stats = {
-						size: 256 * 1024, // 256KB
-						mtime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days old
-						atime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-					}
-					break
-				case 'large-image.png':
-					stats = {
-						size: 5 * 1024 * 1024, // 5MB
-						mtime: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), // 10 days old
-						atime: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-					}
-					break
-				default:
-					stats = {
-						size: 1024 * 1024,
-						mtime: new Date(),
-						atime: new Date(),
-					}
-			}
-
-			return Promise.resolve(stats)
-		})
-	})
-
-	afterAll(async () => {
+	afterEach(async () => {
 		await module.close()
+		vi.clearAllMocks()
+		vi.useRealTimers()
 	})
 
-	describe('end-to-End Storage Management Workflow', () => {
-		it('should perform complete storage management cycle', async () => {
-			// 1. Monitor storage and get initial stats
-			const initialStats = await storageMonitoring.getStorageStats()
-			expect(initialStats.totalFiles).toBe(5)
-			expect(initialStats.totalSize).toBe(8.75 * 1024 * 1024) // Total of all file sizes
+	it('wires the three storage providers', () => {
+		expect(storageMonitoring).toBeInstanceOf(StorageMonitoringService)
+		expect(storageCleanup).toBeInstanceOf(StorageCleanupService)
+		expect(storageHealth).toBeInstanceOf(StorageHealthIndicator)
+		expect(storageHealth.key).toBe('storage')
+	})
 
-			// 2. Check storage thresholds
-			const thresholdCheck = await storageMonitoring.checkThresholds()
-			expect(thresholdCheck.status).toBe('healthy') // Should be healthy with test data
-
-			// 3. Get eviction candidates
-			const evictionCandidates = await storageMonitoring.getEvictionCandidates(2 * 1024 * 1024) // 2MB target
-			expect(evictionCandidates.length).toBeGreaterThan(0)
-
-			// 4. Perform intelligent eviction
-			const evictionResult = await intelligentEviction.performEviction(1 * 1024 * 1024) // 1MB target
-			expect(evictionResult.filesEvicted).toBeGreaterThan(0)
-			expect(evictionResult.sizeFreed).toBeGreaterThan(0)
-
-			// 5. Run cleanup with retention policies
-			const cleanupResult = await storageCleanup.performCleanup()
-			expect(cleanupResult.filesRemoved).toBeGreaterThan(0)
-			expect(cleanupResult.policiesApplied.length).toBeGreaterThan(0)
-
-			// 6. Optimize frequently accessed files
-			// First, simulate popular files by recording access
-			bumpAccessCount(storageMonitoring, 'popular-image.webp', 16)
-
-			const optimizationResult = await storageOptimization.optimizeFrequentlyAccessedFiles()
-			expect(optimizationResult.strategy).toBeDefined()
-
-			// 7. Check final health status
-			const healthResult = await storageHealth.isHealthy()
-			expect(healthResult.storage).toBeDefined()
-			expect(healthResult.storage.status).toMatch(/up|down/)
+	it('runs inventory, thresholds, cleanup and health against one directory', async () => {
+		useDisk({
+			'.gitkeep': { size: 0 },
+			'default_optimized_abc.webp': { size: MB },
+			'live.rsc': { size: 2 * MB },
+			'live.rsm': { size: 100, content: metaJson(NOW - DAY, 30 * DAY, 8) },
+			'expired.rsc': { size: 3 * MB },
+			'expired.rsm': { size: 100, content: metaJson(NOW - 10 * DAY, 5 * DAY) },
+			'stale.rst': { size: 512, mtime: NOW - 2 * HOUR },
+			'fresh.tmp': { size: 64, mtime: NOW - 5 * 60 * 1000 },
 		})
 
-		it('should handle storage threshold escalation', async () => {
-			// Simulate high storage usage
-			mockFs.stat.mockResolvedValue({
-				size: 200 * 1024 * 1024, // 200MB per file
-				mtime: new Date(),
-				atime: new Date(),
-			} as any)
+		const inventory = await storageMonitoring.getInventory()
+		expect(inventory.totalFiles).toBe(7)
+		expect(inventory.totalSize).toBe(6 * MB + 200 + 512 + 64)
+		expect(inventory.entries.map(entry => entry.id).sort()).toEqual(['expired', 'live'])
+		expect(inventory.orphans.map(orphan => orphan.name).sort()).toEqual(['fresh.tmp', 'stale.rst'])
 
-			// Check thresholds - should be warning/critical
-			const thresholdCheck = await storageMonitoring.checkThresholds()
-			expect(['warning', 'critical']).toContain(thresholdCheck.status)
+		const check = await storageMonitoring.checkThresholds()
+		expect(check.status).toBe('healthy')
+		expect(check.inventory).toBe(inventory)
 
-			// Perform threshold-based eviction
-			const evictionResult = await intelligentEviction.performThresholdBasedEviction()
+		const cleanup = await storageCleanup.performCleanup()
+		expect(cleanup.removed).toEqual({ expired: 1, stale: 1, evicted: 0 })
+		expect(cleanup.filesRemoved).toBe(3)
+		expect(cleanup.sizeFreed).toBe(3 * MB + 100 + 512)
+		expect(cleanup.errors).toEqual([])
+		expect(Object.keys(disk).sort()).toEqual(['.gitkeep', 'default_optimized_abc.webp', 'fresh.tmp', 'live.rsc', 'live.rsm'])
 
-			const isCritical = thresholdCheck.status === 'critical'
-			expect(isCritical ? evictionResult.filesEvicted > 0 : true).toBe(true)
-
-			// Health check should reflect the situation
-			const healthResult = await storageHealth.isHealthy()
-			expect(isCritical ? healthResult.storage.status === 'down' : true).toBe(true)
-		})
-
-		it('should coordinate cleanup and optimization', async () => {
-			// Record access patterns to create popular files
-			bumpAccessCount(storageMonitoring, 'popular-image.webp', 20)
-			bumpAccessCount(storageMonitoring, 'recent-image.jpg', 15)
-
-			// Run cleanup first
-			const cleanupResult = await storageCleanup.performCleanup()
-
-			// Then optimize remaining popular files
-			const optimizationResult = await storageOptimization.optimizeFrequentlyAccessedFiles()
-
-			// Both should have processed files
-			expect(cleanupResult.filesRemoved + optimizationResult.filesOptimized).toBeGreaterThan(0)
-
-			// Get final storage analysis (getStorageAnalysis was removed from
-			// StorageHealthIndicator as test-only surface; assert the
-			// underlying monitoring data directly instead)
-			const stats = await storageMonitoring.getStorageStats()
-			const evictionCandidates = await storageMonitoring.getEvictionCandidates()
-			expect(stats).toBeDefined()
-			expect(evictionCandidates).toBeDefined()
+		await storageMonitoring.getInventory(0)
+		const health = await storageHealth.isHealthy()
+		expect(health.storage).toMatchObject({
+			status: 'up',
+			totalFiles: 4,
+			totalSize: '3.0 MB',
+			usagePercentage: 15,
+			entries: 1,
+			orphans: 1,
+			expired: 0,
+			oldestEntry: new Date(NOW - DAY).toISOString(),
+			newestEntry: new Date(NOW - DAY).toISOString(),
+			cleanupStatus: { enabled: true, dryRun: false, lastCleanup: new Date(NOW).toISOString(), nextCleanup: null },
+			thresholds: { warningSize: '10.0 MB', criticalSize: '20.0 MB', warningFileCount: 100, criticalFileCount: 200 },
 		})
 	})
 
-	describe('service Integration', () => {
-		it('should share access pattern data between services', async () => {
-			// Record access in monitoring service
-			bumpAccessCount(storageMonitoring, 'popular-image.webp', 2)
-
-			// Get stats to update patterns
-			await storageMonitoring.getStorageStats()
-
-			// Eviction service should see the access patterns
-			const evictionCandidates = await storageMonitoring.getEvictionCandidates()
-			const popularFile = evictionCandidates.find(c => c.file === 'popular-image.webp')
-
-			expect(popularFile ? popularFile.accessCount > 1 : true).toBe(true)
+	it('evicts down to the warning thresholds and reports the tier healthy again', async () => {
+		useDisk({
+			'popular.rsc': { size: 4 * MB },
+			'popular.rsm': { size: 10, content: metaJson(NOW - 200 * DAY, 365 * DAY, 50) },
+			'old.rsc': { size: 4 * MB },
+			'old.rsm': { size: 10, content: metaJson(NOW - 50 * DAY, 365 * DAY) },
+			'new.rsc': { size: 4 * MB },
+			'new.rsm': { size: 10, content: metaJson(NOW - DAY, 365 * DAY) },
 		})
 
-		it('should provide consistent health reporting', async () => {
-			// Get health status
-			const healthResult = await storageHealth.isHealthy()
+		const before = await storageMonitoring.checkThresholds()
+		expect(before.status).toBe('warning')
+		const unhealthy = await storageHealth.isHealthy()
+		expect(unhealthy.storage.status).toBe('up')
+		expect(unhealthy.storage.detailStatus).toBe('warning')
 
-			// Get storage stats directly (getStorageAnalysis was removed from
-			// StorageHealthIndicator as test-only surface)
-			const stats = await storageMonitoring.getStorageStats()
+		const cleanup = await storageCleanup.performCleanup()
+		expect(cleanup.removed).toEqual({ expired: 0, stale: 0, evicted: 1 })
+		expect(Object.keys(disk).sort()).toEqual(['new.rsc', 'new.rsm', 'popular.rsc', 'popular.rsm'])
 
-			// Both should reflect same underlying data
-			expect(healthResult.storage.totalFiles).toBe(stats.totalFiles)
-			expect(healthResult.storage.recommendations).toBeDefined()
-		})
-
-		it('should handle service dependencies correctly', async () => {
-			// Cleanup service depends on monitoring and eviction
-			const cleanupStatus = storageCleanup.getCleanupStatus()
-			expect(cleanupStatus.enabled).toBe(true)
-
-			// Health indicator depends on monitoring and cleanup
-			const healthResult = await storageHealth.isHealthy()
-			expect(healthResult.storage.cleanupStatus).toBeDefined()
-
-			// Optimization depends on monitoring (getOptimizationStats was
-			// removed as test-only surface; assert the private config directly)
-			expect((storageOptimization as any).config.enabled).toBe(true)
-		})
+		await storageMonitoring.getInventory(0)
+		const after = await storageHealth.isHealthy()
+		expect(after.storage.status).toBe('up')
+		expect(after.storage.detailStatus).toBeUndefined()
+		expect(after.storage.entries).toBe(2)
 	})
 
-	describe('error Handling and Resilience', () => {
-		it('should handle file system errors gracefully', async () => {
-			// Simulate file system errors
-			mockFs.readdir.mockRejectedValueOnce(new Error('Permission denied'))
-			mockFs.stat.mockRejectedValueOnce(new Error('File not found'))
+	it('reports the storage indicator down at the critical threshold', async () => {
+		const files: Record<string, DiskFile> = {}
+		for (let index = 0; index < 5; index++) {
+			files[`bulk-${index}.rst`] = { size: 4 * MB }
+		}
+		useDisk(files)
 
-			// Services should handle errors without crashing
-			await expect(storageMonitoring.getStorageStats()).rejects.toThrow()
+		const result = await storageHealth.isHealthy()
 
-			// But other operations should still work
-			const cleanupStatus = storageCleanup.getCleanupStatus()
-			expect(cleanupStatus).toBeDefined()
-		})
-
-		it('should maintain service availability during partial failures', async () => {
-			// Simulate partial failures
-			mockFs.unlink.mockRejectedValueOnce(new Error('Permission denied'))
-
-			// Cleanup should continue with other files
-			const cleanupResult = await storageCleanup.performCleanup()
-			expect(cleanupResult.errors.length).toBeGreaterThan(0)
-			expect(cleanupResult.filesRemoved).toBeGreaterThanOrEqual(0)
-
-			// Health check should still work
-			const healthResult = await storageHealth.isHealthy()
-			expect(healthResult.storage).toBeDefined()
-		})
-
-		it('should provide meaningful error reporting', async () => {
-			// Simulate various error conditions — individual stat failures are caught per-file
-			mockFs.stat.mockRejectedValue(new Error('Disk full'))
-
-			// getStorageStats now handles per-file errors gracefully and returns empty results
-			const stats = await storageMonitoring.getStorageStats()
-			expect(stats.totalFiles).toBe(0)
-			expect(stats.totalSize).toBe(0)
-
-			// Simulate readdir failure for health check.
-			// BaseHealthIndicator.isHealthy() resolves with a `down` result when the check
-			// fails — terminus 12 rethrows anything an indicator throws as a 500.
-			mockFs.readdir.mockRejectedValue(new Error('Disk full'))
-			const failed = await storageHealth.isHealthy()
-			expect(failed).toHaveProperty('storage')
-			expect(failed.storage.status).toBe('down')
-			expect(failed.storage.message).toContain('Disk full')
-		})
+		expect(result.storage.status).toBe('down')
+		expect(result.storage.message).toBe('Storage in critical state: Storage size critical: 20.0 MB / 20.0 MB')
+		expect(result.storage.usagePercentage).toBe(100)
 	})
 
-	describe('performance and Scalability', () => {
-		it('should handle large numbers of files efficiently', async () => {
-			// Simulate many files
-			const manyFiles = Array.from({ length: 1000 }, (_, i) => `file${i}.jpg`)
-			mockFs.readdir.mockResolvedValue(manyFiles as any)
+	it('reports the storage indicator down when the directory cannot be listed', async () => {
+		mockFs.readdir.mockRejectedValue(new Error('Disk full'))
 
-			const startTime = Date.now()
-			const stats = await storageMonitoring.getStorageStats()
-			const duration = Date.now() - startTime
+		const result = await storageHealth.isHealthy()
 
-			expect(stats.totalFiles).toBe(1000)
-			expect(duration).toBeLessThan(5000) // Should complete within 5 seconds
-		})
-
-		it('should limit resource usage during optimization', async () => {
-			// Optimization should respect time limits (getOptimizationStats
-			// was removed as test-only surface; assert the private config directly)
-			expect((storageOptimization as any).config.enabled).toBe(true)
-
-			// Should not run concurrent optimizations
-			const firstOptimization = storageOptimization.optimizeFrequentlyAccessedFiles()
-			await expect(storageOptimization.optimizeFrequentlyAccessedFiles()).rejects.toThrow('already running')
-
-			await firstOptimization
-		})
+		expect(result.storage.status).toBe('down')
+		expect(result.storage.message).toContain('Disk full')
 	})
 })

@@ -1,190 +1,148 @@
 import type { OnModuleInit } from '@nestjs/common'
-import { promises as fs, Stats } from 'node:fs'
+import type { StorageCleanupConfig } from '#microservice/Config/interfaces/app-config.interface'
+import type { StorageEntry, StorageOrphan } from './storage-monitoring.service.js'
+import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { Injectable } from '@nestjs/common'
 import { SchedulerRegistry } from '@nestjs/schedule'
 import { CronJob } from 'cron'
+import { formatBytes } from '#microservice/common/utils/bytes.util'
+import { errorMessage } from '#microservice/common/utils/error-message.util'
+import { storageDirectory } from '#microservice/common/utils/storage-path.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
-import { IntelligentEvictionService } from './intelligent-eviction.service.js'
-import { StorageMonitoringService } from './storage-monitoring.service.js'
+import { isExpired, StorageMonitoringService } from './storage-monitoring.service.js'
 
-const CACHE_FILE_RE = /\.(json|cache|rsc|rsm)$/
-const IMAGE_FILE_RE = /\.(jpg|jpeg|png|webp|gif|rsc)$/
-const TEMP_FILE_RE = /\.(tmp|temp|rst)$/
+/** Orphans and temp files younger than this may still belong to an in-flight write. */
+export const STALE_FILE_MIN_AGE_MS = 60 * 60 * 1000
 
-export interface RetentionPolicy {
-	name: string
-	description: string
-	maxAge: number
-	maxSize: number
-	filePattern?: RegExp
-	preserveCount?: number
-	enabled: boolean
-}
+const CRON_JOB_NAME = 'storage-cleanup'
+const DAY_MS = 24 * 60 * 60 * 1000
+const MB = 1024 * 1024
 
 export interface CleanupResult {
+	removed: {
+		/** Pairs whose `dateCreated + privateTTL` has passed. */
+		expired: number
+		/** Orphan and temp files older than {@link STALE_FILE_MIN_AGE_MS}. */
+		stale: number
+		/** Pairs evicted to get back under the warning thresholds. */
+		evicted: number
+	}
 	filesRemoved: number
 	sizeFreed: number
 	errors: string[]
-	policiesApplied: string[]
 	duration: number
-	nextCleanup: Date
 }
 
-export interface CleanupConfig {
+export interface CleanupStatus {
 	enabled: boolean
-	cronSchedule: string
-	policies: RetentionPolicy[]
 	dryRun: boolean
-	maxCleanupDuration: number
+	isRunning: boolean
+	lastCleanup: Date | null
+	nextCleanup: Date | null
 }
 
+interface CleanupRun {
+	result: CleanupResult
+	dryRun: boolean
+	deadline: number
+	timedOut: boolean
+	remainingFiles: number
+	remainingSize: number
+}
+
+/**
+ * Eviction priority of a pair; higher goes first. Age and size push a pair
+ * towards eviction, every recorded cache hit pulls it back.
+ */
+export function evictionScore(entry: StorageEntry, now: number): number {
+	const ageDays = Math.max(now - entry.dateCreated, 0) / DAY_MS
+	return Math.min(ageDays * 10, 1000)
+		+ Math.max(1000 - entry.accessCount * 10, 0)
+		+ Math.min(entry.size / MB, 100)
+}
+
+/**
+ * Pair-aware hygiene for the on-disk cache tier: expired pairs, stale
+ * orphans, then score-based eviction down to the warning thresholds. Runs on
+ * the configured cron and on demand.
+ */
 @Injectable()
 export class StorageCleanupService implements OnModuleInit {
-	private readonly storageDirectory: string
-	private readonly config: CleanupConfig
-	private lastCleanup: Date = new Date()
-	private isCleanupRunning = false
+	private readonly directory: string
+	private readonly config: StorageCleanupConfig
+	private readonly minAccessCount: number
+	private cronJob: CronJob | null = null
+	private lastCleanup: Date | null = null
+	private isRunning = false
 
 	constructor(
-		private readonly _configService: ConfigService,
-		private readonly storageMonitoring: StorageMonitoringService,
-		private readonly intelligentEviction: IntelligentEvictionService,
+		configService: ConfigService,
+		private readonly monitoring: StorageMonitoringService,
 		private readonly schedulerRegistry: SchedulerRegistry,
 	) {
-		this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage')
-		this.config = this.loadCleanupConfig()
+		this.directory = storageDirectory(configService)
+		this.config = configService.get<StorageCleanupConfig>('storage.cleanup')
+		this.minAccessCount = configService.get<number>('storage.eviction.minAccessCount')
 	}
 
-	async onModuleInit(): Promise<void> {
-		if (this.config.enabled) {
-			CorrelatedLogger.log(`Storage cleanup service initialized with policies: ${this.config.policies.map(p => p.name).join(', ')}`, StorageCleanupService.name)
-			this.registerCleanupCron()
+	onModuleInit(): void {
+		if (!this.config.enabled) {
+			CorrelatedLogger.log('Storage cleanup disabled', StorageCleanupService.name)
+			return
 		}
-		else {
-			CorrelatedLogger.log('Storage cleanup service disabled', StorageCleanupService.name)
-		}
-	}
 
-	private registerCleanupCron(): void {
-		const cronName = 'storage-cleanup'
-		const schedule = this.config.cronSchedule
-
-		const job = new CronJob(schedule, async () => {
-			const currentlyEnabled = this._configService.getOptional('storage.cleanup.enabled', true)
-			if (!currentlyEnabled || this.isCleanupRunning) {
-				return
-			}
-
-			try {
-				await this.performCleanup()
-			}
-			catch (error: unknown) {
-				CorrelatedLogger.error(
-					`Scheduled cleanup failed: ${(error as Error).message}`,
-					(error as Error).stack,
-					StorageCleanupService.name,
-				)
-			}
+		this.cronJob = CronJob.from({
+			cronTime: this.config.cronSchedule,
+			onTick: () => this.runScheduled(),
+			// A tick that fires while the previous run is still going is skipped.
+			waitForCompletion: true,
 		})
-
-		this.schedulerRegistry.addCronJob(cronName, job)
-		job.start()
-
-		CorrelatedLogger.log(`Storage cleanup cron registered with schedule: ${schedule}`, StorageCleanupService.name)
+		this.schedulerRegistry.addCronJob(CRON_JOB_NAME, this.cronJob)
+		this.cronJob.start()
+		CorrelatedLogger.log(`Storage cleanup scheduled: ${this.config.cronSchedule}`, StorageCleanupService.name)
 	}
 
-	/**
-	 * Perform manual cleanup with optional policy override
-	 */
-	async performCleanup(policyNames?: string[], dryRun?: boolean): Promise<CleanupResult> {
-		if (this.isCleanupRunning) {
+	async performCleanup(): Promise<CleanupResult> {
+		if (this.isRunning) {
 			throw new Error('Cleanup is already running')
 		}
+		this.isRunning = true
 
-		const startTime = Date.now()
-		this.isCleanupRunning = true
+		const startedAt = Date.now()
+		const run: CleanupRun = {
+			result: { removed: { expired: 0, stale: 0, evicted: 0 }, filesRemoved: 0, sizeFreed: 0, errors: [], duration: 0 },
+			dryRun: this.config.dryRun,
+			deadline: startedAt + this.config.maxDuration,
+			timedOut: false,
+			remainingFiles: 0,
+			remainingSize: 0,
+		}
 
 		try {
-			CorrelatedLogger.log('Starting storage cleanup', StorageCleanupService.name)
+			const inventory = await this.monitoring.getInventory(0)
+			run.remainingFiles = inventory.totalFiles
+			run.remainingSize = inventory.totalSize
 
-			const policiesToApply = policyNames
-				? this.config.policies.filter(p => policyNames.includes(p.name))
-				: this.config.policies.filter(p => p.enabled)
-
-			const isDryRun = dryRun ?? this.config.dryRun
-
-			let totalFilesRemoved = 0
-			let totalSizeFreed = 0
-			const allErrors: string[] = []
-			const appliedPolicies: string[] = []
-
-			const deadline = startTime + this.config.maxCleanupDuration
-			for (const policy of policiesToApply) {
-				// Enforce the configured time budget (STORAGE_CLEANUP_MAX_DURATION)
-				// — previously read into config but never applied, so a runaway
-				// pass had no ceiling.
-				if (Date.now() >= deadline) {
-					const msg = `Cleanup time budget (${this.config.maxCleanupDuration}ms) exhausted; skipping remaining policies`
-					allErrors.push(msg)
-					CorrelatedLogger.warn(msg, StorageCleanupService.name)
-					break
-				}
-				try {
-					const result = await this.applyRetentionPolicy(policy, isDryRun)
-					totalFilesRemoved += result.filesRemoved
-					totalSizeFreed += result.sizeFreed
-					allErrors.push(...result.errors)
-					appliedPolicies.push(policy.name)
-
-					CorrelatedLogger.debug(
-						`Policy '${policy.name}': ${result.filesRemoved} files, ${this.formatBytes(result.sizeFreed)} freed`,
-						StorageCleanupService.name,
-					)
-				}
-				catch (error: unknown) {
-					const errorMsg = `Policy '${policy.name}' failed: ${(error as Error).message}`
-					allErrors.push(errorMsg)
-					CorrelatedLogger.error(errorMsg, (error as Error).stack, StorageCleanupService.name)
-				}
-			}
-
-			const thresholdCheck = await this.storageMonitoring.checkThresholds()
-			if (thresholdCheck.status !== 'healthy' && !isDryRun) {
-				try {
-					const evictionResult = await this.intelligentEviction.performThresholdBasedEviction()
-					totalFilesRemoved += evictionResult.filesEvicted
-					totalSizeFreed += evictionResult.sizeFreed
-					allErrors.push(...evictionResult.errors)
-					appliedPolicies.push('intelligent-eviction')
-				}
-				catch (error: unknown) {
-					allErrors.push(`Intelligent eviction failed: ${(error as Error).message}`)
-				}
-			}
+			const live = await this.removeExpired(inventory.entries, startedAt, run)
+			await this.removeStale(inventory.orphans, startedAt, run)
+			await this.evict(live, startedAt, run)
 
 			this.lastCleanup = new Date()
-			const duration = Date.now() - startTime
+			run.result.duration = Date.now() - startedAt
 
-			const result: CleanupResult = {
-				filesRemoved: totalFilesRemoved,
-				sizeFreed: totalSizeFreed,
-				errors: allErrors,
-				policiesApplied: appliedPolicies,
-				duration,
-				nextCleanup: this.getNextCleanupTime(),
-			}
-
+			const { removed, sizeFreed, errors, duration } = run.result
 			CorrelatedLogger.log(
-				`Cleanup completed: ${totalFilesRemoved} files removed, ${this.formatBytes(totalSizeFreed)} freed`,
+				`Storage cleanup ${run.dryRun ? '(dry run) ' : ''}finished in ${duration}ms: `
+				+ `${removed.expired} expired pair(s), ${removed.stale} stale file(s), ${removed.evicted} evicted pair(s), `
+				+ `${formatBytes(sizeFreed)} freed, ${errors.length} error(s)`,
 				StorageCleanupService.name,
 			)
-
-			return result
+			return run.result
 		}
 		finally {
-			this.isCleanupRunning = false
+			this.isRunning = false
 		}
 	}
 
@@ -201,7 +159,7 @@ export class StorageCleanupService implements OnModuleInit {
 	 *
 	 * Storage filenames are flat UUIDs with no tenant information encoded —
 	 * the tenant lives inside each ``.rsm`` metadata JSON's ``tenantSchema``
-	 * field (legacy sidecars written before multi-tenancy omit it, which
+	 * field (sidecars written before multi-tenancy omit it, which
 	 * ``ResourceMetaData`` defaults to ``'public'``). This scans every
 	 * ``.rsm`` file, parses it, and removes the ``.rsm`` + matching ``.rsc``
 	 * pair when the metadata's tenant matches. Per-file read/parse/unlink
@@ -214,10 +172,10 @@ export class StorageCleanupService implements OnModuleInit {
 
 		let allFiles: string[]
 		try {
-			allFiles = await fs.readdir(this.storageDirectory)
+			allFiles = await fs.readdir(this.directory)
 		}
 		catch (error: unknown) {
-			const msg = `Failed to read storage directory for tenant sweep: ${(error as Error).message}`
+			const msg = `Failed to read storage directory for tenant sweep: ${errorMessage(error)}`
 			CorrelatedLogger.warn(msg, StorageCleanupService.name)
 			return { filesRemoved: 0, errors: [msg] }
 		}
@@ -225,14 +183,12 @@ export class StorageCleanupService implements OnModuleInit {
 		const metaFiles = allFiles.filter(f => f.endsWith('.rsm'))
 
 		const results = await Promise.allSettled(metaFiles.map(async (metaFile) => {
-			const metaPath = join(this.storageDirectory, metaFile)
-
 			let content: string
 			try {
-				content = await fs.readFile(metaPath, 'utf8')
+				content = await fs.readFile(join(this.directory, metaFile), 'utf8')
 			}
 			catch (error: unknown) {
-				throw new Error(`Failed to read metadata ${metaFile}: ${(error as Error).message}`)
+				throw new Error(`Failed to read metadata ${metaFile}: ${errorMessage(error)}`)
 			}
 
 			let metadata: { tenantSchema?: string }
@@ -240,23 +196,14 @@ export class StorageCleanupService implements OnModuleInit {
 				metadata = JSON.parse(content)
 			}
 			catch (error: unknown) {
-				throw new Error(`Failed to parse metadata ${metaFile}: ${(error as Error).message}`)
+				throw new Error(`Failed to parse metadata ${metaFile}: ${errorMessage(error)}`)
 			}
 
 			if ((metadata.tenantSchema || 'public') !== tenantSchema) {
 				return false
 			}
 
-			const resourcePath = join(this.storageDirectory, metaFile.replace(/\.rsm$/, '.rsc'))
-			await Promise.all([
-				fs.unlink(metaPath),
-				fs.unlink(resourcePath).catch((error: unknown) => {
-					// .rsc may already be gone (e.g. a metadata-only leftover) — not fatal
-					if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-						throw error
-					}
-				}),
-			])
+			await this.unlinkPair(metaFile.replace(/\.rsm$/, ''))
 			return true
 		}))
 
@@ -268,7 +215,7 @@ export class StorageCleanupService implements OnModuleInit {
 				}
 			}
 			else {
-				const msg = `Tenant file sweep failed for ${metaFiles[i]}: ${(result.reason as Error).message}`
+				const msg = `Tenant file sweep failed for ${metaFiles[i]}: ${errorMessage(result.reason)}`
 				errors.push(msg)
 				CorrelatedLogger.warn(msg, StorageCleanupService.name)
 			}
@@ -282,212 +229,148 @@ export class StorageCleanupService implements OnModuleInit {
 		return { filesRemoved, errors }
 	}
 
-	/**
-	 * Scheduled cleanup — invoked by the dynamically registered cron job
-	 * (schedule comes from config.cronSchedule, registered in onModuleInit).
-	 */
-	async scheduledCleanup(): Promise<void> {
-		const currentlyEnabled = this._configService.getOptional('storage.cleanup.enabled', true)
-		if (!currentlyEnabled || this.isCleanupRunning) {
+	getCleanupStatus(): CleanupStatus {
+		return {
+			enabled: this.config.enabled,
+			dryRun: this.config.dryRun,
+			isRunning: this.isRunning,
+			lastCleanup: this.lastCleanup,
+			nextCleanup: this.cronJob?.nextDate().toJSDate() ?? null,
+		}
+	}
+
+	private async runScheduled(): Promise<void> {
+		if (this.isRunning) {
 			return
 		}
-
 		try {
 			await this.performCleanup()
 		}
 		catch (error: unknown) {
 			CorrelatedLogger.error(
-				`Scheduled cleanup failed: ${(error as Error).message}`,
-				(error as Error).stack,
+				`Scheduled storage cleanup failed: ${errorMessage(error)}`,
+				error instanceof Error ? error.stack : undefined,
 				StorageCleanupService.name,
 			)
 		}
 	}
 
-	/**
-	 * Get cleanup status and next scheduled run
-	 */
-	getCleanupStatus(): {
-		enabled: boolean
-		isRunning: boolean
-		lastCleanup: Date
-		nextCleanup: Date
-		policies: RetentionPolicy[]
-	} {
-		return {
-			enabled: this.config.enabled,
-			isRunning: this.isCleanupRunning,
-			lastCleanup: this.lastCleanup,
-			nextCleanup: this.getNextCleanupTime(),
-			policies: this.config.policies,
+	/** Pass 1 — returns the pairs that are still within their TTL. */
+	private async removeExpired(entries: StorageEntry[], now: number, run: CleanupRun): Promise<StorageEntry[]> {
+		const live: StorageEntry[] = []
+		for (const entry of entries) {
+			if (!isExpired(entry, now)) {
+				live.push(entry)
+			}
+			else if (!this.outOfTime(run) && await this.removePair(entry, run)) {
+				run.result.removed.expired++
+			}
+		}
+		return live
+	}
+
+	/** Pass 2 — orphans and temp files old enough that no writer can still own them. */
+	private async removeStale(orphans: StorageOrphan[], now: number, run: CleanupRun): Promise<void> {
+		for (const orphan of orphans) {
+			if (now - orphan.mtime < STALE_FILE_MIN_AGE_MS) {
+				continue
+			}
+			if (this.outOfTime(run)) {
+				return
+			}
+			try {
+				if (!run.dryRun) {
+					await this.unlinkFile(orphan.name)
+				}
+				this.account(run, 1, orphan.size, orphan.name)
+				run.result.removed.stale++
+			}
+			catch (error: unknown) {
+				run.result.errors.push(`Failed to remove ${orphan.name}: ${errorMessage(error)}`)
+			}
 		}
 	}
 
-	private async applyRetentionPolicy(policy: RetentionPolicy, dryRun: boolean): Promise<{
-		filesRemoved: number
-		sizeFreed: number
-		errors: string[]
-	}> {
-		const allFiles = await fs.readdir(this.storageDirectory)
-		const files = allFiles.filter(f => f !== '.gitkeep')
-
-		// Batch stat calls in parallel
-		const statResults = await Promise.all(
-			files.map(async (file) => {
-				try {
-					const stats = await fs.stat(join(this.storageDirectory, file))
-					return { file, stats }
-				}
-				catch {
-					return null
-				}
-			}),
-		)
-
-		const now = Date.now()
-		const candidates: Array<{ file: string, stats: Stats }> = []
-
-		for (const result of statResults) {
-			if (!result)
-				continue
-
-			const { file, stats } = result
-
-			if (policy.filePattern && !policy.filePattern.test(file)) {
-				continue
-			}
-
-			const ageInDays = (now - stats.mtime.getTime()) / (1000 * 60 * 60 * 24)
-			if (ageInDays < policy.maxAge) {
-				continue
-			}
-
-			candidates.push({ file, stats })
+	/**
+	 * Pass 3 — while the tier is still at or above a warning threshold, evict
+	 * live pairs by {@link evictionScore}; pairs with `minAccessCount` or more
+	 * hits go last.
+	 */
+	private async evict(entries: StorageEntry[], now: number, run: CleanupRun): Promise<void> {
+		const { warningSize, warningFileCount } = this.monitoring.thresholds
+		const overThreshold = (): boolean => run.remainingSize >= warningSize || run.remainingFiles >= warningFileCount
+		if (!overThreshold()) {
+			return
 		}
 
-		candidates.sort((a: any, b: any) => a.stats.mtime.getTime() - b.stats.mtime.getTime())
+		const ranked = entries
+			.map(entry => ({ entry, popular: entry.accessCount >= this.minAccessCount, score: evictionScore(entry, now) }))
+			.sort((a, b) => Number(a.popular) - Number(b.popular) || b.score - a.score)
 
-		if (policy.preserveCount && candidates.length <= policy.preserveCount) {
-			return { filesRemoved: 0, sizeFreed: 0, errors: [] }
-		}
-
-		const filesToRemove = policy.preserveCount
-			? candidates.slice(0, candidates.length - policy.preserveCount)
-			: candidates
-
-		let totalSize = 0
-		const finalCandidates: Array<{ file: string, stats: Stats }> = []
-
-		for (const candidate of filesToRemove) {
-			if (policy.maxSize > 0 && totalSize + candidate.stats.size > policy.maxSize) {
+		for (const { entry } of ranked) {
+			if (!overThreshold() || this.outOfTime(run)) {
 				break
 			}
-			finalCandidates.push(candidate)
-			totalSize += candidate.stats.size
-		}
-
-		const errors: string[] = []
-
-		// Batch unlink in parallel
-		const unlinkResults = await Promise.allSettled(
-			finalCandidates.map(async ({ file, stats }) => {
-				if (!dryRun) {
-					await fs.unlink(join(this.storageDirectory, file))
-				}
-				CorrelatedLogger.debug(
-					`${dryRun ? '[DRY RUN] ' : ''}Removed file: ${file} (${this.formatBytes(stats.size)})`,
-					StorageCleanupService.name,
-				)
-				return stats.size
-			}),
-		)
-
-		let filesRemoved = 0
-		let sizeFreed = 0
-
-		for (const result of unlinkResults) {
-			if (result.status === 'fulfilled') {
-				filesRemoved++
-				sizeFreed += result.value
-			}
-			else {
-				const errorMsg = `Failed to remove file: ${result.reason}`
-				errors.push(errorMsg)
-				CorrelatedLogger.warn(errorMsg, StorageCleanupService.name)
+			if (await this.removePair(entry, run)) {
+				run.result.removed.evicted++
 			}
 		}
 
-		return { filesRemoved, sizeFreed, errors }
-	}
-
-	private loadCleanupConfig(): CleanupConfig {
-		const enabled = this._configService.getOptional('storage.cleanup.enabled', true)
-		const cronSchedule = this._configService.getOptional('storage.cleanup.cronSchedule', '0 2 * * *')
-		const dryRun = this._configService.getOptional('storage.cleanup.dryRun', false)
-		const maxCleanupDuration = this._configService.getOptional('storage.cleanup.maxDuration', 300000)
-
-		const defaultPolicies: RetentionPolicy[] = [
-			{
-				name: 'old-cache-files',
-				description: 'Remove cache files older than 30 days',
-				maxAge: 30,
-				maxSize: 0,
-				filePattern: CACHE_FILE_RE,
-				enabled: true,
-			},
-			{
-				name: 'large-images',
-				description: 'Remove large image files older than 7 days',
-				maxAge: 7,
-				maxSize: 100 * 1024 * 1024,
-				filePattern: IMAGE_FILE_RE,
-				enabled: true,
-			},
-			{
-				name: 'temp-files',
-				description: 'Remove temporary files older than 1 day',
-				maxAge: 1,
-				maxSize: 0,
-				filePattern: TEMP_FILE_RE,
-				enabled: true,
-			},
-			// NOTE: no "preserve-recent" default. It was named as a floor
-			// ("keep at least 100 most recent files") but each policy runs as
-			// an independent DELETION pass — with maxAge 0 it deleted every
-			// file except the newest 100 on each nightly run, contradicting
-			// StorageMonitoringService's own thresholds (up to 5000 files is
-			// healthy). Size-pressure eviction is already handled by the
-			// threshold-gated IntelligentEvictionService pass below in
-			// performCleanup(); the age policies above cover hygiene.
-		]
-
-		return {
-			enabled,
-			cronSchedule,
-			policies: defaultPolicies,
-			dryRun,
-			maxCleanupDuration,
+		if (overThreshold()) {
+			CorrelatedLogger.warn(
+				`Storage still above warning thresholds after eviction: ${run.remainingFiles} files, ${formatBytes(run.remainingSize)}`,
+				StorageCleanupService.name,
+			)
 		}
 	}
 
-	private getNextCleanupTime(): Date {
-		const nextCleanup = new Date(this.lastCleanup)
-		nextCleanup.setDate(nextCleanup.getDate() + 1)
-		nextCleanup.setHours(2, 0, 0, 0)
-
-		return nextCleanup
+	private async removePair(entry: StorageEntry, run: CleanupRun): Promise<boolean> {
+		try {
+			if (!run.dryRun) {
+				await this.unlinkPair(entry.id)
+			}
+			this.account(run, 2, entry.size, entry.id)
+			return true
+		}
+		catch (error: unknown) {
+			run.result.errors.push(`Failed to remove ${entry.id}: ${errorMessage(error)}`)
+			return false
+		}
 	}
 
-	private formatBytes(bytes: number): string {
-		const units = ['B', 'KB', 'MB', 'GB']
-		let size = bytes
-		let unitIndex = 0
+	private account(run: CleanupRun, files: number, size: number, name: string): void {
+		run.result.filesRemoved += files
+		run.result.sizeFreed += size
+		run.remainingFiles -= files
+		run.remainingSize -= size
+		CorrelatedLogger.debug(`${run.dryRun ? '[dry run] ' : ''}Removed ${name} (${formatBytes(size)})`, StorageCleanupService.name)
+	}
 
-		while (size >= 1024 && unitIndex < units.length - 1) {
-			size /= 1024
-			unitIndex++
+	/** True once `storage.cleanup.maxDuration` has elapsed; reports the budget exhaustion once. */
+	private outOfTime(run: CleanupRun): boolean {
+		if (!run.timedOut && Date.now() >= run.deadline) {
+			run.timedOut = true
+			const msg = `Cleanup time budget (${this.config.maxDuration}ms) exhausted; remaining passes skipped`
+			run.result.errors.push(msg)
+			CorrelatedLogger.warn(msg, StorageCleanupService.name)
 		}
+		return run.timedOut
+	}
 
-		return `${size.toFixed(1)} ${units[unitIndex]}`
+	/** Sidecar first: an `.rsc` without its `.rsm` is harmless, the reverse is a false cache hit. */
+	private async unlinkPair(id: string): Promise<void> {
+		await this.unlinkFile(`${id}.rsm`)
+		await this.unlinkFile(`${id}.rsc`)
+	}
+
+	private async unlinkFile(name: string): Promise<void> {
+		try {
+			await fs.unlink(join(this.directory, name))
+		}
+		catch (error: unknown) {
+			if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+				throw error
+			}
+		}
 	}
 }

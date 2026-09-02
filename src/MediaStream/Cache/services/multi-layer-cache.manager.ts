@@ -1,15 +1,13 @@
-import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
-import type { LayerDistribution, StringMap } from '#microservice/common/types/common.types'
-
-import type { CacheKeyStrategy, CacheLayer, CacheLayerStats } from '../interfaces/cache-layer.interface.js'
+import type { OnModuleInit } from '@nestjs/common'
+import type { LayerDistribution } from '#microservice/common/types/common.types'
+import type { CacheLayer, CacheLayerStats } from '../interfaces/cache-layer.interface.js'
 import { Injectable } from '@nestjs/common'
-import { ConfigService } from '#microservice/Config/config.service'
+import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { MemoryCacheLayer } from '../layers/memory-cache.layer.js'
 import { RedisCacheLayer } from '../layers/redis-cache.layer.js'
-
-import { DefaultCacheKeyStrategy } from '../strategies/cache-key.strategy.js'
+import { cacheKey, tenantFromNamespace } from '../utils/cache-namespace.util.js'
 
 export interface MultiLayerCacheStats {
 	layers: Record<string, CacheLayerStats>
@@ -19,149 +17,100 @@ export interface MultiLayerCacheStats {
 	layerHitDistribution: LayerDistribution
 }
 
+/**
+ * Memory → Redis, checked in priority order; first hit wins and is backfilled
+ * into the faster layers. This class is the only place that records
+ * `mediastream_cache_operations_total` for the layered tier, so every logical
+ * get/set/delete produces exactly one sample per layer probed.
+ */
 @Injectable()
-export class MultiLayerCacheManager implements OnModuleInit, OnModuleDestroy {
+export class MultiLayerCacheManager implements OnModuleInit {
 	private layers: CacheLayer[] = []
-	private keyStrategy: CacheKeyStrategy
-	private preloadingEnabled: boolean
-	private popularKeys: Map<string, number> = new Map()
-	private preloadingInterval?: NodeJS.Timeout
 
 	constructor(
-		private readonly _configService: ConfigService,
 		private readonly metricsService: MetricsService,
 		private readonly memoryCacheLayer: MemoryCacheLayer,
 		private readonly redisCacheLayer: RedisCacheLayer,
-	) {
-		this.keyStrategy = new DefaultCacheKeyStrategy()
-		this.preloadingEnabled = this._configService.getOptional('cache.preloading.enabled', false)
-	}
+	) {}
 
-	async onModuleInit(): Promise<void> {
-		this.layers = [
-			this.memoryCacheLayer,
-			this.redisCacheLayer,
-		].sort((a: any, b: any) => a.getPriority() - b.getPriority())
+	onModuleInit(): void {
+		this.layers = [this.memoryCacheLayer, this.redisCacheLayer]
+			.sort((a, b) => a.getPriority() - b.getPriority())
 
 		CorrelatedLogger.debug(
-			`Multi-layer cache initialized with ${this.layers.length} layers: ${this.layers.map(l => l.getLayerName()).join(', ')}`,
+			`Multi-layer cache initialized with ${this.layers.length} layers: ${this.layers.map(layer => layer.getLayerName()).join(', ')}`,
 			MultiLayerCacheManager.name,
 		)
-
-		if (this.preloadingEnabled) {
-			this.startPreloading()
-		}
 	}
 
-	async onModuleDestroy(): Promise<void> {
-		this.stopPreloading()
-		CorrelatedLogger.debug('Multi-layer cache manager destroyed', MultiLayerCacheManager.name)
-	}
-
-	/**
-	 * Get a value from cache, checking layers sequentially by priority.
-	 * Stops on first hit and backfills higher-priority layers asynchronously.
-	 */
-	async get<T>(namespace: string, identifier: string, params?: StringMap): Promise<T | null> {
-		const key = this.keyStrategy.generateKey(namespace, identifier, params)
-		this.trackKeyAccess(key)
+	async get<T>(namespace: string, identifier: string): Promise<T | null> {
+		const key = cacheKey(namespace, identifier)
+		const tenant = tenantFromNamespace(namespace)
 
 		for (const layer of this.layers) {
 			try {
 				const value = await layer.get<T>(key)
 				if (value !== null) {
-					CorrelatedLogger.debug(
-						`Cache HIT in ${layer.getLayerName()} layer for key: ${key}`,
-						MultiLayerCacheManager.name,
-					)
-					this.metricsService.recordCacheOperation('get', layer.getLayerName(), 'hit')
+					CorrelatedLogger.debug(`Cache HIT in ${layer.getLayerName()} layer for key: ${key}`, MultiLayerCacheManager.name)
+					this.metricsService.recordCacheOperation('get', layer.getLayerName(), 'hit', undefined, tenant)
 
-					// Backfill higher priority layers asynchronously (don't wait)
-					this.backfillLayers(key, value, layer).catch((err: unknown) => {
-						CorrelatedLogger.warn(`Backfill failed for key ${key}: ${(err as Error).message}`, MultiLayerCacheManager.name)
+					this.backfillLayers(key, value, layer).catch((error: unknown) => {
+						CorrelatedLogger.warn(`Backfill failed for key ${key}: ${errorMessage(error)}`, MultiLayerCacheManager.name)
 					})
 
 					return value
 				}
 			}
 			catch (error: unknown) {
-				CorrelatedLogger.warn(
-					`Cache layer ${layer.getLayerName()} failed for key ${key}: ${(error as Error).message}`,
-					MultiLayerCacheManager.name,
-				)
+				CorrelatedLogger.warn(`Cache layer ${layer.getLayerName()} failed for key ${key}: ${errorMessage(error)}`, MultiLayerCacheManager.name)
+				this.metricsService.recordCacheOperation('get', layer.getLayerName(), 'error', undefined, tenant)
 			}
 		}
 
 		CorrelatedLogger.debug(`Cache MISS for key: ${key}`, MultiLayerCacheManager.name)
-		this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss')
+		this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', undefined, tenant)
 
 		return null
 	}
 
-	/**
-	 * Set a value in all cache layers
-	 */
-	async set<T>(
-		namespace: string,
-		identifier: string,
-		value: T,
-		ttl?: number,
-		params?: StringMap,
-	): Promise<void> {
-		const key = this.keyStrategy.generateKey(namespace, identifier, params)
+	/** Write to every layer; one layer failing never blocks the others. */
+	async set<T>(namespace: string, identifier: string, value: T, ttl?: number): Promise<void> {
+		const key = cacheKey(namespace, identifier)
+		const tenant = tenantFromNamespace(namespace)
 
-		const setPromises = this.layers.map(async (layer) => {
+		await Promise.all(this.layers.map(async (layer) => {
 			try {
 				await layer.set(key, value, ttl)
-				CorrelatedLogger.debug(
-					`Cache SET in ${layer.getLayerName()} layer for key: ${key}`,
-					MultiLayerCacheManager.name,
-				)
+				CorrelatedLogger.debug(`Cache SET in ${layer.getLayerName()} layer for key: ${key}`, MultiLayerCacheManager.name)
 			}
 			catch (error: unknown) {
-				CorrelatedLogger.warn(
-					`Cache SET failed in ${layer.getLayerName()} layer for key ${key}: ${(error as Error).message}`,
-					MultiLayerCacheManager.name,
-				)
+				CorrelatedLogger.warn(`Cache SET failed in ${layer.getLayerName()} layer for key ${key}: ${errorMessage(error)}`, MultiLayerCacheManager.name)
+				this.metricsService.recordCacheOperation('set', layer.getLayerName(), 'error', undefined, tenant)
 			}
-		})
+		}))
 
-		await Promise.allSettled(setPromises)
-		this.metricsService.recordCacheOperation('set', 'multi-layer', 'success')
+		this.metricsService.recordCacheOperation('set', 'multi-layer', 'success', undefined, tenant)
 	}
 
-	/**
-	 * Delete a key from all cache layers
-	 */
-	async delete(namespace: string, identifier: string, params?: StringMap): Promise<void> {
-		const key = this.keyStrategy.generateKey(namespace, identifier, params)
+	async delete(namespace: string, identifier: string): Promise<void> {
+		const key = cacheKey(namespace, identifier)
+		const tenant = tenantFromNamespace(namespace)
 
-		const deletePromises = this.layers.map(async (layer) => {
+		await Promise.all(this.layers.map(async (layer) => {
 			try {
 				await layer.delete(key)
-				CorrelatedLogger.debug(
-					`Cache DELETE in ${layer.getLayerName()} layer for key: ${key}`,
-					MultiLayerCacheManager.name,
-				)
+				CorrelatedLogger.debug(`Cache DELETE in ${layer.getLayerName()} layer for key: ${key}`, MultiLayerCacheManager.name)
 			}
 			catch (error: unknown) {
-				CorrelatedLogger.warn(
-					`Cache DELETE failed in ${layer.getLayerName()} layer for key ${key}: ${(error as Error).message}`,
-					MultiLayerCacheManager.name,
-				)
+				CorrelatedLogger.warn(`Cache DELETE failed in ${layer.getLayerName()} layer for key ${key}: ${errorMessage(error)}`, MultiLayerCacheManager.name)
 			}
-		})
+		}))
 
-		await Promise.allSettled(deletePromises)
-		this.popularKeys.delete(key)
-		this.metricsService.recordCacheOperation('delete', 'multi-layer', 'success')
+		this.metricsService.recordCacheOperation('delete', 'multi-layer', 'success', undefined, tenant)
 	}
 
-	/**
-	 * Check if a key exists in any cache layer
-	 */
-	async exists(namespace: string, identifier: string, params?: StringMap): Promise<boolean> {
-		const key = this.keyStrategy.generateKey(namespace, identifier, params)
+	async exists(namespace: string, identifier: string): Promise<boolean> {
+		const key = cacheKey(namespace, identifier)
 
 		for (const layer of this.layers) {
 			try {
@@ -170,165 +119,87 @@ export class MultiLayerCacheManager implements OnModuleInit, OnModuleDestroy {
 				}
 			}
 			catch (error: unknown) {
-				CorrelatedLogger.warn(
-					`Cache EXISTS check failed in ${layer.getLayerName()} layer for key ${key}: ${(error as Error).message}`,
-					MultiLayerCacheManager.name,
-				)
+				CorrelatedLogger.warn(`Cache EXISTS check failed in ${layer.getLayerName()} layer for key ${key}: ${errorMessage(error)}`, MultiLayerCacheManager.name)
 			}
 		}
 
 		return false
 	}
 
-	/**
-	 * Clear all cache layers
-	 */
 	async clear(): Promise<void> {
-		const clearPromises = this.layers.map(async (layer) => {
+		await Promise.all(this.layers.map(async (layer) => {
 			try {
 				await layer.clear()
-				CorrelatedLogger.debug(
-					`Cache CLEARED in ${layer.getLayerName()} layer`,
-					MultiLayerCacheManager.name,
-				)
+				CorrelatedLogger.debug(`Cache CLEARED in ${layer.getLayerName()} layer`, MultiLayerCacheManager.name)
 			}
 			catch (error: unknown) {
-				CorrelatedLogger.warn(
-					`Cache CLEAR failed in ${layer.getLayerName()} layer: ${(error as Error).message}`,
-					MultiLayerCacheManager.name,
-				)
+				CorrelatedLogger.warn(`Cache CLEAR failed in ${layer.getLayerName()} layer: ${errorMessage(error)}`, MultiLayerCacheManager.name)
 			}
-		})
+		}))
 
-		await Promise.allSettled(clearPromises)
-		this.popularKeys.clear()
 		this.metricsService.recordCacheOperation('flush', 'multi-layer', 'success')
 	}
 
-	/**
-	 * Invalidate keys by namespace prefix
-	 */
+	/** Delete every key under a namespace (`image:acme` → `image:acme:*`) in every layer. */
 	async invalidateNamespace(namespace: string): Promise<void> {
-		const prefix = this.keyStrategy.generateKey(namespace, '')
-		CorrelatedLogger.debug(
-			`Invalidating cache namespace: ${namespace} (prefix: ${prefix})`,
-			MultiLayerCacheManager.name,
-		)
+		const prefix = cacheKey(namespace, '')
+		CorrelatedLogger.debug(`Invalidating cache namespace: ${namespace} (prefix: ${prefix})`, MultiLayerCacheManager.name)
 
 		let totalDeleted = 0
 		for (const layer of this.layers) {
 			try {
-				const deleted = await layer.deleteByPrefix(prefix)
-				totalDeleted += deleted
+				totalDeleted += await layer.deleteByPrefix(prefix)
 			}
 			catch (error: unknown) {
-				CorrelatedLogger.warn(
-					`Failed to invalidate namespace in ${layer.getLayerName()}: ${(error as Error).message}`,
-					MultiLayerCacheManager.name,
-				)
+				CorrelatedLogger.warn(`Failed to invalidate namespace in ${layer.getLayerName()}: ${errorMessage(error)}`, MultiLayerCacheManager.name)
 			}
 		}
 
-		CorrelatedLogger.debug(
-			`Namespace ${namespace} invalidated: ${totalDeleted} keys deleted`,
-			MultiLayerCacheManager.name,
-		)
-		this.metricsService.recordCacheOperation('clear', 'multi-layer', 'success')
+		CorrelatedLogger.debug(`Namespace ${namespace} invalidated: ${totalDeleted} keys deleted`, MultiLayerCacheManager.name)
+		this.metricsService.recordCacheOperation('clear', 'multi-layer', 'success', undefined, tenantFromNamespace(namespace))
 	}
 
-	/**
-	 * Get comprehensive cache statistics
-	 */
 	async getStats(): Promise<MultiLayerCacheStats> {
 		const layerStats: Record<string, CacheLayerStats> = {}
+		const layerHitDistribution: LayerDistribution = {}
 		let totalHits = 0
 		let totalMisses = 0
-		const layerHitDistribution: LayerDistribution = {}
 
 		for (const layer of this.layers) {
 			try {
 				const stats = await layer.getStats()
 				layerStats[layer.getLayerName()] = stats
+				layerHitDistribution[layer.getLayerName()] = stats.hits
 				totalHits += stats.hits
 				totalMisses += stats.misses
-				layerHitDistribution[layer.getLayerName()] = stats.hits
 			}
 			catch (error: unknown) {
-				CorrelatedLogger.warn(
-					`Failed to get stats from ${layer.getLayerName()} layer: ${(error as Error).message}`,
-					MultiLayerCacheManager.name,
-				)
-				layerStats[layer.getLayerName()] = {
-					hits: 0,
-					misses: 0,
-					keys: 0,
-					hitRate: 0,
-					errors: 1,
-				}
+				CorrelatedLogger.warn(`Failed to get stats from ${layer.getLayerName()} layer: ${errorMessage(error)}`, MultiLayerCacheManager.name)
+				layerStats[layer.getLayerName()] = { hits: 0, misses: 0, keys: 0, hitRate: 0, errors: 1 }
 			}
 		}
 
 		const totalRequests = totalHits + totalMisses
-		const overallHitRate = totalRequests > 0 ? totalHits / totalRequests : 0
 
 		return {
 			layers: layerStats,
 			totalHits,
 			totalMisses,
-			overallHitRate,
+			overallHitRate: totalRequests > 0 ? totalHits / totalRequests : 0,
 			layerHitDistribution,
 		}
 	}
 
 	/**
-	 * Preload popular keys into higher priority layers
-	 */
-	async preloadPopularKeys(): Promise<void> {
-		if (!this.preloadingEnabled) {
-			return
-		}
-
-		const popularKeys = Array.from(this.popularKeys.entries())
-			.sort(([, a], [, b]) => b - a)
-			.slice(0, 100)
-			.map(([key]) => key)
-
-		CorrelatedLogger.debug(
-			`Preloading ${popularKeys.length} popular keys`,
-			MultiLayerCacheManager.name,
-		)
-
-		for (const key of popularKeys) {
-			try {
-				for (let i = this.layers.length - 1; i >= 0; i--) {
-					const value = await this.layers[i].get(key)
-					if (value !== null) {
-						for (let j = 0; j < i; j++) {
-							await this.layers[j].set(key, value)
-						}
-						break
-					}
-				}
-			}
-			catch (error: unknown) {
-				CorrelatedLogger.warn(
-					`Failed to preload key ${key}: ${(error as Error).message}`,
-					MultiLayerCacheManager.name,
-				)
-			}
-		}
-	}
-
-	/**
-	 * Backfill higher priority layers when a cache hit occurs in a lower priority layer
+	 * Copy a lower-layer hit into every faster layer, capped at the source's
+	 * remaining TTL so a backfilled entry never outlives its origin.
 	 */
 	private async backfillLayers<T>(key: string, value: T, sourceLayer: CacheLayer): Promise<void> {
-		const sourceIndex = this.layers.findIndex(layer => layer === sourceLayer)
+		const sourceIndex = this.layers.indexOf(sourceLayer)
 		if (sourceIndex <= 0) {
 			return
 		}
 
-		// Get remaining TTL from source so backfilled layers don't outlive the source
 		let remainingTtl: number | undefined
 		try {
 			const ttl = await sourceLayer.getTtl(key)
@@ -337,108 +208,17 @@ export class MultiLayerCacheManager implements OnModuleInit, OnModuleDestroy {
 			}
 		}
 		catch {
-			// If TTL lookup fails, backfill without TTL (uses layer default)
+			// Unknown TTL: the layer default applies
 		}
 
-		const backfillPromises = this.layers.slice(0, sourceIndex).map(async (layer) => {
+		await Promise.all(this.layers.slice(0, sourceIndex).map(async (layer) => {
 			try {
 				await layer.set(key, value, remainingTtl)
-				CorrelatedLogger.debug(
-					`Backfilled ${layer.getLayerName()} layer with key: ${key} (TTL: ${remainingTtl ?? 'default'}s)`,
-					MultiLayerCacheManager.name,
-				)
+				CorrelatedLogger.debug(`Backfilled ${layer.getLayerName()} layer with key: ${key} (TTL: ${remainingTtl ?? 'default'}s)`, MultiLayerCacheManager.name)
 			}
 			catch (error: unknown) {
-				CorrelatedLogger.warn(
-					`Failed to backfill ${layer.getLayerName()} layer for key ${key}: ${(error as Error).message}`,
-					MultiLayerCacheManager.name,
-				)
+				CorrelatedLogger.warn(`Failed to backfill ${layer.getLayerName()} layer for key ${key}: ${errorMessage(error)}`, MultiLayerCacheManager.name)
 			}
-		})
-
-		await Promise.allSettled(backfillPromises)
-	}
-
-	/**
-	 * Track key access frequency for preloading.
-	 * Uses a simple size cap with FIFO eviction of single-access entries
-	 * to avoid O(n log n) sort on every prune.
-	 */
-	private trackKeyAccess(key: string): void {
-		if (!this.preloadingEnabled) {
-			return
-		}
-
-		const currentCount = this.popularKeys.get(key) || 0
-		this.popularKeys.set(key, currentCount + 1)
-
-		if (this.popularKeys.size > 5000) {
-			// Collect candidates in a single O(n) pass rather than deleting inside
-			// the live Map iterator, which can behave unpredictably. The actual
-			// deletes are deferred via setImmediate so the current request-handling
-			// tick is not blocked by a potentially large eviction loop.
-			const toDelete: string[] = []
-			for (const [k, v] of this.popularKeys) {
-				if (toDelete.length >= 2500)
-					break
-				if (v <= 1)
-					toDelete.push(k)
-			}
-			setImmediate(() => {
-				for (const k of toDelete)
-					this.popularKeys.delete(k)
-			})
-
-			// If single-access eviction still won't bring us below the cap, schedule
-			// a FIFO pass in the same deferred tick.
-			if (this.popularKeys.size - toDelete.length > 2500) {
-				setImmediate(() => {
-					const iter = this.popularKeys.keys()
-					while (this.popularKeys.size > 2500) {
-						const { value } = iter.next()
-						if (value)
-							this.popularKeys.delete(value)
-						else
-							break
-					}
-				})
-			}
-		}
-	}
-
-	/**
-	 * Start periodic preloading
-	 */
-	private startPreloading(): void {
-		const interval = this._configService.getOptional('cache.preloading.interval', 300000)
-
-		this.preloadingInterval = setInterval(async () => {
-			try {
-				await this.preloadPopularKeys()
-			}
-			catch (error: unknown) {
-				CorrelatedLogger.error(
-					`Preloading failed: ${(error as Error).message}`,
-					(error as Error).stack,
-					MultiLayerCacheManager.name,
-				)
-			}
-		}, interval)
-
-		CorrelatedLogger.debug(
-			`Cache preloading started with ${interval}ms interval`,
-			MultiLayerCacheManager.name,
-		)
-	}
-
-	/**
-	 * Stop periodic preloading
-	 */
-	private stopPreloading(): void {
-		if (this.preloadingInterval) {
-			clearInterval(this.preloadingInterval)
-			this.preloadingInterval = undefined
-			CorrelatedLogger.debug('Cache preloading stopped', MultiLayerCacheManager.name)
-		}
+		}))
 	}
 }

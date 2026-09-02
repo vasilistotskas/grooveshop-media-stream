@@ -1,21 +1,37 @@
 import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
+import type { RedisConfig } from '#microservice/Config/interfaces/app-config.interface'
 import type { CacheStats, ICacheManager } from '../interfaces/cache-manager.interface.js'
 import { Buffer } from 'node:buffer'
-import { env } from 'node:process'
 import { Injectable } from '@nestjs/common'
 import { Redis } from 'ioredis'
+import { errorMessage } from '#microservice/common/utils/error-message.util'
+import { isProduction } from '#microservice/common/utils/runtime-env.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
+import { IMAGE_KEY_PATTERN } from '../utils/cache-namespace.util.js'
 
-const DB_KEYS_RE = /db\d+:keys=(\d+)/
 const USED_MEMORY_RE = /used_memory:(\d+)/
+/** Reconnect backoff: 2s, 4s, … capped at 30s (ioredis drives the retries). */
+const RECONNECT_MAX_DELAY_MS = 30000
+const KEEP_ALIVE_MS = 30000
+const CONNECT_TIMEOUT_MS = 10000
+const COMMAND_TIMEOUT_MS = 5000
+const SCAN_BATCH = 100
+
+/**
+ * Binary envelope for cached images: [0x00][u32 metadata length][metadata JSON][raw bytes].
+ * 0x00 can never start a JSON document, so plain-JSON values stay distinguishable.
+ */
+const BINARY_MARKER = 0x00
+const BINARY_HEADER_BYTES = 5
 
 @Injectable()
 export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleDestroy {
 	private redis!: Redis
-	private isConnected = false
-	private stats = {
+	private readonly config: RedisConfig
+	private readonly keyspaceKeysRe: RegExp
+	private readonly stats = {
 		hits: 0,
 		misses: 0,
 		operations: 0,
@@ -23,12 +39,57 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 	}
 
 	constructor(
-		private readonly _configService: ConfigService,
+		configService: ConfigService,
 		private readonly metricsService: MetricsService,
-	) { }
+	) {
+		this.config = configService.get<RedisConfig>('cache.redis')
+		// `INFO keyspace` lists every populated DB; only the configured one counts.
+		this.keyspaceKeysRe = new RegExp(`^db${this.config.db}:keys=(\\d+)`, 'm')
+	}
 
 	async onModuleInit(): Promise<void> {
-		await this.initializeRedis()
+		if (isProduction() && !this.config.password) {
+			throw new Error('[RedisCacheService] REDIS_PASSWORD is required in production. Set the REDIS_PASSWORD environment variable and restart.')
+		}
+
+		this.redis = new Redis({
+			host: this.config.host,
+			port: this.config.port,
+			password: this.config.password,
+			db: this.config.db,
+			maxRetriesPerRequest: this.config.maxRetries,
+			lazyConnect: true,
+			keepAlive: KEEP_ALIVE_MS,
+			connectTimeout: CONNECT_TIMEOUT_MS,
+			commandTimeout: COMMAND_TIMEOUT_MS,
+			retryStrategy: times => Math.min(1000 * 2 ** times, RECONNECT_MAX_DELAY_MS),
+		})
+
+		this.redis.on('ready', () => {
+			CorrelatedLogger.log('Redis connection ready', RedisCacheService.name)
+			this.metricsService.updateActiveConnections('redis', 1)
+		})
+
+		this.redis.on('error', (error: unknown) => {
+			this.stats.errors++
+			CorrelatedLogger.error(`Redis connection error: ${errorMessage(error)}`, undefined, RedisCacheService.name)
+			this.metricsService.updateActiveConnections('redis', 0)
+		})
+
+		this.redis.on('close', () => {
+			CorrelatedLogger.warn('Redis connection closed', RedisCacheService.name)
+			this.metricsService.updateActiveConnections('redis', 0)
+		})
+
+		// One explicit connect so dependants (circuit-breaker state restore)
+		// see a ready client when Redis is up. If it is not, ioredis keeps
+		// reconnecting on its own via retryStrategy — never call connect() again.
+		try {
+			await this.redis.connect()
+		}
+		catch (error: unknown) {
+			CorrelatedLogger.warn(`Redis unavailable at startup, ioredis will keep retrying: ${errorMessage(error)}`, RedisCacheService.name)
+		}
 	}
 
 	async onModuleDestroy(): Promise<void> {
@@ -38,199 +99,59 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 		}
 	}
 
-	private async initializeRedis(): Promise<void> {
-		const config = this._configService.get('cache.redis')
-
-		// Fail fast in production if Redis password is not set.
-		// Redis without a password in production is a security risk.
-		// Set REDIS_PASSWORD in your environment to resolve this.
-		if (env.NODE_ENV === 'production' && !config.password) {
-			throw new Error(
-				'[RedisCacheService] REDIS_PASSWORD is required in production. '
-				+ 'Set the REDIS_PASSWORD environment variable and restart.',
-			)
-		}
-
-		this.redis = new Redis({
-			host: config.host,
-			port: config.port,
-			password: config.password,
-			db: config.db,
-			maxRetriesPerRequest: config.maxRetries,
-			enableReadyCheck: true,
-			lazyConnect: true,
-			keepAlive: 30000,
-			connectTimeout: 10000,
-			commandTimeout: 5000,
-		})
-
-		this.redis.on('connect', () => {
-			CorrelatedLogger.log('Redis connecting...', RedisCacheService.name)
-		})
-
-		this.redis.on('ready', () => {
-			this.isConnected = true
-			CorrelatedLogger.log('Redis connection ready', RedisCacheService.name)
-			this.metricsService.updateActiveConnections('redis', 1)
-		})
-
-		this.redis.on('error', (error: unknown) => {
-			this.isConnected = false
-			this.stats.errors++
-			CorrelatedLogger.error(`Redis connection error: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
-			this.metricsService.updateActiveConnections('redis', 0)
-		})
-
-		this.redis.on('close', () => {
-			this.isConnected = false
-			CorrelatedLogger.warn('Redis connection closed', RedisCacheService.name)
-			this.metricsService.updateActiveConnections('redis', 0)
-		})
-
-		this.redis.on('reconnecting', () => {
-			CorrelatedLogger.log('Redis reconnecting...', RedisCacheService.name)
-		})
-
-		try {
-			await this.redis.connect()
-		}
-		catch (error: unknown) {
-			this.isConnected = false
-			CorrelatedLogger.warn(
-				`Redis unavailable at startup, will retry in background: ${(error as Error).message}`,
-				RedisCacheService.name,
-			)
-			this.scheduleReconnect(1)
-		}
+	get isConnected(): boolean {
+		return this.redis?.status === 'ready'
 	}
 
-	private scheduleReconnect(attempt: number): void {
-		const delay = Math.min(1000 * 2 ** attempt, 30000)
-		setTimeout(async () => {
-			if (this.isConnected) {
-				return
-			}
-			try {
-				await this.redis.connect()
-				CorrelatedLogger.log('Redis reconnected successfully', RedisCacheService.name)
-			}
-			catch {
-				CorrelatedLogger.warn(`Redis reconnect attempt ${attempt} failed, retrying...`, RedisCacheService.name)
-				this.scheduleReconnect(attempt + 1)
-			}
-		}, delay)
-	}
-
+	/** Returns null (a miss) while disconnected; throws on a command error. */
 	async get<T>(key: string): Promise<T | null> {
 		if (!this.isConnected) {
-			CorrelatedLogger.warn('Redis not connected, returning null', RedisCacheService.name)
 			this.stats.misses++
-			this.metricsService.recordCacheOperation('get', 'redis', 'miss')
 			return null
 		}
 
+		this.stats.operations++
+		let value: Buffer | null
 		try {
-			this.stats.operations++
-			// Use getBuffer to handle both binary and string values
-			const value = await this.redis.getBuffer(key)
-
-			if (value === null) {
-				this.stats.misses++
-				this.metricsService.recordCacheOperation('get', 'redis', 'miss')
-				CorrelatedLogger.debug(`Redis cache MISS: ${key}`, RedisCacheService.name)
-				return null
-			}
-
-			this.stats.hits++
-			this.metricsService.recordCacheOperation('get', 'redis', 'hit')
-			CorrelatedLogger.debug(`Redis cache HIT: ${key}`, RedisCacheService.name)
-
-			return this.deserializeValue(value) as T
+			value = await this.redis.getBuffer(key)
 		}
 		catch (error: unknown) {
 			this.stats.errors++
 			this.stats.misses++
-			this.metricsService.recordCacheOperation('get', 'redis', 'error')
-			CorrelatedLogger.error(`Redis cache GET error for key ${key}: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
+			throw error
+		}
+
+		if (value === null) {
+			this.stats.misses++
 			return null
 		}
+
+		this.stats.hits++
+		return this.deserializeValue<T>(value)
 	}
 
+	/**
+	 * `ttl` in seconds; 0/undefined means the configured `cache.redis.ttl`.
+	 * Entries are never written without an expiry.
+	 */
 	async set<T>(key: string, value: T, ttl?: number): Promise<void> {
 		if (!this.isConnected) {
 			CorrelatedLogger.warn('Redis not connected, skipping SET operation', RedisCacheService.name)
 			return
 		}
 
+		const effectiveTtl = ttl !== undefined && ttl > 0 ? ttl : this.config.ttl
+		if (effectiveTtl <= 0) {
+			throw new Error(`[RedisCacheService] Redis TTL must be > 0 — cache.redis.ttl is misconfigured (got ${effectiveTtl})`)
+		}
+
+		this.stats.operations++
 		try {
-			this.stats.operations++
-			const serializedValue = this.serializeValue(value)
-			// Treat ttl === 0 or ttl === undefined as "use the configured default TTL".
-			// Callers that want a no-expiry key must go through a separate code path;
-			// a zero or absent TTL here always means "fall back to config" so that
-			// cache entries are never accidentally persisted without expiry.
-			const defaultTtl = this._configService.get('cache.redis.ttl')
-			const effectiveTtl = (ttl !== undefined && ttl > 0) ? ttl : defaultTtl
-
-			if (effectiveTtl && effectiveTtl > 0) {
-				await this.redis.set(key, serializedValue, 'EX', effectiveTtl)
-			}
-			else {
-				throw new Error(
-					`[RedisCacheService] Redis TTL must be > 0 — cache.redis.ttl is misconfigured (got ${effectiveTtl})`,
-				)
-			}
-
-			this.metricsService.recordCacheOperation('set', 'redis', 'success')
-			CorrelatedLogger.debug(`Redis cache SET: ${key} (TTL: ${effectiveTtl}s)`, RedisCacheService.name)
+			await this.redis.set(key, this.serializeValue(value), 'EX', effectiveTtl)
 		}
 		catch (error: unknown) {
 			this.stats.errors++
-			this.metricsService.recordCacheOperation('set', 'redis', 'error')
-			CorrelatedLogger.error(`Redis cache SET error for key ${key}: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
-		}
-	}
-
-	/**
-	 * Set a key only if it does not already exist (SET NX EX).
-	 * Used by the cache-fill pattern to prevent thundering-herd overwrites:
-	 * the first writer wins and subsequent workers skip the write.
-	 * Returns true if the key was set, false if it already existed.
-	 */
-	async setIfNotExists<T>(key: string, value: T, ttl?: number): Promise<boolean> {
-		if (!this.isConnected) {
-			CorrelatedLogger.warn('Redis not connected, skipping SET NX operation', RedisCacheService.name)
-			return false
-		}
-
-		try {
-			this.stats.operations++
-			const serializedValue = this.serializeValue(value)
-			const defaultTtl = this._configService.get('cache.redis.ttl')
-			const effectiveTtl = (ttl !== undefined && ttl > 0) ? ttl : defaultTtl
-
-			if (!effectiveTtl || effectiveTtl <= 0) {
-				throw new Error(
-					`[RedisCacheService] Redis TTL must be > 0 — cache.redis.ttl is misconfigured (got ${effectiveTtl})`,
-				)
-			}
-
-			// SET key value EX ttl NX — atomic: only sets if key does not exist
-			const result = await this.redis.set(key, serializedValue, 'EX', effectiveTtl, 'NX')
-			const wasSet = result === 'OK'
-
-			this.metricsService.recordCacheOperation('set', 'redis', wasSet ? 'success' : 'miss')
-			CorrelatedLogger.debug(
-				`Redis cache SET NX: ${key} (TTL: ${effectiveTtl}s) — ${wasSet ? 'written' : 'already exists'}`,
-				RedisCacheService.name,
-			)
-			return wasSet
-		}
-		catch (error: unknown) {
-			this.stats.errors++
-			this.metricsService.recordCacheOperation('set', 'redis', 'error')
-			CorrelatedLogger.error(`Redis cache SET NX error for key ${key}: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
-			return false
+			throw error
 		}
 	}
 
@@ -240,46 +161,42 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			return
 		}
 
+		this.stats.operations++
 		try {
-			this.stats.operations++
 			await this.redis.del(key)
-			this.metricsService.recordCacheOperation('delete', 'redis', 'success')
-			CorrelatedLogger.debug(`Redis cache DELETE: ${key}`, RedisCacheService.name)
 		}
 		catch (error: unknown) {
 			this.stats.errors++
-			this.metricsService.recordCacheOperation('delete', 'redis', 'error')
-			CorrelatedLogger.error(`Redis cache DELETE error for key ${key}: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
 			throw error
 		}
 	}
 
+	/**
+	 * Remove every image entry (SCAN + DEL). Never FLUSHDB: the database also
+	 * holds rate-limit counters and the circuit-breaker state.
+	 */
 	async clear(): Promise<void> {
 		if (!this.isConnected) {
 			CorrelatedLogger.warn('Redis not connected, skipping CLEAR operation', RedisCacheService.name)
 			return
 		}
 
+		this.stats.operations++
 		try {
-			this.stats.operations++
-			// Use SCAN + DEL instead of FLUSHDB to preserve non-cache keys (rate limits, circuit breaker)
 			let deleted = 0
 			let cursor = '0'
 			do {
-				const [nextCursor, keys] = await this.redis.scan(cursor, 'MATCH', 'image:*', 'COUNT', 100)
+				const [nextCursor, keys] = await this.redis.scan(cursor, 'MATCH', IMAGE_KEY_PATTERN, 'COUNT', SCAN_BATCH)
 				cursor = nextCursor
 				if (keys.length > 0) {
 					await this.redis.del(...keys)
 					deleted += keys.length
 				}
 			} while (cursor !== '0')
-			this.metricsService.recordCacheOperation('clear', 'redis', 'success')
 			CorrelatedLogger.debug(`Redis cache CLEARED: ${deleted} image keys deleted`, RedisCacheService.name)
 		}
 		catch (error: unknown) {
 			this.stats.errors++
-			this.metricsService.recordCacheOperation('clear', 'redis', 'error')
-			CorrelatedLogger.error(`Redis cache CLEAR error: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
 			throw error
 		}
 	}
@@ -289,113 +206,44 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			return false
 		}
 
+		this.stats.operations++
 		try {
-			this.stats.operations++
-			const exists = await this.redis.exists(key)
-			return exists === 1
+			return (await this.redis.exists(key)) === 1
 		}
 		catch (error: unknown) {
 			this.stats.errors++
-			CorrelatedLogger.error(`Redis cache HAS error for key ${key}: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
+			CorrelatedLogger.error(`Redis cache HAS error for key ${key}: ${errorMessage(error)}`, undefined, RedisCacheService.name)
 			return false
 		}
 	}
 
-	async exists(key: string): Promise<boolean> {
-		return this.has(key)
-	}
-
-	async keys(): Promise<string[]> {
-		if (!this.isConnected) {
-			return []
-		}
-
-		try {
-			this.stats.operations++
-			const allKeys: string[] = []
-			let cursor = '0'
-			do {
-				const [nextCursor, keys] = await this.redis.scan(cursor, 'COUNT', 100)
-				cursor = nextCursor
-				allKeys.push(...keys)
-			} while (cursor !== '0')
-			return allKeys
-		}
-		catch (error: unknown) {
-			this.stats.errors++
-			CorrelatedLogger.error(`Redis cache KEYS error: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
-			return []
-		}
-	}
-
-	async flushAll(): Promise<void> {
-		if (!this.isConnected) {
-			CorrelatedLogger.warn('Redis not connected, skipping FLUSH operation', RedisCacheService.name)
-			return
-		}
-
-		try {
-			this.stats.operations++
-			// Use FLUSHDB (current database only), NOT FLUSHALL (all databases).
-			// Redis is shared with Django cache, Nuxt SSR cache, Celery, and
-			// Django Channels — FLUSHALL would destroy all their data.
-			await this.redis.flushdb()
-			this.metricsService.recordCacheOperation('flush', 'redis', 'success')
-			CorrelatedLogger.debug('Redis cache FLUSHED (current DB)', RedisCacheService.name)
-		}
-		catch (error: unknown) {
-			this.stats.errors++
-			this.metricsService.recordCacheOperation('flush', 'redis', 'error')
-			CorrelatedLogger.error(`Redis cache FLUSH error: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
-			throw error
-		}
-	}
-
 	async getStats(): Promise<CacheStats> {
-		try {
-			const hitRate = this.stats.hits + this.stats.misses > 0
-				? this.stats.hits / (this.stats.hits + this.stats.misses)
-				: 0
+		const total = this.stats.hits + this.stats.misses
+		const hitRate = total > 0 ? this.stats.hits / total : 0
+		this.metricsService.updateCacheHitRatio('redis', hitRate)
 
-			this.metricsService.updateCacheHitRatio('redis', hitRate)
+		let keys = 0
+		let memoryUsage = 0
+		if (this.isConnected) {
+			try {
+				const keyspace = await this.redis.info('keyspace')
+				keys = Number.parseInt(keyspace.match(this.keyspaceKeysRe)?.[1] ?? '0', 10)
 
-			let keys = 0
-			let memoryUsage = 0
-
-			if (this.isConnected) {
-				try {
-					const info = await this.redis.info('keyspace')
-					const dbInfo = info.match(DB_KEYS_RE)
-					keys = dbInfo ? Number.parseInt(dbInfo[1]) : 0
-
-					const memInfo = await this.redis.info('memory')
-					const memMatch = memInfo.match(USED_MEMORY_RE)
-					memoryUsage = memMatch ? Number.parseInt(memMatch[1]) : 0
-				}
-				catch (error: unknown) {
-					CorrelatedLogger.warn(`Failed to get Redis info: ${(error as Error).message}`, RedisCacheService.name)
-				}
+				const memory = await this.redis.info('memory')
+				memoryUsage = Number.parseInt(memory.match(USED_MEMORY_RE)?.[1] ?? '0', 10)
 			}
-
-			return {
-				hits: this.stats.hits,
-				misses: this.stats.misses,
-				keys,
-				ksize: 0,
-				vsize: memoryUsage,
-				hitRate,
+			catch (error: unknown) {
+				CorrelatedLogger.warn(`Failed to get Redis info: ${errorMessage(error)}`, RedisCacheService.name)
 			}
 		}
-		catch (error: unknown) {
-			CorrelatedLogger.error(`Redis cache STATS error: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
-			return {
-				hits: this.stats.hits,
-				misses: this.stats.misses,
-				keys: 0,
-				ksize: 0,
-				vsize: 0,
-				hitRate: 0,
-			}
+
+		return {
+			hits: this.stats.hits,
+			misses: this.stats.misses,
+			keys,
+			ksize: 0,
+			vsize: memoryUsage,
+			hitRate,
 		}
 	}
 
@@ -403,9 +251,10 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 		if (!this.isConnected) {
 			throw new Error('Redis not connected')
 		}
-		return await this.redis.ping()
+		return this.redis.ping()
 	}
 
+	/** Remaining TTL in seconds; -1 when disconnected, unknown, or without expiry. */
 	async getTtl(key: string): Promise<number> {
 		if (!this.isConnected) {
 			return -1
@@ -415,14 +264,12 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			return await this.redis.ttl(key)
 		}
 		catch (error: unknown) {
-			CorrelatedLogger.error(`Redis TTL error for key ${key}: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
+			CorrelatedLogger.error(`Redis TTL error for key ${key}: ${errorMessage(error)}`, undefined, RedisCacheService.name)
 			return -1
 		}
 	}
 
-	/**
-	 * Expose raw ioredis client for atomic operations (e.g., rate limiting pipelines)
-	 */
+	/** Raw client for atomic operations (rate-limit Lua, prefix SCANs); null while disconnected. */
 	getClient(): Redis | null {
 		return this.isConnected ? this.redis : null
 	}
@@ -441,14 +288,14 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 
 		try {
 			const info = await this.redis.info('memory')
-			const used = this.extractMemoryValue(info, 'used_memory')
-			const peak = this.extractMemoryValue(info, 'used_memory_peak')
-			const fragmentation = this.extractMemoryValue(info, 'mem_fragmentation_ratio')
-
-			return { used, peak, fragmentation }
+			return {
+				used: this.extractMemoryValue(info, 'used_memory'),
+				peak: this.extractMemoryValue(info, 'used_memory_peak'),
+				fragmentation: this.extractMemoryValue(info, 'mem_fragmentation_ratio'),
+			}
 		}
 		catch (error: unknown) {
-			CorrelatedLogger.error(`Redis memory info error: ${(error as Error).message}`, (error as Error).stack, RedisCacheService.name)
+			CorrelatedLogger.error(`Redis memory info error: ${errorMessage(error)}`, undefined, RedisCacheService.name)
 			return { used: 0, peak: 0, fragmentation: 0 }
 		}
 	}
@@ -458,71 +305,31 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 		return match ? Number.parseFloat(match[1]) : 0
 	}
 
-	/**
-	 * Binary format marker byte (0x00 is not valid JSON start).
-	 * Format: [0x00][4 bytes: metadata JSON length][metadata JSON][raw binary data]
-	 */
-	private static readonly BINARY_MARKER = 0x00
-
-	/**
-	 * Serialize value for Redis storage.
-	 * For objects containing Buffer data, uses compact binary format (no base64 overhead).
-	 * For other values, uses plain JSON.
-	 */
+	/** Objects carrying a `data: Buffer` use the binary envelope; everything else is JSON. */
 	private serializeValue<T>(value: T): Buffer {
-		if (value && typeof value === 'object' && 'data' in (value as any) && Buffer.isBuffer((value as any).data)) {
-			const { data, ...rest } = value as any
+		if (value && typeof value === 'object' && 'data' in value && Buffer.isBuffer((value as { data: unknown }).data)) {
+			const { data, ...rest } = value as { data: Buffer } & Record<string, unknown>
 			const metaJson = Buffer.from(JSON.stringify(rest), 'utf8')
-			const header = Buffer.alloc(5)
-			header[0] = RedisCacheService.BINARY_MARKER
+			const header = Buffer.alloc(BINARY_HEADER_BYTES)
+			header[0] = BINARY_MARKER
 			header.writeUInt32BE(metaJson.length, 1)
 			return Buffer.concat([header, metaJson, data])
 		}
 		return Buffer.from(JSON.stringify(value), 'utf8')
 	}
 
-	/**
-	 * Deserialize value from Redis storage.
-	 * Handles two formats:
-	 * 1. Binary format (BINARY_MARKER prefix) — compact, used for cached
-	 *    image payloads (avoids the base64 bloat the old format paid).
-	 * 2. Plain JSON — for non-binary cache values (counters, metadata-only
-	 *    entries, plain objects).
-	 *
-	 * Any entry still using the pre-binary-marker base64-Buffer wrapping
-	 * (``{ type: "Buffer", data: "<base64>" }``) returns ``null`` →
-	 * treated as a cache miss → the consumer re-fetches and re-caches
-	 * in the current binary format. Self-healing.
-	 */
+	/** The binary envelope's payload is returned as a subarray view — no copy of the image bytes. */
 	private deserializeValue<T>(value: Buffer): T | null {
-		// Check for binary format marker
-		if (value.length >= 5 && value[0] === RedisCacheService.BINARY_MARKER) {
+		if (value.length >= BINARY_HEADER_BYTES && value[0] === BINARY_MARKER) {
 			const metaLength = value.readUInt32BE(1)
-			if (metaLength > 0 && 5 + metaLength <= value.length) {
-				const metaJson = value.toString('utf8', 5, 5 + metaLength)
-				const rest = JSON.parse(metaJson)
-				// Use subarray view directly — avoids copying the entire image buffer
-				const data = value.subarray(5 + metaLength)
-				return { ...rest, data } as T
+			if (metaLength > 0 && BINARY_HEADER_BYTES + metaLength <= value.length) {
+				const rest = JSON.parse(value.toString('utf8', BINARY_HEADER_BYTES, BINARY_HEADER_BYTES + metaLength))
+				return { ...rest, data: value.subarray(BINARY_HEADER_BYTES + metaLength) } as T
 			}
 		}
 
-		// Fall back to JSON parsing for non-binary values. The reviver
-		// detects the pre-binary-marker base64-Buffer shape and throws,
-		// caught below → null → cache miss → self-heal.
 		try {
-			const str = value.toString('utf8')
-			return JSON.parse(str, (_key, val) => {
-				if (
-					val
-					&& typeof val === 'object'
-					&& val.type === 'Buffer'
-					&& typeof val.data === 'string'
-				) {
-					throw new Error('stale base64-buffer cache entry — re-cache in binary format')
-				}
-				return val
-			})
+			return JSON.parse(value.toString('utf8')) as T
 		}
 		catch {
 			CorrelatedLogger.warn('Failed to deserialize Redis value, returning null', RedisCacheService.name)

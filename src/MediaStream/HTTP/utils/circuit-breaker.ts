@@ -1,3 +1,4 @@
+import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 
 export enum CircuitState {
@@ -11,7 +12,6 @@ export interface CircuitBreakerOptions {
 	resetTimeout: number
 	rollingWindow: number
 	minimumRequests: number
-	name?: string
 	persistState?: (state: CircuitBreakerPersistedState) => Promise<void>
 	loadState?: () => Promise<CircuitBreakerPersistedState | null>
 }
@@ -43,15 +43,7 @@ export class CircuitBreaker {
 	private halfOpenTrialInFlight = false
 
 	constructor(options: CircuitBreakerOptions) {
-		this.options = {
-			failureThreshold: options.failureThreshold || 50,
-			resetTimeout: options.resetTimeout || 30000,
-			rollingWindow: options.rollingWindow || 60000,
-			minimumRequests: options.minimumRequests || 5,
-			name: options.name || 'default',
-			persistState: options.persistState,
-			loadState: options.loadState,
-		}
+		this.options = options
 	}
 
 	/**
@@ -97,7 +89,7 @@ export class CircuitBreaker {
 		}
 		catch (error: unknown) {
 			CorrelatedLogger.warn(
-				`Failed to load circuit breaker state: ${(error as Error).message}`,
+				`Failed to load circuit breaker state: ${errorMessage(error)}`,
 				'CircuitBreaker',
 			)
 		}
@@ -122,7 +114,7 @@ export class CircuitBreaker {
 		}
 		catch (error: unknown) {
 			CorrelatedLogger.warn(
-				`Failed to persist circuit breaker state: ${(error as Error).message}`,
+				`Failed to persist circuit breaker state: ${errorMessage(error)}`,
 				'CircuitBreaker',
 			)
 		}
@@ -135,33 +127,6 @@ export class CircuitBreaker {
 		if (this.persistenceTimer) {
 			clearInterval(this.persistenceTimer)
 			this.persistenceTimer = undefined
-		}
-	}
-
-	/**
-	 * Execute a function with circuit breaker protection
-	 */
-	async execute<T>(fn: () => Promise<T>, fallback?: () => Promise<T>): Promise<T> {
-		if (!this.allowRequest()) {
-			if (fallback) {
-				CorrelatedLogger.warn('Circuit is open, using fallback', 'CircuitBreaker')
-				return fallback()
-			}
-			throw new Error('Circuit breaker is open')
-		}
-
-		try {
-			const result = await fn()
-			this.recordSuccess()
-			return result
-		}
-		catch (error: unknown) {
-			this.recordFailure()
-			if (fallback) {
-				CorrelatedLogger.warn(`Request failed, using fallback: ${(error as Error).message}`, 'CircuitBreaker')
-				return fallback()
-			}
-			throw error
 		}
 	}
 
@@ -240,7 +205,7 @@ export class CircuitBreaker {
 	/**
 	 * Decide whether a NEW request attempt may proceed right now — the method
 	 * application code should call immediately before making the real gated
-	 * call (HttpClientService.executeRequest, execute() above).
+	 * call (HttpClientService.executeRequest).
 	 *
 	 * Unlike isOpen(), this claims a slot: in HALF_OPEN, exactly one caller is
 	 * let through as the recovery canary and every other concurrent caller is

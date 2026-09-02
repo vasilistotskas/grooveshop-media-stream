@@ -1,10 +1,11 @@
 import { HttpStatus } from '@nestjs/common'
 import { describe, expect, it } from 'vitest'
 import {
+	CircuitBreakerOpenError,
 	DefaultImageFallbackError,
 	InvalidRequestError,
 	MediaStreamError,
-	ResourceStreamingError,
+	UpstreamResourceTooLargeError,
 } from '#microservice/common/errors/media-stream.errors'
 
 describe('mediaStreamErrors', () => {
@@ -48,18 +49,6 @@ describe('mediaStreamErrors', () => {
 		})
 	})
 
-	describe('resourceStreamingError', () => {
-		it('should create a streaming error with default values', () => {
-			const error = new ResourceStreamingError()
-
-			expect(error).toBeInstanceOf(MediaStreamError)
-			expect(error.name).toBe('ResourceStreamingError')
-			expect(error.message).toBe('Failed to stream resource')
-			expect(error.status).toBe(HttpStatus.INTERNAL_SERVER_ERROR)
-			expect(error.code).toBe('RESOURCE_STREAMING_ERROR')
-		})
-	})
-
 	describe('defaultImageFallbackError', () => {
 		it('should create a fallback error with default values', () => {
 			const error = new DefaultImageFallbackError()
@@ -81,6 +70,36 @@ describe('mediaStreamErrors', () => {
 			expect(error.message).toBe('Invalid request parameters')
 			expect(error.status).toBe(HttpStatus.BAD_REQUEST)
 			expect(error.code).toBe('INVALID_REQUEST')
+		})
+	})
+	describe('circuitBreakerOpenError', () => {
+		it('is a 503 with a stable code', () => {
+			const error = new CircuitBreakerOpenError({ name: 'http_client' })
+
+			expect(error).toBeInstanceOf(MediaStreamError)
+			expect(error.name).toBe('CircuitBreakerOpenError')
+			expect(error.message).toBe('Circuit breaker is open')
+			expect(error.status).toBe(HttpStatus.SERVICE_UNAVAILABLE)
+			expect(error.code).toBe('CIRCUIT_BREAKER_OPEN')
+			expect(error.context).toEqual({ name: 'http_client' })
+		})
+	})
+
+	describe('upstreamResourceTooLargeError', () => {
+		it('is a 502 with a default message', () => {
+			const error = new UpstreamResourceTooLargeError()
+
+			expect(error).toBeInstanceOf(MediaStreamError)
+			expect(error.message).toBe('Upstream resource exceeds the size limit')
+			expect(error.status).toBe(HttpStatus.BAD_GATEWAY)
+			expect(error.code).toBe('UPSTREAM_RESOURCE_TOO_LARGE')
+		})
+
+		it('accepts a custom message and context', () => {
+			const error = new UpstreamResourceTooLargeError('too big', { bytes: 1 })
+
+			expect(error.message).toBe('too big')
+			expect(error.context).toEqual({ bytes: 1 })
 		})
 	})
 })

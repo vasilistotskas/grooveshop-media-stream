@@ -3,6 +3,7 @@ import CacheImageRequest, {
 	BackgroundOptions,
 	FitOptions,
 	PositionOptions,
+	ResizeOptions,
 	SupportedResizeFormats,
 } from '#microservice/API/dto/cache-image-request.dto'
 import GenerateResourceIdentityFromRequestJob from '#microservice/Processing/jobs/generate-resource-identity-from-request.job'
@@ -40,6 +41,29 @@ describe('generateResourceIdentityFromRequestJob', () => {
 		expect(id1).toMatch(
 			/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
 		)
+	})
+
+	it('keeps the request identity stable across refactors (golden UUID)', async () => {
+		// Any change to the JSON fed into the UUIDv5 hash re-keys every cached
+		// entry (memory, Redis and the on-disk .rsc/.rsm pairs). Pinning the
+		// value makes such a change an explicit, reviewed decision. The request
+		// is built exactly the way the controller builds it.
+		const request = new CacheImageRequest({
+			resourceTarget: 'http://backend-service/media/acme/uploads/blog/post/cover.jpg',
+			resizeOptions: new ResizeOptions({
+				width: 800,
+				height: 600,
+				fit: FitOptions.cover,
+				position: PositionOptions.entropy,
+				format: SupportedResizeFormats.webp,
+				background: '#ff00aa80',
+				trimThreshold: 5,
+				quality: 80,
+			}),
+			tenantSchema: 'acme',
+		})
+
+		expect(await job.handle(request)).toBe('73ea4b9c-8730-5d77-b751-5a194b88809a')
 	})
 
 	it('produces different UUIDs for the same URL on different tenants', async () => {

@@ -1,30 +1,23 @@
 import type { HealthIndicatorResult } from '@nestjs/terminus'
-import type { DetailsMap } from '#microservice/common/types/common.types'
-import type { HealthCheckOptions, HealthMetrics, IHealthIndicator } from '../interfaces/health-indicator.interface.js'
-import { Injectable, Logger } from '@nestjs/common'
+import type { Metadata } from '#microservice/common/types/common.types'
+import { Injectable } from '@nestjs/common'
+import { errorMessage } from '#microservice/common/utils/error-message.util'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 
+const DEFAULT_TIMEOUT_MS = 5000
+
+/**
+ * Base for every health indicator. Terminus 12 rethrows anything an indicator
+ * rejects with (a 500 with no body), so `isHealthy()` converts throws into a
+ * returned `down` result; subclasses may throw freely from `performHealthCheck`.
+ */
 @Injectable()
-export abstract class BaseHealthIndicator implements IHealthIndicator {
-	protected readonly logger: Logger
-	protected readonly options: HealthCheckOptions
-	private lastCheck?: HealthMetrics
-
+export abstract class BaseHealthIndicator {
 	constructor(
 		public readonly key: string,
-		options: HealthCheckOptions = {},
-	) {
-		this.logger = new Logger(`${this.constructor.name}`)
-		this.options = {
-			timeout: 5000,
-			retries: 3,
-			threshold: 0.8,
-			...options,
-		}
-	}
+		protected readonly timeoutMs: number = DEFAULT_TIMEOUT_MS,
+	) {}
 
-	/**
-	 * Public method to check health with error handling and metrics
-	 */
 	async isHealthy(): Promise<HealthIndicatorResult> {
 		const startTime = Date.now()
 
@@ -32,45 +25,20 @@ export abstract class BaseHealthIndicator implements IHealthIndicator {
 			const result = await this.performHealthCheck()
 			const responseTime = Date.now() - startTime
 
-			// performHealthCheck() may legitimately *return* a `down` result via
-			// createUnhealthyResult() instead of throwing, so record what it
-			// actually reported rather than assuming the check passed.
-			const reported = result[this.key]
-			const isDown = reported?.status === 'down'
-
-			this.lastCheck = {
-				timestamp: Date.now(),
-				status: isDown ? 'unhealthy' : 'healthy',
-				responseTime,
-				details: reported || {},
-			}
-
-			if (isDown) {
-				this.logger.warn(`Health check reported down for ${this.key} in ${responseTime}ms`)
+			if (result[this.key]?.status === 'down') {
+				CorrelatedLogger.warn(`Health check reported down for ${this.key} in ${responseTime}ms`, this.constructor.name)
 			}
 			else {
-				this.logger.debug(`Health check passed for ${this.key} in ${responseTime}ms`)
+				CorrelatedLogger.debug(`Health check passed for ${this.key} in ${responseTime}ms`, this.constructor.name)
 			}
 			return result
 		}
 		catch (error: unknown) {
 			const responseTime = Date.now() - startTime
-			const message = error instanceof Error ? (error as Error).message : 'Health check failed'
+			const message = errorMessage(error)
+			CorrelatedLogger.warn(`Health check failed for ${this.key}: ${message}`, this.constructor.name)
 
-			this.lastCheck = {
-				timestamp: Date.now(),
-				status: 'unhealthy',
-				responseTime,
-				details: { error: message },
-			}
-
-			this.logger.warn(`Health check failed for ${this.key}: ${message}`)
-
-			// Terminus 12 removed HealthCheckError: its executor rethrows any
-			// rejected indicator promise, which escapes HealthCheckService as a
-			// 500 with no health payload. Returning the `down` result keeps the
-			// failure inside the aggregated report so /health still answers 503.
-			const downResult: HealthIndicatorResult = {
+			return {
 				[this.key]: {
 					status: 'down',
 					message,
@@ -78,37 +46,14 @@ export abstract class BaseHealthIndicator implements IHealthIndicator {
 					responseTime,
 				},
 			}
-
-			return downResult
 		}
 	}
 
-	/**
-	 * Get details about this health indicator including last check results
-	 */
-	getDetails(): DetailsMap {
-		return {
-			key: this.key,
-			options: this.options,
-			lastCheck: this.lastCheck,
-			description: this.getDescription(),
-		}
-	}
-
-	/**
-	 * Abstract method that subclasses must implement to perform the actual health check
-	 */
 	protected abstract performHealthCheck(): Promise<HealthIndicatorResult>
 
-	/**
-	 * Abstract method that subclasses should implement to provide a description
-	 */
 	protected abstract getDescription(): string
 
-	/**
-	 * Helper method to create a healthy result
-	 */
-	protected createHealthyResult(details: DetailsMap = {}): HealthIndicatorResult {
+	protected createHealthyResult(details: Metadata = {}): HealthIndicatorResult {
 		return {
 			[this.key]: {
 				status: 'up',
@@ -118,10 +63,7 @@ export abstract class BaseHealthIndicator implements IHealthIndicator {
 		}
 	}
 
-	/**
-	 * Helper method to create an unhealthy result
-	 */
-	protected createUnhealthyResult(message: string, details: DetailsMap = {}): HealthIndicatorResult {
+	protected createUnhealthyResult(message: string, details: Metadata = {}): HealthIndicatorResult {
 		return {
 			[this.key]: {
 				status: 'down',
@@ -132,13 +74,8 @@ export abstract class BaseHealthIndicator implements IHealthIndicator {
 		}
 	}
 
-	/**
-	 * Helper method to execute with timeout
-	 */
-	protected async executeWithTimeout<T>(
-		operation: () => Promise<T>,
-		timeoutMs: number = this.options.timeout || 5000,
-	): Promise<T> {
+	/** Rejects with a timeout error when `operation` outlives the indicator's budget. */
+	protected async executeWithTimeout<T>(operation: () => Promise<T>, timeoutMs: number = this.timeoutMs): Promise<T> {
 		return new Promise((resolve, reject) => {
 			const timer = setTimeout(() => {
 				reject(new Error(`Health check timeout after ${timeoutMs}ms`))

@@ -34,12 +34,13 @@ function generateUUIDv5(name: string, namespace: string = NAMESPACE_URL): string
  * two tenants requesting the same source URL (e.g. via the shared
  * `static/images/...` route that has no tenant in the URL) produce
  * different UUIDs and cannot collide in cache or on disk.
+ *
+ * The JSON text is the cache identity: field order and value shapes are
+ * pinned by the golden-UUID spec.
  */
 @Injectable()
 export default class GenerateResourceIdentityFromRequestJob {
 	async handle(cacheImageRequest: CacheImageRequest): Promise<ResourceIdentifierKP> {
-		const request = JSON.parse(JSON.stringify(cacheImageRequest))
-		const requestStr = JSON.stringify(request)
-		return generateUUIDv5(requestStr)
+		return generateUUIDv5(JSON.stringify(cacheImageRequest))
 	}
 }

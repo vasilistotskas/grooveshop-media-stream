@@ -3,16 +3,16 @@ import type { ImageSourceKey } from '../config/image-sources.config.js'
 import type { ImageProcessingContext, ImageProcessingParams } from '../types/image-source.types.js'
 import { BadRequestException, Controller, Get, NotFoundException, Req, Res } from '@nestjs/common'
 import { IMAGE } from '#microservice/common/constants/route-prefixes.constant'
-import { TENANT_SCHEMA_PATTERN } from '#microservice/common/constants/tenant.constant'
+import { PUBLIC_TENANT_SCHEMA } from '#microservice/common/constants/tenant.constant'
+import { errorMessage } from '#microservice/common/utils/error-message.util'
+import { decodePathFully } from '#microservice/common/utils/percent-decode.util'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { IMAGE_SOURCES } from '../config/image-sources.config.js'
 import CacheImageRequest, {
-	BackgroundOptions,
 	FitOptions,
-	PositionOptions,
 	ResizeOptions,
 	SupportedResizeFormats,
 } from '../dto/cache-image-request.dto.js'
@@ -25,13 +25,6 @@ const PARAM_PLUS_RE = /:([^/.]+)\+/g
 const PARAM_DOT_PARAM_RE = /:([^/.]+)\.([^/.]+)/g
 const PARAM_RE = /:([^/]+)/g
 const SLASH_RE = /\//g
-
-// The route regex already constrains the tenantSchema segment to
-// ``[^/]+``, so any value that reaches the controller is non-empty —
-// TENANT_SCHEMA_PATTERN (shared with admin-cache.controller.ts and
-// RequestValidatorService) catches uppercase, hyphens, dots, and
-// over-length values before they reach the cache namespace or the
-// Prometheus ``tenant_schema`` label (H20 in MULTI_TENANT_AUDIT.md).
 
 /**
  * Controller for image streaming with dynamic route matching
@@ -78,46 +71,15 @@ export default class MediaStreamImageController {
 			? req.path.substring(basePath.length)
 			: req.path
 
-		// Loop-decode percent-encoding until stable, capped at 3 passes.
-		//
-		// TinyMCE-edited blog HTML stores image URLs with inconsistent
-		// percent-encoding — the slash sometimes ends up as ``%2F`` and Greek
-		// bytes as ``%25CF%2584`` (double-encoded). Single-pass decoding
-		// leaves the inner layer intact, the URL builder re-encodes it, and
-		// the upstream returns 404 with a confusing "Double-encoded URL
-		// detected" or "No matching image source" rejection (verified
-		// 2026-05-16: 34 × C19 rejections + 42 × no-source-found on legit
-		// blog covers in 24h).
-		//
-		// Security: this looks like the C19 evasion (multi-decode bypass)
-		// it isn't, because path-traversal defence lives downstream of
-		// here — ``RequestValidatorService.validateRequest`` runs
-		// ``SecurityCheckerService.checkForMaliciousContent`` on every
-		// string param including ``imagePath``, and that service's
-		// ``containsPathTraversal`` already multi-decodes (single + double)
-		// and tests every traversal pattern (``../``, ``%2e%2e%2f`` etc.)
-		// against each decoded variant. Additionally, the strict
-		// IMAGE_SOURCES regex (``media/uploads/:imagePath+/:width/.../...``)
-		// rejects anything not shaped like a legitimate image path.
-		//
-		// A pathological input that never stabilises within 3 passes falls
-		// through still containing ``%`` — the regex won't match and the
-		// request 404s, which is the right outcome.
-		const MAX_DECODE_PASSES = 3
-		if (fullPath && fullPath.includes('%')) {
-			for (let i = 0; i < MAX_DECODE_PASSES; i++) {
-				let decoded: string
-				try {
-					decoded = decodeURIComponent(fullPath)
-				}
-				catch {
-					throw new BadRequestException('Invalid URL encoding in image path')
-				}
-				if (decoded === fullPath) {
-					break
-				}
-				fullPath = decoded
-			}
+		// Percent-decode until stable: TinyMCE-authored URLs arrive double-encoded.
+		// Traversal defence lives downstream (SecurityCheckerService multi-decodes
+		// every string param) and the strict IMAGE_SOURCES regex rejects anything
+		// not shaped like an image path, so decoding here is safe.
+		try {
+			fullPath = decodePathFully(fullPath)
+		}
+		catch {
+			throw new BadRequestException('Invalid URL encoding in image path')
 		}
 
 		CorrelatedLogger.debug(`Processing image request: ${fullPath} (original: ${req.path})`, MediaStreamImageController.name)
@@ -189,14 +151,7 @@ export default class MediaStreamImageController {
 
 		const params: ImageProcessingParams = {}
 		paramNames.forEach((name, index) => {
-			// Segments are kept VERBATIM. The former "null"→null sentinel
-			// is gone end-to-end: no client emits it (the Nuxt provider
-			// always sends concrete values — verified) and no stored
-			// content carries such URLs. Worse, coercing
-			// `media/null/uploads/…` turned tenantSchema into null and
-			// the controller fell back to the PUBLIC namespace — an
-			// unvalidated tenant bypass. A literal "null" resize segment
-			// now fails validation (400) like any other garbage value.
+			// Segments are kept verbatim; RequestValidatorService rejects garbage values with a 400.
 			params[name] = match[index + 1]
 		})
 
@@ -226,29 +181,16 @@ export default class MediaStreamImageController {
 				correlationId,
 			}
 
-			await this.requestValidatorService.validateRequest(context)
+			this.requestValidatorService.validateRequest(context)
 
 			const resourceUrl = this.urlBuilderService.buildResourceUrl(context)
-			await this.requestValidatorService.validateUrl(resourceUrl, correlationId)
+			this.requestValidatorService.validateUrl(resourceUrl, correlationId)
 
 			const resizeOptions = this.buildResizeOptions(params)
 
-			// tenantSchema is extracted from route params when the URL pattern
-			// includes it (UPLOADED_MEDIA). For shared sources (STATIC_IMAGES),
-			// fall back to "public" so keys remain stable. Used downstream as
-			// part of the cache namespace AND
-			// as the ``tenant_schema`` Prometheus label, so we validate
-			// the shape here before it can drive disk paths or metrics
-			// cardinality (H20 in MULTI_TENANT_AUDIT.md).
-			const rawTenantSchema = (params as Record<string, unknown> & { tenantSchema?: unknown }).tenantSchema
-			const tenantSchema = typeof rawTenantSchema === 'string'
-				? rawTenantSchema
-				: 'public'
-			if (tenantSchema !== 'public' && !TENANT_SCHEMA_PATTERN.test(tenantSchema)) {
-				throw new BadRequestException(
-					`Invalid tenantSchema: ${tenantSchema}. Must match /^[a-z_][a-z0-9_]{0,62}$/`,
-				)
-			}
+			// Only the tenant route carries a schema (already validated against
+			// TENANT_SCHEMA_PATTERN); shared routes cache under the public tenant.
+			const tenantSchema = params.tenantSchema ?? PUBLIC_TENANT_SCHEMA
 
 			const request = new CacheImageRequest({
 				resourceTarget: resourceUrl,
@@ -258,15 +200,12 @@ export default class MediaStreamImageController {
 
 			CorrelatedLogger.debug(`Processing ${source.name} request for ${resourceUrl} (params: ${JSON.stringify(params)})`, MediaStreamImageController.name)
 
-			res.locals.requestedFormat = resizeOptions.format
-			res.locals.originalUrl = resourceUrl
-
 			await this.imageStreamService.processAndStream(context, request, res, req)
 		}
 		catch (error: unknown) {
 			const errorName = error instanceof Error ? error.constructor.name : 'UnknownError'
 			CorrelatedLogger.error(
-				`Error in ${source.name} (params: ${JSON.stringify(params)}): ${(error as Error).message}`,
+				`Error in ${source.name} (params: ${JSON.stringify(params)}): ${errorMessage(error)}`,
 				error instanceof Error ? error.stack : undefined,
 				MediaStreamImageController.name,
 			)
@@ -278,16 +217,21 @@ export default class MediaStreamImageController {
 		}
 	}
 
+	/**
+	 * Every route segment is mandatory and already validated, so values are
+	 * converted verbatim; ResizeOptions supplies defaults only for programmatic
+	 * callers that omit a field.
+	 */
 	private buildResizeOptions(params: ImageProcessingParams): ResizeOptions {
 		return new ResizeOptions({
-			width: params.width ? Number(params.width) : null,
-			height: params.height ? Number(params.height) : null,
-			position: params.position || PositionOptions.entropy,
-			background: params.background || BackgroundOptions.transparent,
-			fit: (params.fit as FitOptions) || FitOptions.contain,
-			trimThreshold: params.trimThreshold ? Number(params.trimThreshold) : 5,
-			format: (params.format as SupportedResizeFormats) || SupportedResizeFormats.webp,
-			quality: params.quality ? Number(params.quality) : 80,
+			width: Number(params.width),
+			height: Number(params.height),
+			position: params.position,
+			background: params.background,
+			fit: params.fit as FitOptions | undefined,
+			trimThreshold: Number(params.trimThreshold),
+			format: params.format as SupportedResizeFormats | undefined,
+			quality: Number(params.quality),
 		})
 	}
 }

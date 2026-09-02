@@ -1,131 +1,18 @@
-/**
- * Content negotiation utility for serving optimal image formats
- * based on client Accept header
- */
-
-import type { Request } from 'express'
-import { SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
-
-interface NegotiatedFormat {
-	format: SupportedResizeFormats
-	quality: number
-	mimeType: string
-}
+const MIME_TYPES: Readonly<Record<string, string>> = Object.freeze({
+	avif: 'image/avif',
+	webp: 'image/webp',
+	jpeg: 'image/jpeg',
+	png: 'image/png',
+	svg: 'image/svg+xml',
+	gif: 'image/gif',
+	tiff: 'image/tiff',
+	// remove after 2026-12-26: sidecars written before 2026-06-29 may carry format 'heif'
+	heif: 'image/avif',
+})
 
 /**
- * Format priority order (best compression/quality ratio first)
+ * Content-Type for a stored/processed image format; unknown formats are served as octet-stream.
  */
-const FORMAT_PRIORITY: Array<{
-	format: SupportedResizeFormats
-	mimeType: string
-	acceptPattern: RegExp
-	defaultQuality: number
-}> = [
-	{
-		format: SupportedResizeFormats.avif,
-		mimeType: 'image/avif',
-		acceptPattern: /image\/avif/i,
-		defaultQuality: 70,
-	},
-	{
-		format: SupportedResizeFormats.webp,
-		mimeType: 'image/webp',
-		acceptPattern: /image\/webp/i,
-		defaultQuality: 80,
-	},
-	{
-		format: SupportedResizeFormats.jpeg,
-		mimeType: 'image/jpeg',
-		acceptPattern: /image\/jpe?g/i,
-		defaultQuality: 85,
-	},
-	{
-		format: SupportedResizeFormats.png,
-		mimeType: 'image/png',
-		acceptPattern: /image\/png/i,
-		defaultQuality: 90,
-	},
-]
-
-/**
- * Negotiate the best image format based on Accept header
- */
-export function negotiateImageFormat(
-	req: Request,
-	requestedFormat?: SupportedResizeFormats,
-	requestedQuality?: number,
-): NegotiatedFormat {
-	const acceptHeader = req.headers.accept || ''
-
-	// If a specific format is explicitly requested in the URL, always honor it
-	// This ensures URL-based format requests are respected
-	if (requestedFormat) {
-		const formatConfig = FORMAT_PRIORITY.find(f => f.format === requestedFormat)
-		if (formatConfig) {
-			return {
-				format: requestedFormat,
-				quality: requestedQuality || formatConfig.defaultQuality,
-				mimeType: formatConfig.mimeType,
-			}
-		}
-		// Handle formats not in priority list (e.g., svg, gif)
-		return {
-			format: requestedFormat,
-			quality: requestedQuality || 80,
-			mimeType: getMimeType(requestedFormat),
-		}
-	}
-
-	// No format requested - negotiate based on Accept header
-	// Check Accept header for supported formats (in priority order)
-	for (const formatConfig of FORMAT_PRIORITY) {
-		if (formatConfig.acceptPattern.test(acceptHeader)) {
-			return {
-				format: formatConfig.format,
-				quality: requestedQuality || formatConfig.defaultQuality,
-				mimeType: formatConfig.mimeType,
-			}
-		}
-	}
-
-	// Default to WebP as it has the best browser support among modern formats
-	return {
-		format: SupportedResizeFormats.webp,
-		quality: requestedQuality || 80,
-		mimeType: 'image/webp',
-	}
-}
-
-/**
- * Get the MIME type for a format
- */
-export function getMimeType(format: SupportedResizeFormats | string): string {
-	const formatConfig = FORMAT_PRIORITY.find(f => f.format === format)
-	if (formatConfig) {
-		return formatConfig.mimeType
-	}
-
-	// Handle additional formats
-	switch (format) {
-		case 'svg':
-			return 'image/svg+xml'
-		case 'gif':
-			return 'image/gif'
-		case 'tiff':
-			return 'image/tiff'
-		// Sharp/libvips reports AVIF output as 'heif' (the only producer of this
-		// value in our pipeline is the .avif() encoder). Map it to image/avif so
-		// entries cached before this normalisation still serve the correct type.
-		case 'heif':
-			return 'image/avif'
-		default:
-			return 'application/octet-stream'
-	}
-}
-
-/**
- * Generate Vary header value for content negotiation
- */
-export function getVaryHeader(): string {
-	return 'Accept, Accept-Encoding'
+export function getMimeType(format: string): string {
+	return MIME_TYPES[format] ?? 'application/octet-stream'
 }

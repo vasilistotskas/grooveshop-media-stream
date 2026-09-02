@@ -6,9 +6,14 @@ import { CorrelationService } from '../services/correlation.service.js'
 import { CorrelatedLogger } from '../utils/logger.util.js'
 import { PerformanceTracker } from '../utils/performance-tracker.util.js'
 
+/** Requests slower than this are logged at warn with a performance alert. */
+const SLOW_REQUEST_MS = 1000
+/** Requests slower than this are logged at warn even when they succeed. */
+const WARN_DURATION_MS = 2000
+
 @Injectable()
 export class TimingMiddleware implements NestMiddleware {
-	constructor(private readonly _correlationService: CorrelationService) { }
+	constructor(private readonly correlationService: CorrelationService) {}
 
 	use(req: Request, res: Response, next: NextFunction): void {
 		const startTime = process.hrtime.bigint()
@@ -17,8 +22,7 @@ export class TimingMiddleware implements NestMiddleware {
 		res.setHeader('x-request-start', startTimestamp.toString())
 
 		const originalEnd = res.end.bind(res)
-		const correlationService = this._correlationService
-		res.end = function (chunk?: any, encoding?: any, cb?: any): Response {
+		res.end = ((chunk?: unknown, encoding?: BufferEncoding, cb?: () => void): Response => {
 			const endTime = process.hrtime.bigint()
 			const endTimestamp = Date.now()
 			const duration = Number(endTime - startTime) / 1_000_000
@@ -28,57 +32,44 @@ export class TimingMiddleware implements NestMiddleware {
 				res.setHeader('x-request-end', endTimestamp.toString())
 			}
 
-			correlationService.updateContext({
-				startTime,
-				endTime,
-				duration,
-				startTimestamp,
-				endTimestamp,
-			})
+			this.correlationService.updateContext({ startTime, endTime, duration, startTimestamp, endTimestamp })
 
-			const context = correlationService.getContext()
+			const context = this.correlationService.getContext()
 			if (context) {
-				const logLevel = TimingMiddleware.prototype.getLogLevel(duration, res.statusCode)
 				const message = `${req.method} ${req.url} - ${res.statusCode} - ${duration.toFixed(2)}ms`
 
-				if (logLevel === 'warn') {
-					CorrelatedLogger.warn(`SLOW REQUEST: ${message}`, TimingMiddleware.name)
-				}
-				else if (logLevel === 'error') {
-					CorrelatedLogger.error(`FAILED REQUEST: ${message}`, '', TimingMiddleware.name)
-				}
-				else {
-					CorrelatedLogger.debug(message, TimingMiddleware.name)
+				switch (this.getLogLevel(duration, res.statusCode)) {
+					case 'error':
+						CorrelatedLogger.error(`FAILED REQUEST: ${message}`, undefined, TimingMiddleware.name)
+						break
+					case 'warn':
+						CorrelatedLogger.warn(`SLOW REQUEST: ${message}`, TimingMiddleware.name)
+						break
+					default:
+						CorrelatedLogger.debug(message, TimingMiddleware.name)
 				}
 
-				if (duration > 1000) {
-					CorrelatedLogger.warn(
-						`Performance Alert: Request took ${duration.toFixed(2)}ms - consider optimization`,
-						TimingMiddleware.name,
-					)
+				if (duration > SLOW_REQUEST_MS) {
+					CorrelatedLogger.warn(`Performance Alert: Request took ${duration.toFixed(2)}ms - consider optimization`, TimingMiddleware.name)
 				}
 
 				PerformanceTracker.logSummary()
-
-				// Ensure cleanup happens even if logSummary didn't clear it (redundancy)
-				// or if logSummary wasn't called
+				// logSummary clears the current request's phases; this covers the
+				// no-phase case so the tracker never retains a finished request.
 				PerformanceTracker.cleanup(context.correlationId)
 			}
 
-			return originalEnd(chunk, encoding, cb)
-		} as any
+			return originalEnd(chunk as never, encoding as never, cb)
+		}) as Response['end']
 
 		next()
 	}
 
-	/**
-	 * Determine appropriate log level based on response time and status code
-	 */
 	private getLogLevel(duration: number, statusCode: number): 'debug' | 'warn' | 'error' {
 		if (statusCode >= 500) {
 			return 'error'
 		}
-		if (statusCode >= 400 || duration > 2000) {
+		if (statusCode >= 400 || duration > WARN_DURATION_MS) {
 			return 'warn'
 		}
 		return 'debug'

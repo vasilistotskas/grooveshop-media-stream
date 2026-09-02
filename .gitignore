@@ -2,9 +2,10 @@
 dist
 build
 
-# ignore all env files except .env.example
+# ignore all env files except the committed examples
 .env*
-!*.env.example
+!.env.example
+!.env.docker.example
 
 # storage
 storage/*

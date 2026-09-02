@@ -1,26 +1,45 @@
 import type { HealthIndicatorResult } from '@nestjs/terminus'
+import type { RedisConfig } from '#microservice/Config/interfaces/app-config.interface'
+import type { CacheStats } from '../interfaces/cache-manager.interface.js'
 import { Injectable } from '@nestjs/common'
+import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { BaseHealthIndicator } from '#microservice/Health/base/base-health-indicator'
 import { RedisCacheService } from '../services/redis-cache.service.js'
 
+/** PING + SET + GET slower than this marks Redis `down`. */
+const RESPONSE_TIME_DOWN_MS = 200
+const RESPONSE_TIME_WARN_MS = 100
+const HIT_RATE_WARNING = 0.7
+const FRAGMENTATION_WARNING = 1.5
+const MEMORY_WARNING_MB = 100
+const HEALTH_CHECK_KEY = 'health-check-redis-test'
+
+interface RedisMemoryUsage {
+	used: number
+	peak: number
+	fragmentation: number
+}
+
 @Injectable()
 export class RedisHealthIndicator extends BaseHealthIndicator {
 	private lastHealthCheck: { result: HealthIndicatorResult, timestamp: number } | null = null
 	private readonly healthCheckCacheTtl: number
+	private readonly connection: Pick<RedisConfig, 'host' | 'port' | 'db'>
 
 	constructor(
 		private readonly redisCacheService: RedisCacheService,
-		private readonly _configService: ConfigService,
+		configService: ConfigService,
 	) {
 		super('redis')
-		// ✅ Load health check cache TTL from configuration (default: 10 seconds)
-		this.healthCheckCacheTtl = this._configService.getOptional('cache.redis.healthCheckCacheTtl', 10000)
+		const config = configService.get<RedisConfig>('cache.redis')
+		this.healthCheckCacheTtl = config.healthCheckCacheTtl
+		this.connection = { host: config.host, port: config.port, db: config.db }
 	}
 
 	protected async performHealthCheck(): Promise<HealthIndicatorResult> {
-		// Return cached result if recent (reduces Redis load by 90%)
+		// Memoised: probes fire every few seconds and must not load Redis
 		if (this.lastHealthCheck && Date.now() - this.lastHealthCheck.timestamp < this.healthCheckCacheTtl) {
 			CorrelatedLogger.debug('Returning cached Redis health check result', RedisHealthIndicator.name)
 			return this.lastHealthCheck.result
@@ -29,20 +48,14 @@ export class RedisHealthIndicator extends BaseHealthIndicator {
 		const startTime = Date.now()
 
 		try {
-			// Simple PING check - fastest way to verify Redis is alive
 			const pingResult = await this.redisCacheService.ping()
 			if (pingResult !== 'PONG') {
 				throw new Error(`Redis ping failed: ${pingResult}`)
 			}
 
-			// Single SET/GET test (simplified from 5 operations to 2)
-			const testKey = 'health-check-redis-test'
 			const testValue = Date.now()
-
-			await this.redisCacheService.set(testKey, testValue, 60)
-
-			const retrievedValue = await this.redisCacheService.get<number>(testKey)
-			if (retrievedValue !== testValue) {
+			await this.redisCacheService.set(HEALTH_CHECK_KEY, testValue, 60)
+			if (await this.redisCacheService.get<number>(HEALTH_CHECK_KEY) !== testValue) {
 				throw new Error('Redis GET operation failed')
 			}
 
@@ -51,18 +64,20 @@ export class RedisHealthIndicator extends BaseHealthIndicator {
 			const connectionStatus = this.redisCacheService.getConnectionStatus()
 
 			const responseTime = Date.now() - startTime
-			const isHealthy = connectionStatus.connected && responseTime <= 200
+			const isHealthy = connectionStatus.connected && responseTime <= RESPONSE_TIME_DOWN_MS
+
+			if (isHealthy) {
+				CorrelatedLogger.debug(`Redis health check passed in ${responseTime}ms`, RedisHealthIndicator.name)
+			}
+			else {
+				CorrelatedLogger.warn(`Redis health check failed: response time ${responseTime}ms, connected ${connectionStatus.connected}`, RedisHealthIndicator.name)
+			}
 
 			const result: HealthIndicatorResult = {
 				[this.key]: {
 					status: isHealthy ? 'up' : 'down',
 					responseTime: `${responseTime}ms`,
-					connection: {
-						connected: connectionStatus.connected,
-						host: this._configService.get('cache.redis.host'),
-						port: this._configService.get('cache.redis.port'),
-						db: this._configService.get('cache.redis.db'),
-					},
+					connection: { connected: connectionStatus.connected, ...this.connection },
 					statistics: {
 						hits: stats.hits,
 						misses: stats.misses,
@@ -78,57 +93,46 @@ export class RedisHealthIndicator extends BaseHealthIndicator {
 						usedMB: Math.round(memoryUsage.used / 1024 / 1024 * 100) / 100,
 					},
 					thresholds: {
-						responseTime: '200ms',
-						hitRate: '70%',
-						memoryFragmentation: '1.5',
+						responseTime: `${RESPONSE_TIME_DOWN_MS}ms`,
+						hitRate: `${HIT_RATE_WARNING * 100}%`,
+						memoryFragmentation: `${FRAGMENTATION_WARNING}`,
 					},
 					warnings: this.generateWarnings(stats, memoryUsage, responseTime, connectionStatus.stats.errors),
 				},
 			}
 
-			if (isHealthy) {
-				CorrelatedLogger.debug(`Redis health check passed in ${responseTime}ms`, RedisHealthIndicator.name)
-			}
-			else {
-				CorrelatedLogger.warn(`Redis health check failed: response time ${responseTime}ms, connected ${connectionStatus.connected}`, RedisHealthIndicator.name)
-			}
-
+			this.lastHealthCheck = { result, timestamp: Date.now() }
 			return result
 		}
 		catch (error: unknown) {
 			const responseTime = Date.now() - startTime
-			CorrelatedLogger.error(`Redis health check failed: ${(error as Error).message}`, (error as Error).stack, RedisHealthIndicator.name)
+			CorrelatedLogger.error(`Redis health check failed: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, RedisHealthIndicator.name)
 
 			return {
 				[this.key]: {
 					status: 'down',
-					error: (error as Error).message,
+					error: errorMessage(error),
 					responseTime: `${responseTime}ms`,
-					connection: {
-						connected: false,
-						host: this._configService.get('cache.redis.host'),
-						port: this._configService.get('cache.redis.port'),
-						db: this._configService.get('cache.redis.db'),
-					},
+					connection: { connected: false, ...this.connection },
 					lastCheck: new Date().toISOString(),
 				},
 			}
 		}
 	}
 
-	private generateWarnings(stats: any, memoryUsage: any, responseTime: number, errors: number = 0): string[] {
+	private generateWarnings(stats: CacheStats, memoryUsage: RedisMemoryUsage, responseTime: number, errors: number): string[] {
 		const warnings: string[] = []
 
-		if (responseTime > 100) {
-			warnings.push(`Response time (${responseTime}ms) is slower than optimal (100ms)`)
+		if (responseTime > RESPONSE_TIME_WARN_MS) {
+			warnings.push(`Response time (${responseTime}ms) is slower than optimal (${RESPONSE_TIME_WARN_MS}ms)`)
 		}
 
-		if (stats.hitRate < 0.7) {
-			warnings.push(`Cache hit rate (${Math.round(stats.hitRate * 100)}%) is below optimal (70%)`)
+		if (stats.hitRate < HIT_RATE_WARNING) {
+			warnings.push(`Cache hit rate (${Math.round(stats.hitRate * 100)}%) is below optimal (${HIT_RATE_WARNING * 100}%)`)
 		}
 
-		if (memoryUsage.fragmentation > 1.5) {
-			warnings.push(`Memory fragmentation (${memoryUsage.fragmentation}) is high (>1.5)`)
+		if (memoryUsage.fragmentation > FRAGMENTATION_WARNING) {
+			warnings.push(`Memory fragmentation (${memoryUsage.fragmentation}) is high (>${FRAGMENTATION_WARNING})`)
 		}
 
 		if (errors > 0) {
@@ -136,7 +140,7 @@ export class RedisHealthIndicator extends BaseHealthIndicator {
 		}
 
 		const memoryUsageMB = memoryUsage.used / 1024 / 1024
-		if (memoryUsageMB > 100) {
+		if (memoryUsageMB > MEMORY_WARNING_MB) {
 			warnings.push(`Memory usage (${Math.round(memoryUsageMB)}MB) is high`)
 		}
 

@@ -1,58 +1,41 @@
-import type { MockedObject } from 'vitest'
-import { Test, TestingModule } from '@nestjs/testing'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
-import { ConfigService } from '#microservice/Config/config.service'
-import { MetricsService } from '#microservice/Metrics/services/metrics.service'
+import type { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
+import type { MetricsService } from '#microservice/Metrics/services/metrics.service'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { RateLimitService } from '#microservice/RateLimit/services/rate-limit.service'
+import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
+
+/** Deliberately non-default values so the tests prove the schema wiring, not the defaults. */
+const CONFIG_OVERRIDES = {
+	'rateLimit.default.windowMs': 30_000,
+	'rateLimit.default.max': 120,
+	'rateLimit.imageProcessing.windowMs': 45_000,
+	'rateLimit.imageProcessing.max': 40,
+	'rateLimit.healthCheck.windowMs': 5_000,
+	'rateLimit.healthCheck.max': 900,
+}
+
+function createRedisClientMock(incrResult: number | Error) {
+	return {
+		defineCommand: vi.fn(),
+		rateLimitIncr: incrResult instanceof Error
+			? vi.fn().mockRejectedValue(incrResult)
+			: vi.fn().mockResolvedValue(incrResult),
+	}
+}
 
 describe('rateLimitService', () => {
 	let service: RateLimitService
-	let configService: MockedObject<ConfigService>
-	let metricsService: MockedObject<MetricsService>
+	let metricsService: { recordError: ReturnType<typeof vi.fn> }
+	let redisCacheService: { getClient: ReturnType<typeof vi.fn> }
 
-	beforeEach(async () => {
-		const mockConfigService = {
-			get: vi.fn(),
-			getOptional: vi.fn(),
-		}
-
-		const mockMetricsService = {
-			recordCacheOperation: vi.fn(),
-			recordError: vi.fn(),
-			getRegistry: vi.fn().mockReturnValue({}),
-		}
-
-		const mockRedisCacheService = {
-			get: vi.fn().mockResolvedValue(null),
-			set: vi.fn().mockResolvedValue(undefined),
-			delete: vi.fn().mockResolvedValue(undefined),
-			getConnectionStatus: vi.fn().mockReturnValue({ connected: false, stats: {} }),
-		}
-
-		const module: TestingModule = await Test.createTestingModule({
-			providers: [
-				RateLimitService,
-				{ provide: ConfigService, useValue: mockConfigService },
-				{ provide: MetricsService, useValue: mockMetricsService },
-				{ provide: RedisCacheService, useValue: mockRedisCacheService },
-			],
-		}).compile()
-
-		service = module.get<RateLimitService>(RateLimitService)
-		configService = module.get(ConfigService)
-		metricsService = module.get(MetricsService)
-	})
-
-	afterEach(() => {
-		vi.clearAllMocks()
-	})
-
-	describe('generateKey', () => {
-		it('should generate a key from IP and request type', () => {
-			const key = service.generateKey('192.168.1.1', 'image-processing')
-			expect(key).toBe('192.168.1.1:image-processing')
-		})
+	beforeEach(() => {
+		metricsService = { recordError: vi.fn() }
+		redisCacheService = { getClient: vi.fn().mockReturnValue(null) }
+		service = new RateLimitService(
+			createConfigServiceMock(CONFIG_OVERRIDES),
+			metricsService as unknown as MetricsService,
+			redisCacheService as unknown as RedisCacheService,
+		)
 	})
 
 	describe('generateAdvancedKey', () => {
@@ -63,7 +46,6 @@ describe('rateLimitService', () => {
 		})
 
 		it('should handle empty user agent', () => {
-			// For image-processing endpoint, we use IP-only (+ tenant schema) to prevent UA spoofing bypass
 			const key = service.generateAdvancedKey('192.168.1.1', '', 'image-processing')
 			expect(key).toBe('public:192.168.1.1:image-processing')
 		})
@@ -83,61 +65,33 @@ describe('rateLimitService', () => {
 			const key = service.generateAdvancedKey('192.168.1.1', 'Mozilla/5.0', 'default', 'acme')
 			expect(key).toMatch(/^192\.168\.1\.1:[a-z0-9]+:default$/)
 		})
+
+		it('should hash user agents that differ only in version numbers, case or whitespace into the same bucket', () => {
+			const chrome120 = service.generateAdvancedKey('192.168.1.1', 'Mozilla/5.0 Chrome/120.0.6099', 'default')
+			const chrome121 = service.generateAdvancedKey('192.168.1.1', 'mozilla/5.0   chrome/121.0.6167', 'default')
+			const firefox = service.generateAdvancedKey('192.168.1.1', 'Mozilla/5.0 Firefox/121.0', 'default')
+
+			expect(chrome121).toBe(chrome120)
+			expect(firefox).not.toBe(chrome120)
+		})
 	})
 
 	describe('getRateLimitConfig', () => {
-		beforeEach(() => {
-			configService.getOptional.mockImplementation((key: string, defaultValue?: any) => {
-				const configs: Record<string, any> = {
-					'rateLimit.default.windowMs': 60000,
-					'rateLimit.default.max': 100,
-					'rateLimit.imageProcessing.windowMs': 60000,
-					'rateLimit.imageProcessing.max': 50,
-					'rateLimit.healthCheck.windowMs': 10000,
-					'rateLimit.healthCheck.max': 1000,
-				}
-				return configs[key] || defaultValue
-			})
-		})
-
 		it('should return default config for unknown request type', () => {
-			const config = service.getRateLimitConfig('unknown')
-			expect(config).toEqual({
-				windowMs: 60000,
-				max: 100,
-				skipSuccessfulRequests: false,
-				skipFailedRequests: false,
-			})
+			expect(service.getRateLimitConfig('unknown')).toEqual({ windowMs: 30_000, max: 120 })
 		})
 
 		it('should return image processing config', () => {
-			const config = service.getRateLimitConfig('image-processing')
-			expect(config).toEqual({
-				windowMs: 60000,
-				max: 50,
-				skipSuccessfulRequests: false,
-				skipFailedRequests: false,
-			})
+			expect(service.getRateLimitConfig('image-processing')).toEqual({ windowMs: 45_000, max: 40 })
 		})
 
 		it('should return health check config', () => {
-			const config = service.getRateLimitConfig('health-check')
-			expect(config).toEqual({
-				windowMs: 10000,
-				max: 1000,
-				skipSuccessfulRequests: false,
-				skipFailedRequests: false,
-			})
+			expect(service.getRateLimitConfig('health-check')).toEqual({ windowMs: 5_000, max: 900 })
 		})
 	})
 
-	describe('checkRateLimit', () => {
-		const mockConfig = {
-			windowMs: 60000,
-			max: 5,
-			skipSuccessfulRequests: false,
-			skipFailedRequests: false,
-		}
+	describe('checkRateLimit (in-memory fallback, no Redis client)', () => {
+		const mockConfig = { windowMs: 60_000, max: 5 }
 
 		it('should allow first request', async () => {
 			const result = await service.checkRateLimit('test-key', mockConfig)
@@ -149,10 +103,8 @@ describe('rateLimitService', () => {
 		})
 
 		it('should track multiple requests', async () => {
-			// First request
 			await service.checkRateLimit('test-key', mockConfig)
 
-			// Second request
 			const result = await service.checkRateLimit('test-key', mockConfig)
 
 			expect(result.allowed).toBe(true)
@@ -161,12 +113,10 @@ describe('rateLimitService', () => {
 		})
 
 		it('should block requests when limit exceeded', async () => {
-			// Make 5 requests (at the limit)
 			for (let i = 0; i < 5; i++) {
 				await service.checkRateLimit('test-key', mockConfig)
 			}
 
-			// 6th request should be blocked
 			const result = await service.checkRateLimit('test-key', mockConfig)
 
 			expect(result.allowed).toBe(false)
@@ -177,13 +127,9 @@ describe('rateLimitService', () => {
 		it('should reset after window expires', async () => {
 			const shortConfig = { ...mockConfig, windowMs: 100 }
 
-			// Make request
 			await service.checkRateLimit('test-key', shortConfig)
-
-			// Wait for window to expire
 			await new Promise(resolve => setTimeout(resolve, 150))
 
-			// Next request should be allowed
 			const result = await service.checkRateLimit('test-key', shortConfig)
 			expect(result.allowed).toBe(true)
 			expect(result.info.current).toBe(1)
@@ -198,89 +144,108 @@ describe('rateLimitService', () => {
 		})
 	})
 
-	describe('getSystemLoad', () => {
-		it('should report heap pressure against the V8 heap ceiling', async () => {
-			const systemLoad = await service.getSystemLoad()
+	describe('checkRateLimit (Redis)', () => {
+		const mockConfig = { windowMs: 60_000, max: 5 }
 
-			expect(typeof systemLoad.memoryUsage).toBe('number')
+		it('should register the Lua command once per client and use its INCR result', async () => {
+			const client = createRedisClientMock(3)
+			redisCacheService.getClient.mockReturnValue(client)
+
+			await service.checkRateLimit('test-key', mockConfig)
+			const result = await service.checkRateLimit('test-key', mockConfig)
+
+			expect(client.defineCommand).toHaveBeenCalledTimes(1)
+			expect(client.defineCommand).toHaveBeenCalledWith('rateLimitIncr', {
+				numberOfKeys: 1,
+				lua: expect.stringContaining('INCR'),
+			})
+			expect(client.rateLimitIncr).toHaveBeenCalledTimes(2)
+			expect(client.rateLimitIncr).toHaveBeenCalledWith('ratelimit:test-key', 60)
+			expect(result.allowed).toBe(true)
+			expect(result.info.current).toBe(3)
+			expect(result.info.remaining).toBe(2)
+			expect(result.info.limit).toBe(5)
+		})
+
+		it('should block when the shared counter exceeds the limit', async () => {
+			redisCacheService.getClient.mockReturnValue(createRedisClientMock(6))
+
+			const result = await service.checkRateLimit('test-key', mockConfig)
+
+			expect(result.allowed).toBe(false)
+			expect(result.info.current).toBe(6)
+			expect(result.info.remaining).toBe(0)
+		})
+
+		it('should re-register the Lua command when the client instance changes (reconnect)', async () => {
+			const first = createRedisClientMock(1)
+			const second = createRedisClientMock(1)
+			redisCacheService.getClient.mockReturnValueOnce(first).mockReturnValueOnce(second)
+
+			await service.checkRateLimit('test-key', mockConfig)
+			await service.checkRateLimit('test-key', mockConfig)
+
+			expect(first.defineCommand).toHaveBeenCalledTimes(1)
+			expect(second.defineCommand).toHaveBeenCalledTimes(1)
+		})
+
+		it('should fall back to the in-memory counter when the Redis command rejects', async () => {
+			const client = createRedisClientMock(new Error('READONLY'))
+			redisCacheService.getClient.mockReturnValue(client)
+
+			const first = await service.checkRateLimit('test-key', mockConfig)
+			const second = await service.checkRateLimit('test-key', mockConfig)
+
+			// Redis is retried on every call rather than being marked dead
+			expect(client.rateLimitIncr).toHaveBeenCalledTimes(2)
+			expect(first.allowed).toBe(true)
+			expect(first.info.current).toBe(1)
+			expect(second.info.current).toBe(2)
+		})
+	})
+
+	describe('getHeapPressurePercent', () => {
+		it('should report heap pressure against the V8 heap ceiling', () => {
+			const pressure = service.getHeapPressurePercent()
+
+			expect(typeof pressure).toBe('number')
 			// heapUsed / heap_size_limit: a healthy test process sits far below
 			// its heap ceiling (heapUsed/heapTotal would routinely read >85%).
-			expect(systemLoad.memoryUsage).toBeGreaterThan(0)
-			expect(systemLoad.memoryUsage).toBeLessThan(85)
+			expect(pressure).toBeGreaterThan(0)
+			expect(pressure).toBeLessThan(85)
 		})
 	})
 
 	describe('calculateAdaptiveLimit', () => {
-		it('should return base limit when system load is low', async () => {
-			// Temporarily override NODE_ENV to test adaptive behavior
-			const originalEnv = process.env.NODE_ENV
-			process.env.NODE_ENV = 'production'
+		it('should return the base limit while heap pressure is at or below the threshold', async () => {
+			vi.spyOn(service, 'getHeapPressurePercent').mockReturnValue(60)
 
-			try {
-				// Mock low system load
-				vi.spyOn(service, 'getSystemLoad').mockResolvedValue({
-					memoryUsage: 60,
-				})
-
-				const adaptiveLimit = await service.calculateAdaptiveLimit(100)
-				expect(adaptiveLimit).toBe(100)
-			}
-			finally {
-				// Restore original environment
-				process.env.NODE_ENV = originalEnv
-			}
+			await expect(service.calculateAdaptiveLimit(100)).resolves.toBe(100)
 		})
 
-		it('should reduce limit when memory usage is high', async () => {
-			// Temporarily override NODE_ENV to test adaptive behavior
-			const originalEnv = process.env.NODE_ENV
-			process.env.NODE_ENV = 'production'
+		it('should reduce the limit proportionally above 85% pressure', async () => {
+			// 90% is 5 points past the threshold: 5/20 = 25% reduction
+			vi.spyOn(service, 'getHeapPressurePercent').mockReturnValue(90)
 
-			try {
-				// Mock high memory usage
-				vi.spyOn(service, 'getSystemLoad').mockResolvedValue({
-					memoryUsage: 90, // Above 85% threshold
-				})
+			await expect(service.calculateAdaptiveLimit(100)).resolves.toBe(75)
+		})
 
-				const adaptiveLimit = await service.calculateAdaptiveLimit(100)
-				expect(adaptiveLimit).toBeLessThan(100)
-				expect(adaptiveLimit).toBeGreaterThan(0)
-			}
-			finally {
-				// Restore original environment
-				process.env.NODE_ENV = originalEnv
-			}
+		it('should cap the reduction at 50%', async () => {
+			vi.spyOn(service, 'getHeapPressurePercent').mockReturnValue(120)
+
+			await expect(service.calculateAdaptiveLimit(100)).resolves.toBe(50)
 		})
 
 		it('should ensure minimum limit of 1', async () => {
-			// Temporarily override NODE_ENV to test adaptive behavior
-			const originalEnv = process.env.NODE_ENV
-			process.env.NODE_ENV = 'production'
+			vi.spyOn(service, 'getHeapPressurePercent').mockReturnValue(95)
 
-			try {
-				// Mock extremely high system load
-				vi.spyOn(service, 'getSystemLoad').mockResolvedValue({
-					memoryUsage: 95,
-				})
-
-				const adaptiveLimit = await service.calculateAdaptiveLimit(10)
-				expect(adaptiveLimit).toBeGreaterThanOrEqual(1)
-			}
-			finally {
-				// Restore original environment
-				process.env.NODE_ENV = originalEnv
-			}
+			await expect(service.calculateAdaptiveLimit(1)).resolves.toBe(1)
 		})
 	})
 
 	describe('recordRateLimitMetrics', () => {
 		it('should record metrics for allowed requests', () => {
-			const info = {
-				limit: 100,
-				current: 1,
-				remaining: 99,
-				resetTime: new Date(),
-			}
+			const info = { limit: 100, current: 1, remaining: 99, resetTime: new Date() }
 
 			service.recordRateLimitMetrics('image-processing', true, info)
 
@@ -288,19 +253,11 @@ describe('rateLimitService', () => {
 		})
 
 		it('should record metrics for blocked requests', () => {
-			const info = {
-				limit: 100,
-				current: 101,
-				remaining: 0,
-				resetTime: new Date(),
-			}
+			const info = { limit: 100, current: 101, remaining: 0, resetTime: new Date() }
 
 			service.recordRateLimitMetrics('image-processing', false, info)
 
-			expect(metricsService.recordError).toHaveBeenCalledWith(
-				'rate_limit_exceeded',
-				'image-processing',
-			)
+			expect(metricsService.recordError).toHaveBeenCalledWith('rate_limit_exceeded', 'image-processing')
 		})
 	})
 
@@ -340,23 +297,8 @@ describe('rateLimitService', () => {
 			expect(service.isBot('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)')).toBe(false)
 		})
 
-		it('should handle empty user agent', () => {
+		it('should not treat an empty user agent as a bot', () => {
 			expect(service.isBot('')).toBe(false)
-			expect(service.isBot(null as any)).toBe(false)
-			expect(service.isBot(undefined as any)).toBe(false)
-		})
-	})
-
-	describe('getBypassBotsConfig', () => {
-		it('should return bot bypass configuration', () => {
-			configService.getOptional.mockReturnValue(true)
-			expect(service.getBypassBotsConfig()).toBe(true)
-			expect(configService.getOptional).toHaveBeenCalledWith('rateLimit.bypass.bots', true)
-		})
-
-		it('should return default value when not configured', () => {
-			configService.getOptional.mockReturnValue(true)
-			expect(service.getBypassBotsConfig()).toBe(true)
 		})
 	})
 })

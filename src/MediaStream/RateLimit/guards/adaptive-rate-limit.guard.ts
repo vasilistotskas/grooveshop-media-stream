@@ -1,222 +1,150 @@
-import type { ExecutionContext } from '@nestjs/common'
-import type { ThrottlerModuleOptions, ThrottlerStorage } from '@nestjs/throttler'
-import * as process from 'node:process'
-import { Inject, Injectable } from '@nestjs/common'
-import { Reflector } from '@nestjs/core'
-import { getOptionsToken, getStorageToken, ThrottlerException, ThrottlerGuard } from '@nestjs/throttler'
+import type { CanActivate, ExecutionContext } from '@nestjs/common'
+import type { RateLimitConfig } from '#microservice/Config/interfaces/app-config.interface'
+import type { RateLimitInfo } from '../services/rate-limit.service.js'
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common'
 import { IMAGE } from '#microservice/common/constants/route-prefixes.constant'
+import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { getClientIp, isInternalIp } from '#microservice/common/utils/ip.util'
 import { extractTenantSchemaFromPath } from '#microservice/common/utils/tenant-path.util'
+import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { TenantDomainsService } from '#microservice/Validation/services/tenant-domains.service'
 import { RateLimitService } from '../services/rate-limit.service.js'
 
 const STATIC_ASSET_RE = /\.(?:css|js|png|jpg|jpeg|gif|ico|svg)$/
+const IMAGE_ROUTE_SEGMENT = `/${IMAGE}/`
+const HEALTH_PREFIX = '/health'
+const CIRCUIT_BREAKER_RESET_PATH = '/health/circuit-breaker/reset'
+
+/** Minimal request shape the guard reads; matches Express and the spec doubles. */
+interface GuardRequest {
+	url?: string
+	method?: string
+	ip?: string
+	headers: Record<string, string | string[] | undefined>
+	socket?: { remoteAddress?: string }
+}
+
+interface GuardResponse {
+	setHeader: (name: string, value: string) => unknown
+}
 
 /**
- * AdaptiveRateLimitGuard extends ThrottlerGuard so that the NestJS Throttler
- * storage (registered via ThrottlerModule.forRootAsync) is the counting backend.
+ * Adaptive, distributed rate limiting.
  *
- * Layer structure:
- *   1. shouldSkip() — fast-path bypass for dev, health checks, static
- *      assets, bots from internal IPs, and whitelisted domains. `/metrics`
- *      is deliberately NOT exempt (see shouldSkipRateLimit()). If any bypass
- *      fires, the NestJS ThrottlerGuard counting is skipped entirely.
- *   2. Adaptive pre-check — when system load is high the effective limit is
- *      reduced; if that reduced limit is already exceeded by our own Redis
- *      counter we throw 429 immediately without going through the Throttler
- *      increment path.
- *   3. super.canActivate() — delegates to ThrottlerGuard which calls
- *      storageService.increment() (in-memory ThrottlerStorageService) for
- *      the per-process secondary safety net, and sets X-RateLimit-* headers.
+ *  1. Bypass fast path: health probes, static assets under public/, bots from
+ *     internal IPs, and whitelisted internal referers. `/metrics` is
+ *     deliberately NOT exempt (defence in depth beside InternalSecretGuard).
+ *  2. The effective limit shrinks under heap pressure (RateLimitService).
+ *  3. The counter is a Redis Lua INCR+EXPIRE, with an in-process fallback when
+ *     Redis is unavailable (RateLimitService.checkRateLimit).
  *
- * The primary distributed counter lives in RateLimitService (Redis via
- * ioredis with an atomic Lua INCR+EXPIRE).  The ThrottlerStorageService is
- * an in-process fallback that catches per-pod bursts even if Redis is down.
- *
- * Testability: Because shouldSkip() and getTracker() are both overridable
- * protected methods, unit tests can subclass this guard and replace either
- * without mocking the entire ThrottlerModule.  Integration tests can inject
- * a spy ThrottlerStorage to assert increment() call counts.
+ * A limiter fault must never 500 a request, so internal errors fail open.
+ * `RATE_LIMIT_ENABLED=false` is the operator kill-switch.
  */
 @Injectable()
-export class AdaptiveRateLimitGuard extends ThrottlerGuard {
-	private cachedWhitelistedDomains: string[] | null = null
-	private cachedBypassBots: boolean | null = null
-	private cachedEnabled: boolean | null = null
-	private cachedBypassHealthChecks: boolean | null = null
-	private cachedBypassStaticAssets: boolean | null = null
+export class AdaptiveRateLimitGuard implements CanActivate {
+	private readonly enabled: boolean
+	private readonly bypassHealthChecks: boolean
+	private readonly bypassStaticAssets: boolean
+	private readonly bypassBots: boolean
+	private readonly whitelistedDomains: readonly string[]
 
 	constructor(
-		@Inject(getOptionsToken()) options: ThrottlerModuleOptions,
-		@Inject(getStorageToken()) storageService: ThrottlerStorage,
-		reflector: Reflector,
+		configService: ConfigService,
 		private readonly rateLimitService: RateLimitService,
 		private readonly metricsService: MetricsService,
 		private readonly tenantDomainsService: TenantDomainsService,
 	) {
-		super(options, storageService, reflector)
+		const config = configService.get<RateLimitConfig>('rateLimit')
+		this.enabled = config.enabled
+		this.bypassHealthChecks = config.bypass.healthChecks
+		this.bypassStaticAssets = config.bypass.staticAssets
+		this.bypassBots = config.bypass.bots
+		this.whitelistedDomains = config.bypass.whitelistedDomains
 	}
 
-	/**
-	 * Override canActivate to add adaptive pre-check before delegating to the
-	 * NestJS ThrottlerGuard counting.
-	 */
-	override async canActivate(context: ExecutionContext): Promise<boolean> {
-		if (process.env.NODE_ENV === 'development') {
-			CorrelatedLogger.debug('Skipping rate limiting in development mode', AdaptiveRateLimitGuard.name)
+	async canActivate(context: ExecutionContext): Promise<boolean> {
+		if (!this.enabled) {
 			return true
 		}
 
-		// Operator kill-switch (RATE_LIMIT_ENABLED=false disables all limiting).
-		// A config read failure must not 500 requests — default to enabled.
-		if (this.cachedEnabled === null) {
-			try {
-				this.cachedEnabled = this.rateLimitService.isEnabled()
-			}
-			catch {
-				this.cachedEnabled = true
-			}
-		}
-		if (!this.cachedEnabled) {
+		const request = context.switchToHttp().getRequest<GuardRequest>()
+		if (this.shouldSkip(request)) {
 			return true
 		}
 
-		const request = context.switchToHttp().getRequest()
-
-		if (await this.shouldSkip(context)) {
-			return true
-		}
-
-		// Adaptive pre-check: apply Redis-backed counting with load-adjusted
-		// limits BEFORE the ThrottlerGuard in-memory increment.
 		try {
 			const clientIp = getClientIp(request)
 			const requestType = this.getRequestType(request)
-			const userAgent: string = request.headers['user-agent'] || ''
-			const tenantSchema = extractTenantSchemaFromPath((request.url || '').split('?')[0])
+			const userAgent = this.headerValue(request, 'user-agent')
+			const tenantSchema = extractTenantSchemaFromPath(this.pathname(request))
 
-			const rateLimitKey = this.rateLimitService.generateAdvancedKey(clientIp, userAgent, requestType, tenantSchema)
+			const key = this.rateLimitService.generateAdvancedKey(clientIp, userAgent, requestType, tenantSchema)
 			const config = this.rateLimitService.getRateLimitConfig(requestType)
-			const adaptiveLimit = await this.rateLimitService.calculateAdaptiveLimit(config.max)
-			const adaptiveConfig = { ...config, max: adaptiveLimit }
+			const max = await this.rateLimitService.calculateAdaptiveLimit(config.max)
 
-			const { allowed, info } = await this.rateLimitService.checkRateLimit(rateLimitKey, adaptiveConfig)
+			const { allowed, info } = await this.rateLimitService.checkRateLimit(key, { ...config, max })
 
 			this.rateLimitService.recordRateLimitMetrics(requestType, allowed, info)
 			this.metricsService.recordRateLimitAttempt(requestType, allowed)
-
-			const response = context.switchToHttp().getResponse()
-			this.addRateLimitHeaders(response, info, allowed)
+			this.addRateLimitHeaders(context.switchToHttp().getResponse<GuardResponse>(), info, allowed)
 
 			if (!allowed) {
-				CorrelatedLogger.warn(`Rate limit exceeded for ${clientIp} on ${requestType} (${info.current}/${info.limit}, resets ${info.resetTime.toISOString()})`, AdaptiveRateLimitGuard.name)
-
-				throw new ThrottlerException('Rate limit exceeded')
+				CorrelatedLogger.warn(
+					`Rate limit exceeded for ${clientIp} on ${requestType} (${info.current}/${info.limit}, resets ${info.resetTime.toISOString()})`,
+					AdaptiveRateLimitGuard.name,
+				)
+				throw new HttpException('Rate limit exceeded', HttpStatus.TOO_MANY_REQUESTS)
 			}
 
-			CorrelatedLogger.debug(`Rate limit pre-check passed for ${clientIp} on ${requestType} (${info.current}/${info.limit}, ${info.remaining} remaining)`, AdaptiveRateLimitGuard.name)
+			CorrelatedLogger.debug(
+				`Rate limit check passed for ${clientIp} on ${requestType} (${info.current}/${info.limit}, ${info.remaining} remaining)`,
+				AdaptiveRateLimitGuard.name,
+			)
 		}
 		catch (error: unknown) {
-			if (error instanceof ThrottlerException) {
+			if (error instanceof HttpException) {
 				throw error
 			}
 
-			CorrelatedLogger.error(`Error in rate limit adaptive pre-check: ${(error as Error).message}`, (error as Error).stack, AdaptiveRateLimitGuard.name)
-			// Do not block on pre-check errors; fall through to ThrottlerGuard.
+			CorrelatedLogger.error(
+				`Rate limit check failed, allowing request: ${errorMessage(error)}`,
+				error instanceof Error ? error.stack : undefined,
+				AdaptiveRateLimitGuard.name,
+			)
 		}
 
-		// Delegate to ThrottlerGuard for per-process in-memory counting.
-		// This acts as a secondary safety net when Redis is unavailable.
-		return super.canActivate(context)
+		return true
 	}
 
 	/**
-	 * Override shouldSkip so that health checks, static assets, whitelisted
-	 * domains, and bot UAs from internal IPs all bypass the Throttler
-	 * counters. `/metrics` is deliberately NOT exempt.
+	 * Cheapest checks first. K8s probes (/health, /health/live, /health/ready)
+	 * fire every few seconds and must never be throttled; the circuit-breaker
+	 * reset is auth-gated and stays limited as defence in depth.
 	 */
-	protected override async shouldSkip(context: ExecutionContext): Promise<boolean> {
-		const request = context.switchToHttp().getRequest()
-		return this.shouldSkipRateLimit(request)
-	}
+	private shouldSkip(request: GuardRequest): boolean {
+		const url = request.url ?? ''
+		const method = request.method ?? 'GET'
 
-	/**
-	 * Override getTracker to use our IP-based key consistent with
-	 * RateLimitService.generateAdvancedKey.
-	 */
-	protected override async getTracker(req: Record<string, any>): Promise<string> {
-		return getClientIp(req)
-	}
-
-	/**
-	 * Override generateKey to incorporate request type into the throttler key
-	 * so that image-processing and default buckets are tracked separately.
-	 */
-	protected override generateKey(
-		context: ExecutionContext,
-		suffix: string,
-		name: string,
-	): string {
-		const request = context.switchToHttp().getRequest()
-		const requestType = this.getRequestType(request)
-		return `${suffix}:${requestType}:${name}`
-	}
-
-	/**
-	 * Determine if rate limiting should be skipped for this request.
-	 */
-	private shouldSkipRateLimit(request: any): boolean {
-		const url = request.url || ''
-
-		// Config read failures must not 500 requests — fall back to the defaults.
-		if (this.cachedBypassHealthChecks === null) {
-			try {
-				this.cachedBypassHealthChecks = this.rateLimitService.getBypassHealthChecksConfig()
-			}
-			catch {
-				this.cachedBypassHealthChecks = true
-			}
-		}
-		if (this.cachedBypassStaticAssets === null) {
-			try {
-				this.cachedBypassStaticAssets = this.rateLimitService.getBypassStaticAssetsConfig()
-			}
-			catch {
-				this.cachedBypassStaticAssets = true
-			}
-		}
-
-		// Cheapest checks first (string startsWith).
-		// /metrics and POST /health/circuit-breaker/reset are now auth-gated via
-		// InternalSecretGuard; they must NOT be rate-limit-exempt so that the
-		// guard acts as a defence-in-depth layer even with the secret present.
-		// K8s liveness/readiness probes (/health/live, /health/ready, /health)
-		// and the circuit-breaker status GET are exempt — they fire every few
-		// seconds and must never be throttled.
-		const method = request.method || 'GET'
-		if (this.cachedBypassHealthChecks && url.startsWith('/health') && !(url === '/health/circuit-breaker/reset' && method === 'POST')) {
+		if (this.bypassHealthChecks && url.startsWith(HEALTH_PREFIX) && !(url === CIRCUIT_BREAKER_RESET_PATH && method === 'POST')) {
 			return true
 		}
 
-		// Static-asset bypass is for genuinely static files served from public/
-		// (default.png, robots.txt, etc). It must NOT match image-processing
-		// routes: those end in `:quality.:format` (e.g. `/…/80.png`), so a png/
-		// jpg/gif/svg output format would otherwise match STATIC_ASSET_RE and
-		// let an attacker skip the image-processing throttle entirely by
-		// choosing a non-webp/avif output format.
-		if (this.cachedBypassStaticAssets && !url.includes(`/${IMAGE}/`) && STATIC_ASSET_RE.test(url)) {
+		// Static-asset bypass covers files served from public/ only. Image
+		// routes end in `:quality.:format` (e.g. `/…/80.png`), so they must be
+		// excluded or a png/jpg/gif/svg output format would skip the throttle.
+		if (this.bypassStaticAssets && !url.includes(IMAGE_ROUTE_SEGMENT) && STATIC_ASSET_RE.test(url)) {
 			return true
 		}
 
-		const userAgent = request.headers['user-agent'] || ''
-		if (this.shouldBypassBot(userAgent) && isInternalIp(getClientIp(request))) {
+		const userAgent = this.headerValue(request, 'user-agent')
+		if (this.bypassBots && this.rateLimitService.isBot(userAgent) && isInternalIp(getClientIp(request))) {
 			CorrelatedLogger.debug(`Skipping rate limiting for bot from internal IP: ${userAgent}`, AdaptiveRateLimitGuard.name)
 			return true
 		}
 
-		// Most expensive check last (IP check + URL parsing + domain matching)
 		if (this.isDomainWhitelisted(request)) {
 			CorrelatedLogger.debug(`Skipping rate limiting for internal whitelisted domain (ip: ${getClientIp(request)})`, AdaptiveRateLimitGuard.name)
 			return true
@@ -226,149 +154,62 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 	}
 
 	/**
-	 * Check if bot bypass is enabled and user agent is a bot.
+	 * Referer/Origin are attacker-controlled, so the whitelist only applies to
+	 * internal-IP callers. A hostname passes if it matches the static env list
+	 * (an entry also covers its subdomains) OR the dynamic tenant-domain set, which is
+	 * deliberately not cached so newly onboarded tenants bypass immediately.
 	 */
-	private shouldBypassBot(userAgent: string): boolean {
-		// Config read failures must not 500 requests — fail with bypass disabled.
-		if (this.cachedBypassBots === null) {
+	private isDomainWhitelisted(request: GuardRequest): boolean {
+		if (!isInternalIp(getClientIp(request))) {
+			return false
+		}
+
+		for (const header of ['referer', 'origin'] as const) {
+			const value = this.headerValue(request, header)
+			if (!value) {
+				continue
+			}
 			try {
-				this.cachedBypassBots = this.rateLimitService.getBypassBotsConfig()
-			}
-			catch {
-				this.cachedBypassBots = false
-			}
-		}
-		if (!this.cachedBypassBots) {
-			return false
-		}
-
-		return this.rateLimitService.isBot(userAgent)
-	}
-
-	/**
-	 * Check if the request comes from a whitelisted domain.
-	 * Only trusted for requests arriving from internal/private IP ranges —
-	 * Referer and Origin are fully attacker-controlled HTTP headers and MUST NOT
-	 * be used to bypass rate limiting for requests from public IP addresses.
-	 *
-	 * Union semantics (mirrors InputSanitizationService.validateUrl): a hostname
-	 * bypasses rate limiting if it matches the static, process-lifetime env list
-	 * (`RATE_LIMIT_BYPASS_WHITELISTED_DOMAINS` — cluster-internal service names
-	 * like backend-service/frontend-nuxt-service, which never change at runtime
-	 * and so are safe to cache once) OR the dynamic per-tenant domain set kept
-	 * live by TenantDomainsService (refreshed from Django's tenant feed without
-	 * a restart). The dynamic side is deliberately NOT cached here so newly
-	 * onboarded tenant domains bypass immediately.
-	 */
-	private isDomainWhitelisted(request: any): boolean {
-		try {
-			// Guard: only apply the whitelist for internal-network callers.
-			// An external client can trivially forge Referer/Origin headers.
-			if (!isInternalIp(getClientIp(request))) {
-				return false
-			}
-
-			if (this.cachedWhitelistedDomains === null) {
-				this.cachedWhitelistedDomains = this.rateLimitService.getWhitelistedDomains()
-			}
-			const whitelistedDomains = this.cachedWhitelistedDomains
-
-			const referer = request.headers.referer
-			if (referer) {
-				try {
-					const refererUrl = new URL(referer)
-					if (this.isHostnameWhitelisted(refererUrl.hostname, whitelistedDomains)) {
-						return true
-					}
-				}
-				catch {
-					// Invalid referer URL, continue checking other headers
-				}
-			}
-
-			const origin = request.headers.origin
-			if (origin) {
-				try {
-					const originUrl = new URL(origin)
-					if (this.isHostnameWhitelisted(originUrl.hostname, whitelistedDomains)) {
-						return true
-					}
-				}
-				catch {
-					// Invalid origin URL, continue
-				}
-			}
-
-			return false
-		}
-		catch (error: unknown) {
-			CorrelatedLogger.error(`Error checking domain whitelist: ${(error as Error).message}`, (error as Error).stack, AdaptiveRateLimitGuard.name)
-			return false
-		}
-	}
-
-	/**
-	 * Union of the static env-configured whitelist and the dynamic tenant
-	 * domain set. See isDomainWhitelisted() for the rationale.
-	 */
-	private isHostnameWhitelisted(hostname: string, whitelistedDomains: string[] | null): boolean {
-		if (whitelistedDomains && whitelistedDomains.length > 0 && this.matchesDomain(hostname, whitelistedDomains)) {
-			return true
-		}
-
-		return this.tenantDomainsService.isAllowed(hostname)
-	}
-
-	/**
-	 * Check if a domain matches any of the whitelisted domains.
-	 * Supports exact matches and wildcard subdomains (*.example.com).
-	 */
-	private matchesDomain(domain: string, whitelistedDomains: string[]): boolean {
-		for (const whitelistedDomain of whitelistedDomains) {
-			if (domain === whitelistedDomain) {
-				return true
-			}
-
-			if (whitelistedDomain.startsWith('*.')) {
-				const baseDomain = whitelistedDomain.substring(2)
-				if (domain.endsWith(`.${baseDomain}`) || domain === baseDomain) {
+				if (this.isHostnameWhitelisted(new URL(value).hostname)) {
 					return true
 				}
 			}
-
-			if (domain.endsWith(`.${whitelistedDomain}`)) {
-				return true
+			catch {
+				// Invalid URL in the header — try the next one
 			}
 		}
 
 		return false
 	}
 
-	/**
-	 * Determine request type for rate limiting.
-	 */
-	private getRequestType(request: any): string {
-		const url = request.url || ''
-		const method = request.method || 'GET'
+	private isHostnameWhitelisted(hostname: string): boolean {
+		return this.matchesDomain(hostname) || this.tenantDomainsService.isAllowed(hostname)
+	}
 
-		if (url.includes('/media_stream-image/')) {
+	/** An entry matches itself and every subdomain; a leading `*.` is accepted and ignored. */
+	private matchesDomain(hostname: string): boolean {
+		return this.whitelistedDomains.some((whitelisted) => {
+			const domain = whitelisted.startsWith('*.') ? whitelisted.slice(2) : whitelisted
+			return hostname === domain || hostname.endsWith(`.${domain}`)
+		})
+	}
+
+	private getRequestType(request: GuardRequest): string {
+		const url = request.url ?? ''
+		if (url.includes(IMAGE_ROUTE_SEGMENT)) {
 			return 'image-processing'
 		}
-
-		if (url.startsWith('/health')) {
+		if (url.startsWith(HEALTH_PREFIX)) {
 			return 'health-check'
 		}
-
-		return `${method.toLowerCase()}-default`
+		return `${(request.method ?? 'GET').toLowerCase()}-default`
 	}
 
 	/**
-	 * Add rate limit headers to response.
-	 * Emits RFC 6585 `Retry-After` alongside the X-RateLimit-* family only
-	 * when the request was throttled — per the spec the header is intended
-	 * for 429 responses. Value is seconds until reset (non-negative integer).
+	 * X-RateLimit-* on every counted response; RFC 6585 `Retry-After` (seconds
+	 * until the window resets) only when the request was throttled.
 	 */
-	private addRateLimitHeaders(response: any, info: any, allowed: boolean): void {
+	private addRateLimitHeaders(response: GuardResponse, info: RateLimitInfo, allowed: boolean): void {
 		response.setHeader('X-RateLimit-Limit', info.limit.toString())
 		response.setHeader('X-RateLimit-Remaining', info.remaining.toString())
 		response.setHeader('X-RateLimit-Reset', Math.ceil(info.resetTime.getTime() / 1000).toString())
@@ -378,5 +219,14 @@ export class AdaptiveRateLimitGuard extends ThrottlerGuard {
 			const retryAfterSeconds = Math.max(1, Math.ceil((info.resetTime.getTime() - Date.now()) / 1000))
 			response.setHeader('Retry-After', retryAfterSeconds.toString())
 		}
+	}
+
+	private headerValue(request: GuardRequest, name: string): string {
+		const value = request.headers[name]
+		return Array.isArray(value) ? value[0] ?? '' : value ?? ''
+	}
+
+	private pathname(request: GuardRequest): string {
+		return (request.url ?? '').split('?')[0]
 	}
 }

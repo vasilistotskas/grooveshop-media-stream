@@ -140,75 +140,6 @@ describe('circuitBreaker', () => {
 		})
 	})
 
-	describe('execute Method', () => {
-		it('should execute function when circuit is closed', async () => {
-			const mockFn = vi.fn().mockResolvedValue('success')
-
-			const result = await circuitBreaker.execute(mockFn)
-
-			expect(result).toBe('success')
-			expect(mockFn).toHaveBeenCalled()
-		})
-
-		it('should throw error when circuit is open and no fallback', async () => {
-			// Trip the circuit
-			for (let i = 0; i < 5; i++) {
-				circuitBreaker.recordFailure()
-			}
-
-			const mockFn = vi.fn().mockResolvedValue('success')
-
-			await expect(circuitBreaker.execute(mockFn)).rejects.toThrow('Circuit breaker is open')
-			expect(mockFn).not.toHaveBeenCalled()
-		})
-
-		it('should use fallback when circuit is open', async () => {
-			// Trip the circuit
-			for (let i = 0; i < 5; i++) {
-				circuitBreaker.recordFailure()
-			}
-
-			const mockFn = vi.fn().mockResolvedValue('success')
-			const fallbackFn = vi.fn().mockResolvedValue('fallback')
-
-			const result = await circuitBreaker.execute(mockFn, fallbackFn)
-
-			expect(result).toBe('fallback')
-			expect(mockFn).not.toHaveBeenCalled()
-			expect(fallbackFn).toHaveBeenCalled()
-		})
-
-		it('should record success when function succeeds', async () => {
-			const mockFn = vi.fn().mockResolvedValue('success')
-
-			await circuitBreaker.execute(mockFn)
-
-			const stats = circuitBreaker.getStats()
-			expect(stats.successCount).toBe(1)
-			expect(stats.totalRequests).toBe(1)
-		})
-
-		it('should record failure when function throws', async () => {
-			const mockFn = vi.fn().mockRejectedValue(new Error('test error'))
-
-			await expect(circuitBreaker.execute(mockFn)).rejects.toThrow('test error')
-
-			const stats = circuitBreaker.getStats()
-			expect(stats.failureCount).toBe(1)
-			expect(stats.totalRequests).toBe(1)
-		})
-
-		it('should use fallback when function throws and fallback is provided', async () => {
-			const mockFn = vi.fn().mockRejectedValue(new Error('test error'))
-			const fallbackFn = vi.fn().mockResolvedValue('fallback')
-
-			const result = await circuitBreaker.execute(mockFn, fallbackFn)
-
-			expect(result).toBe('fallback')
-			expect(fallbackFn).toHaveBeenCalled()
-		})
-	})
-
 	describe('statistics and Reset', () => {
 		it('should provide accurate statistics', () => {
 			circuitBreaker.recordSuccess()
@@ -324,18 +255,6 @@ describe('circuitBreaker', () => {
 
 			// A real request can still claim it afterwards.
 			expect(circuitBreaker.allowRequest()).toBe(true)
-		})
-
-		it('execute() only runs the trial function for the first half-open caller and rejects concurrent ones', async () => {
-			tripAndEnterHalfOpen()
-
-			const mockFn = vi.fn().mockResolvedValue('success')
-
-			const first = circuitBreaker.execute(mockFn)
-			await expect(circuitBreaker.execute(mockFn)).rejects.toThrow('Circuit breaker is open')
-
-			await expect(first).resolves.toBe('success')
-			expect(mockFn).toHaveBeenCalledTimes(1)
 		})
 	})
 

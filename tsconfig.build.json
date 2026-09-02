@@ -14,7 +14,7 @@
     "node_modules",
     "build",
     "src/test",
-    "**/*spec.ts",
-    "vitest.config.ts"
+    "src/repl.ts",
+    "**/*spec.ts"
   ]
 }

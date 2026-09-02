@@ -2,15 +2,15 @@
 
 /**
  * Media Stream Cache Clearing Script
- * 
+ *
  * This script clears all cache layers used by the media stream service:
  * 1. Redis cache (distributed cache)
  * 2. File cache (storage directory with .rsc, .rsm, .rst files)
  * 3. Memory cache (cleared by restarting the server)
- * 
+ *
  * Usage:
- *   node clear-cache.js [options]
- * 
+ *   pnpm run cache:clear -- [options]
+ *
  * Options:
  *   --redis-only     Clear only Redis cache
  *   --files-only     Clear only file cache
@@ -24,6 +24,7 @@
 
 const fs = require('node:fs')
 const path = require('node:path')
+const process = require('node:process')
 const Redis = require('ioredis')
 
 // Parse command line arguments
@@ -31,10 +32,10 @@ const args = process.argv.slice(2)
 const options = {
 	redisOnly: args.includes('--redis-only'),
 	filesOnly: args.includes('--files-only'),
-	redisHost: getArgValue('--redis-host') || process.env.CACHE_REDIS_HOST || process.env.REDIS_HOST || 'localhost',
-	redisPort: Number.parseInt(getArgValue('--redis-port') || process.env.CACHE_REDIS_PORT || process.env.REDIS_PORT || '6379'),
-	redisDb: Number.parseInt(getArgValue('--redis-db') || process.env.CACHE_REDIS_DB || process.env.REDIS_DB || '0'),
-	redisPass: getArgValue('--redis-pass') || process.env.CACHE_REDIS_PASSWORD || process.env.REDIS_PASSWORD || '',
+	redisHost: getArgValue('--redis-host') || process.env.REDIS_HOST || 'localhost',
+	redisPort: Number.parseInt(getArgValue('--redis-port') || process.env.REDIS_PORT || '6379'),
+	redisDb: Number.parseInt(getArgValue('--redis-db') || process.env.REDIS_DB || '0'),
+	redisPass: getArgValue('--redis-pass') || process.env.REDIS_PASSWORD || '',
 	storagePath: getArgValue('--storage-path') || process.env.CACHE_FILE_DIRECTORY || './storage',
 	help: args.includes('--help') || args.includes('-h'),
 }
@@ -50,11 +51,11 @@ Media Stream Cache Clearing Script
 
 This script clears all cache layers used by the media stream service:
 1. Redis cache (distributed cache)
-2. File cache (storage directory with .rsc, .rsm, .rst, .json files)
+2. File cache (storage directory with .rsc, .rsm, .rst files)
 3. Memory cache (cleared by restarting the server)
 
 Usage:
-  node clear-cache.js [options]
+  pnpm run cache:clear -- [options]
 
 Options:
   --redis-only         Clear only Redis cache
@@ -66,18 +67,18 @@ Options:
   --storage-path PATH  Storage directory path (default: ./storage)
   --help, -h           Show this help message
 
-Environment Variables:
-  CACHE_REDIS_HOST     Redis host
-  CACHE_REDIS_PORT     Redis port
-  CACHE_REDIS_DB       Redis database number
-  CACHE_REDIS_PASSWORD Redis password
+Environment Variables (same names as the service):
+  REDIS_HOST           Redis host
+  REDIS_PORT           Redis port
+  REDIS_DB             Redis database number
+  REDIS_PASSWORD       Redis password
   CACHE_FILE_DIRECTORY Storage directory path
 
 Examples:
-  node clear-cache.js
-  node clear-cache.js --redis-only
-  node clear-cache.js --files-only
-  node clear-cache.js --redis-host redis.example.com --redis-port 6380
+  pnpm run cache:clear
+  pnpm run cache:clear -- --redis-only
+  pnpm run cache:clear -- --files-only
+  pnpm run cache:clear -- --redis-host redis.example.com --redis-port 6380
 	`)
 }
 
@@ -168,14 +169,12 @@ async function clearFileCache() {
 			// - .rsc (resource cache)
 			// - .rsm (resource metadata)
 			// - .rst (resource temp)
-			// - .json (file cache layer entries)
 			// - default_optimized_* (optimized default images)
 			const shouldDelete
 				= file.endsWith('.rsc')
-				|| file.endsWith('.rsm')
-				|| file.endsWith('.rst')
-				|| file.endsWith('.json')
-				|| file.startsWith('default_optimized_')
+					|| file.endsWith('.rsm')
+					|| file.endsWith('.rst')
+					|| file.startsWith('default_optimized_')
 
 			if (shouldDelete) {
 				try {
@@ -275,7 +274,7 @@ async function clearMediaStreamCache() {
 		// Exit with appropriate code
 		const hasFailures
 			= (results.redis && !results.redis.success)
-			|| (results.files && !results.files.success)
+				|| (results.files && !results.files.success)
 
 		process.exit(hasFailures ? 1 : 0)
 	}

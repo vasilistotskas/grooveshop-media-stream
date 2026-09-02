@@ -1,31 +1,30 @@
 # Docker
-dev.Dockerfile
-Dockerfile*
-docker-compose*
+docker/
 .dockerignore
 
-# Git files
+# Git / CI / editors / agents
 .git
 .gitignore
-
-# macOS specific files
-.DS_Store
-
-# IDE / Editor directories
+.github
 .editorconfig
 .idea
+.claude
+.kiro
 
-# Nest dev/build outputs
+# Environment files (the example is documentation, never loaded)
+.env*
+
+# Build output and runtime data
 build/
-/var/
+coverage*
+storage/
+test-cache/
 
 # Tests
-coverage*
+src/test/
 
 # Node dependencies
 node_modules
 
-# Others
-.env
+# Docs
 *.md
-helm-charts

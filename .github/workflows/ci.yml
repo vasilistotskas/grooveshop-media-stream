@@ -5,14 +5,12 @@ on:
     branches: ['main']
     paths-ignore:
       - '**.md'
-      - 'docs/**'
       - 'LICENSE'
       - '.editorconfig'
   pull_request:
     branches: ['main']
     paths-ignore:
       - '**.md'
-      - 'docs/**'
       - 'LICENSE'
       - '.editorconfig'
   workflow_dispatch:
@@ -25,7 +23,8 @@ permissions:
   contents: read
 
 env:
-  SYSTEM_ENV: ci
+  # Same Node line as docker/Dockerfile's NODE_VERSION
+  NODE_VERSION: 24.19.0
 
 jobs:
   security-scan:
@@ -93,20 +92,20 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '24.x'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Run linting
-        run: pnpm run lint
-
-      - name: Build application
-        run: pnpm run build
+        run: pnpm run lint:ci
 
       - name: Check TypeScript
         run: pnpm run type-check
+
+      - name: Build application
+        run: pnpm run build
 
       - name: Run unit tests with coverage
         run: pnpm run test:coverage
@@ -119,8 +118,8 @@ jobs:
       - name: Test production build
         env:
           NODE_ENV: production
-          CORS_ORIGIN: https://webside.gr
-          REDIS_PASSWORD: ci_smoke_test_password
+          CORS_ORIGIN: https://store.example.com
+          BACKEND_URL: http://backend-service:8000
         run: |
           timeout 10s pnpm run prod || exit_code=$?
           if [ $exit_code -eq 124 ]; then
@@ -184,7 +183,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '24.x'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
       - name: Install dependencies

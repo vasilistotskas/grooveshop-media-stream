@@ -1,6 +1,7 @@
 import { plainToInstance } from 'class-transformer'
 import { validate } from 'class-validator'
 import { describe, expect, it } from 'vitest'
+import { APP_CONFIG_SCHEMA, buildConfigFromSchema } from '#microservice/common/utils/config-schema.util'
 import {
 	CircuitBreakerConfigDto,
 	ConnectionPoolConfigDto,
@@ -9,23 +10,20 @@ import {
 } from '#microservice/Config/dto/http-config.dto'
 import 'reflect-metadata'
 
+/** A fresh copy of the schema-default `http` group. */
+function httpDefaults(): Record<string, any> {
+	return buildConfigFromSchema<{ http: Record<string, any> }>(() => undefined, APP_CONFIG_SCHEMA).http
+}
+
 describe('hTTP Config DTOs', () => {
 	describe('circuitBreakerConfigDto', () => {
-		it('should use schema-aligned default values', () => {
-			const config = new CircuitBreakerConfigDto()
-
-			expect(config.enabled).toBe(true)
-			expect(config.failureThreshold).toBe(50)
-			expect(config.resetTimeout).toBe(30000)
-			expect(config.monitoringPeriod).toBe(60000)
-			expect(config.minimumRequests).toBe(10)
-		})
-
 		it('should validate minimum values', async () => {
-			const config = new CircuitBreakerConfigDto()
-			config.failureThreshold = 0
-			config.resetTimeout = 500
-			config.monitoringPeriod = 500
+			const config = plainToInstance(CircuitBreakerConfigDto, {
+				...httpDefaults().circuitBreaker,
+				failureThreshold: 0,
+				resetTimeout: 500,
+				monitoringPeriod: 500,
+			})
 
 			const errors = await validate(config)
 
@@ -37,17 +35,12 @@ describe('hTTP Config DTOs', () => {
 	})
 
 	describe('connectionPoolConfigDto', () => {
-		it('should use schema-aligned default values', () => {
-			const config = new ConnectionPoolConfigDto()
-
-			expect(config.maxSockets).toBe(50)
-			expect(config.keepAliveMsecs).toBe(1000)
-		})
-
 		it('should validate minimum values', async () => {
-			const config = new ConnectionPoolConfigDto()
-			config.maxSockets = 0
-			config.keepAliveMsecs = 50
+			const config = plainToInstance(ConnectionPoolConfigDto, {
+				...httpDefaults().connectionPool,
+				maxSockets: 0,
+				keepAliveMsecs: 50,
+			})
 
 			const errors = await validate(config)
 
@@ -58,15 +51,9 @@ describe('hTTP Config DTOs', () => {
 	})
 
 	describe('httpHealthCheckConfigDto', () => {
-		it('should default to no probe URLs', () => {
-			const config = new HttpHealthCheckConfigDto()
-
-			expect(config.urls).toEqual([])
-			expect(config.timeout).toBe(5000)
-		})
-
 		it('should reject non-string URL entries', async () => {
-			const config = plainToInstance(HttpHealthCheckConfigDto, { urls: [42] })
+			const config = plainToInstance(HttpHealthCheckConfigDto, { ...httpDefaults().healthCheck, urls: [42] })
+
 			const errors = await validate(config)
 
 			expect(errors.some(error => error.property === 'urls')).toBe(true)
@@ -74,41 +61,20 @@ describe('hTTP Config DTOs', () => {
 	})
 
 	describe('httpConfigDto', () => {
-		it('should use schema-aligned default values', () => {
-			const config = new HttpConfigDto()
-
-			expect(config.timeout).toBe(30000)
-			expect(config.maxRetries).toBe(3)
-			expect(config.retryDelay).toBe(1000)
-			expect(config.maxRetryDelay).toBe(10000)
-			expect(config.circuitBreaker).toBeInstanceOf(CircuitBreakerConfigDto)
-			expect(config.connectionPool).toBeInstanceOf(ConnectionPoolConfigDto)
-			expect(config.healthCheck).toBeInstanceOf(HttpHealthCheckConfigDto)
-		})
-
 		it('should validate a complete valid config', async () => {
 			const config = plainToInstance(HttpConfigDto, {
-				timeout: 30000,
-				maxRetries: 3,
-				retryDelay: 1000,
-				maxRetryDelay: 10000,
-				connectionPool: { maxSockets: 50, keepAliveMsecs: 1000 },
-				circuitBreaker: {
-					enabled: true,
-					failureThreshold: 50,
-					resetTimeout: 30000,
-					monitoringPeriod: 60000,
-					minimumRequests: 10,
-				},
+				...httpDefaults(),
 				healthCheck: { urls: ['http://localhost:8000/health'], timeout: 5000 },
 			})
 
 			const errors = await validate(config)
+
 			expect(errors).toHaveLength(0)
 		})
 
 		it('should reject out-of-range top-level values', async () => {
 			const config = plainToInstance(HttpConfigDto, {
+				...httpDefaults(),
 				timeout: 500, // below Min(1000)
 				maxRetries: 20, // above Max(10)
 				retryDelay: 10, // below Min(100)
@@ -122,15 +88,24 @@ describe('hTTP Config DTOs', () => {
 		})
 
 		it('should surface nested circuit-breaker violations', async () => {
-			const config = plainToInstance(HttpConfigDto, {
-				circuitBreaker: { failureThreshold: 0 },
-			})
+			const plain = httpDefaults()
+			plain.circuitBreaker.failureThreshold = 0
 
-			const errors = await validate(config)
+			const errors = await validate(plainToInstance(HttpConfigDto, plain))
 			const cbError = errors.find(error => error.property === 'circuitBreaker')
 
 			expect(cbError).toBeDefined()
 			expect(cbError?.children?.length).toBeGreaterThan(0)
+		})
+
+		it('should fail validation when a field is missing', async () => {
+			const plain = httpDefaults()
+			delete plain.timeout
+
+			const errors = await validate(plainToInstance(HttpConfigDto, plain))
+			const timeoutError = errors.find(error => error.property === 'timeout')
+
+			expect(timeoutError?.constraints).toMatchObject({ isNumber: expect.stringContaining('must be a number') })
 		})
 	})
 })

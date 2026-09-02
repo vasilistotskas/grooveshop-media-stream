@@ -1,144 +1,96 @@
 import type { ArgumentsHost, ExceptionFilter } from '@nestjs/common'
 import type { Request, Response } from 'express'
-import type { Metadata, StringMap } from '../types/common.types.js'
 import { Catch, HttpException, HttpStatus } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
-
 import { MediaStreamError } from '../errors/media-stream.errors.js'
 
-/**
- * Type for generic error objects
- */
-interface GenericErrorObject {
+/** The JSON body every error response carries. */
+export interface ErrorResponseBody {
 	name: string
 	message: string
 	status: HttpStatus
 	code: string
-	context?: Metadata
+	timestamp: string
+	path: string
+	method: string
+	correlationId: string | null
 }
 
+type ErrorShape = Pick<ErrorResponseBody, 'name' | 'message' | 'status' | 'code'>
+
 /**
- * Global exception filter for handling MediaStream errors
- * Converts errors to appropriate HTTP responses with structured error information
+ * Global exception filter: every error becomes the same JSON envelope.
+ *
+ * 5xx are server faults → ERROR log. 4xx are client errors (bad params, an
+ * unknown image, a crawler hitting a retired URL shape) → WARN, so the ERROR
+ * stream stays reserved for real server-side problems.
  */
 @Catch()
 export class MediaStreamExceptionFilter implements ExceptionFilter {
 	constructor(
 		private readonly httpAdapterHost: HttpAdapterHost,
-		private readonly _correlationService: CorrelationService,
+		private readonly correlationService: CorrelationService,
 	) {}
 
-	/**
-	 * Log an exception at a level matched to its HTTP status.
-	 *
-	 * 5xx are genuine server faults → ERROR. 4xx are CLIENT errors (a bad
-	 * path or params, or an unknown image — e.g. a stale pre-multi-tenant
-	 * ``media/uploads/...`` URL, missing the tenant segment, requested by
-	 * an external crawler after the URL scheme changed) → WARN, so the
-	 * ERROR stream (and any alerting on it) stays reserved for real
-	 * server-side problems and isn't drowned by expected 404/400s.
-	 */
-	private static logByStatus(status: HttpStatus, message: string, detail: string): void {
-		if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
-			CorrelatedLogger.error(message, detail, MediaStreamExceptionFilter.name)
-		}
-		else {
-			CorrelatedLogger.warn(`${message} ${detail}`, MediaStreamExceptionFilter.name)
-		}
-	}
-
 	catch(exception: Error, host: ArgumentsHost): void {
-		const { httpAdapter } = this.httpAdapterHost
 		const ctx = host.switchToHttp()
 		const response = ctx.getResponse<Response>()
 		const request = ctx.getRequest<Request>()
 
-		let status: HttpStatus
-		let errorResponse: StringMap
+		let shape: ErrorShape
+		let logDetail: string
 
 		if (exception instanceof MediaStreamError) {
-			status = exception.status
-			errorResponse = this.formatErrorResponse(exception, request)
-			MediaStreamExceptionFilter.logByStatus(status, `MediaStream Error: ${exception.message}`, JSON.stringify(exception.toJSON()))
+			shape = exception
+			// error.context (e.g. the upstream URL) goes to the log only; exposing
+			// it in the response would leak internal topology.
+			logDetail = JSON.stringify(exception.toJSON())
 		}
 		else if (exception instanceof HttpException) {
-			status = exception.getStatus()
-			const exceptionResponse = exception.getResponse()
-			const message = typeof exceptionResponse === 'object' && exceptionResponse !== null && 'message' in exceptionResponse
-				? String(exceptionResponse.message)
-				: exception.message
-
-			errorResponse = this.formatErrorResponse({
+			const status = exception.getStatus()
+			const payload = exception.getResponse()
+			shape = {
 				name: exception.name,
-				message,
+				message: typeof payload === 'object' && payload !== null && 'message' in payload ? String(payload.message) : exception.message,
 				status,
 				code: `HTTP_${status}`,
-				context: {
-					path: request.url,
-					method: request.method,
-				},
-			}, request)
-
-			MediaStreamExceptionFilter.logByStatus(status, `HTTP Exception: ${exception.message}`, JSON.stringify(errorResponse))
+			}
+			logDetail = exception.message
 		}
 		else {
-			status = HttpStatus.INTERNAL_SERVER_ERROR
-			errorResponse = this.formatErrorResponse({
+			shape = {
 				name: 'InternalServerError',
 				message: 'An unexpected error occurred',
-				status,
+				status: HttpStatus.INTERNAL_SERVER_ERROR,
 				code: 'INTERNAL_SERVER_ERROR',
-				context: {
-					path: request.url,
-					method: request.method,
-				},
-			}, request)
-
-			CorrelatedLogger.error(`Unexpected Error: ${exception.message}`, exception.stack || '', MediaStreamExceptionFilter.name)
+			}
+			logDetail = exception.stack || exception.message
 		}
 
-		httpAdapter.reply(response, errorResponse, status)
+		const body = this.formatErrorResponse(shape, request)
+
+		if (shape.status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+			CorrelatedLogger.error(`${shape.name}: ${exception.message}`, logDetail, MediaStreamExceptionFilter.name)
+		}
+		else {
+			CorrelatedLogger.warn(`${shape.name}: ${exception.message} ${JSON.stringify(body)}`, MediaStreamExceptionFilter.name)
+		}
+
+		this.httpAdapterHost.httpAdapter.reply(response, body, shape.status)
 	}
 
-	/**
-	 * Formats the error response with consistent structure
-	 */
-	private formatErrorResponse(
-		error: MediaStreamError | GenericErrorObject,
-		request: Request,
-	): StringMap {
-		const timestamp = new Date().toISOString()
-		const path = request.url
-		const method = request.method
-		const correlationId = this._correlationService.getCorrelationId()
-
-		if (error instanceof MediaStreamError) {
-			// Deliberately omit error.context (e.g. { resource: url }) from the
-			// response body — it is written to logs via toJSON() above. Exposing
-			// upstream resource URLs in API responses leaks internal topology.
-			return {
-				name: error.name,
-				message: error.message,
-				status: error.status,
-				code: error.code,
-				timestamp,
-				path,
-				method,
-				correlationId,
-			}
-		}
-
+	private formatErrorResponse(error: ErrorShape, request: Request): ErrorResponseBody {
 		return {
 			name: error.name,
 			message: error.message,
-			code: error.code,
 			status: error.status,
-			timestamp,
-			path,
-			method,
-			correlationId,
+			code: error.code,
+			timestamp: new Date().toISOString(),
+			path: request.url,
+			method: request.method,
+			correlationId: this.correlationService.getCorrelationId(),
 		}
 	}
 }

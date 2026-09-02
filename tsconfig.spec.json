@@ -19,7 +19,6 @@
   ],
   "exclude": [
     "node_modules",
-    "build",
-    "vitest.config.ts"
+    "build"
   ]
 }

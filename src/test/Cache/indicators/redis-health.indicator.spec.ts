@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RedisHealthIndicator } from '#microservice/Cache/indicators/redis-health.indicator'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { ConfigService } from '#microservice/Config/config.service'
+import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 
 describe('redisHealthIndicator', () => {
 	let indicator: RedisHealthIndicator
@@ -30,26 +31,7 @@ describe('redisHealthIndicator', () => {
 			keys: vi.fn(),
 		}
 
-		const mockConfigService = {
-			get: vi.fn().mockImplementation((key: string) => {
-				if (key === 'cache.redis.host')
-					return mockConfig.host
-				if (key === 'cache.redis.port')
-					return mockConfig.port
-				if (key === 'cache.redis.db')
-					return mockConfig.db
-				if (key === 'cache.redis.ttl')
-					return mockConfig.ttl
-				if (key === 'cache.redis.maxRetries')
-					return mockConfig.maxRetries
-				return undefined
-			}),
-			getOptional: vi.fn().mockImplementation((key: string, defaultValue?: any) => {
-				if (key === 'cache.redis.healthCheckCacheTtl')
-					return 10000 // 10 seconds cache TTL for tests
-				return defaultValue
-			}),
-		}
+		const mockConfigService = createConfigServiceMock({ 'cache.redis': { ...mockConfig, healthCheckCacheTtl: 10000 } })
 
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [

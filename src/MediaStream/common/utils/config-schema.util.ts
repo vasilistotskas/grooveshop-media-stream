@@ -104,6 +104,14 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	'server.cors.methods': { env: 'CORS_METHODS', default: 'GET', type: 'string' },
 	'server.cors.maxAge': { env: 'CORS_MAX_AGE', default: 86400, type: 'number' },
 
+	// Upstream Django API that images are fetched from. Required in production
+	// (ConfigService.validate); empty in specs, which never fetch.
+	'backend.url': { env: 'BACKEND_URL', default: '', type: 'string' },
+
+	// Shared secret for the internal admin endpoints (/metrics, cache flush,
+	// circuit-breaker reset). Empty keeps those endpoints closed.
+	'admin.secret': { env: 'INTERNAL_ADMIN_SECRET', default: '', type: 'string' },
+
 	// Memory cache configuration
 	'cache.memory.maxSize': { env: 'CACHE_MEMORY_MAX_SIZE', default: 104857600, type: 'number' },
 	'cache.memory.defaultTtl': { env: 'CACHE_MEMORY_DEFAULT_TTL', default: 3600, type: 'number' },
@@ -133,10 +141,6 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	// Base TTL (seconds) for warmed entries; access count scales it up
 	'cache.warming.baseTtl': { env: 'CACHE_WARMING_BASE_TTL', default: 3600, type: 'number' },
 
-	// Popular-key preloading (multi-layer cache)
-	'cache.preloading.enabled': { env: 'CACHE_PRELOADING_ENABLED', default: false, type: 'boolean' },
-	'cache.preloading.interval': { env: 'CACHE_PRELOADING_INTERVAL', default: 300000, type: 'number' },
-
 	// Image TTL configuration (in seconds — cache layers expect seconds)
 	'cache.image.publicTtl': { env: 'CACHE_IMAGE_PUBLIC_TTL', default: 12 * 30 * 24 * 3600, type: 'number' },
 	'cache.image.privateTtl': { env: 'CACHE_IMAGE_PRIVATE_TTL', default: 6 * 30 * 24 * 3600, type: 'number' },
@@ -150,9 +154,6 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	'monitoring.enabled': { env: 'MONITORING_ENABLED', default: true, type: 'boolean' },
 	'monitoring.systemMetricsInterval': { env: 'MONITORING_SYSTEM_METRICS_INTERVAL', default: 60000, type: 'number' },
 	'monitoring.performanceMetricsInterval': { env: 'MONITORING_PERFORMANCE_METRICS_INTERVAL', default: 30000, type: 'number' },
-
-	// External services configuration
-	'externalServices.requestTimeout': { env: 'EXTERNAL_REQUEST_TIMEOUT', default: 30000, type: 'number' },
 
 	// HTTP client configuration
 	'http.timeout': { env: 'HTTP_TIMEOUT', default: 30000, type: 'number' },
@@ -180,7 +181,8 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	'rateLimit.healthCheck.max': { env: 'RATE_LIMIT_HEALTH_CHECK_MAX', default: 1000, type: 'number' },
 	'rateLimit.bypass.healthChecks': { env: 'RATE_LIMIT_BYPASS_HEALTH_CHECKS', default: true, type: 'boolean' },
 	'rateLimit.bypass.staticAssets': { env: 'RATE_LIMIT_BYPASS_STATIC_ASSETS', default: true, type: 'boolean' },
-	'rateLimit.bypass.whitelistedDomains': { env: 'RATE_LIMIT_BYPASS_WHITELISTED_DOMAINS', default: '', type: 'string' },
+	// Comma-separated hostnames; an entry also covers its subdomains. Only honoured for internal-IP callers
+	'rateLimit.bypass.whitelistedDomains': { env: 'RATE_LIMIT_BYPASS_WHITELISTED_DOMAINS', default: [], type: 'array' },
 	'rateLimit.bypass.bots': { env: 'RATE_LIMIT_BYPASS_BOTS', default: true, type: 'boolean' },
 
 	// Input validation configuration
@@ -207,38 +209,27 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 
 	// Dynamic tenant-domain allowlist, polled from Django. Empty secret disables the
 	// feature entirely — the static validation.allowedDomains list keeps working.
-	// Empty refreshUrl means "derive from BACKEND_URL" (computed in TenantDomainsService,
-	// since BACKEND_URL itself is read directly from process.env, not this schema).
+	// Empty refreshUrl means "derive from backend.url" (see TenantDomainsService).
 	'tenantDomains.refreshUrl': { env: 'TENANT_DOMAINS_REFRESH_URL', default: '', type: 'string' },
 	'tenantDomains.secret': { env: 'INTERNAL_DOMAINS_SECRET', default: '', type: 'string' },
 	'tenantDomains.refreshIntervalMs': { env: 'TENANT_DOMAINS_REFRESH_INTERVAL_MS', default: 300000, type: 'number' },
 
-	// Storage monitoring thresholds (bytes / file counts / days)
-	'storage.maxSize': { env: 'STORAGE_MAX_SIZE', default: 1073741824, type: 'number' },
-	'storage.maxFileAge': { env: 'STORAGE_MAX_FILE_AGE_DAYS', default: 30, type: 'number' },
+	// On-disk cache tier thresholds (bytes / file counts). Cleanup evicts down
+	// to the warning values; the health check reports `down` at the critical ones.
 	'storage.warningSize': { env: 'STORAGE_WARNING_SIZE', default: 838860800, type: 'number' },
 	'storage.criticalSize': { env: 'STORAGE_CRITICAL_SIZE', default: 1073741824, type: 'number' },
 	'storage.warningFileCount': { env: 'STORAGE_WARNING_FILE_COUNT', default: 5000, type: 'number' },
 	'storage.criticalFileCount': { env: 'STORAGE_CRITICAL_FILE_COUNT', default: 10000, type: 'number' },
 
-	// Storage cleanup (daily retention-policy cron)
+	// Storage cleanup cron: expired pairs, stale orphans/temp files, then
+	// score-based eviction to the warning thresholds. Dry run reports only.
 	'storage.cleanup.enabled': { env: 'STORAGE_CLEANUP_ENABLED', default: true, type: 'boolean' },
 	'storage.cleanup.cronSchedule': { env: 'STORAGE_CLEANUP_CRON', default: '0 2 * * *', type: 'string' },
 	'storage.cleanup.dryRun': { env: 'STORAGE_CLEANUP_DRY_RUN', default: false, type: 'boolean' },
 	'storage.cleanup.maxDuration': { env: 'STORAGE_CLEANUP_MAX_DURATION', default: 300000, type: 'number' },
 
-	// Storage eviction
-	'storage.eviction.strategy': { env: 'STORAGE_EVICTION_STRATEGY', default: 'intelligent', type: 'string' },
-	'storage.eviction.aggressiveness': { env: 'STORAGE_EVICTION_AGGRESSIVENESS', default: 'moderate', type: 'string' },
-	'storage.eviction.preservePopular': { env: 'STORAGE_EVICTION_PRESERVE_POPULAR', default: true, type: 'boolean' },
+	// Pairs with at least this many recorded cache hits are evicted last.
 	'storage.eviction.minAccessCount': { env: 'STORAGE_EVICTION_MIN_ACCESS_COUNT', default: 5, type: 'number' },
-	'storage.eviction.maxFileAge': { env: 'STORAGE_EVICTION_MAX_FILE_AGE_DAYS', default: 7, type: 'number' },
-
-	// Storage optimization (deduplication, every 6 hours)
-	'storage.optimization.enabled': { env: 'STORAGE_OPTIMIZATION_ENABLED', default: true, type: 'boolean' },
-	'storage.optimization.strategies': { env: 'STORAGE_OPTIMIZATION_STRATEGIES', default: ['deduplication'], type: 'array' },
-	'storage.optimization.popularThreshold': { env: 'STORAGE_OPTIMIZATION_POPULAR_THRESHOLD', default: 10, type: 'number' },
-	'storage.optimization.maxTime': { env: 'STORAGE_OPTIMIZATION_MAX_TIME', default: 600000, type: 'number' },
 
 	// Graceful shutdown configuration
 	'shutdown.timeout': { env: 'SHUTDOWN_TIMEOUT', default: 30000, type: 'number' },

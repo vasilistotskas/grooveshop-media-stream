@@ -1,17 +1,22 @@
 import type { OnModuleInit } from '@nestjs/common'
-import { access, readdir, readFile, stat } from 'node:fs/promises'
-import { join } from 'node:path'
-import { cwd } from 'node:process'
+import { readdir, readFile, stat } from 'node:fs/promises'
+import { basename, join } from 'node:path'
 import { Injectable } from '@nestjs/common'
 import { SchedulerRegistry } from '@nestjs/schedule'
 import { CronJob } from 'cron'
+import { errorMessage } from '#microservice/common/utils/error-message.util'
+import { storageDirectory } from '#microservice/common/utils/storage-path.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
+import { imageNamespace } from '../utils/cache-namespace.util.js'
 import { MultiLayerCacheManager } from './multi-layer-cache.manager.js'
 
-const FILE_EXTENSION_RE = /\.[^/.]+$/
+const RESOURCE_EXTENSION = '.rsc'
+const METADATA_EXTENSION = '.rsm'
+/** Sidecars read per Promise.all batch while scanning the storage directory. */
+const SCAN_BATCH_SIZE = 50
 
 interface CacheWarmingConfig {
 	enabled: boolean
@@ -24,10 +29,13 @@ interface CacheWarmingConfig {
 interface FileAccessInfo {
 	path: string
 	lastAccessed: Date
-	accessCount: number
-	size: number
+	metadata: ResourceMetaData
 }
 
+/**
+ * Re-populates the layered cache from the on-disk tier with the most
+ * accessed entries (by sidecar `accessCount`), on a cron and optionally at boot.
+ */
 @Injectable()
 export class CacheWarmingService implements OnModuleInit {
 	private readonly config: CacheWarmingConfig
@@ -38,22 +46,13 @@ export class CacheWarmingService implements OnModuleInit {
 
 	constructor(
 		private readonly cacheManager: MultiLayerCacheManager,
-		private readonly _configService: ConfigService,
+		configService: ConfigService,
 		private readonly metricsService: MetricsService,
 		private readonly schedulerRegistry: SchedulerRegistry,
 	) {
-		this.config = this._configService.get('cache.warming') || {
-			enabled: true,
-			warmupOnStart: true,
-			maxFilesToWarm: 50,
-			warmupCron: '0 */6 * * *',
-			popularImageThreshold: 5,
-		}
-
-		this.storagePath = join(cwd(), 'storage')
-
-		// Load base cache TTL from configuration (default: 3600 seconds = 1 hour)
-		this.baseCacheTtl = this._configService.getOptional('cache.warming.baseTtl', 3600)
+		this.config = configService.get<CacheWarmingConfig>('cache.warming')
+		this.storagePath = storageDirectory(configService)
+		this.baseCacheTtl = configService.get('cache.warming.baseTtl')
 	}
 
 	async onModuleInit(): Promise<void> {
@@ -72,7 +71,6 @@ export class CacheWarmingService implements OnModuleInit {
 	 */
 	private registerWarmupCron(): void {
 		const schedule = this.config.warmupCron
-		const cronName = 'cache-warming'
 
 		const job = new CronJob(schedule, async () => {
 			CorrelatedLogger.log('Starting scheduled cache warmup', CacheWarmingService.name)
@@ -80,21 +78,14 @@ export class CacheWarmingService implements OnModuleInit {
 				await this.warmupCache()
 			}
 			catch (error: unknown) {
-				CorrelatedLogger.error(
-					`Scheduled cache warmup failed: ${(error as Error).message}`,
-					(error as Error).stack,
-					CacheWarmingService.name,
-				)
+				CorrelatedLogger.error(`Scheduled cache warmup failed: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, CacheWarmingService.name)
 			}
 		})
 
-		this.schedulerRegistry.addCronJob(cronName, job)
+		this.schedulerRegistry.addCronJob('cache-warming', job)
 		job.start()
 
-		CorrelatedLogger.log(
-			`Cache warming cron registered with schedule: ${schedule}`,
-			CacheWarmingService.name,
-		)
+		CorrelatedLogger.log(`Cache warming cron registered with schedule: ${schedule}`, CacheWarmingService.name)
 	}
 
 	async warmupCache(): Promise<void> {
@@ -117,7 +108,7 @@ export class CacheWarmingService implements OnModuleInit {
 					warmedCount++
 				}
 				catch (error: unknown) {
-					CorrelatedLogger.warn(`Failed to warm up file ${fileInfo.path}: ${(error as Error).message}`, CacheWarmingService.name)
+					CorrelatedLogger.warn(`Failed to warm up file ${fileInfo.path}: ${errorMessage(error)}`, CacheWarmingService.name)
 				}
 			}
 
@@ -129,66 +120,42 @@ export class CacheWarmingService implements OnModuleInit {
 			this.metricsService.recordCacheOperation('warmup', 'memory', 'success')
 		}
 		catch (error: unknown) {
-			CorrelatedLogger.error(`Cache warmup failed: ${(error as Error).message}`, (error as Error).stack, CacheWarmingService.name)
+			CorrelatedLogger.error(`Cache warmup failed: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, CacheWarmingService.name)
 			this.metricsService.recordCacheOperation('warmup', 'memory', 'error')
 		}
 	}
 
+	/** Every `.rsc` with a readable sidecar at or above the popularity threshold, most accessed first. */
 	private async getPopularFiles(): Promise<FileAccessInfo[]> {
-		const BATCH_SIZE = 50
-
 		try {
 			const dirEntries = await readdir(this.storagePath, { withFileTypes: true })
-
-			// Filter to plain .rsc files only — no syscalls yet
-			const rscEntries = dirEntries.filter(
-				e => e.isFile() && e.name.endsWith('.rsc'),
-			)
+			const rscEntries = dirEntries.filter(e => e.isFile() && e.name.endsWith(RESOURCE_EXTENSION))
 
 			const results: FileAccessInfo[] = []
 
-			// Process in batches of BATCH_SIZE to bound peak concurrency
-			for (let i = 0; i < rscEntries.length; i += BATCH_SIZE) {
-				const batch = rscEntries.slice(i, i + BATCH_SIZE)
+			// Bounded concurrency: one batch of stat + sidecar reads at a time
+			for (let i = 0; i < rscEntries.length; i += SCAN_BATCH_SIZE) {
+				const batch = rscEntries.slice(i, i + SCAN_BATCH_SIZE)
 
 				const batchResults = await Promise.all(
-					batch.map(async (entry) => {
+					batch.map(async (entry): Promise<FileAccessInfo | null> => {
 						const filePath = join(this.storagePath, entry.name)
-						const metaPath = filePath.replace('.rsc', '.rsm')
+						const metaPath = join(this.storagePath, `${basename(entry.name, RESOURCE_EXTENSION)}${METADATA_EXTENSION}`)
 
 						try {
-							// Pre-filter: skip files with no metadata — they have accessCount = 1
-							// which is always below threshold, so stat() would be wasted I/O
-							const metaAccessible = await access(metaPath).then(() => true, () => false)
-							if (!metaAccessible) {
-								return null
-							}
-
 							const [fileStat, metaContent] = await Promise.all([
 								stat(filePath),
-								readFile(metaPath, 'utf8').catch(() => null),
+								readFile(metaPath, 'utf8'),
 							])
-
-							let accessCount = 1
-							if (metaContent) {
-								try {
-									const metadata = JSON.parse(metaContent)
-									accessCount = metadata.accessCount || 1
-								}
-								catch {
-									// Ignore metadata parsing errors
-								}
-							}
-
 							return {
 								path: filePath,
 								lastAccessed: fileStat.atime,
-								accessCount,
-								size: fileStat.size,
-							} satisfies FileAccessInfo
+								metadata: new ResourceMetaData(JSON.parse(metaContent)),
+							}
 						}
 						catch (error: unknown) {
-							CorrelatedLogger.debug(`Skipping file ${entry.name}: ${(error as Error).message}`, CacheWarmingService.name)
+							// No sidecar, or an unreadable one: nothing to score the file by
+							CorrelatedLogger.debug(`Skipping file ${entry.name}: ${errorMessage(error)}`, CacheWarmingService.name)
 							return null
 						}
 					}),
@@ -202,73 +169,38 @@ export class CacheWarmingService implements OnModuleInit {
 			}
 
 			return results
-				.filter(f => f.accessCount >= this.config.popularImageThreshold)
+				.filter(f => f.metadata.accessCount >= this.config.popularImageThreshold)
 				.sort((a, b) => {
-					if (a.accessCount !== b.accessCount) {
-						return b.accessCount - a.accessCount
+					if (a.metadata.accessCount !== b.metadata.accessCount) {
+						return b.metadata.accessCount - a.metadata.accessCount
 					}
 					return b.lastAccessed.getTime() - a.lastAccessed.getTime()
 				})
 		}
 		catch (error: unknown) {
-			CorrelatedLogger.error(`Failed to get popular files: ${(error as Error).message}`, (error as Error).stack, CacheWarmingService.name)
+			CorrelatedLogger.error(`Failed to get popular files: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, CacheWarmingService.name)
 			return []
 		}
 	}
 
 	private async warmupFile(fileInfo: FileAccessInfo): Promise<void> {
-		const resourceId = this.extractResourceId(fileInfo.path)
+		const resourceId = basename(fileInfo.path, RESOURCE_EXTENSION)
+		const namespace = imageNamespace(fileInfo.metadata.tenantSchema)
 
-		try {
-			const metadataPath = fileInfo.path.replace(/\.rsc$/, '.rsm')
-			const [content, metaRaw] = await Promise.all([
-				readFile(fileInfo.path),
-				readFile(metadataPath, 'utf8').catch(() => null),
-			])
-
-			let metadata: ResourceMetaData
-			if (metaRaw) {
-				try {
-					metadata = new ResourceMetaData(JSON.parse(metaRaw))
-				}
-				catch {
-					metadata = new ResourceMetaData()
-				}
-			}
-			else {
-				metadata = new ResourceMetaData()
-			}
-
-			// The `image` namespace was previously hard-coded here, which
-			// meant warmed entries landed under `image:{id}` while every
-			// request path read `image:{tenantSchema}:{id}` — warming
-			// was a no-op for tenant content.
-			// `metadata.tenantSchema` was persisted at write time by
-			// `cache-image-resource.operation.ts`; legacy entries that
-			// pre-date this field default to `'public'` via the DTO.
-			const namespace = `image:${metadata.tenantSchema || 'public'}`
-
-			if (await this.cacheManager.exists(namespace, resourceId)) {
-				CorrelatedLogger.debug(`File already in cache: ${fileInfo.path}`, CacheWarmingService.name)
-				return
-			}
-
-			const accessMultiplier = Math.min(fileInfo.accessCount / 10, 5)
-			const ttl = Math.floor(this.baseCacheTtl * (1 + accessMultiplier))
-
-			await this.cacheManager.set(namespace, resourceId, { data: content, metadata }, ttl)
-
-			CorrelatedLogger.debug(`Warmed up file: ${fileInfo.path} (ns=${namespace}, TTL: ${ttl}s)`, CacheWarmingService.name)
+		if (await this.cacheManager.exists(namespace, resourceId)) {
+			CorrelatedLogger.debug(`File already in cache: ${fileInfo.path}`, CacheWarmingService.name)
+			return
 		}
-		catch (error: unknown) {
-			CorrelatedLogger.warn(`Failed to warm up file ${fileInfo.path}: ${(error as Error).message}`, CacheWarmingService.name)
-			throw error
-		}
-	}
 
-	private extractResourceId(filePath: string): string {
-		const filename = filePath.split('/').pop() || filePath.split('\\').pop()
-		return filename?.replace(FILE_EXTENSION_RE, '') || ''
+		const content = await readFile(fileInfo.path)
+
+		// Access-weighted TTL: popular files live up to 6x longer
+		const accessMultiplier = Math.min(fileInfo.metadata.accessCount / 10, 5)
+		const ttl = Math.floor(this.baseCacheTtl * (1 + accessMultiplier))
+
+		await this.cacheManager.set(namespace, resourceId, { data: content, metadata: fileInfo.metadata }, ttl)
+
+		CorrelatedLogger.debug(`Warmed up file: ${fileInfo.path} (ns=${namespace}, TTL: ${ttl}s)`, CacheWarmingService.name)
 	}
 
 	async getWarmupStats(): Promise<{

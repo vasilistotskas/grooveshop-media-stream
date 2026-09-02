@@ -3,17 +3,19 @@ import { Injectable, Logger } from '@nestjs/common'
 import sharp from 'sharp'
 import { ConfigService } from '#microservice/Config/config.service'
 
+/** libvips threads per CPU core; image work is I/O-bound enough to oversubscribe. */
+const CONCURRENCY_PER_CORE = 2
+const MIN_CONCURRENCY = 2
+const MAX_CONCURRENCY = 4
+
+/** libvips operation cache, sized for the 1536Mi container limit. */
+const CACHE_MEMORY_MB = 100
+const CACHE_FILES = 20
+const CACHE_ITEMS = 150
+
 /**
- * Centralized Sharp configuration service.
- * Ensures consistent Sharp settings across all image processing operations.
- *
- * PERFORMANCE OPTIMIZATION:
- * - Concurrency matched to available CPU cores (1.5 cores = 3-4 concurrent operations)
- * - Cache size optimized for memory limits (100MB memory, 20 files, 150 items)
- * - SIMD enabled for faster processing
- *
- * This replaces conflicting configurations in:
- * - webp-image-manipulation.job.ts (was: 8 concurrent, 200MB cache)
+ * Applies the process-wide Sharp settings (concurrency, libvips cache, SIMD)
+ * once at boot, before the first image is processed.
  */
 @Injectable()
 export class SharpConfigService implements OnModuleInit {
@@ -22,45 +24,13 @@ export class SharpConfigService implements OnModuleInit {
 	constructor(private readonly configService: ConfigService) {}
 
 	onModuleInit(): void {
-		this.configureSharp()
-	}
-
-	/**
-	 * Configure Sharp with optimized settings for production
-	 */
-	private configureSharp(): void {
-		// Get CPU limit from config or default to 1.5 cores (Kubernetes limit)
-		const cpuCores = this.configService.getOptional<number>('processing.cpuCores', 1.5)
-
-		// Calculate optimal concurrency: 2-3x CPU cores for I/O-bound operations
-		// With 1.5 cores: 3-4 concurrent operations
-		const concurrency = Math.max(2, Math.min(4, Math.floor(cpuCores * 2)))
+		const cpuCores = this.configService.get<number>('processing.cpuCores')
+		const concurrency = Math.max(MIN_CONCURRENCY, Math.min(MAX_CONCURRENCY, Math.floor(cpuCores * CONCURRENCY_PER_CORE)))
 
 		sharp.concurrency(concurrency)
-		this.logger.log(`Sharp concurrency set to ${concurrency} (based on ${cpuCores} CPU cores)`)
-
-		// Configure cache with balanced settings
-		// Memory: 100MB (fits within 1536Mi container limit)
-		// Files: 20 (reasonable for typical workload)
-		// Items: 150 (balance between memory and performance)
-		sharp.cache({
-			memory: 100, // 100MB memory cache
-			files: 20, // Max 20 files cached
-			items: 150, // Max 150 items
-		})
-		this.logger.log('Sharp cache configured: 100MB memory, 20 files, 150 items')
-
-		// Enable SIMD for better performance on supported CPUs
+		sharp.cache({ memory: CACHE_MEMORY_MB, files: CACHE_FILES, items: CACHE_ITEMS })
 		sharp.simd(true)
-		this.logger.log('Sharp SIMD enabled for improved performance')
 
-		// Log Sharp version and capabilities
-		const sharpInfo = {
-			version: sharp.versions.sharp,
-			libvips: sharp.versions.vips,
-			simd: sharp.simd(),
-			concurrency: sharp.concurrency(),
-		}
-		this.logger.log(`Sharp initialized: ${JSON.stringify(sharpInfo)}`)
+		this.logger.log(`Sharp ${sharp.versions.sharp} (libvips ${sharp.versions.vips}) initialized: concurrency ${sharp.concurrency()} for ${cpuCores} CPU cores, cache ${CACHE_MEMORY_MB}MB/${CACHE_FILES} files/${CACHE_ITEMS} items, simd ${sharp.simd()}`)
 	}
 }

@@ -1,610 +1,382 @@
 import type { MockedObject } from 'vitest'
+import type { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { Buffer } from 'node:buffer'
-import { Test, TestingModule } from '@nestjs/testing'
 import { Redis } from 'ioredis'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
-import { ConfigService } from '#microservice/Config/config.service'
-import { MetricsService } from '#microservice/Metrics/services/metrics.service'
+import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 
-// Mock ioredis
+interface MockRedis {
+	status: string
+	connect: ReturnType<typeof vi.fn>
+	quit: ReturnType<typeof vi.fn>
+	getBuffer: ReturnType<typeof vi.fn>
+	set: ReturnType<typeof vi.fn>
+	del: ReturnType<typeof vi.fn>
+	exists: ReturnType<typeof vi.fn>
+	scan: ReturnType<typeof vi.fn>
+	ping: ReturnType<typeof vi.fn>
+	ttl: ReturnType<typeof vi.fn>
+	info: ReturnType<typeof vi.fn>
+	on: ReturnType<typeof vi.fn>
+}
+
 vi.mock('ioredis', () => {
-	const mockConstructor = vi.fn(function (this: any) {
-		// Create a new instance for each call
-		const instance = {
-			connect: vi.fn().mockResolvedValue(undefined),
+	const mockConstructor = vi.fn(function (this: Record<string, unknown>) {
+		const instance: MockRedis = {
+			status: 'wait',
+			connect: vi.fn().mockImplementation(function (this: MockRedis) {
+				this.status = 'ready'
+				return Promise.resolve()
+			}),
 			quit: vi.fn().mockResolvedValue('OK'),
-			get: vi.fn(),
 			getBuffer: vi.fn(),
 			set: vi.fn().mockResolvedValue('OK'),
-			setex: vi.fn().mockResolvedValue('OK'),
 			del: vi.fn().mockResolvedValue(1),
-			flushdb: vi.fn().mockResolvedValue('OK'),
-			flushall: vi.fn().mockResolvedValue('OK'),
 			exists: vi.fn(),
-			keys: vi.fn().mockResolvedValue(['key1', 'key2']),
 			scan: vi.fn().mockResolvedValue(['0', []]),
 			ping: vi.fn().mockResolvedValue('PONG'),
 			ttl: vi.fn().mockResolvedValue(3600),
-			expire: vi.fn().mockResolvedValue(1),
 			info: vi.fn(),
 			on: vi.fn(),
 		}
-		// Store the instance on 'this' for constructor calls
 		Object.assign(this, instance)
 		return instance
 	})
 
-	return {
-		default: mockConstructor,
-		Redis: mockConstructor,
-	}
+	return { default: mockConstructor, Redis: mockConstructor }
 })
+
+const REDIS_CONFIG = {
+	host: 'redis.local',
+	port: 6380,
+	password: undefined,
+	db: 2,
+	ttl: 7200,
+	maxRetries: 3,
+	healthCheckCacheTtl: 10000,
+}
 
 describe('redisCacheService', () => {
 	let service: RedisCacheService
 	let metricsService: MockedObject<MetricsService>
-	let mockRedis: MockedObject<Redis>
+	let redis: MockRedis
 
-	const mockConfig = {
-		host: 'localhost',
-		port: 6379,
-		password: undefined,
-		db: 0,
-		ttl: 7200,
-		maxRetries: 3,
+	async function createService(overrides: Record<string, unknown> = {}): Promise<RedisCacheService> {
+		const created = new RedisCacheService(
+			createConfigServiceMock({ 'cache.redis': { ...REDIS_CONFIG, ...overrides } }),
+			metricsService,
+		)
+		await created.onModuleInit()
+		redis = vi.mocked(Redis).mock.results.at(-1)!.value as MockRedis
+		return created
 	}
 
 	beforeEach(async () => {
-		// Reset all mock function calls
 		vi.clearAllMocks()
-
-		const mockConfigService = {
-			get: vi.fn().mockImplementation((key: string) => {
-				if (key === 'cache.redis')
-					return mockConfig
-				if (key === 'cache.redis.ttl')
-					return mockConfig.ttl
-				return undefined
-			}),
-		}
-
-		const mockMetricsService = {
-			recordCacheOperation: vi.fn(),
-			updateCacheHitRatio: vi.fn(),
+		metricsService = {
 			updateActiveConnections: vi.fn(),
-		}
-
-		const module: TestingModule = await Test.createTestingModule({
-			providers: [
-				RedisCacheService,
-				{ provide: ConfigService, useValue: mockConfigService },
-				{ provide: MetricsService, useValue: mockMetricsService },
-			],
-		}).compile()
-
-		service = module.get<RedisCacheService>(RedisCacheService)
-		metricsService = module.get(MetricsService)
-
-		// Get the mock Redis instance from the mocked Redis constructor
-		// Redis is the mocked constructor, we can get its instances
-		const RedisMock = Redis as any
-		if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
-			mockRedis = RedisMock.mock.instances.at(-1)
-		}
+			updateCacheHitRatio: vi.fn(),
+		} as unknown as MockedObject<MetricsService>
+		service = await createService()
 	})
 
 	afterEach(() => {
-		vi.clearAllMocks()
+		vi.unstubAllEnvs()
 	})
 
 	describe('initialization', () => {
-		it('should be defined', () => {
-			expect(service).toBeDefined()
-		})
-
-		it('should initialize Redis connection on module init', async () => {
-			await service.onModuleInit()
-
-			// Update mockRedis to the latest instance
-			const RedisMock = Redis as any
-			if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
-				mockRedis = RedisMock.mock.instances.at(-1)
-			}
-
-			expect(Redis).toHaveBeenCalledWith({
-				host: mockConfig.host,
-				port: mockConfig.port,
-				password: mockConfig.password,
-				db: mockConfig.db,
-				maxRetriesPerRequest: mockConfig.maxRetries,
-				enableReadyCheck: true,
+		it('should construct the client from cache.redis and connect once', () => {
+			expect(Redis).toHaveBeenCalledWith(expect.objectContaining({
+				host: 'redis.local',
+				port: 6380,
+				db: 2,
+				maxRetriesPerRequest: 3,
 				lazyConnect: true,
-				keepAlive: 30000,
-				connectTimeout: 10000,
-				commandTimeout: 5000,
+				retryStrategy: expect.any(Function),
+			}))
+			expect(redis.connect).toHaveBeenCalledOnce()
+			expect(service.isConnected).toBe(true)
+		})
+
+		it('should back off exponentially up to 30 seconds between reconnects', () => {
+			const [options] = vi.mocked(Redis).mock.calls[0] as unknown as [{ retryStrategy: (times: number) => number }]
+			const { retryStrategy } = options
+
+			expect(retryStrategy(1)).toBe(2000)
+			expect(retryStrategy(3)).toBe(8000)
+			expect(retryStrategy(10)).toBe(30000)
+		})
+
+		it('should register ready, error and close listeners', () => {
+			const events = redis.on.mock.calls.map(([event]) => event)
+
+			expect(events).toEqual(['ready', 'error', 'close'])
+		})
+
+		it('should report connections through the metrics gauge', () => {
+			const ready = redis.on.mock.calls.find(([event]) => event === 'ready')![1] as () => void
+			const close = redis.on.mock.calls.find(([event]) => event === 'close')![1] as () => void
+
+			ready()
+			expect(metricsService.updateActiveConnections).toHaveBeenCalledWith('redis', 1)
+			close()
+			expect(metricsService.updateActiveConnections).toHaveBeenCalledWith('redis', 0)
+		})
+
+		it('should resolve onModuleInit when the initial connect fails and let ioredis retry', async () => {
+			const constructorMock = vi.mocked(Redis) as unknown as { mockImplementationOnce: (fn: () => unknown) => void }
+			constructorMock.mockImplementationOnce(function (this: Record<string, unknown>) {
+				const instance = {
+					status: 'reconnecting',
+					connect: vi.fn().mockRejectedValue(new Error('ECONNREFUSED')),
+					on: vi.fn(),
+				}
+				Object.assign(this, instance)
+				return instance
 			})
-			expect(mockRedis.connect).toHaveBeenCalled()
+
+			const offline = new RedisCacheService(createConfigServiceMock({ 'cache.redis': REDIS_CONFIG }), metricsService)
+			await expect(offline.onModuleInit()).resolves.toBeUndefined()
+
+			const instance = vi.mocked(Redis).mock.results.at(-1)!.value as MockRedis
+			expect(instance.connect).toHaveBeenCalledOnce()
+			expect(offline.isConnected).toBe(false)
+			expect(offline.getClient()).toBeNull()
 		})
 
-		it('should set up event listeners', async () => {
-			await service.onModuleInit()
+		it('should refuse to start in production without a password', async () => {
+			vi.stubEnv('NODE_ENV', 'production')
+			const unprotected = new RedisCacheService(createConfigServiceMock({ 'cache.redis': REDIS_CONFIG }), metricsService)
 
-			// Update mockRedis to the latest instance
-			const RedisMock = Redis as any
-			if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
-				mockRedis = RedisMock.mock.instances.at(-1)
-			}
-
-			expect(mockRedis.on).toHaveBeenCalledWith('connect', expect.any(Function))
-			expect(mockRedis.on).toHaveBeenCalledWith('ready', expect.any(Function))
-			expect(mockRedis.on).toHaveBeenCalledWith('error', expect.any(Function))
-			expect(mockRedis.on).toHaveBeenCalledWith('close', expect.any(Function))
-			expect(mockRedis.on).toHaveBeenCalledWith('reconnecting', expect.any(Function))
+			await expect(unprotected.onModuleInit()).rejects.toThrow('REDIS_PASSWORD is required in production')
 		})
 
-		it('should close Redis connection on module destroy', async () => {
-			await service.onModuleInit()
-
-			// Update mockRedis to the latest instance
-			const RedisMock = Redis as any
-			if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
-				mockRedis = RedisMock.mock.instances.at(-1)
-			}
-
+		it('should quit the client on module destroy', async () => {
 			await service.onModuleDestroy()
 
-			expect(mockRedis.quit).toHaveBeenCalled()
+			expect(redis.quit).toHaveBeenCalledOnce()
 		})
 	})
 
-	describe('cache operations', () => {
-		beforeEach(async () => {
-			await service.onModuleInit()
+	describe('get', () => {
+		it('should parse JSON values', async () => {
+			redis.getBuffer.mockResolvedValue(Buffer.from(JSON.stringify({ hello: 'world' })))
 
-			// Update mockRedis to the latest instance after onModuleInit
-			const RedisMock = Redis as any
-			if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
-				mockRedis = RedisMock.mock.instances.at(-1)
-			}
-
-			// Simulate ready event
-			const readyCallback = mockRedis.on.mock.calls.find((call: unknown[]) => call[0] === 'ready')?.[1]
-			if (readyCallback)
-				readyCallback()
+			await expect(service.get('key')).resolves.toEqual({ hello: 'world' })
+			expect(redis.getBuffer).toHaveBeenCalledWith('key')
 		})
 
-		describe('get', () => {
-			it('should get value from Redis and parse JSON', async () => {
-				const testValue = { test: 'data', number: 42 }
-				mockRedis.getBuffer.mockResolvedValue(Buffer.from(JSON.stringify(testValue)))
+		it('should return null for a missing key', async () => {
+			redis.getBuffer.mockResolvedValue(null)
 
-				const result = await service.get<typeof testValue>('test-key')
-
-				expect(mockRedis.getBuffer).toHaveBeenCalledWith('test-key')
-				expect(result).toEqual(testValue)
-				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'redis', 'hit')
-			})
-
-			it('should return null when key does not exist', async () => {
-				mockRedis.getBuffer.mockResolvedValue(null)
-
-				const result = await service.get('non-existent-key')
-
-				expect(result).toBeNull()
-				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'redis', 'miss')
-			})
-
-			it('should handle Redis errors gracefully', async () => {
-				mockRedis.getBuffer.mockRejectedValue(new Error('Redis connection failed'))
-
-				const result = await service.get('test-key')
-
-				expect(result).toBeNull()
-				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'redis', 'error')
-			})
-
-			it('should return null when Redis is not connected', async () => {
-				// Simulate disconnected state
-				const closeCallback = mockRedis.on.mock.calls.find((call: unknown[]) => call[0] === 'close')?.[1]
-				if (closeCallback)
-					closeCallback()
-
-				const result = await service.get('test-key')
-
-				expect(result).toBeNull()
-				expect(mockRedis.getBuffer).not.toHaveBeenCalled()
-				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'redis', 'miss')
-			})
-
-			it('should deserialize binary format with Buffer data', async () => {
-				const imageData = Buffer.from('fake-image-binary-data')
-				const metadata = { metadata: { format: 'webp', size: '100' } }
-				const metaJson = Buffer.from(JSON.stringify(metadata), 'utf8')
-
-				// Build binary format: [0x00][4 bytes meta length][meta JSON][binary data]
-				const header = Buffer.alloc(5)
-				header[0] = 0x00
-				header.writeUInt32BE(metaJson.length, 1)
-				const stored = Buffer.concat([header, metaJson, imageData])
-
-				mockRedis.getBuffer.mockResolvedValue(stored)
-
-				const result = await service.get<{ data: Buffer, metadata: any }>('image-key')
-
-				expect(result).not.toBeNull()
-				expect(Buffer.isBuffer(result!.data)).toBe(true)
-				expect(result!.data).toEqual(imageData)
-				expect(result!.metadata).toEqual(metadata.metadata)
-			})
-
-			it('treats stale base64-buffer entries as cache misses (self-heal)', async () => {
-				// The pre-binary-marker cache format wrapped Buffers as
-				// ``{ type: "Buffer", data: "<base64>" }``. Any entry
-				// still using that shape must return ``null`` so the
-				// consumer re-fetches the upstream image and re-caches
-				// it in the current compact binary format.
-				const imageData = Buffer.from('stale-image-data')
-				const staleValue = JSON.stringify({
-					data: { type: 'Buffer', data: imageData.toString('base64') },
-					metadata: { format: 'webp' },
-				})
-				mockRedis.getBuffer.mockResolvedValue(Buffer.from(staleValue))
-
-				const result = await service.get<{ data: Buffer, metadata: any }>('stale-key')
-
-				expect(result).toBeNull()
-			})
+			await expect(service.get('missing')).resolves.toBeNull()
 		})
 
-		describe('set', () => {
-			it('should set value in Redis with TTL', async () => {
-				const testValue = { test: 'data' }
-				const ttl = 3600
+		it('should decode the binary envelope without copying the payload', async () => {
+			const meta = Buffer.from(JSON.stringify({ metadata: { format: 'webp' } }), 'utf8')
+			const image = Buffer.from([1, 2, 3, 4])
+			const header = Buffer.alloc(5)
+			header[0] = 0x00
+			header.writeUInt32BE(meta.length, 1)
+			const stored = Buffer.concat([header, meta, image])
+			redis.getBuffer.mockResolvedValue(stored)
 
-				await service.set('test-key', testValue, ttl)
+			const value = await service.get<{ data: Buffer, metadata: { format: string } }>('image:acme:x')
 
-				expect(mockRedis.set).toHaveBeenCalledWith(
-					'test-key',
-					expect.any(Buffer),
-					'EX',
-					ttl,
-				)
-				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('set', 'redis', 'success')
-			})
-
-			it('should set value in Redis with default TTL', async () => {
-				const testValue = { test: 'data' }
-
-				await service.set('test-key', testValue)
-
-				expect(mockRedis.set).toHaveBeenCalledWith(
-					'test-key',
-					expect.any(Buffer),
-					'EX',
-					mockConfig.ttl,
-				)
-				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('set', 'redis', 'success')
-			})
-
-			it('should set value without TTL when TTL is 0', async () => {
-				const testValue = { test: 'data' }
-
-				await service.set('test-key', testValue, 0)
-
-				// TTL=0 is treated as "use default configured TTL" — never persists without expiry.
-				// The service falls back to cache.redis.ttl (7200 in mock config).
-				expect(mockRedis.set).toHaveBeenCalledWith('test-key', expect.any(Buffer), 'EX', mockConfig.ttl)
-				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('set', 'redis', 'success')
-			})
-
-			it('should handle Redis errors', async () => {
-				mockRedis.set.mockRejectedValue(new Error('Redis connection failed'))
-
-				// The service should handle errors gracefully and not throw
-				await service.set('test-key', { test: 'data' })
-				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('set', 'redis', 'error')
-			})
-
-			it('should skip operation when Redis is not connected', async () => {
-				// Simulate disconnected state
-				const closeCallback = mockRedis.on.mock.calls.find((call: unknown[]) => call[0] === 'close')?.[1]
-				if (closeCallback)
-					closeCallback()
-
-				await service.set('test-key', { test: 'data' })
-
-				expect(mockRedis.set).not.toHaveBeenCalled()
-			})
-
-			it('should use binary format for values with Buffer data', async () => {
-				const imageData = Buffer.from('test-image-binary')
-				const value = { data: imageData, metadata: { format: 'webp' } }
-
-				await service.set('image-key', value, 3600)
-
-				expect(mockRedis.set).toHaveBeenCalled()
-				const storedBuffer = mockRedis.set.mock.calls[0][1] as Buffer
-				// Binary format starts with 0x00 marker
-				expect(storedBuffer[0]).toBe(0x00)
-				// Verify it doesn't contain base64 (no bloat)
-				expect(storedBuffer.length).toBeLessThan(
-					Buffer.from(JSON.stringify({ data: { type: 'Buffer', data: imageData.toString('base64') }, metadata: { format: 'webp' } })).length,
-				)
-			})
+			expect(value?.metadata).toEqual({ format: 'webp' })
+			expect(Buffer.isBuffer(value?.data)).toBe(true)
+			expect(value?.data.equals(image)).toBe(true)
+			expect(value?.data.buffer).toBe(stored.buffer)
 		})
 
-		describe('delete', () => {
-			it('should delete key from Redis', async () => {
-				await service.delete('test-key')
+		it('should return null for an undecodable value', async () => {
+			redis.getBuffer.mockResolvedValue(Buffer.from('not json'))
 
-				expect(mockRedis.del).toHaveBeenCalledWith('test-key')
-				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('delete', 'redis', 'success')
-			})
-
-			it('should handle Redis errors', async () => {
-				mockRedis.del.mockRejectedValue(new Error('Redis connection failed'))
-
-				await expect(service.delete('test-key')).rejects.toThrow('Redis connection failed')
-				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('delete', 'redis', 'error')
-			})
-
-			it('should skip operation when Redis is not connected', async () => {
-				// Simulate disconnected state
-				const closeCallback = mockRedis.on.mock.calls.find((call: unknown[]) => call[0] === 'close')?.[1]
-				if (closeCallback)
-					closeCallback()
-
-				await service.delete('test-key')
-
-				expect(mockRedis.del).not.toHaveBeenCalled()
-			})
+			await expect(service.get('key')).resolves.toBeNull()
 		})
 
-		describe('clear', () => {
-			it('should delete image keys using SCAN + DEL', async () => {
-				// Simulate SCAN returning some image keys, then cursor '0' to end
-				mockRedis.scan
-					.mockResolvedValueOnce(['42', ['image:key1', 'image:key2']])
-					.mockResolvedValueOnce(['0', ['image:key3']])
+		it('should propagate command errors and count them', async () => {
+			redis.getBuffer.mockRejectedValue(new Error('READONLY'))
 
-				await service.clear()
-
-				expect(mockRedis.scan).toHaveBeenCalledWith('0', 'MATCH', 'image:*', 'COUNT', 100)
-				expect(mockRedis.scan).toHaveBeenCalledWith('42', 'MATCH', 'image:*', 'COUNT', 100)
-				expect(mockRedis.del).toHaveBeenCalledWith('image:key1', 'image:key2')
-				expect(mockRedis.del).toHaveBeenCalledWith('image:key3')
-				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('clear', 'redis', 'success')
-			})
-
-			it('should handle empty SCAN result', async () => {
-				mockRedis.scan.mockResolvedValueOnce(['0', []])
-
-				await service.clear()
-
-				expect(mockRedis.scan).toHaveBeenCalledWith('0', 'MATCH', 'image:*', 'COUNT', 100)
-				expect(mockRedis.del).not.toHaveBeenCalled()
-				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('clear', 'redis', 'success')
-			})
-
-			it('should handle Redis errors', async () => {
-				mockRedis.scan.mockRejectedValue(new Error('Redis connection failed'))
-
-				await expect(service.clear()).rejects.toThrow('Redis connection failed')
-				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('clear', 'redis', 'error')
-			})
+			await expect(service.get('key')).rejects.toThrow('READONLY')
+			expect(service.getConnectionStatus().stats.errors).toBe(1)
 		})
 
-		describe('has', () => {
-			it('should return true when key exists', async () => {
-				mockRedis.exists.mockResolvedValue(1)
+		it('should be a miss while disconnected', async () => {
+			redis.status = 'reconnecting'
 
-				const result = await service.has('test-key')
-
-				expect(result).toBe(true)
-				expect(mockRedis.exists).toHaveBeenCalledWith('test-key')
-			})
-
-			it('should return false when key does not exist', async () => {
-				mockRedis.exists.mockResolvedValue(0)
-
-				const result = await service.has('test-key')
-
-				expect(result).toBe(false)
-			})
-
-			it('should return false on Redis errors', async () => {
-				mockRedis.exists.mockRejectedValue(new Error('Redis connection failed'))
-
-				const result = await service.has('test-key')
-
-				expect(result).toBe(false)
-			})
-		})
-
-		describe('keys', () => {
-			it('should return all keys using SCAN iteration', async () => {
-				mockRedis.scan
-					.mockResolvedValueOnce(['42', ['key1', 'key2']])
-					.mockResolvedValueOnce(['0', ['key3']])
-
-				const result = await service.keys()
-
-				expect(result).toEqual(['key1', 'key2', 'key3'])
-				expect(mockRedis.scan).toHaveBeenCalledWith('0', 'COUNT', 100)
-				expect(mockRedis.scan).toHaveBeenCalledWith('42', 'COUNT', 100)
-			})
-
-			it('should return empty array on Redis errors', async () => {
-				mockRedis.scan.mockRejectedValue(new Error('Redis connection failed'))
-
-				const result = await service.keys()
-
-				expect(result).toEqual([])
-			})
-		})
-
-		describe('flushAll', () => {
-			it('should flush current database only', async () => {
-				await service.flushAll()
-
-				expect(mockRedis.flushdb).toHaveBeenCalled()
-				expect(mockRedis.flushall).not.toHaveBeenCalled()
-				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('flush', 'redis', 'success')
-			})
-
-			it('should handle Redis errors', async () => {
-				mockRedis.flushdb.mockRejectedValue(new Error('Redis connection failed'))
-
-				await expect(service.flushAll()).rejects.toThrow('Redis connection failed')
-				expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('flush', 'redis', 'error')
-			})
-		})
-
-		describe('getStats', () => {
-			it('should return cache statistics', async () => {
-				mockRedis.info.mockImplementation((...args: (string | Buffer)[]) => {
-					const section = args[0] as string
-					if (section === 'keyspace')
-						return Promise.resolve('db0:keys=100,expires=50')
-					if (section === 'memory')
-						return Promise.resolve('used_memory:1048576')
-					return Promise.resolve('')
-				})
-
-				// Simulate some cache operations to generate stats
-				mockRedis.getBuffer.mockResolvedValueOnce(null) // miss
-				await service.get('key1')
-				mockRedis.getBuffer.mockResolvedValueOnce(Buffer.from(JSON.stringify({ test: 'data' }))) // hit
-				await service.get('key2')
-				mockRedis.getBuffer.mockResolvedValueOnce(Buffer.from(JSON.stringify({ test: 'data2' }))) // hit
-				await service.get('key3')
-
-				const stats = await service.getStats()
-
-				expect(stats).toEqual({
-					hits: 2,
-					misses: 1,
-					keys: 100,
-					ksize: 0,
-					vsize: 1048576,
-					hitRate: 0.6666666666666666,
-				})
-				expect(metricsService.updateCacheHitRatio).toHaveBeenCalledWith('redis', 0.6666666666666666)
-			})
-
-			it('should handle Redis info errors gracefully', async () => {
-				mockRedis.info.mockRejectedValue(new Error('Redis connection failed'))
-
-				const stats = await service.getStats()
-
-				expect(stats.keys).toBe(0)
-				expect(stats.vsize).toBe(0)
-			})
+			await expect(service.get('key')).resolves.toBeNull()
+			expect(redis.getBuffer).not.toHaveBeenCalled()
 		})
 	})
 
-	describe('redis-specific methods', () => {
-		beforeEach(async () => {
-			await service.onModuleInit()
+	describe('set', () => {
+		it('should write with the given TTL in seconds', async () => {
+			await service.set('key', { a: 1 }, 60)
 
-			// Update mockRedis to the latest instance after onModuleInit
-			const RedisMock = Redis as any
-			if (RedisMock.mock && RedisMock.mock.instances.length > 0) {
-				mockRedis = RedisMock.mock.instances.at(-1)
-			}
-
-			// Simulate ready event
-			const readyCallback = mockRedis.on.mock.calls.find((call: unknown[]) => call[0] === 'ready')?.[1]
-			if (readyCallback)
-				readyCallback()
+			expect(redis.set).toHaveBeenCalledWith('key', Buffer.from(JSON.stringify({ a: 1 })), 'EX', 60)
 		})
 
-		describe('ping', () => {
-			it('should ping Redis successfully', async () => {
-				const result = await service.ping()
+		it.each([undefined, 0])('should fall back to cache.redis.ttl when ttl is %s', async (ttl) => {
+			await service.set('key', 'value', ttl)
 
-				expect(result).toBe('PONG')
-				expect(mockRedis.ping).toHaveBeenCalled()
-			})
+			expect(redis.set).toHaveBeenCalledWith('key', expect.any(Buffer), 'EX', 7200)
+		})
 
-			it('should throw error when Redis is not connected', async () => {
-				// Simulate disconnected state
-				const closeCallback = mockRedis.on.mock.calls.find((call: unknown[]) => call[0] === 'close')?.[1]
-				if (closeCallback)
-					closeCallback()
+		it('should use the binary envelope for values carrying a Buffer', async () => {
+			const data = Buffer.from([9, 8, 7])
+			await service.set('image:acme:x', { data, metadata: { format: 'png' } }, 30)
 
-				await expect(service.ping()).rejects.toThrow('Redis not connected')
+			const stored = redis.set.mock.calls[0][1] as Buffer
+			expect(stored[0]).toBe(0x00)
+			const metaLength = stored.readUInt32BE(1)
+			expect(JSON.parse(stored.toString('utf8', 5, 5 + metaLength))).toEqual({ metadata: { format: 'png' } })
+			expect(stored.subarray(5 + metaLength).equals(data)).toBe(true)
+		})
+
+		it('should propagate command errors', async () => {
+			redis.set.mockRejectedValue(new Error('OOM'))
+
+			await expect(service.set('key', 'value', 10)).rejects.toThrow('OOM')
+		})
+
+		it('should skip the write while disconnected', async () => {
+			redis.status = 'connecting'
+
+			await service.set('key', 'value', 10)
+
+			expect(redis.set).not.toHaveBeenCalled()
+		})
+	})
+
+	describe('delete', () => {
+		it('should delete the key', async () => {
+			await service.delete('key')
+
+			expect(redis.del).toHaveBeenCalledWith('key')
+		})
+
+		it('should propagate command errors', async () => {
+			redis.del.mockRejectedValue(new Error('down'))
+
+			await expect(service.delete('key')).rejects.toThrow('down')
+		})
+
+		it('should skip the delete while disconnected', async () => {
+			redis.status = 'end'
+
+			await service.delete('key')
+
+			expect(redis.del).not.toHaveBeenCalled()
+		})
+	})
+
+	describe('clear', () => {
+		it('should SCAN image keys and DEL each batch', async () => {
+			redis.scan
+				.mockResolvedValueOnce(['5', ['image:acme:a', 'image:acme:b']])
+				.mockResolvedValueOnce(['0', ['image:public:c']])
+
+			await service.clear()
+
+			expect(redis.scan).toHaveBeenCalledWith('0', 'MATCH', 'image:*', 'COUNT', 100)
+			expect(redis.del).toHaveBeenCalledWith('image:acme:a', 'image:acme:b')
+			expect(redis.del).toHaveBeenCalledWith('image:public:c')
+		})
+
+		it('should not DEL when the scan is empty', async () => {
+			await service.clear()
+
+			expect(redis.del).not.toHaveBeenCalled()
+		})
+
+		it('should propagate command errors', async () => {
+			redis.scan.mockRejectedValue(new Error('scan failed'))
+
+			await expect(service.clear()).rejects.toThrow('scan failed')
+		})
+	})
+
+	describe('has', () => {
+		it('should reflect EXISTS', async () => {
+			redis.exists.mockResolvedValueOnce(1).mockResolvedValueOnce(0)
+
+			await expect(service.has('a')).resolves.toBe(true)
+			await expect(service.has('b')).resolves.toBe(false)
+		})
+
+		it('should return false on command errors', async () => {
+			redis.exists.mockRejectedValue(new Error('down'))
+
+			await expect(service.has('a')).resolves.toBe(false)
+		})
+	})
+
+	describe('getStats', () => {
+		it('should read the key count of the configured database only', async () => {
+			redis.info
+				.mockResolvedValueOnce('# Keyspace\r\ndb0:keys=999,expires=0\r\ndb2:keys=42,expires=1\r\n')
+				.mockResolvedValueOnce('used_memory:2048\r\n')
+			redis.getBuffer.mockResolvedValueOnce(Buffer.from('"x"')).mockResolvedValueOnce(null)
+			await service.get('hit')
+			await service.get('miss')
+
+			const stats = await service.getStats()
+
+			expect(stats).toEqual({ hits: 1, misses: 1, keys: 42, ksize: 0, vsize: 2048, hitRate: 0.5 })
+			expect(metricsService.updateCacheHitRatio).toHaveBeenCalledWith('redis', 0.5)
+		})
+
+		it('should tolerate INFO failures', async () => {
+			redis.info.mockRejectedValue(new Error('INFO disabled'))
+
+			const stats = await service.getStats()
+
+			expect(stats.keys).toBe(0)
+			expect(stats.vsize).toBe(0)
+		})
+	})
+
+	describe('connection helpers', () => {
+		it('should ping when connected and throw otherwise', async () => {
+			await expect(service.ping()).resolves.toBe('PONG')
+
+			redis.status = 'reconnecting'
+			await expect(service.ping()).rejects.toThrow('Redis not connected')
+		})
+
+		it('should report TTL, -1 when disconnected', async () => {
+			await expect(service.getTtl('key')).resolves.toBe(3600)
+
+			redis.status = 'reconnecting'
+			await expect(service.getTtl('key')).resolves.toBe(-1)
+		})
+
+		it('should expose the raw client only while ready', () => {
+			expect(service.getClient()).toBe(redis)
+
+			redis.status = 'close'
+			expect(service.getClient()).toBeNull()
+		})
+
+		it('should snapshot connection status and counters', async () => {
+			redis.getBuffer.mockResolvedValue(null)
+			await service.get('a')
+
+			expect(service.getConnectionStatus()).toEqual({
+				connected: true,
+				stats: { hits: 0, misses: 1, operations: 1, errors: 0 },
 			})
 		})
 
-		describe('getTtl', () => {
-			it('should get TTL for key', async () => {
-				mockRedis.ttl.mockResolvedValue(3600)
+		it('should parse memory usage and return zeros while disconnected', async () => {
+			redis.info.mockResolvedValue('used_memory:1000\r\nused_memory_peak:1500\r\nmem_fragmentation_ratio:1.25\r\n')
 
-				const result = await service.getTtl('test-key')
+			await expect(service.getMemoryUsage()).resolves.toEqual({ used: 1000, peak: 1500, fragmentation: 1.25 })
 
-				expect(result).toBe(3600)
-				expect(mockRedis.ttl).toHaveBeenCalledWith('test-key')
-			})
-
-			it('should return -1 when Redis is not connected', async () => {
-				// Simulate disconnected state
-				const closeCallback = mockRedis.on.mock.calls.find((call: unknown[]) => call[0] === 'close')?.[1]
-				if (closeCallback)
-					closeCallback()
-
-				const result = await service.getTtl('test-key')
-
-				expect(result).toBe(-1)
-			})
-		})
-
-		describe('getConnectionStatus', () => {
-			it('should return connection status and stats', async () => {
-				const status = service.getConnectionStatus()
-
-				expect(status).toEqual({
-					connected: true,
-					stats: {
-						hits: 0,
-						misses: 0,
-						operations: 0,
-						errors: 0,
-					},
-				})
-			})
-		})
-
-		describe('getMemoryUsage', () => {
-			it('should return memory usage information', async () => {
-				mockRedis.info.mockResolvedValue(
-					'used_memory:1048576\nused_memory_peak:2097152\nmem_fragmentation_ratio:1.25',
-				)
-
-				const result = await service.getMemoryUsage()
-
-				expect(result).toEqual({
-					used: 1048576,
-					peak: 2097152,
-					fragmentation: 1.25,
-				})
-			})
-
-			it('should return zeros when Redis is not connected', async () => {
-				// Simulate disconnected state
-				const closeCallback = mockRedis.on.mock.calls.find((call: unknown[]) => call[0] === 'close')?.[1]
-				if (closeCallback)
-					closeCallback()
-
-				const result = await service.getMemoryUsage()
-
-				expect(result).toEqual({
-					used: 0,
-					peak: 0,
-					fragmentation: 0,
-				})
-			})
+			redis.status = 'reconnecting'
+			await expect(service.getMemoryUsage()).resolves.toEqual({ used: 0, peak: 0, fragmentation: 0 })
 		})
 	})
 })

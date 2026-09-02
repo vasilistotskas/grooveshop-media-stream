@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConfigService } from '#microservice/Config/config.service'
 import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
+import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 
 describe('httpHealthIndicator', () => {
 	let indicator: HttpHealthIndicator
@@ -14,21 +15,12 @@ describe('httpHealthIndicator', () => {
 		get: vi.fn(),
 	}
 
-	const mockConfigService = {
-		getOptional: vi.fn(),
-	}
+	let mockConfigService: ConfigService
 
 	beforeEach(async () => {
 		vi.clearAllMocks()
 
-		// Set default mock behavior
-		mockConfigService.getOptional.mockImplementation((key: string, defaultValue: any) => {
-			if (key === 'http.healthCheck.urls')
-				return []
-			if (key === 'http.healthCheck.timeout')
-				return 5000
-			return defaultValue
-		})
+		mockConfigService = createConfigServiceMock()
 
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [
@@ -53,22 +45,11 @@ describe('httpHealthIndicator', () => {
 		})
 
 		it('should load configuration from ConfigService', () => {
-			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.healthCheck.urls', [])
-			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.healthCheck.timeout', 5000)
+			expect(mockConfigService.get).toHaveBeenCalledWith('http.healthCheck')
 		})
 	})
 
 	describe('health Check - No URLs Configured', () => {
-		beforeEach(() => {
-			mockConfigService.getOptional.mockImplementation((key: string, defaultValue: any) => {
-				if (key === 'http.healthCheck.urls')
-					return []
-				if (key === 'http.healthCheck.timeout')
-					return 5000
-				return defaultValue
-			})
-		})
-
 		it('should return healthy when circuit breaker is closed', async () => {
 			mockHttpClientService.isCircuitOpen.mockReturnValue(false)
 			mockHttpClientService.getStats.mockReturnValue({
@@ -116,13 +97,7 @@ describe('httpHealthIndicator', () => {
 			// Reset all mocks
 			vi.clearAllMocks()
 
-			mockConfigService.getOptional.mockImplementation((key: string, defaultValue: any) => {
-				if (key === 'http.healthCheck.urls')
-					return ['https://api.example.com/health', 'https://cdn.example.com/health']
-				if (key === 'http.healthCheck.timeout')
-					return 5000
-				return defaultValue
-			})
+			mockConfigService = createConfigServiceMock({ 'http.healthCheck.urls': ['https://api.example.com/health', 'https://cdn.example.com/health'] })
 
 			// Recreate the indicator with new configuration
 			const module: TestingModule = await Test.createTestingModule({
@@ -216,7 +191,7 @@ describe('httpHealthIndicator', () => {
 
 			const result = await indicator.isHealthy()
 			expect(result.http.status).toBe('down')
-			expect(result.http.message).toContain('circuit breaker: true')
+			expect(result.http.message).toContain('circuit breaker: open')
 		})
 
 		it('should handle timeout errors gracefully', async () => {
@@ -266,27 +241,9 @@ describe('httpHealthIndicator', () => {
 	})
 
 	describe('error Handling', () => {
-		beforeEach(() => {
-			mockConfigService.getOptional.mockImplementation((key: string, defaultValue: any) => {
-				if (key === 'http.healthCheck.urls')
-					return ['https://api.example.com/health']
-				if (key === 'http.healthCheck.timeout')
-					return 5000
-				return defaultValue
-			})
-		})
-
 		it('should handle unexpected errors gracefully', async () => {
 			// Need to recreate the indicator with health check URLs configured
-			mockConfigService.getOptional.mockImplementation((key: string, defaultValue: any) => {
-				if (key === 'http.healthCheck.urls') {
-					return ['http://test-url.com']
-				}
-				if (key === 'http.healthCheck.timeout') {
-					return 5000
-				}
-				return defaultValue
-			})
+			mockConfigService = createConfigServiceMock({ 'http.healthCheck.urls': ['http://test-url.com'] })
 
 			// Recreate the indicator with the new configuration
 			const module: TestingModule = await Test.createTestingModule({
@@ -318,15 +275,6 @@ describe('httpHealthIndicator', () => {
 			const result = await testIndicator.isHealthy()
 			expect(result.http.status).toBe('down')
 			expect(result.http.message).toContain('0/1 endpoints healthy')
-		})
-	})
-
-	describe('getDetails', () => {
-		it('should return indicator details', () => {
-			const details = indicator.getDetails()
-
-			expect(details.key).toBe('http')
-			expect(details.description).toContain('HTTP connection health')
 		})
 	})
 })

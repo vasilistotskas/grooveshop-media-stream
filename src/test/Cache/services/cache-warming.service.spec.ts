@@ -1,401 +1,245 @@
 import type { Dirent } from 'node:fs'
-import type { MockedFunction, MockedObject } from 'vitest'
+import type { MockedObject } from 'vitest'
+import type { ConfigOverrides } from '../../helpers/config-service.mock.js'
 import { Buffer } from 'node:buffer'
-import { access, readdir, readFile, stat } from 'node:fs/promises'
+import { readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { SchedulerRegistry } from '@nestjs/schedule'
-import { Test, TestingModule } from '@nestjs/testing'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Test } from '@nestjs/testing'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CacheWarmingService } from '#microservice/Cache/services/cache-warming.service'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
+import { storageDirectory } from '#microservice/common/utils/storage-path.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
+import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 
-// Mock fs promises
 vi.mock('node:fs/promises')
-vi.mock('node:path')
 
-const mockReaddir = readdir as unknown as MockedFunction<typeof readdir>
-const mockStat = stat as unknown as MockedFunction<typeof stat>
-const mockReadFile = readFile as unknown as MockedFunction<typeof readFile>
-const mockJoin = join as unknown as MockedFunction<typeof join>
-const mockAccess = access as unknown as MockedFunction<typeof access>
+const mockReaddir = vi.mocked(readdir)
+const mockStat = vi.mocked(stat)
+const mockReadFile = vi.mocked(readFile)
 
-/** Create a mock Dirent for readdir({ withFileTypes: true }) */
 function mockDirent(name: string, isFile = true): Dirent {
 	return { name, isFile: () => isFile, isDirectory: () => !isFile, isBlockDevice: () => false, isCharacterDevice: () => false, isFIFO: () => false, isSocket: () => false, isSymbolicLink: () => false, path: '', parentPath: '' } as Dirent
 }
 
+function sidecar(accessCount: number, tenantSchema?: string): string {
+	return JSON.stringify({
+		version: 1,
+		size: '1024',
+		format: 'webp',
+		dateCreated: Date.now(),
+		privateTTL: 1000,
+		publicTTL: 2000,
+		accessCount,
+		...(tenantSchema ? { tenantSchema } : {}),
+	})
+}
+
+function enoent(): NodeJS.ErrnoException {
+	return Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' })
+}
+
+interface Harness {
+	service: CacheWarmingService
+	cacheManager: MockedObject<MultiLayerCacheManager>
+	configService: MockedObject<ConfigService>
+	metricsService: MockedObject<MetricsService>
+	storageDir: string
+}
+
+async function createHarness(overrides: ConfigOverrides = {}): Promise<Harness> {
+	const configService = createConfigServiceMock(overrides)
+	const module = await Test.createTestingModule({
+		providers: [
+			CacheWarmingService,
+			{ provide: MultiLayerCacheManager, useValue: { exists: vi.fn(), set: vi.fn() } },
+			{ provide: ConfigService, useValue: configService },
+			{ provide: MetricsService, useValue: { recordCacheOperation: vi.fn() } },
+			{ provide: SchedulerRegistry, useValue: { addCronJob: vi.fn() } },
+		],
+	}).compile()
+
+	return {
+		service: module.get(CacheWarmingService),
+		cacheManager: module.get(MultiLayerCacheManager),
+		configService: module.get(ConfigService),
+		metricsService: module.get(MetricsService),
+		storageDir: storageDirectory(configService),
+	}
+}
+
 describe('cacheWarmingService', () => {
-	let service: CacheWarmingService
-	let cacheManager: MockedObject<MultiLayerCacheManager>
-	let configService: MockedObject<ConfigService>
-	let metricsService: MockedObject<MetricsService>
+	let harness: Harness
 
 	beforeEach(async () => {
-		const mockCacheManager = {
-			exists: vi.fn(),
-			set: vi.fn(),
-			get: vi.fn(),
-			delete: vi.fn(),
-			clear: vi.fn(),
-			getStats: vi.fn(),
-		}
-
-		const mockConfigService = {
-			get: vi.fn(),
-			getOptional: vi.fn((key: string, defaultValue: any) => {
-				if (key === 'cache.warming.baseTtl')
-					return 3600
-				return defaultValue
-			}),
-		}
-
-		const mockMetricsService = {
-			recordCacheOperation: vi.fn(),
-		}
-
-		const mockSchedulerRegistry = {
-			addCronJob: vi.fn(),
-		}
-
-		const module: TestingModule = await Test.createTestingModule({
-			providers: [
-				CacheWarmingService,
-				{
-					provide: MultiLayerCacheManager,
-					useValue: mockCacheManager,
-				},
-				{
-					provide: ConfigService,
-					useValue: mockConfigService,
-				},
-				{
-					provide: MetricsService,
-					useValue: mockMetricsService,
-				},
-				{
-					provide: SchedulerRegistry,
-					useValue: mockSchedulerRegistry,
-				},
-			],
-		}).compile()
-
-		service = module.get<CacheWarmingService>(CacheWarmingService)
-		cacheManager = module.get(MultiLayerCacheManager)
-		configService = module.get(ConfigService)
-		metricsService = module.get(MetricsService)
-
-		// Setup default config
-		configService.get.mockImplementation((key: string) => {
-			const config = {
-				'cache.warming': {
-					enabled: true,
-					warmupOnStart: true,
-					maxFilesToWarm: 50,
-					warmupCron: '0 */6 * * *',
-					popularImageThreshold: 5,
-				},
-			}
-			return (config as any)[key]
-		})
-
-		// Setup default mocks
-		mockJoin.mockImplementation((...paths) => paths.join('/'))
-	})
-
-	afterEach(() => {
-		vi.clearAllMocks()
+		vi.resetAllMocks()
+		mockStat.mockResolvedValue({ atime: new Date(), size: 1024 } as any)
+		harness = await createHarness()
+		harness.cacheManager.exists.mockResolvedValue(false)
+		harness.cacheManager.set.mockResolvedValue()
 	})
 
 	describe('initialization', () => {
 		it('should be defined', () => {
-			expect(service).toBeDefined()
+			expect(harness.service).toBeDefined()
 		})
 
 		it('should load configuration on initialization', () => {
-			expect(configService.get).toHaveBeenCalledWith('cache.warming')
+			expect(harness.configService.get).toHaveBeenCalledWith('cache.warming')
 		})
 	})
 
 	describe('cache Warmup', () => {
-		it('should warm up popular files', async () => {
-			// Mock file system
+		it('warms popular files, reading each sidecar once and each payload once', async () => {
 			mockReaddir.mockResolvedValue([mockDirent('file1.rsc'), mockDirent('file2.rsc'), mockDirent('file3.rsc')] as any)
-			mockAccess.mockResolvedValue(undefined)
-			mockStat.mockResolvedValue({
-				atime: new Date(),
-				size: 1024,
-			} as any)
 			mockReadFile
-				.mockResolvedValueOnce('{"accessCount": 10}') // metadata
-				.mockResolvedValueOnce('{"accessCount": 8}') // metadata
-				.mockResolvedValueOnce('{"accessCount": 6}') // metadata
-				.mockResolvedValue(Buffer.from('file content')) // file content
+				.mockResolvedValueOnce(sidecar(10))
+				.mockResolvedValueOnce(sidecar(8))
+				.mockResolvedValueOnce(sidecar(6))
+				.mockResolvedValue(Buffer.from('file content'))
 
-			cacheManager.exists.mockResolvedValue(false)
-			cacheManager.set.mockResolvedValue()
+			await harness.service.warmupCache()
 
-			await service.warmupCache()
-
-			expect(mockReaddir).toHaveBeenCalled()
-			expect(cacheManager.set).toHaveBeenCalledTimes(3)
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('warmup', 'memory', 'success')
+			expect(mockReaddir).toHaveBeenCalledWith(harness.storageDir, { withFileTypes: true })
+			expect(mockReadFile).toHaveBeenCalledTimes(6)
+			expect(mockReadFile).toHaveBeenCalledWith(join(harness.storageDir, 'file1.rsm'), 'utf8')
+			expect(mockReadFile).toHaveBeenCalledWith(join(harness.storageDir, 'file1.rsc'))
+			expect(harness.cacheManager.set).toHaveBeenCalledTimes(3)
+			expect(harness.metricsService.recordCacheOperation).toHaveBeenCalledWith('warmup', 'memory', 'success')
 		})
 
 		it('should skip files already in cache', async () => {
 			mockReaddir.mockResolvedValue([mockDirent('file1.rsc')] as any)
-			mockAccess.mockResolvedValue(undefined)
-			mockStat.mockResolvedValue({
-				atime: new Date(),
-				size: 1024,
-			} as any)
-			mockReadFile.mockResolvedValue('{"accessCount": 10}')
+			mockReadFile.mockResolvedValue(sidecar(10))
+			harness.cacheManager.exists.mockResolvedValue(true)
 
-			cacheManager.exists.mockResolvedValue(true) // Already in cache
-			cacheManager.set.mockResolvedValue()
+			await harness.service.warmupCache()
 
-			await service.warmupCache()
-
-			expect(cacheManager.set).not.toHaveBeenCalled()
+			expect(harness.cacheManager.set).not.toHaveBeenCalled()
+			// The payload is not read for an entry that is already cached
+			expect(mockReadFile).toHaveBeenCalledTimes(1)
 		})
 
 		it('should limit number of files warmed up', async () => {
-			// Override config to limit files
-			configService.get.mockImplementation((key: string) => {
-				if (key === 'cache.warming') {
-					return {
-						enabled: true,
-						warmupOnStart: true,
-						maxFilesToWarm: 2, // Limit to 2 files
-						warmupCron: '0 */6 * * *',
-						popularImageThreshold: 5,
-					}
-				}
-				return undefined
-			})
-
-			// Create new service instance with updated config
-			const module: TestingModule = await Test.createTestingModule({
-				providers: [
-					CacheWarmingService,
-					{
-						provide: MultiLayerCacheManager,
-						useValue: cacheManager,
-					},
-					{
-						provide: ConfigService,
-						useValue: configService,
-					},
-					{
-						provide: MetricsService,
-						useValue: metricsService,
-					},
-					{
-						provide: SchedulerRegistry,
-						useValue: { addCronJob: vi.fn() },
-					},
-				],
-			}).compile()
-
-			const limitedService = module.get<CacheWarmingService>(CacheWarmingService)
+			const limited = await createHarness({ 'cache.warming.maxFilesToWarm': 2 })
+			limited.cacheManager.exists.mockResolvedValue(false)
+			limited.cacheManager.set.mockResolvedValue()
 
 			mockReaddir.mockResolvedValue([mockDirent('file1.rsc'), mockDirent('file2.rsc'), mockDirent('file3.rsc')] as any)
-			mockAccess.mockResolvedValue(undefined)
-			mockStat.mockResolvedValue({
-				atime: new Date(),
-				size: 1024,
-			} as any)
 			mockReadFile
-				.mockResolvedValueOnce('{"accessCount": 10}')
-				.mockResolvedValueOnce('{"accessCount": 8}')
-				.mockResolvedValueOnce('{"accessCount": 6}')
+				.mockResolvedValueOnce(sidecar(10))
+				.mockResolvedValueOnce(sidecar(8))
+				.mockResolvedValueOnce(sidecar(6))
 				.mockResolvedValue(Buffer.from('file content'))
 
-			cacheManager.exists.mockResolvedValue(false)
-			cacheManager.set.mockResolvedValue()
+			await limited.service.warmupCache()
 
-			await limitedService.warmupCache()
-
-			expect(cacheManager.set).toHaveBeenCalledTimes(2) // Limited to 2 files
+			expect(limited.cacheManager.set).toHaveBeenCalledTimes(2)
 		})
 
 		it('should filter files by popularity threshold', async () => {
 			mockReaddir.mockResolvedValue([mockDirent('file1.rsc'), mockDirent('file2.rsc')] as any)
-			mockAccess.mockResolvedValue(undefined)
-			mockStat.mockResolvedValue({
-				atime: new Date(),
-				size: 1024,
-			} as any)
 			mockReadFile
-				.mockResolvedValueOnce('{"accessCount": 10}') // Above threshold
-				.mockResolvedValueOnce('{"accessCount": 2}') // Below threshold
+				.mockResolvedValueOnce(sidecar(10)) // above threshold
+				.mockResolvedValueOnce(sidecar(2)) // below threshold
 				.mockResolvedValue(Buffer.from('file content'))
 
-			cacheManager.exists.mockResolvedValue(false)
-			cacheManager.set.mockResolvedValue()
+			await harness.service.warmupCache()
 
-			await service.warmupCache()
+			expect(harness.cacheManager.set).toHaveBeenCalledTimes(1)
+			expect(harness.cacheManager.set).toHaveBeenCalledWith('image:public', 'file1', expect.any(Object), expect.any(Number))
+		})
 
-			expect(cacheManager.set).toHaveBeenCalledTimes(1) // Only 1 file above threshold
+		it('skips entries whose sidecar is missing or unreadable', async () => {
+			mockReaddir.mockResolvedValue([mockDirent('file1.rsc'), mockDirent('file2.rsc'), mockDirent('file3.rsc'), mockDirent('other.rsm')] as any)
+			mockReadFile
+				.mockResolvedValueOnce(sidecar(10))
+				.mockRejectedValueOnce(enoent())
+				.mockResolvedValueOnce('not json')
+				.mockResolvedValue(Buffer.from('file content'))
+
+			await harness.service.warmupCache()
+
+			expect(harness.cacheManager.set).toHaveBeenCalledTimes(1)
+			expect(harness.cacheManager.set).toHaveBeenCalledWith('image:public', 'file1', expect.any(Object), expect.any(Number))
+			expect(harness.metricsService.recordCacheOperation).toHaveBeenCalledWith('warmup', 'memory', 'success')
 		})
 
 		it('should handle file system errors gracefully', async () => {
 			mockReaddir.mockRejectedValue(new Error('File system error'))
 
-			await service.warmupCache()
+			await harness.service.warmupCache()
 
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('warmup', 'memory', 'success')
+			expect(harness.metricsService.recordCacheOperation).toHaveBeenCalledWith('warmup', 'memory', 'success')
 		})
 
 		it('should handle individual file errors gracefully', async () => {
 			mockReaddir.mockResolvedValue([mockDirent('file1.rsc'), mockDirent('file2.rsc')] as any)
-			mockAccess.mockResolvedValue(undefined)
-			mockStat.mockResolvedValue({
-				atime: new Date(),
-				size: 1024,
-			} as any)
-			// Call order:
-			//   getPopularFiles: file1.rsm (mock 1), file2.rsm (mock 2)
-			//   warmupFile(file1): file1.rsc (mock 3), file1.rsm (mock 4, caught internally)
-			//   warmupFile(file2): file2.rsc (mock 5 — rejected, not caught → file2 fails), file2.rsm (mock 6, may not run)
+			// Call order: file1.rsm, file2.rsm (scan), then file1.rsc, file2.rsc (warmup)
 			mockReadFile
-				.mockResolvedValueOnce('{"accessCount": 10}') // getPopularFiles file1 meta
-				.mockResolvedValueOnce('{"accessCount": 8}') // getPopularFiles file2 meta
-				.mockResolvedValueOnce(Buffer.from('file content')) // warmupFile file1 content (success)
-				.mockResolvedValueOnce(null as unknown as string) // warmupFile file1 meta (caught internally)
-				.mockRejectedValueOnce(new Error('File read error')) // warmupFile file2 content (fails)
+				.mockResolvedValueOnce(sidecar(10))
+				.mockResolvedValueOnce(sidecar(8))
+				.mockResolvedValueOnce(Buffer.from('file content'))
+				.mockRejectedValueOnce(new Error('File read error'))
 
-			cacheManager.exists.mockResolvedValue(false)
-			cacheManager.set.mockResolvedValue()
+			await harness.service.warmupCache()
 
-			await service.warmupCache()
+			expect(harness.cacheManager.set).toHaveBeenCalledTimes(1)
+			expect(harness.metricsService.recordCacheOperation).toHaveBeenCalledWith('warmup', 'memory', 'success')
+		})
+	})
 
-			expect(cacheManager.set).toHaveBeenCalledTimes(1) // Only successful file
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('warmup', 'memory', 'success')
+	describe('cache entry', () => {
+		it('keys the entry by the sidecar\'s tenant namespace and the file basename, carrying the parsed metadata', async () => {
+			mockReaddir.mockResolvedValue([mockDirent('abc-123.rsc')] as any)
+			mockReadFile
+				.mockResolvedValueOnce(sidecar(20, 'acme'))
+				.mockResolvedValueOnce(Buffer.from('file content'))
+
+			await harness.service.warmupCache()
+
+			expect(harness.cacheManager.exists).toHaveBeenCalledWith('image:acme', 'abc-123')
+			expect(harness.cacheManager.set).toHaveBeenCalledWith(
+				'image:acme',
+				'abc-123',
+				{ data: Buffer.from('file content'), metadata: expect.objectContaining({ tenantSchema: 'acme', accessCount: 20, format: 'webp' }) },
+				expect.any(Number),
+			)
+		})
+
+		it('defaults a sidecar without tenantSchema to the public namespace and weights the TTL by access count', async () => {
+			mockReaddir.mockResolvedValue([mockDirent('file1.rsc')] as any)
+			mockReadFile
+				.mockResolvedValueOnce(sidecar(20))
+				.mockResolvedValueOnce(Buffer.from('file content'))
+
+			await harness.service.warmupCache()
+
+			expect(harness.cacheManager.set).toHaveBeenCalledWith('image:public', 'file1', expect.any(Object), expect.any(Number))
+			const [, , , ttl] = harness.cacheManager.set.mock.calls[0]
+			const baseTtl = harness.configService.get<number>('cache.warming.baseTtl')
+			// baseTtl × (1 + min(20/10, 5))
+			expect(ttl).toBe(Math.floor(baseTtl * 3))
 		})
 	})
 
 	describe('statistics', () => {
 		it('should return warmup statistics', async () => {
-			const stats = await service.getWarmupStats()
+			const stats = await harness.service.getWarmupStats()
 
-			expect(stats).toHaveProperty('enabled')
-			expect(stats).toHaveProperty('lastWarmup')
-			expect(stats).toHaveProperty('filesWarmed')
-			expect(stats.enabled).toBe(true)
-			expect(stats.filesWarmed).toBe(0)
+			expect(stats).toEqual({ enabled: true, lastWarmup: null, filesWarmed: 0 })
 		})
 	})
 
 	describe('configuration', () => {
 		it('should respect disabled configuration', async () => {
-			configService.get.mockImplementation((key: string) => {
-				if (key === 'cache.warming') {
-					return {
-						enabled: false,
-						warmupOnStart: true,
-						maxFilesToWarm: 50,
-						warmupCron: '0 */6 * * *',
-						popularImageThreshold: 5,
-					}
-				}
-				return undefined
-			})
+			const disabled = await createHarness({ 'cache.warming.enabled': false })
 
-			// Create new service instance with disabled config
-			const module: TestingModule = await Test.createTestingModule({
-				providers: [
-					CacheWarmingService,
-					{
-						provide: MultiLayerCacheManager,
-						useValue: cacheManager,
-					},
-					{
-						provide: ConfigService,
-						useValue: configService,
-					},
-					{
-						provide: MetricsService,
-						useValue: metricsService,
-					},
-					{
-						provide: SchedulerRegistry,
-						useValue: { addCronJob: vi.fn() },
-					},
-				],
-			}).compile()
-
-			const disabledService = module.get<CacheWarmingService>(CacheWarmingService)
-
-			await disabledService.warmupCache()
+			await disabled.service.warmupCache()
 
 			expect(mockReaddir).not.toHaveBeenCalled()
-		})
-
-		it('should use default configuration when not provided', () => {
-			configService.get.mockReturnValue(undefined)
-
-			// Create new service instance
-			const module = Test.createTestingModule({
-				providers: [
-					CacheWarmingService,
-					{
-						provide: MultiLayerCacheManager,
-						useValue: cacheManager,
-					},
-					{
-						provide: ConfigService,
-						useValue: configService,
-					},
-					{
-						provide: MetricsService,
-						useValue: metricsService,
-					},
-					{
-						provide: SchedulerRegistry,
-						useValue: { addCronJob: vi.fn() },
-					},
-				],
-			})
-
-			expect(() => module.compile()).not.toThrow()
-		})
-	})
-
-	describe('tTL Calculation', () => {
-		it('should calculate TTL based on access patterns', async () => {
-			mockReaddir.mockResolvedValue([mockDirent('file1.rsc')] as any)
-			mockAccess.mockResolvedValue(undefined)
-			mockStat.mockResolvedValue({
-				atime: new Date(),
-				size: 1024,
-			} as any)
-			// Call order:
-			//   getPopularFiles: file1.rsm (mock 1)
-			//   warmupFile(file1): file1.rsc (mock 2), file1.rsm (mock 3, caught internally)
-			mockReadFile
-				.mockResolvedValueOnce('{"accessCount": 20}') // getPopularFiles file1 meta
-				.mockResolvedValueOnce(Buffer.from('file content')) // warmupFile file1 content
-				.mockResolvedValueOnce('{"accessCount": 20}') // warmupFile file1 meta (re-read)
-
-			cacheManager.exists.mockResolvedValue(false)
-			cacheManager.set.mockResolvedValue()
-
-			await service.warmupCache()
-
-			// Service sets { data: content, metadata } as the value, not a raw Buffer.
-			// Namespace is `image:{tenantSchema}` after H21; this fixture metadata
-			// has no tenantSchema so it defaults to 'public'.
-			expect(cacheManager.set).toHaveBeenCalledWith(
-				'image:public',
-				expect.any(String),
-				expect.any(Object),
-				expect.any(Number),
-			)
-
-			const [, , , ttl] = cacheManager.set.mock.calls[0]
-			expect(ttl).toBeGreaterThan(3600) // Should be higher than base TTL
 		})
 	})
 })

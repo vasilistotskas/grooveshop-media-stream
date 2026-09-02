@@ -77,7 +77,7 @@ describe('correlationService', () => {
 		it('should update context with partial data', () => {
 			service.setContext(mockContext)
 
-			const updates = { userId: 'user123' }
+			const updates = { userAgent: 'updated-agent' }
 			service.updateContext(updates)
 
 			const updatedContext = service.getContext()
@@ -85,7 +85,7 @@ describe('correlationService', () => {
 		})
 
 		it('should not update context when no context exists', () => {
-			const updates = { userId: 'user123' }
+			const updates = { userAgent: 'updated-agent' }
 			service.updateContext(updates)
 
 			const context = service.getContext()

@@ -9,12 +9,11 @@ describe('memoryCacheService Integration', () => {
 	let module: TestingModule
 
 	beforeAll(async () => {
-		// Mock environment variables for configuration
-		process.env.CACHE_MEMORY_DEFAULT_TTL = '3600'
-		process.env.CACHE_MEMORY_CHECK_PERIOD = '600'
-		process.env.CACHE_MEMORY_MAX_KEYS = '1000'
-		process.env.CACHE_MEMORY_MAX_SIZE = '104857600'
-		process.env.MONITORING_ENABLED = 'true'
+		vi.stubEnv('CACHE_MEMORY_DEFAULT_TTL', '3600')
+		vi.stubEnv('CACHE_MEMORY_CHECK_PERIOD', '600')
+		vi.stubEnv('CACHE_MEMORY_MAX_KEYS', '1000')
+		vi.stubEnv('CACHE_MEMORY_MAX_SIZE', '104857600')
+		vi.stubEnv('MONITORING_ENABLED', 'true')
 
 		module = await Test.createTestingModule({
 			providers: [
@@ -55,6 +54,7 @@ describe('memoryCacheService Integration', () => {
 
 	afterAll(async () => {
 		await module.close()
+		vi.unstubAllEnvs()
 	})
 
 	it('should be defined', () => {
@@ -76,12 +76,18 @@ describe('memoryCacheService Integration', () => {
 		const value = 'test-value'
 		const ttl = 1 // 1 second
 
-		await service.set(key, value, ttl)
-		expect(await service.get(key)).toBe(value)
+		vi.useFakeTimers()
+		try {
+			await service.set(key, value, ttl)
+			expect(await service.get(key)).toBe(value)
 
-		// Wait for expiration
-		await new Promise(resolve => setTimeout(resolve, 1100))
-		expect(await service.get(key)).toBeNull()
+			// node-cache checks expiry against Date.now(), which fake timers advance
+			vi.advanceTimersByTime(1100)
+			expect(await service.get(key)).toBeNull()
+		}
+		finally {
+			vi.useRealTimers()
+		}
 	})
 
 	it('should return cache statistics', async () => {

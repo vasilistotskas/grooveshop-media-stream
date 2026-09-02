@@ -7,10 +7,7 @@ import CacheImageResourceOperation from '#microservice/Cache/operations/cache-im
 import MediaStreamModule from '#microservice/media-stream.module'
 import FetchResourceResponseJob from '#microservice/Processing/jobs/fetch-resource-response.job'
 import GenerateResourceIdentityFromRequestJob from '#microservice/Processing/jobs/generate-resource-identity-from-request.job'
-import StoreResourceResponseToFileJob from '#microservice/Processing/jobs/store-resource-response-to-file.job'
 import WebpImageManipulationJob from '#microservice/Processing/jobs/webp-image-manipulation.job'
-import ValidateCacheImageRequestResizeTargetRule from '#microservice/Validation/rules/validate-cache-image-request-resize-target.rule'
-import ValidateCacheImageRequestRule from '#microservice/Validation/rules/validate-cache-image-request.rule'
 
 describe('mediaStreamModule', () => {
 	let module: TestingModule
@@ -47,24 +44,9 @@ describe('mediaStreamModule', () => {
 		expect(job).toBeDefined()
 	})
 
-	it('should have StoreResourceResponseToFileJob defined', async () => {
-		const job = await module.resolve<StoreResourceResponseToFileJob>(StoreResourceResponseToFileJob)
-		expect(job).toBeDefined()
-	})
-
 	it('should have WebpImageManipulationJob defined', async () => {
 		const job = await module.resolve<WebpImageManipulationJob>(WebpImageManipulationJob)
 		expect(job).toBeDefined()
-	})
-
-	it('should have ValidateCacheImageRequestRule defined', async () => {
-		const rule = await module.resolve<ValidateCacheImageRequestRule>(ValidateCacheImageRequestRule)
-		expect(rule).toBeDefined()
-	})
-
-	it('should have ValidateCacheImageRequestResizeTargetRule defined', async () => {
-		const rule = await module.resolve<ValidateCacheImageRequestResizeTargetRule>(ValidateCacheImageRequestResizeTargetRule)
-		expect(rule).toBeDefined()
 	})
 
 	it('should import HttpModule', () => {

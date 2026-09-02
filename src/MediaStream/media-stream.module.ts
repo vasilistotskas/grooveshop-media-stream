@@ -1,6 +1,6 @@
 import type { MiddlewareConsumer, NestModule } from '@nestjs/common'
 import { Module } from '@nestjs/common'
-import { APP_FILTER, APP_GUARD, HttpAdapterHost } from '@nestjs/core'
+import { APP_FILTER, APP_GUARD } from '@nestjs/core'
 import { ScheduleModule } from '@nestjs/schedule'
 import { ApiModule } from '#microservice/API/api.module'
 import MediaStreamImageController from '#microservice/API/controllers/media-stream-image.controller'
@@ -11,7 +11,6 @@ import { ConfigModule } from '#microservice/Config/config.module'
 import { CorrelationModule } from '#microservice/Correlation/correlation.module'
 import { CorrelationMiddleware } from '#microservice/Correlation/middleware/correlation.middleware'
 import { TimingMiddleware } from '#microservice/Correlation/middleware/timing.middleware'
-import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { HealthModule } from '#microservice/Health/health.module'
 import { HttpModule } from '#microservice/HTTP/http.module'
 import { MetricsModule } from '#microservice/Metrics/metrics.module'
@@ -46,10 +45,7 @@ const controllers = [MediaStreamImageController]
 	providers: [
 		{
 			provide: APP_FILTER,
-			useFactory: (httpAdapterHost: HttpAdapterHost, _correlationService: CorrelationService) => {
-				return new MediaStreamExceptionFilter(httpAdapterHost, _correlationService)
-			},
-			inject: [HttpAdapterHost, CorrelationService],
+			useClass: MediaStreamExceptionFilter,
 		},
 		{
 			provide: APP_GUARD,

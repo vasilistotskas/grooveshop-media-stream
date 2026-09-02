@@ -1,5 +1,3 @@
-import type { StringRecord } from '#microservice/common/types/common.types'
-
 /**
  * Defines the structure for image source configurations
  */
@@ -10,85 +8,47 @@ export interface ImageSourceConfig {
 	name: string
 
 	/**
-	 * Base URL for this source (REQUIRED)
-	 * Can be:
-	 * - Environment variable key (e.g., 'BACKEND_URL', 'CDN_URL')
-	 * - Direct URL (e.g., 'https://api.example.com')
-	 */
-	baseUrl: string
-
-	/**
-	 * URL pattern for the source
-	 * Supports placeholders: {baseUrl}, {path}, {param1}, {param2}, etc.
+	 * URL pattern for the upstream resource. Supports `{baseUrl}` plus one
+	 * placeholder per route param, e.g. `{tenantSchema}`, `{imagePath}`.
 	 */
 	urlPattern: string
 
 	/**
-	 * Route pattern for NestJS controller
-	 * Example: 'media/uploads/:imagePath+/:width/:height/:fit/:position/:background/:trimThreshold/:quality.:format'
-	 * Note: :imagePath+ captures nested paths like blog/post/main/image.jpg
+	 * Route pattern matched by the controller. `:param+` captures nested
+	 * paths (blog/post/main/image.jpg); `:quality.:format` splits on the dot.
 	 */
 	routePattern: string
 
 	/**
-	 * Parameters that should be extracted from the route
+	 * Parameters extracted from the route, in capture-group order
 	 */
 	routeParams: string[]
-
-	/**
-	 * Whether this source requires authentication
-	 */
-	requiresAuth?: boolean
-
-	/**
-	 * Custom headers to include in requests
-	 */
-	customHeaders?: StringRecord
-
-	/**
-	 * Maximum file size allowed for this source (in bytes)
-	 */
-	maxFileSize?: number
 }
 
 /**
- * Image processing parameters
+ * Route parameters. Regex captures are always strings; the named fields exist
+ * so call sites keep dot access under `noPropertyAccessFromIndexSignature`.
  */
 export interface ImageProcessingParams {
-	imagePath?: string // Captures full nested path (e.g., blog/post/main/image.jpg)
-	image?: string // For static images
-	width?: number | string | null
-	height?: number | string | null
+	[key: string]: string | undefined
+	tenantSchema?: string
+	imagePath?: string
+	image?: string
+	width?: string
+	height?: string
 	fit?: string
 	position?: string
 	background?: string
-	trimThreshold?: number | string
+	trimThreshold?: string
+	quality?: string
 	format?: string
-	quality?: number | string
-	[key: string]: string | number | null | undefined
 }
 
 /**
  * Request context for image processing
  */
 export interface ImageProcessingContext {
-	/**
-	 * Source configuration
-	 */
 	source: ImageSourceConfig
-
-	/**
-	 * Extracted route parameters
-	 */
 	params: ImageProcessingParams
-
-	/**
-	 * Correlation ID for tracking
-	 */
 	correlationId: string
-
-	/**
-	 * Original request URL
-	 */
-	originalUrl?: string
 }

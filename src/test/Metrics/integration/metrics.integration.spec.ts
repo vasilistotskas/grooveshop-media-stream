@@ -1,7 +1,7 @@
 import type { INestApplication } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import request from 'supertest'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { ConfigModule } from '#microservice/Config/config.module'
 import { MetricsModule } from '#microservice/Metrics/metrics.module'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
@@ -19,7 +19,7 @@ describe('metrics Integration', () => {
 	beforeAll(async () => {
 		// Set the secret BEFORE creating the test module so the
 		// ConfigService picks it up at startup.
-		process.env.INTERNAL_ADMIN_SECRET = TEST_INTERNAL_SECRET
+		vi.stubEnv('INTERNAL_ADMIN_SECRET', TEST_INTERNAL_SECRET)
 
 		const moduleFixture: TestingModule = await Test.createTestingModule({
 			imports: [ConfigModule, MetricsModule],
@@ -31,11 +31,6 @@ describe('metrics Integration', () => {
 		await app.init()
 	})
 
-	beforeEach(() => {
-		// Reset metrics before each test
-		metricsService.reset()
-	})
-
 	afterAll(async () => {
 		// Add delay to allow pending requests to complete
 		await new Promise(resolve => setTimeout(resolve, 100))
@@ -43,6 +38,7 @@ describe('metrics Integration', () => {
 		if (app) {
 			await app.close()
 		}
+		vi.unstubAllEnvs()
 	})
 
 	// Helper: every /metrics request must carry the internal secret header

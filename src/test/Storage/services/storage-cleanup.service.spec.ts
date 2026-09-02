@@ -1,12 +1,15 @@
 import type { MockedObject } from 'vitest'
+import type { StorageEntry, StorageInventory, StorageOrphan } from '#microservice/Storage/services/storage-monitoring.service'
 import { promises as fs } from 'node:fs'
+import { resolve } from 'node:path'
 import { SchedulerRegistry } from '@nestjs/schedule'
 import { Test, TestingModule } from '@nestjs/testing'
+import { CronJob } from 'cron'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConfigService } from '#microservice/Config/config.service'
-import { IntelligentEvictionService } from '#microservice/Storage/services/intelligent-eviction.service'
-import { StorageCleanupService } from '#microservice/Storage/services/storage-cleanup.service'
+import { evictionScore, STALE_FILE_MIN_AGE_MS, StorageCleanupService } from '#microservice/Storage/services/storage-cleanup.service'
 import { StorageMonitoringService } from '#microservice/Storage/services/storage-monitoring.service'
+import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 
 // Mock fs module
 vi.mock('node:fs', () => ({
@@ -20,395 +23,414 @@ vi.mock('node:fs', () => ({
 
 const mockFs = fs as MockedObject<typeof fs>
 
+const STORAGE_DIR = resolve('/test/storage')
+const MB = 1024 * 1024
+const DAY = 24 * 60 * 60 * 1000
+const NOW = new Date('2026-09-01T12:00:00.000Z').getTime()
+
+const thresholds = {
+	warningSize: 10 * MB,
+	criticalSize: 20 * MB,
+	warningFileCount: 100,
+	criticalFileCount: 200,
+}
+
+function entry(id: string, overrides: Partial<StorageEntry> = {}): StorageEntry {
+	return {
+		id,
+		size: 1 * MB,
+		dateCreated: NOW - DAY,
+		privateTTL: 365 * DAY,
+		accessCount: 0,
+		tenantSchema: 'public',
+		...overrides,
+	}
+}
+
+function orphan(name: string, ageMs: number, size = 512): StorageOrphan {
+	return { name, size, mtime: NOW - ageMs }
+}
+
+function inventory(entries: StorageEntry[], orphans: StorageOrphan[] = [], extra = { files: 0, size: 0 }): StorageInventory {
+	const entrySize = entries.reduce((sum, item) => sum + item.size, 0)
+	const orphanSize = orphans.reduce((sum, item) => sum + item.size, 0)
+	return {
+		entries,
+		orphans,
+		totalFiles: entries.length * 2 + orphans.length + extra.files,
+		totalSize: entrySize + orphanSize + extra.size,
+		scannedAt: NOW,
+	}
+}
+
+function unlinkedNames(): string[] {
+	return mockFs.unlink.mock.calls.map(([filePath]) => String(filePath).split(/[/\\]/).pop() ?? '')
+}
+
+function schedulerRegistryMock(): Record<string, ReturnType<typeof vi.fn>> {
+	return {
+		addCronJob: vi.fn(),
+		getCronJob: vi.fn(),
+		deleteCronJob: vi.fn(),
+		doesExist: vi.fn().mockReturnValue(false),
+	}
+}
+
 describe('storageCleanupService', () => {
 	let service: StorageCleanupService
 	let storageMonitoring: MockedObject<StorageMonitoringService>
-	let intelligentEviction: MockedObject<IntelligentEvictionService>
-	let configService: MockedObject<ConfigService>
+	let schedulerRegistry: Record<string, ReturnType<typeof vi.fn>>
 
-	const mockFiles = [
-		'old-image.jpg',
-		'recent-image.webp',
-		'cache-file.json',
-		'temp-file.tmp',
-		'.gitkeep',
-	]
+	const mockConfig = {
+		'cache.file.directory': '/test/storage',
+		'storage.cleanup.enabled': true,
+		'storage.cleanup.cronSchedule': '0 2 * * *',
+		'storage.cleanup.dryRun': false,
+		'storage.cleanup.maxDuration': 300000,
+		'storage.eviction.minAccessCount': 5,
+	}
 
-	beforeEach(async () => {
-		const mockStorageMonitoring = {
-			checkThresholds: vi.fn(),
-		}
-
-		const mockIntelligentEviction = {
-			performThresholdBasedEviction: vi.fn(),
-		}
-
-		const mockConfigService = {
-			get: vi.fn().mockImplementation((key: string) => {
-				if (key === 'cache.file.directory')
-					return '/test/storage'
-				return undefined
-			}),
-			getOptional: vi.fn().mockImplementation((key: string, defaultValue: any) => {
-				const defaults: Record<string, any> = {
-					'storage.cleanup.enabled': true,
-					'storage.cleanup.cronSchedule': '0 2 * * *',
-					'storage.cleanup.dryRun': false,
-					'storage.cleanup.maxDuration': 300000,
-				}
-				return defaults[key] || defaultValue
-			}),
-		}
-
-		const mockSchedulerRegistry = {
-			addCronJob: vi.fn(),
-			getCronJob: vi.fn(),
-			deleteCronJob: vi.fn(),
-			doesExist: vi.fn().mockReturnValue(false),
-		}
-
+	async function buildService(overrides: Record<string, unknown> = {}): Promise<StorageCleanupService> {
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [
 				StorageCleanupService,
-				{
-					provide: StorageMonitoringService,
-					useValue: mockStorageMonitoring,
-				},
-				{
-					provide: IntelligentEvictionService,
-					useValue: mockIntelligentEviction,
-				},
-				{
-					provide: ConfigService,
-					useValue: mockConfigService,
-				},
-				{
-					provide: SchedulerRegistry,
-					useValue: mockSchedulerRegistry,
-				},
+				{ provide: StorageMonitoringService, useValue: storageMonitoring },
+				{ provide: ConfigService, useValue: createConfigServiceMock({ ...mockConfig, ...overrides }) },
+				{ provide: SchedulerRegistry, useValue: schedulerRegistry },
 			],
 		}).compile()
 
-		service = module.get<StorageCleanupService>(StorageCleanupService)
-		storageMonitoring = module.get(StorageMonitoringService)
-		intelligentEviction = module.get(IntelligentEvictionService)
-		configService = module.get(ConfigService)
+		return module.get<StorageCleanupService>(StorageCleanupService)
+	}
 
-		// Setup fs mocks
-		mockFs.readdir.mockResolvedValue(mockFiles as any)
+	beforeEach(async () => {
+		vi.useFakeTimers()
+		vi.setSystemTime(NOW)
+
+		storageMonitoring = { getInventory: vi.fn(), thresholds } as unknown as MockedObject<StorageMonitoringService>
+		schedulerRegistry = schedulerRegistryMock()
+		service = await buildService()
+
+		mockFs.unlink.mockReset()
 		mockFs.unlink.mockResolvedValue(undefined)
-
-		// Add spies to track calls
-		vi.spyOn(mockFs, 'readdir')
-		vi.spyOn(mockFs, 'stat')
-		vi.spyOn(mockFs, 'unlink')
-
-		// Mock file stats - create old files that should be cleaned up
-		mockFs.stat.mockImplementation((filePath: any) => {
-			const fileName = filePath.split('/').pop() || ''
-			const size = fileName.includes('large') ? 10 * 1024 * 1024 : 1024 * 1024 // 10MB or 1MB
-
-			// Make files old enough to be cleaned up based on policy
-			let ageInDays = 0
-			if (fileName.includes('cache') || fileName.endsWith('.json')) {
-				ageInDays = 35 // Older than 30 days for old-cache-files policy
-			}
-			else if (fileName.includes('temp') || fileName.endsWith('.tmp')) {
-				ageInDays = 2 // Older than 1 day for temp-files policy
-			}
-			else if (fileName.includes('old') || /\.(?:jpg|jpeg|png|webp|gif)$/.test(fileName)) {
-				ageInDays = 10 // Older than 7 days for large-images policy
-			}
-
-			const mtime = new Date(Date.now() - ageInDays * 24 * 60 * 60 * 1000)
-
-			return Promise.resolve({
-				size,
-				mtime,
-				isFile: () => true,
-				isDirectory: () => false,
-			} as any)
-		})
-
-		// Setup storage monitoring mocks
-		storageMonitoring.checkThresholds.mockResolvedValue({
-			status: 'healthy',
-			issues: [],
-			stats: {
-				totalSize: 100 * 1024 * 1024,
-				totalFiles: 100,
-				averageFileSize: 1024 * 1024,
-				oldestFile: new Date('2024-01-01'),
-				newestFile: new Date('2024-01-15'),
-				fileTypes: { '.jpg': 50, '.png': 30, '.webp': 20 },
-				accessPatterns: [],
-			},
-		})
-
-		// Setup intelligent eviction mocks
-		intelligentEviction.performThresholdBasedEviction.mockResolvedValue({
-			filesEvicted: 0,
-			sizeFreed: 0,
-			errors: [],
-			strategy: 'threshold-based',
-			duration: 0,
-		})
+		mockFs.readdir.mockReset()
+		mockFs.readFile.mockReset()
 	})
 
 	afterEach(() => {
 		vi.clearAllMocks()
+		vi.useRealTimers()
+	})
+
+	describe('evictionScore', () => {
+		it('ranks older, larger and less-served entries higher', () => {
+			const base = entry('base', { dateCreated: NOW - 10 * DAY, size: 50 * MB, accessCount: 0 })
+
+			expect(evictionScore(base, NOW)).toBe(100 + 1000 + 50)
+			expect(evictionScore(entry('older', { ...base, dateCreated: NOW - 20 * DAY }), NOW)).toBeGreaterThan(evictionScore(base, NOW))
+			expect(evictionScore(entry('larger', { ...base, size: 60 * MB }), NOW)).toBeGreaterThan(evictionScore(base, NOW))
+			expect(evictionScore(entry('served', { ...base, accessCount: 10 }), NOW)).toBeLessThan(evictionScore(base, NOW))
+		})
+
+		it('caps the age, access and size components', () => {
+			const capped = entry('capped', { dateCreated: NOW - 400 * DAY, size: 900 * MB, accessCount: 500 })
+
+			expect(evictionScore(capped, NOW)).toBe(1000 + 0 + 100)
+		})
+
+		it('does not reward a dateCreated in the future', () => {
+			const future = entry('future', { dateCreated: NOW + DAY, size: 0, accessCount: 0 })
+
+			expect(evictionScore(future, NOW)).toBe(1000)
+		})
 	})
 
 	describe('performCleanup', () => {
-		beforeEach(() => {
-			// Mock file stats for different ages
-			mockFs.stat.mockImplementation((filePath: any) => {
-				const filename = filePath.split('/').pop()
-				let mtime: Date
+		it('forces a fresh inventory scan', async () => {
+			storageMonitoring.getInventory.mockResolvedValue(inventory([]))
 
-				switch (filename) {
-					case 'old-image.jpg':
-						mtime = new Date(Date.now() - 35 * 24 * 60 * 60 * 1000) // 35 days old
-						break
-					case 'cache-file.json':
-						mtime = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000) // 31 days old
-						break
-					case 'temp-file.tmp':
-						mtime = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) // 2 days old
-						break
-					default:
-						mtime = new Date() // Recent file
-				}
+			await service.performCleanup()
 
-				return Promise.resolve({
-					size: 1024 * 1024, // 1MB
-					mtime,
-					atime: mtime,
-				} as any)
-			})
+			expect(storageMonitoring.getInventory).toHaveBeenCalledWith(0)
 		})
 
-		it('should perform cleanup with default policies', async () => {
-			// Mock files that match policy patterns and are old enough
-			mockFs.readdir.mockResolvedValue(['old-cache.json', 'temp-file.tmp'] as any)
+		it('removes expired pairs sidecar-first and leaves live pairs alone', async () => {
+			const expired = entry('expired', { dateCreated: NOW - 2 * DAY, privateTTL: DAY, size: 3 * MB })
+			const live = entry('live', { dateCreated: NOW - DAY, privateTTL: 30 * DAY })
+			storageMonitoring.getInventory.mockResolvedValue(inventory([expired, live]))
 
-			mockFs.stat.mockImplementation((filePath: any) => {
-				const filename = filePath.split(/[/\\]/).pop() // Handle both Unix and Windows paths
-				let ageInDays = 0
+			const result = await service.performCleanup()
 
-				if (filename === 'old-cache.json') {
-					ageInDays = 35 // Older than 30 days for old-cache-files policy
-				}
-				else if (filename === 'temp-file.tmp') {
-					ageInDays = 2 // Older than 1 day for temp-files policy
-				}
-
-				const mtime = new Date(Date.now() - ageInDays * 24 * 60 * 60 * 1000)
-
-				return Promise.resolve({
-					size: 1024 * 1024, // 1MB
-					mtime,
-					atime: mtime,
-					isFile: () => true,
-					isDirectory: () => false,
-				} as any)
-			})
-
-			const result = await service.performCleanup(['old-cache-files', 'temp-files'])
-
-			expect(result.filesRemoved).toBeGreaterThan(0)
-			expect(result.sizeFreed).toBeGreaterThan(0)
+			expect(unlinkedNames()).toEqual(['expired.rsm', 'expired.rsc'])
+			expect(mockFs.unlink).toHaveBeenCalledWith(resolve(STORAGE_DIR, 'expired.rsm'))
+			expect(result.removed).toEqual({ expired: 1, stale: 0, evicted: 0 })
+			expect(result.filesRemoved).toBe(2)
+			expect(result.sizeFreed).toBe(3 * MB)
 			expect(result.errors).toEqual([])
-			expect(result.policiesApplied.length).toBeGreaterThan(0)
 			expect(result.duration).toBeGreaterThanOrEqual(0)
 		})
 
-		it('should apply specific policies when requested', async () => {
-			const result = await service.performCleanup(['old-cache-files'])
+		it('treats a pair whose TTL ends exactly now as expired', async () => {
+			storageMonitoring.getInventory.mockResolvedValue(inventory([
+				entry('edge', { dateCreated: NOW - DAY, privateTTL: DAY }),
+			]))
 
-			expect(result.policiesApplied).toContain('old-cache-files')
+			const result = await service.performCleanup()
+
+			expect(result.removed.expired).toBe(1)
 		})
 
-		it('should perform dry run when requested', async () => {
-			// Mock files that match policy patterns and are old enough
-			mockFs.readdir.mockResolvedValue(['old-cache.json', 'temp-file.tmp'] as any)
+		it('removes orphans and temp files older than an hour and keeps younger ones', async () => {
+			storageMonitoring.getInventory.mockResolvedValue(inventory([], [
+				orphan('young.rst', STALE_FILE_MIN_AGE_MS - 1),
+				orphan('old.rst', STALE_FILE_MIN_AGE_MS, 700),
+				orphan('lonely.rsm', 2 * STALE_FILE_MIN_AGE_MS, 300),
+			]))
 
-			mockFs.stat.mockImplementation((filePath: any) => {
-				const filename = filePath.split(/[/\\]/).pop() // Handle both Unix and Windows paths
-				let ageInDays = 0
+			const result = await service.performCleanup()
 
-				if (filename === 'old-cache.json') {
-					ageInDays = 35 // Older than 30 days for old-cache-files policy
-				}
-				else if (filename === 'temp-file.tmp') {
-					ageInDays = 2 // Older than 1 day for temp-files policy
-				}
+			expect(unlinkedNames().sort()).toEqual(['lonely.rsm', 'old.rst'])
+			expect(result.removed).toEqual({ expired: 0, stale: 2, evicted: 0 })
+			expect(result.filesRemoved).toBe(2)
+			expect(result.sizeFreed).toBe(1000)
+		})
 
-				const mtime = new Date(Date.now() - ageInDays * 24 * 60 * 60 * 1000)
+		it('does not evict while under both warning thresholds', async () => {
+			storageMonitoring.getInventory.mockResolvedValue(inventory([entry('a'), entry('b')]))
 
-				return Promise.resolve({
-					size: 1024 * 1024, // 1MB
-					mtime,
-					atime: mtime,
-					isFile: () => true,
-					isDirectory: () => false,
-				} as any)
-			})
-
-			const result = await service.performCleanup(['old-cache-files', 'temp-files'], true)
+			const result = await service.performCleanup()
 
 			expect(mockFs.unlink).not.toHaveBeenCalled()
-			expect(result.filesRemoved).toBeGreaterThan(0) // Still counts what would be removed
+			expect(result.removed.evicted).toBe(0)
 		})
 
-		it('should trigger intelligent eviction when thresholds exceeded', async () => {
-			storageMonitoring.checkThresholds.mockResolvedValue({
-				status: 'warning',
-				issues: ['Storage size warning'],
-				stats: {
-					totalSize: 800 * 1024 * 1024,
-					totalFiles: 1000,
-					averageFileSize: 800 * 1024,
-					oldestFile: new Date('2024-01-01'),
-					newestFile: new Date('2024-01-15'),
-					fileTypes: { '.jpg': 500, '.png': 300, '.webp': 200 },
-					accessPatterns: [],
-				},
+		it('evicts the highest-scoring pairs first until under the file count threshold', async () => {
+			storageMonitoring.getInventory.mockResolvedValue(inventory([
+				entry('newest', { dateCreated: NOW - DAY }),
+				entry('oldest', { dateCreated: NOW - 30 * DAY }),
+				entry('middle', { dateCreated: NOW - 10 * DAY }),
+			], [], { files: 96, size: 0 }))
+
+			const result = await service.performCleanup()
+
+			// 102 files >= 100: two pairs must go, the newest survives.
+			expect(unlinkedNames()).toEqual(['oldest.rsm', 'oldest.rsc', 'middle.rsm', 'middle.rsc'])
+			expect(result.removed).toEqual({ expired: 0, stale: 0, evicted: 2 })
+			expect(result.filesRemoved).toBe(4)
+		})
+
+		it('evicts until under the size threshold', async () => {
+			storageMonitoring.getInventory.mockResolvedValue(inventory([
+				entry('small', { size: 1 * MB, dateCreated: NOW - DAY }),
+				entry('big', { size: 6 * MB, dateCreated: NOW - DAY }),
+				entry('medium', { size: 4 * MB, dateCreated: NOW - DAY }),
+			]))
+
+			const result = await service.performCleanup()
+
+			// 11 MB >= 10 MB: the biggest pair alone brings the tier to 5 MB.
+			expect(unlinkedNames()).toEqual(['big.rsm', 'big.rsc'])
+			expect(result.removed.evicted).toBe(1)
+			expect(result.sizeFreed).toBe(6 * MB)
+		})
+
+		it('counts expired and stale removals before deciding whether to evict', async () => {
+			storageMonitoring.getInventory.mockResolvedValue(inventory([
+				entry('expired', { dateCreated: NOW - 2 * DAY, privateTTL: DAY, size: 6 * MB }),
+				entry('live', { size: 5 * MB }),
+			]))
+
+			const result = await service.performCleanup()
+
+			// 11 MB total, expiry alone frees 6 MB, so nothing is evicted.
+			expect(result.removed).toEqual({ expired: 1, stale: 0, evicted: 0 })
+			expect(unlinkedNames()).toEqual(['expired.rsm', 'expired.rsc'])
+		})
+
+		it('evicts popular pairs only after every other live pair is gone', async () => {
+			const popular = entry('popular', { dateCreated: NOW - 300 * DAY, accessCount: 5, size: 5 * MB })
+			const unpopular = entry('unpopular', { dateCreated: NOW - DAY, accessCount: 4, size: 5 * MB })
+			storageMonitoring.getInventory.mockResolvedValue(inventory([popular, unpopular], [], { files: 0, size: 4 * MB }))
+
+			const result = await service.performCleanup()
+
+			// 14 MB: the unpopular pair goes first (9 MB, under), the popular one stays.
+			expect(unlinkedNames()).toEqual(['unpopular.rsm', 'unpopular.rsc'])
+			expect(result.removed.evicted).toBe(1)
+		})
+
+		it('does evict popular pairs when nothing else brings the tier under the thresholds', async () => {
+			const popular = entry('popular', { dateCreated: NOW - 300 * DAY, accessCount: 50, size: 5 * MB })
+			const unpopular = entry('unpopular', { dateCreated: NOW - DAY, accessCount: 0, size: 5 * MB })
+			storageMonitoring.getInventory.mockResolvedValue(inventory([popular, unpopular], [], { files: 0, size: 6 * MB }))
+
+			const result = await service.performCleanup()
+
+			expect(unlinkedNames()).toEqual(['unpopular.rsm', 'unpopular.rsc', 'popular.rsm', 'popular.rsc'])
+			expect(result.removed.evicted).toBe(2)
+		})
+
+		it('reports without deleting when dry run is configured', async () => {
+			const dryRunService = await buildService({ 'storage.cleanup.dryRun': true })
+			storageMonitoring.getInventory.mockResolvedValue(inventory([
+				entry('expired', { dateCreated: NOW - 2 * DAY, privateTTL: DAY, size: 3 * MB }),
+				entry('bulk', { size: 10 * MB }),
+			], [orphan('old.rst', 2 * STALE_FILE_MIN_AGE_MS, 100)]))
+
+			const result = await dryRunService.performCleanup()
+
+			// Expiry and the stale sweep leave exactly 10 MB, still at the warning size.
+			expect(mockFs.unlink).not.toHaveBeenCalled()
+			expect(result.removed).toEqual({ expired: 1, stale: 1, evicted: 1 })
+			expect(result.filesRemoved).toBe(5)
+			expect(result.sizeFreed).toBe(13 * MB + 100)
+			expect(dryRunService.getCleanupStatus().dryRun).toBe(true)
+		})
+
+		it('stops once the configured time budget is spent and says so', async () => {
+			const budgeted = await buildService({ 'storage.cleanup.maxDuration': 1000 })
+			storageMonitoring.getInventory.mockResolvedValue(inventory([
+				entry('first', { dateCreated: NOW - 2 * DAY, privateTTL: DAY }),
+				entry('second', { dateCreated: NOW - 2 * DAY, privateTTL: DAY }),
+			], [orphan('old.rst', 2 * STALE_FILE_MIN_AGE_MS)]))
+			mockFs.unlink.mockImplementation(async () => {
+				vi.setSystemTime(Date.now() + 600)
 			})
 
-			intelligentEviction.performThresholdBasedEviction.mockResolvedValue({
-				filesEvicted: 5,
-				sizeFreed: 5 * 1024 * 1024,
-				errors: [],
-				strategy: 'intelligent',
-				duration: 1000,
+			const result = await budgeted.performCleanup()
+
+			expect(unlinkedNames()).toEqual(['first.rsm', 'first.rsc'])
+			expect(result.removed).toEqual({ expired: 1, stale: 0, evicted: 0 })
+			expect(result.errors).toEqual(['Cleanup time budget (1000ms) exhausted; remaining passes skipped'])
+		})
+
+		it('accumulates per-file errors and carries on', async () => {
+			storageMonitoring.getInventory.mockResolvedValue(inventory([
+				entry('locked', { dateCreated: NOW - 2 * DAY, privateTTL: DAY }),
+				entry('fine', { dateCreated: NOW - 2 * DAY, privateTTL: DAY }),
+			], [orphan('stuck.rst', 2 * STALE_FILE_MIN_AGE_MS)]))
+			mockFs.unlink.mockImplementation((filePath: any) => {
+				const name = String(filePath).split(/[/\\]/).pop()
+				return name === 'locked.rsm' || name === 'stuck.rst'
+					? Promise.reject(new Error('EACCES: permission denied'))
+					: Promise.resolve(undefined)
 			})
 
 			const result = await service.performCleanup()
 
-			expect(intelligentEviction.performThresholdBasedEviction).toHaveBeenCalled()
-			expect(result.policiesApplied).toContain('intelligent-eviction')
-		})
-
-		it('should handle policy execution errors gracefully', async () => {
-			mockFs.readdir.mockRejectedValue(new Error('Permission denied'))
-
-			const result = await service.performCleanup()
-
-			expect(result.errors.length).toBeGreaterThan(0)
-			expect(result.errors[0]).toContain('Permission denied')
-		})
-
-		it('should prevent concurrent cleanup execution', async () => {
-			// Start first cleanup
-			const firstCleanup = service.performCleanup()
-
-			// Try to start second cleanup
-			await expect(service.performCleanup()).rejects.toThrow('Cleanup is already running')
-
-			// Wait for first cleanup to complete
-			await firstCleanup
-		})
-	})
-
-	describe('retention policies', () => {
-		beforeEach(() => {
-			mockFs.stat.mockResolvedValue({
-				size: 1024 * 1024,
-				mtime: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000), // 35 days old
-				atime: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000),
-			} as any)
-		})
-
-		it('should apply old-cache-files policy correctly', async () => {
-			// Set up files in directory - use .json extension to match the policy pattern
-			mockFs.readdir.mockResolvedValue(['old-file.json', 'recent-file.json'] as any)
-
-			// Clear previous mock and set up new implementation
-			mockFs.stat.mockReset()
-			mockFs.stat.mockImplementation((filePath: any) => {
-				const filename = filePath.split(/[/\\]/).pop() // Handle both Unix and Windows paths
-				const isOld = filename === 'old-file.json'
-
-				// Make old file 35 days old (older than 30 day policy), recent file 5 days old
-				const ageInMs = (isOld ? 35 : 5) * 24 * 60 * 60 * 1000
-				const mtime = new Date(Date.now() - ageInMs)
-
-				return Promise.resolve({
-					size: 1024 * 1024, // 1MB
-					mtime,
-					atime: new Date(Date.now() - ageInMs),
-					isFile: () => true,
-					isDirectory: () => false,
-				} as any)
-			})
-
-			// Mock unlink to succeed
-			mockFs.unlink.mockResolvedValue(undefined)
-
-			const result = await service.performCleanup(['old-cache-files'], false)
-
-			expect(result.policiesApplied).toContain('old-cache-files')
-			expect(result.filesRemoved).toBe(1)
-			expect(mockFs.unlink).toHaveBeenCalledWith(
-				expect.stringContaining('old-file.json'),
-			)
-			expect(mockFs.unlink).not.toHaveBeenCalledWith(
-				expect.stringContaining('recent-file.json'),
-			)
-		})
-
-		it('should apply large-images policy correctly', async () => {
-			mockFs.readdir.mockResolvedValue(['large-image.jpg', 'small-image.jpg'] as any)
-
-			const result = await service.performCleanup(['large-images'])
-
-			expect(result.filesRemoved).toBeGreaterThan(0)
-		})
-
-		it('should apply temp-files policy correctly', async () => {
-			mockFs.readdir.mockResolvedValue(['temp1.tmp', 'temp2.temp'] as any)
-
-			mockFs.stat.mockResolvedValue({
-				size: 1024,
-				mtime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days old
-				atime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-			} as any)
-
-			const result = await service.performCleanup(['temp-files'])
-
+			expect(result.errors).toEqual([
+				'Failed to remove locked: EACCES: permission denied',
+				'Failed to remove stuck.rst: EACCES: permission denied',
+			])
+			expect(result.removed).toEqual({ expired: 1, stale: 0, evicted: 0 })
 			expect(result.filesRemoved).toBe(2)
 		})
 
-		it('has no preserve-recent default policy (it deleted all but 100 files)', () => {
-			// The old "preserve-recent" default was named as a floor but ran as
-			// an independent deletion pass (maxAge 0 + preserveCount 100 =>
-			// nightly wipe down to 100 files). It must not come back as a
-			// default; size pressure is the IntelligentEvictionService's job.
-			const names = service.getCleanupStatus().policies.map(p => p.name)
-			expect(names).not.toContain('preserve-recent')
-			expect(names).toEqual(['old-cache-files', 'large-images', 'temp-files'])
+		it('ignores files that are already gone', async () => {
+			storageMonitoring.getInventory.mockResolvedValue(inventory([
+				entry('half', { dateCreated: NOW - 2 * DAY, privateTTL: DAY }),
+			]))
+			mockFs.unlink.mockImplementation((filePath: any) => {
+				if (String(filePath).endsWith('.rsc')) {
+					const error: NodeJS.ErrnoException = new Error('no such file')
+					error.code = 'ENOENT'
+					return Promise.reject(error)
+				}
+				return Promise.resolve(undefined)
+			})
+
+			const result = await service.performCleanup()
+
+			expect(result.errors).toEqual([])
+			expect(result.removed.expired).toBe(1)
 		})
 
-		it('still respects preserveCount on a custom policy', async () => {
-			// updateRetentionPolicy was removed as test-only surface; reach
-			// into the private config directly (same pattern as elsewhere
-			// in the suite) to inject a custom policy for this assertion.
-			(service as any).config.policies.push({
-				name: 'custom-trim',
-				description: 'test-only trim policy',
-				maxAge: 0,
-				maxSize: 0,
-				preserveCount: 100,
+		it('rejects a second run while one is in progress', async () => {
+			let release!: (value: StorageInventory) => void
+			storageMonitoring.getInventory.mockReturnValue(new Promise<StorageInventory>((res) => {
+				release = res
+			}))
+
+			const first = service.performCleanup()
+			expect(service.getCleanupStatus().isRunning).toBe(true)
+			await expect(service.performCleanup()).rejects.toThrow('Cleanup is already running')
+
+			release(inventory([]))
+			await first
+			expect(service.getCleanupStatus().isRunning).toBe(false)
+		})
+
+		it('propagates an inventory failure and records no run', async () => {
+			storageMonitoring.getInventory.mockRejectedValue(new Error('Disk error'))
+
+			await expect(service.performCleanup()).rejects.toThrow('Disk error')
+			expect(service.getCleanupStatus()).toMatchObject({ isRunning: false, lastCleanup: null })
+		})
+	})
+
+	describe('getCleanupStatus', () => {
+		it('has no last or next cleanup before a run or cron registration', () => {
+			expect(service.getCleanupStatus()).toEqual({
 				enabled: true,
+				dryRun: false,
+				isRunning: false,
+				lastCleanup: null,
+				nextCleanup: null,
 			})
-			const manyFiles = Array.from({ length: 150 }, (_, i) => `file${i}.jpg`)
-			mockFs.readdir.mockResolvedValue(manyFiles as any)
+		})
 
-			const result = await service.performCleanup(['custom-trim'])
+		it('records the time of the last run', async () => {
+			storageMonitoring.getInventory.mockResolvedValue(inventory([]))
 
-			// Should preserve at least 100 files
-			expect(result.filesRemoved).toBeLessThanOrEqual(50)
+			await service.performCleanup()
+
+			expect(service.getCleanupStatus().lastCleanup).toEqual(new Date(NOW))
+		})
+	})
+
+	describe('onModuleInit', () => {
+		it('registers and starts the cleanup cron when enabled', () => {
+			service.onModuleInit()
+
+			expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith('storage-cleanup', expect.any(CronJob))
+			const job = schedulerRegistry.addCronJob.mock.calls[0][1] as CronJob
+			try {
+				expect(job.isActive).toBe(true)
+				// Cron schedules in the machine's local zone, so only the wall-clock hour is stable.
+				const next = service.getCleanupStatus().nextCleanup
+				expect(next).toBeInstanceOf(Date)
+				expect(next!.getHours()).toBe(2)
+				expect(next!.getTime()).toBeGreaterThan(NOW)
+			}
+			finally {
+				job.stop()
+			}
+		})
+
+		it('registers nothing when cleanup is disabled', async () => {
+			const disabled = await buildService({ 'storage.cleanup.enabled': false })
+
+			disabled.onModuleInit()
+
+			expect(schedulerRegistry.addCronJob).not.toHaveBeenCalled()
+			expect(disabled.getCleanupStatus()).toMatchObject({ enabled: false, nextCleanup: null })
+		})
+
+		it('runs a cleanup on each cron tick and swallows failures', async () => {
+			storageMonitoring.getInventory.mockRejectedValueOnce(new Error('Disk error'))
+			storageMonitoring.getInventory.mockResolvedValue(inventory([]))
+			service.onModuleInit()
+			const job = schedulerRegistry.addCronJob.mock.calls[0][1] as CronJob
+
+			try {
+				await expect(job.fireOnTick()).resolves.toBeUndefined()
+				await job.fireOnTick()
+				expect(storageMonitoring.getInventory).toHaveBeenCalledTimes(2)
+				expect(service.getCleanupStatus().lastCleanup).toEqual(new Date(NOW))
+			}
+			finally {
+				job.stop()
+			}
 		})
 	})
 
@@ -532,55 +554,6 @@ describe('storageCleanupService', () => {
 
 			expect(result.filesRemoved).toBe(1)
 			expect(result.errors).toEqual([])
-		})
-	})
-
-	describe('getCleanupStatus', () => {
-		it('should return current cleanup status', () => {
-			const status = service.getCleanupStatus()
-
-			expect(status.enabled).toBe(true)
-			expect(status.isRunning).toBe(false)
-			expect(status.lastCleanup).toBeInstanceOf(Date)
-			expect(status.nextCleanup).toBeInstanceOf(Date)
-			expect(status.policies).toBeInstanceOf(Array)
-			expect(status.policies.length).toBeGreaterThan(0)
-		})
-	})
-
-	describe('scheduledCleanup', () => {
-		it('should not run when disabled', async () => {
-			configService.getOptional.mockImplementation((key: string, defaultValue: any) => {
-				if (key === 'storage.cleanup.enabled')
-					return false
-				return defaultValue
-			})
-
-			await service.scheduledCleanup()
-
-			expect(mockFs.readdir).not.toHaveBeenCalled()
-		})
-
-		it('should not run when cleanup is already running', async () => {
-			// Start manual cleanup
-			const manualCleanup = service.performCleanup()
-
-			// Try scheduled cleanup
-			await service.scheduledCleanup()
-
-			// Should not interfere - readdir should only be called from manual cleanup
-			// The number of calls depends on how many policies are enabled and applied
-			expect(mockFs.readdir).toHaveBeenCalled()
-			expect(mockFs.readdir).toHaveBeenCalledWith('./storage')
-
-			await manualCleanup
-		})
-
-		it('should handle scheduled cleanup errors gracefully', async () => {
-			mockFs.readdir.mockRejectedValue(new Error('Disk error'))
-
-			// Should not throw
-			await expect(service.scheduledCleanup()).resolves.toBeUndefined()
 		})
 	})
 })

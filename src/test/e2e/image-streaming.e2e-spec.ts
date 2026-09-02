@@ -6,7 +6,7 @@ import * as process from 'node:process'
 import { Test, TestingModule } from '@nestjs/testing'
 import sharp from 'sharp'
 import request from 'supertest'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import MediaStreamModule from '#microservice/media-stream.module'
 
 /**
@@ -34,8 +34,6 @@ describe('image streaming (e2e)', () => {
 	let upstreamRequests: string[]
 
 	beforeAll(async () => {
-		process.env.DISABLE_CRON = 'true'
-
 		const noise = Buffer.alloc(100 * 100 * 3)
 		for (let i = 0; i < noise.length; i++) {
 			noise[i] = (i * 2654435761) % 256
@@ -62,7 +60,7 @@ describe('image streaming (e2e)', () => {
 		const address = upstream.address()
 		if (typeof address === 'object' && address) {
 			// The default validation.allowedDomains list includes 127.0.0.1
-			process.env.BACKEND_URL = `http://127.0.0.1:${address.port}`
+			vi.stubEnv('BACKEND_URL', `http://127.0.0.1:${address.port}`)
 		}
 
 		moduleFixture = await Test.createTestingModule({
@@ -86,9 +84,7 @@ describe('image streaming (e2e)', () => {
 		if (upstream) {
 			await new Promise<void>(resolve => upstream.close(() => resolve()))
 		}
-		delete process.env.BACKEND_URL
-		// Give async operations (Redis disconnect, scheduled tasks) time to settle
-		await new Promise(resolve => setTimeout(resolve, 1000))
+		vi.unstubAllEnvs()
 	})
 
 	it('serves a processed image with caching headers', async () => {
