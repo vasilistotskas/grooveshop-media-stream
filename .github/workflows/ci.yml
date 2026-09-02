@@ -120,6 +120,9 @@ jobs:
           NODE_ENV: production
           CORS_ORIGIN: https://store.example.com
           BACKEND_URL: http://backend-service:8000
+          # The CI Redis service has no password; this only satisfies the
+          # production-mode guard in RedisCacheService (ioredis warns and continues).
+          REDIS_PASSWORD: ci_smoke_test_password
         run: |
           timeout 10s pnpm run prod || exit_code=$?
           if [ $exit_code -eq 124 ]; then
