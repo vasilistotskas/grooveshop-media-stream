@@ -1,3 +1,23 @@
+# [3.0.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.60.7...v3.0.0) (2026-09-02)
+
+
+* refactor!: whole-repo audit: single-source config, own rate limiter, storage rewrite, hot-path cleanup ([#10](https://github.com/vasilistotskas/grooveshop-media-stream/issues/10)) ([028de9b](https://github.com/vasilistotskas/grooveshop-media-stream/commit/028de9be904e8ec8fde75a2578da2be7f5ed7463))
+
+
+### BREAKING CHANGES
+
+* removed config keys CACHE_PRELOADING_*, STORAGE_MAX_SIZE,
+STORAGE_MAX_FILE_AGE, STORAGE_OPTIMIZATION_*, STORAGE_EVICTION_STRATEGY,
+STORAGE_EVICTION_AGGRESSIVENESS, STORAGE_EVICTION_PRESERVE_POPULAR,
+STORAGE_EVICTION_MAX_FILE_AGE and EXTERNAL_REQUEST_TIMEOUT; BACKEND_URL is
+required in production; the X-RateLimit-*-default header family and the
+Vary header are gone; 429 bodies carry name HttpException; the /health
+storage payload shape and memory.heapUsagePercentage denominator changed;
+mediastream_cache_operations_total counts once per layer probe.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01EXCprLn3P9L9CBpjgmkTXf
+
 ## [2.60.7](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v2.60.6...v2.60.7) (2026-09-01)
 
 
