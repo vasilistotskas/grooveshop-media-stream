@@ -13,7 +13,7 @@ import { MetricsController } from '#microservice/Metrics/controllers/metrics.con
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import WebpImageManipulationJob from '#microservice/Processing/jobs/webp-image-manipulation.job'
 import { AdaptiveRateLimitGuard } from '#microservice/RateLimit/guards/adaptive-rate-limit.guard'
-import { InputSanitizationService } from '#microservice/Validation/services/input-sanitization.service'
+import { ResourceValidationService } from '#microservice/Validation/services/resource-validation.service'
 
 describe('module Integration', () => {
 	let app: INestApplication
@@ -100,7 +100,7 @@ describe('module Integration', () => {
 		})
 
 		it('should have ValidationModule services available', () => {
-			const validationService = module.get<InputSanitizationService>(InputSanitizationService)
+			const validationService = module.get<ResourceValidationService>(ResourceValidationService)
 			expect(validationService).toBeDefined()
 		})
 

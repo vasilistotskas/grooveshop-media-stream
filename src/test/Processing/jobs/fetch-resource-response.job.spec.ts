@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { AxiosError, AxiosHeaders } from 'axios'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CacheImageRequest, { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
-import { ConfigService } from '#microservice/Config/config.service'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 import FetchResourceResponseJob from '#microservice/Processing/jobs/fetch-resource-response.job'
 
@@ -21,12 +20,6 @@ describe('fetchResourceResponseJob', () => {
 				{
 					provide: HttpClientService,
 					useValue: httpClientService,
-				},
-				{
-					provide: ConfigService,
-					useValue: {
-						getOptional: vi.fn().mockReturnValue(30000),
-					},
 				},
 			],
 		}).compile()
@@ -57,7 +50,6 @@ describe('fetchResourceResponseJob', () => {
 				url: request.resourceTarget,
 				method: 'GET',
 				responseType: 'stream',
-				timeout: 30000,
 			})
 			expect(result).toEqual(mockResponse)
 		})

@@ -3,7 +3,7 @@ import sharp from 'sharp'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BackgroundOptions, FitOptions, PositionOptions, ResizeOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
 import ManipulationJobResult from '#microservice/Processing/dto/manipulation-job-result.dto'
-import WebpImageManipulationJob from '#microservice/Processing/jobs/webp-image-manipulation.job'
+import WebpImageManipulationJob, { outputFormat } from '#microservice/Processing/jobs/webp-image-manipulation.job'
 
 vi.mock('sharp', () => ({
 	default: vi.fn(),
@@ -234,50 +234,52 @@ describe('webpImageManipulationJob', () => {
 			expect(result.buffer).toBe(testBuffer)
 		})
 
-		// Regression: handleSvgFormat() created its sharp() pipelines without
-		// destroy()ing them in a finally block, unlike processRaster() — a Sharp
-		// lifecycle/resource-cleanup inconsistency between the two code paths.
-		describe('svg format handling — Sharp pipeline cleanup', () => {
-			it('destroys the sharp pipeline after resizing an SVG source to PNG', async () => {
+		it('falls back to WebP for AVIF requests whose source exceeds the AVIF pixel budget', async () => {
+			mockManipulation.metadata.mockResolvedValueOnce({ width: 4000, height: 3000, format: 'jpeg' })
+			mockManipulation.toBuffer.mockResolvedValue({ data: testBuffer, info: { size: 1000, format: 'webp' } })
+			const options = new ResizeOptions({ width: 800, height: 600, format: SupportedResizeFormats.avif, quality: 80 })
+
+			const result = await job.handle('huge.jpg', options)
+
+			expect(mockManipulation.avif).not.toHaveBeenCalled()
+			expect(mockManipulation.webp).toHaveBeenCalledWith({ quality: 80, smartSubsample: true, effort: 4 })
+			expect(result.format).toBe('webp')
+		})
+
+		describe('svg output requests', () => {
+			const svgOptions = new ResizeOptions({
+				width: 800,
+				height: 600,
+				fit: FitOptions.contain,
+				position: PositionOptions.entropy,
+				background: BackgroundOptions.transparent,
+				trimThreshold: 5,
+				format: SupportedResizeFormats.svg,
+				quality: 80,
+			})
+
+			it('rasterises to PNG through the same trim/autoOrient/resize pipeline as every raster', async () => {
 				const filePathFrom = 'test.svg'
 				mockManipulation.toBuffer.mockResolvedValue({ data: testBuffer, info: { size: 1000, format: 'png' } })
-				const options = new ResizeOptions({
-					width: 800,
-					height: 600,
-					fit: FitOptions.contain,
-					position: PositionOptions.entropy,
-					background: BackgroundOptions.transparent,
-					format: SupportedResizeFormats.svg,
-					quality: 80,
-				})
 
-				const result = await job.handle(filePathFrom, options)
+				const result = await job.handle(filePathFrom, svgOptions)
 
-				expect(mockManipulation.resize).toHaveBeenCalled()
-				expect(mockManipulation.png).toHaveBeenCalledWith({ quality: 80 })
+				expect(sharp).toHaveBeenCalledWith(filePathFrom, { limitInputPixels: 268402689, sequentialRead: true })
+				expect(mockManipulation.autoOrient).toHaveBeenCalledTimes(1)
+				expect(mockManipulation.trim).toHaveBeenCalledWith({ background: { r: 0, g: 0, b: 0, alpha: 0 }, threshold: 5 })
+				expect(mockManipulation.resize).toHaveBeenCalledWith(expect.objectContaining({ width: 800, height: 600 }))
+				expect(mockManipulation.png).toHaveBeenCalledWith({ quality: 80, adaptiveFiltering: true, palette: true, compressionLevel: 6 })
 				expect(mockManipulation.destroy).toHaveBeenCalledTimes(1)
 				expect(result.format).toBe('png')
 			})
 
-			it('destroys the sharp pipeline when converting a non-SVG source to PNG (SVG output requested)', async () => {
-				// No .svg extension and no on-disk file to sniff a header from —
-				// fs.open() rejects (ENOENT), which handleSvgFormat() already
-				// treats as "not SVG" and falls through to this conversion branch.
-				const filePathFrom = 'test-does-not-exist-on-disk.jpg'
+			it('does not sniff the source: a non-SVG source with SVG output requested takes the same pipeline', async () => {
 				mockManipulation.toBuffer.mockResolvedValue({ data: testBuffer, info: { size: 1000, format: 'png' } })
-				const options = new ResizeOptions({
-					width: 800,
-					height: 600,
-					fit: FitOptions.contain,
-					position: PositionOptions.entropy,
-					background: BackgroundOptions.transparent,
-					format: SupportedResizeFormats.svg,
-					quality: 80,
-				})
 
-				const result = await job.handle(filePathFrom, options)
+				const result = await job.handle('test-does-not-exist-on-disk.jpg', svgOptions)
 
-				expect(mockManipulation.png).toHaveBeenCalledWith({ quality: 80 })
+				expect(sharp).toHaveBeenCalledTimes(1)
+				expect(mockManipulation.png).toHaveBeenCalledWith({ quality: 80, adaptiveFiltering: true, palette: true, compressionLevel: 6 })
 				expect(mockManipulation.destroy).toHaveBeenCalledTimes(1)
 				expect(result.format).toBe('png')
 			})
@@ -303,6 +305,22 @@ describe('webpImageManipulationJob', () => {
 			expect(result).toBeInstanceOf(ManipulationJobResult)
 			expect(result.size).toBe('1000')
 			expect(result.buffer).toBe(testBuffer)
+		})
+	})
+
+	describe('outputFormat', () => {
+		it('maps svg to png and passes every other format through', () => {
+			expect(outputFormat(SupportedResizeFormats.svg)).toBe(SupportedResizeFormats.png)
+			for (const format of [
+				SupportedResizeFormats.webp,
+				SupportedResizeFormats.jpeg,
+				SupportedResizeFormats.png,
+				SupportedResizeFormats.gif,
+				SupportedResizeFormats.tiff,
+				SupportedResizeFormats.avif,
+			]) {
+				expect(outputFormat(format)).toBe(format)
+			}
 		})
 	})
 })

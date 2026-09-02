@@ -1,15 +1,18 @@
+# Local stack: the published image plus a Redis. Run from this directory:
+#   cp ../.env.docker.example ../.env.docker   # then adjust as needed
+#   docker compose up
 services:
   service-media_stream:
     container_name: service-media_stream
-    restart: no
-    # Defaults to the CI-maintained `latest` tag (published on every release) so
-    # this dev compose never drifts a version behind. Pin a specific release for
-    # reproducibility with MEDIA_STREAM_IMAGE_TAG=v2.58.1.
+    restart: "no"
+    # Pin a specific release for reproducibility with MEDIA_STREAM_IMAGE_TAG=v2.60.7.
     image: gro0ve/grooveshop-media-stream:${MEDIA_STREAM_IMAGE_TAG:-latest}
     env_file:
-      - ./grooveshop-media-stream/.env.docker
+      - ../.env.docker
     ports:
       - "3003:3003"
+    depends_on:
+      - redis
     networks:
       - groovy-backbone
 

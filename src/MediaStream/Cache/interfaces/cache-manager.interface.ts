@@ -8,6 +8,7 @@ export interface CacheStats {
 	memoryUsage?: number
 }
 
+/** Contract shared by the memory and Redis services behind the cache layers. */
 export interface ICacheManager {
 	get: <T>(key: string) => Promise<T | null>
 	set: <T>(key: string, value: T, ttl?: number) => Promise<void>
@@ -15,7 +16,4 @@ export interface ICacheManager {
 	clear: () => Promise<void>
 	getStats: () => Promise<CacheStats>
 	has: (key: string) => Promise<boolean>
-	keys: () => Promise<string[]>
-	flushAll: () => Promise<void>
-	exists: (key: string) => Promise<boolean>
 }

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryCacheService } from '#microservice/Cache/services/memory-cache.service'
 import { ConfigService } from '#microservice/Config/config.service'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
+import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 
 describe('memoryCacheService', () => {
 	let service: MemoryCacheService
@@ -11,19 +12,7 @@ describe('memoryCacheService', () => {
 	let metricsService: MockedObject<MetricsService>
 
 	beforeEach(async () => {
-		const mockConfigService = {
-			get: vi.fn().mockImplementation((key: string) => {
-				if (key === 'cache.memory') {
-					return {
-						defaultTtl: 3600,
-						checkPeriod: 600,
-						maxKeys: 1000,
-						maxSize: 100 * 1024 * 1024,
-					}
-				}
-				return undefined
-			}),
-		}
+		const mockConfigService = createConfigServiceMock()
 
 		const mockMetricsService = {
 			recordCacheOperation: vi.fn(),
@@ -47,19 +36,6 @@ describe('memoryCacheService', () => {
 		service = module.get<MemoryCacheService>(MemoryCacheService)
 		configService = module.get(ConfigService)
 		metricsService = module.get(MetricsService)
-
-		// Setup default config
-		configService.get.mockImplementation((key: string) => {
-			if (key === 'cache.memory') {
-				return {
-					defaultTtl: 3600,
-					checkPeriod: 600,
-					maxKeys: 1000,
-					maxSize: 100 * 1024 * 1024,
-				}
-			}
-			return undefined
-		})
 	})
 
 	afterEach(async () => {
@@ -80,7 +56,6 @@ describe('memoryCacheService', () => {
 			const result = await service.get(key)
 
 			expect(result).toEqual(value)
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('set', 'memory', 'success')
 		})
 
 		it('should return null for non-existent key', async () => {
@@ -140,12 +115,18 @@ describe('memoryCacheService', () => {
 			const value = 'test-value'
 			const ttl = 1 // 1 second
 
-			await service.set(key, value, ttl)
-			expect(await service.get(key)).toBe(value)
+			vi.useFakeTimers()
+			try {
+				await service.set(key, value, ttl)
+				expect(await service.get(key)).toBe(value)
 
-			// Wait for expiration
-			await new Promise(resolve => setTimeout(resolve, 1100))
-			expect(await service.get(key)).toBeNull()
+				// node-cache checks expiry against Date.now(), which fake timers advance
+				vi.advanceTimersByTime(1100)
+				expect(await service.get(key)).toBeNull()
+			}
+			finally {
+				vi.useRealTimers()
+			}
 		})
 
 		it('should get TTL for a key', async () => {
@@ -204,23 +185,21 @@ describe('memoryCacheService', () => {
 	})
 
 	describe('error Handling', () => {
-		it('should handle get errors gracefully', async () => {
+		it('should propagate get errors', async () => {
 			// Mock cache to throw error
 			const originalGet = (service as any).cache.get
 			;(service as any).cache.get = vi.fn().mockImplementation(() => {
 				throw new Error('Cache error')
 			})
 
-			const result = await service.get('test-key')
-
-			expect(result).toBeNull()
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'memory', 'error')
+			// The layered manager owns error handling and metrics; the layer propagates.
+			await expect(service.get('test-key')).rejects.toThrow('Cache error')
 
 			// Restore original method
 			;(service as any).cache.get = originalGet
 		})
 
-		it('should handle set errors gracefully', async () => {
+		it('should propagate set errors', async () => {
 			// Mock cache to throw error
 			const originalSet = (service as any).cache.set
 			;(service as any).cache.set = vi.fn().mockImplementation(() => {
@@ -228,31 +207,19 @@ describe('memoryCacheService', () => {
 			})
 
 			await expect(service.set('test-key', 'test-value')).rejects.toThrow('Cache error')
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('set', 'memory', 'error')
 
 			// Restore original method
 			;(service as any).cache.set = originalSet
 		})
 
-		it('should handle stats errors gracefully', async () => {
-			// Mock cache to throw error
+		it('should propagate stats errors', async () => {
 			const originalGetStats = (service as any).cache.getStats
 			;(service as any).cache.getStats = vi.fn().mockImplementation(() => {
 				throw new Error('Stats error')
 			})
 
-			const stats = await service.getStats()
+			await expect(service.getStats()).rejects.toThrow('Stats error')
 
-			expect(stats).toEqual({
-				hits: 0,
-				misses: 0,
-				keys: 0,
-				ksize: 0,
-				vsize: 0,
-				hitRate: 0,
-			})
-
-			// Restore original method
 			;(service as any).cache.getStats = originalGetStats
 		})
 	})
@@ -260,28 +227,6 @@ describe('memoryCacheService', () => {
 	describe('configuration', () => {
 		it('should use configuration values', () => {
 			expect(configService.get).toHaveBeenCalledWith('cache.memory')
-		})
-
-		it('should handle missing configuration gracefully', async () => {
-			configService.get.mockReturnValue(undefined)
-
-			// Create new service instance with missing config
-			const module: TestingModule = await Test.createTestingModule({
-				providers: [
-					MemoryCacheService,
-					{
-						provide: ConfigService,
-						useValue: configService,
-					},
-					{
-						provide: MetricsService,
-						useValue: metricsService,
-					},
-				],
-			}).compile()
-
-			const newService = module.get<MemoryCacheService>(MemoryCacheService)
-			expect(newService).toBeDefined()
 		})
 	})
 
@@ -295,12 +240,9 @@ describe('memoryCacheService', () => {
 			await service.delete('key1')
 			await service.clear()
 
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('set', 'memory', 'success')
-			// Note: get operation metrics are recorded via NodeCache events, which may not fire in test environment
-			// The important thing is that the get operation works correctly
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('delete', 'memory', 'success')
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('flush', 'memory', 'success')
-			expect(value).toBe('value1') // Ensure the get actually worked
+			// Per-operation metrics belong to MultiLayerCacheManager; the layer records nothing here.
+			expect(metricsService.recordCacheOperation).not.toHaveBeenCalled()
+			expect(value).toBe('value1')
 		})
 
 		it('should update hit ratio in metrics', async () => {
@@ -319,12 +261,7 @@ describe('memoryCacheService', () => {
 					MemoryCacheService,
 					{
 						provide: ConfigService,
-						useValue: {
-							get: vi.fn().mockImplementation((key: string) =>
-								key === 'cache.memory'
-									? { defaultTtl: 3600, checkPeriod: 600, maxKeys: 1000, maxSize: 2000 }
-									: undefined),
-						},
+						useValue: createConfigServiceMock({ 'cache.memory.maxSize': 2000 }),
 					},
 					{
 						provide: MetricsService,

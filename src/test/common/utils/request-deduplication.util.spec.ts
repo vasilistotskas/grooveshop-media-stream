@@ -59,32 +59,6 @@ describe('requestDeduplicator', () => {
 		await expect(dedup.execute('key', async () => 'recovered')).resolves.toBe('recovered')
 	})
 
-	it('should report pending state and stats while work is in flight', async () => {
-		let release!: () => void
-		const gate = new Promise<void>((resolve) => {
-			release = resolve
-		})
-
-		const promise = dedup.execute('slow', async () => {
-			await gate
-			return 'done'
-		})
-
-		expect(dedup.getStats()).toEqual({ pending: 1, keys: ['slow'] })
-
-		release()
-		await expect(promise).resolves.toBe('done')
-	})
-
-	it('should clear pending entries on demand', async () => {
-		const never = new Promise<string>(() => {})
-		void dedup.execute('stuck', () => never)
-
-		expect(dedup.getStats().pending).toBe(1)
-		dedup.clear()
-		expect(dedup.getStats().pending).toBe(0)
-	})
-
 	it('should stop its cleanup interval on destroy', () => {
 		const clearSpy = vi.spyOn(globalThis, 'clearInterval')
 		dedup.onModuleDestroy()

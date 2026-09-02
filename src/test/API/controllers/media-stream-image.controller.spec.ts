@@ -38,8 +38,8 @@ describe('mediaStreamImageController', () => {
 		} as any
 
 		mockRequestValidatorService = {
-			validateRequest: vi.fn().mockResolvedValue(undefined),
-			validateUrl: vi.fn().mockResolvedValue(undefined),
+			validateRequest: vi.fn(),
+			validateUrl: vi.fn(),
 		} as any
 
 		mockUrlBuilderService = {
@@ -66,7 +66,6 @@ describe('mediaStreamImageController', () => {
 			writable: true,
 			writableEnded: false,
 			writableFinished: false,
-			locals: {},
 		} as any
 
 		const module: TestingModule = await Test.createTestingModule({
@@ -114,7 +113,6 @@ describe('mediaStreamImageController', () => {
 			expect(mockUrlBuilderService.buildResourceUrl).toHaveBeenCalled()
 			expect(mockRequestValidatorService.validateUrl).toHaveBeenCalled()
 			expect(mockImageStreamService.processAndStream).toHaveBeenCalled()
-			expect(mockResponse.locals.requestedFormat).toBe('webp')
 		})
 
 		it('should handle static image request', async () => {
@@ -254,9 +252,9 @@ describe('mediaStreamImageController', () => {
 		})
 
 		it('should handle validation errors', async () => {
-			mockRequestValidatorService.validateRequest.mockRejectedValue(
-				new Error('Invalid parameters'),
-			)
+			mockRequestValidatorService.validateRequest.mockImplementation(() => {
+				throw new Error('Invalid parameters')
+			})
 			const mockRequest = {
 				path: '/media_stream-image/media/acme/uploads/test/image.webp/100/100/contain/entropy/transparent/5/80.webp',
 			} as any
@@ -283,15 +281,19 @@ describe('mediaStreamImageController', () => {
 			expect(mockMetricsService.recordError).toHaveBeenCalled()
 		})
 
-		it('should set response locals correctly', async () => {
+		it('caches shared static images under the public tenant', async () => {
 			const mockRequest = {
 				path: '/media_stream-image/static/images/logo.png/200/200/contain/center/white/5/90.png',
 			} as any
 
 			await controller.handleImageRequest(mockRequest, mockResponse)
 
-			expect(mockResponse.locals.requestedFormat).toBe('png')
-			expect(mockResponse.locals.originalUrl).toBeDefined()
+			expect(mockImageStreamService.processAndStream).toHaveBeenCalledWith(
+				expect.anything(),
+				expect.objectContaining({ tenantSchema: 'public' }),
+				mockResponse,
+				mockRequest,
+			)
 		})
 
 		it('passes literal "null" segments through verbatim (no sentinel coercion)', async () => {

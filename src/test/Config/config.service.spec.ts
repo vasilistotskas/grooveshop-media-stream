@@ -1,7 +1,7 @@
 import type { MockedObject } from 'vitest'
 import { ConfigService as NestConfigService } from '@nestjs/config'
 import { Test, TestingModule } from '@nestjs/testing'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConfigService } from '#microservice/Config/config.service'
 import 'reflect-metadata'
 
@@ -23,13 +23,11 @@ describe('configService', () => {
 		REDIS_DB: '0',
 		REDIS_TTL: '7200',
 		REDIS_MAX_RETRIES: '3',
-		REDIS_RETRY_DELAY: '100',
 		CACHE_FILE_DIRECTORY: './storage',
 		CACHE_IMAGE_NEGATIVE_TTL: '600',
 		PROCESSING_CPU_CORES: '1.5',
 		MONITORING_ENABLED: 'true',
 		BACKEND_URL: 'http://localhost:8000',
-		EXTERNAL_REQUEST_TIMEOUT: '30000',
 		RATE_LIMIT_ENABLED: 'true',
 		RATE_LIMIT_DEFAULT_WINDOW_MS: '60000',
 		RATE_LIMIT_DEFAULT_MAX: '100',
@@ -76,11 +74,6 @@ describe('configService', () => {
 			expect(service.get('monitoring.enabled')).toBe(true)
 		})
 
-		it('should get optional configuration values with defaults', () => {
-			expect(service.getOptional('server.port', 8080)).toBe(3003)
-			expect(service.getOptional('nonexistent.key' as any, 'default')).toBe('default')
-		})
-
 		it('should throw error for non-existent configuration key', () => {
 			expect(() => service.get('nonexistent.key' as any)).toThrow(
 				'Configuration key \'nonexistent.key\' not found',
@@ -95,6 +88,67 @@ describe('configService', () => {
 
 		it('should parse fractional numeric values', () => {
 			expect(service.get('processing.cpuCores')).toBe(1.5)
+		})
+
+		it('should return undefined for the unset Redis password without throwing', () => {
+			expect(service.get('cache.redis.password')).toBeUndefined()
+		})
+
+		it('should read backend.url and admin.secret from the environment', () => {
+			nestConfigService.get.mockImplementation((key: string) => {
+				if (key === 'INTERNAL_ADMIN_SECRET')
+					return 'top-secret'
+				return mockEnvVars[key as keyof typeof mockEnvVars]
+			})
+			const configured = new ConfigService(nestConfigService)
+
+			expect(configured.get('backend.url')).toBe('http://localhost:8000')
+			expect(configured.get('admin.secret')).toBe('top-secret')
+		})
+
+		it('should parse the rate-limit whitelist into an array', () => {
+			nestConfigService.get.mockImplementation((key: string) => {
+				if (key === 'RATE_LIMIT_BYPASS_WHITELISTED_DOMAINS')
+					return 'a.com, *.b.com'
+				return mockEnvVars[key as keyof typeof mockEnvVars]
+			})
+			const configured = new ConfigService(nestConfigService)
+
+			expect(configured.get('rateLimit.bypass.whitelistedDomains')).toEqual(['a.com', '*.b.com'])
+		})
+
+		it('should return a whole group for a group path', () => {
+			const rateLimit = service.get('rateLimit')
+
+			expect(rateLimit.default.max).toBe(100)
+			expect(rateLimit.bypass.whitelistedDomains).toEqual([])
+		})
+	})
+
+	describe('production validation', () => {
+		afterEach(() => {
+			vi.unstubAllEnvs()
+		})
+
+		function productionService(env: Record<string, string | undefined>): ConfigService {
+			vi.stubEnv('NODE_ENV', 'production')
+			const nest = { get: vi.fn((key: string) => key in env ? env[key] : mockEnvVars[key as keyof typeof mockEnvVars]) }
+			return new ConfigService(nest as unknown as NestConfigService)
+		}
+
+		it('rejects a wildcard or empty CORS origin', async () => {
+			await expect(productionService({ CORS_ORIGIN: '*' }).validate()).rejects.toThrow('CORS_ORIGIN')
+			await expect(productionService({ CORS_ORIGIN: '' }).validate()).rejects.toThrow('CORS_ORIGIN')
+		})
+
+		it('rejects an empty BACKEND_URL', async () => {
+			await expect(productionService({ CORS_ORIGIN: 'https://store.example.com', BACKEND_URL: '' }).validate())
+				.rejects
+				.toThrow('BACKEND_URL')
+		})
+
+		it('accepts an explicit origin and backend URL', async () => {
+			await expect(productionService({ CORS_ORIGIN: 'https://store.example.com' }).validate()).resolves.not.toThrow()
 		})
 	})
 

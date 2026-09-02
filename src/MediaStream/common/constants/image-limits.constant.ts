@@ -2,7 +2,7 @@
  * Unified image processing limits
  *
  * These constants ensure consistent validation across all services.
- * Any changes here will affect both RequestValidatorService and InputSanitizationService.
+ * Consumed by RequestValidatorService and ResourceValidationService.
  */
 
 /**
@@ -39,6 +39,17 @@ export const MIN_TRIM_THRESHOLD = 0
 export const MAX_TRIM_THRESHOLD = 100
 
 /**
+ * Sharp `limitInputPixels` applied to every pipeline input (16383 × 16383):
+ * rejects decompression-bomb sources before any pixel is decoded.
+ */
+export const SHARP_INPUT_PIXEL_LIMIT = 268402689
+
+/**
+ * AVIF encoding is too slow above Full HD; larger sources are encoded as WebP instead.
+ */
+export const AVIF_MAX_INPUT_PIXELS = 1920 * 1080
+
+/**
  * Maximum file sizes by format (in bytes)
  */
 export const MAX_FILE_SIZES = Object.freeze({
@@ -50,8 +61,3 @@ export const MAX_FILE_SIZES = Object.freeze({
 	gif: 2 * 1024 * 1024, // 2MB
 	svg: 1024 * 1024, // 1MB
 })
-
-/**
- * Maximum string length for sanitized inputs
- */
-export const MAX_STRING_LENGTH = 2048

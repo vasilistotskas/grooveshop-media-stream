@@ -1,5 +1,22 @@
 import DOMPurify from 'isomorphic-dompurify'
+import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
+
+/** Bytes of a fetched file to inspect for an SVG root; covers the XML declaration and DOCTYPE preamble. */
+export const SVG_SNIFF_BYTES = 1024
+
+const XML_DECLARATION_RE = /^<\?xml[^?]*\?>\s*/i
+const DOCTYPE_RE = /^<!DOCTYPE[^>]*>\s*/i
+const SVG_NAMESPACE = 'xmlns="http://www.w3.org/2000/svg"'
+
+/**
+ * Whether the first bytes of a file are an SVG document: an `<svg` root
+ * after any XML declaration / DOCTYPE preamble, or the SVG namespace.
+ */
+export function isSvgHeader(header: string): boolean {
+	const stripped = header.trimStart().replace(XML_DECLARATION_RE, '').replace(DOCTYPE_RE, '')
+	return stripped.startsWith('<svg') || header.includes(SVG_NAMESPACE)
+}
 
 /**
  * Sanitize an SVG payload against XSS / SSRF vectors before it is either
@@ -40,8 +57,8 @@ export function sanitizeSvg(svg: string): string {
 	}
 	catch (err: unknown) {
 		CorrelatedLogger.error(
-			`DOMPurify SVG sanitization failed — rejecting SVG (fail closed): ${(err as Error).message}`,
-			(err as Error).stack,
+			`DOMPurify SVG sanitization failed — rejecting SVG (fail closed): ${errorMessage(err)}`,
+			err instanceof Error ? err.stack : undefined,
 			'SvgSanitizer',
 		)
 		throw new Error('SVG sanitization unavailable')

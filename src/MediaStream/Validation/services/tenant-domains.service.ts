@@ -1,6 +1,6 @@
 import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
-import * as process from 'node:process'
 import { Injectable } from '@nestjs/common'
+import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
@@ -21,7 +21,7 @@ const FETCH_TIMEOUT_MS = 10000
  * unset (`isAllowed` then always returns false — callers must OR this with
  * the static allowlist), and a failed refresh keeps the last known-good set
  * rather than clearing it, so a transient Django outage never widens or
- * shrinks what InputSanitizationService accepts.
+ * shrinks what ResourceValidationService accepts.
  */
 @Injectable()
 export class TenantDomainsService implements OnModuleInit, OnModuleDestroy {
@@ -46,13 +46,12 @@ export class TenantDomainsService implements OnModuleInit, OnModuleDestroy {
 		private readonly _configService: ConfigService,
 		private readonly _metricsService: MetricsService,
 	) {
-		this.secret = this._configService.getOptional<string>('tenantDomains.secret', '')
+		this.secret = this._configService.get<string>('tenantDomains.secret')
 		this.enabled = this.secret.length > 0
 
-		const configuredUrl = this._configService.getOptional<string>('tenantDomains.refreshUrl', '')
-		const backendUrl = process.env.BACKEND_URL ?? ''
-		this.refreshUrl = configuredUrl || `${backendUrl}/api/v1/tenant/internal/domains`
-		this.refreshIntervalMs = this._configService.getOptional<number>('tenantDomains.refreshIntervalMs', 300000)
+		const configuredUrl = this._configService.get<string>('tenantDomains.refreshUrl')
+		this.refreshUrl = configuredUrl || `${this._configService.get<string>('backend.url')}/api/v1/tenant/internal/domains`
+		this.refreshIntervalMs = this._configService.get<number>('tenantDomains.refreshIntervalMs')
 	}
 
 	async onModuleInit(): Promise<void> {
@@ -66,13 +65,10 @@ export class TenantDomainsService implements OnModuleInit, OnModuleDestroy {
 
 		await this.refresh()
 
-		// Skip the recurring timer in tests — same convention as MetricsService's
-		// periodic-collection guard, to avoid leaking intervals across spec files.
-		if (process.env.NODE_ENV !== 'test') {
-			this.refreshTimer = setInterval(() => {
-				void this.refresh()
-			}, this.refreshIntervalMs)
-		}
+		// unref: the poll must never keep the process (or a spec worker) alive.
+		this.refreshTimer = setInterval(() => {
+			void this.refresh()
+		}, this.refreshIntervalMs).unref()
 	}
 
 	onModuleDestroy(): void {
@@ -142,7 +138,7 @@ export class TenantDomainsService implements OnModuleInit, OnModuleDestroy {
 			// Keep the last known-good set — a transient Django outage must not
 			// widen or shrink the effective allowlist.
 			CorrelatedLogger.warn(
-				`Failed to refresh tenant domains, keeping last known-good set (${this.domains.size} domains): ${(error as Error).message}`,
+				`Failed to refresh tenant domains, keeping last known-good set (${this.domains.size} domains): ${errorMessage(error)}`,
 				TenantDomainsService.name,
 			)
 		}

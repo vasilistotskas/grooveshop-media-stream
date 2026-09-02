@@ -1,8 +1,9 @@
 import type { MockedObject } from 'vitest'
 import { Test, TestingModule } from '@nestjs/testing'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { ConfigService } from '#microservice/Config/config.service'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
+import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 import 'reflect-metadata'
 
 describe('metricsService', () => {
@@ -10,23 +11,7 @@ describe('metricsService', () => {
 	let configService: MockedObject<ConfigService>
 
 	beforeEach(async () => {
-		const mockConfigService = {
-			get: vi.fn((key: string) => {
-				if (key === 'monitoring.enabled')
-					return true
-				return undefined
-			}),
-			getOptional: vi.fn((key: string, defaultValue: any) => {
-				// Return configuration values for metrics intervals
-				if (key === 'monitoring.systemMetricsInterval')
-					return 60000
-				if (key === 'monitoring.performanceMetricsInterval')
-					return 30000
-				if (key === 'monitoring.diskSpaceCacheTtl')
-					return 300000
-				return defaultValue
-			}),
-		}
+		const mockConfigService = createConfigServiceMock()
 
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [
@@ -47,8 +32,6 @@ describe('metricsService', () => {
 		if (service && typeof service.stopMetricsCollection === 'function') {
 			service.stopMetricsCollection()
 		}
-		// Reset metrics after each test
-		service.reset()
 	})
 
 	describe('initialization', () => {
@@ -65,9 +48,12 @@ describe('metricsService', () => {
 			}
 		})
 
-		it('should provide metrics registry', () => {
-			const registry = service.getRegistry()
-			expect(registry).toBeDefined()
+		it('should count image requests on a static counter', async () => {
+			service.recordImageRequest()
+			service.recordImageRequest()
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_image_requests_total 2')
 		})
 	})
 
@@ -298,24 +284,6 @@ describe('metricsService', () => {
 		})
 	})
 
-	describe('reset Functionality', () => {
-		it('should reset all metrics', async () => {
-			service.recordHttpRequest('GET', '/test', 200, 0.5)
-			service.recordError('test', 'operation')
-
-			let metrics = await service.getMetrics()
-			expect(metrics).toContain('mediastream_http_requests_total')
-			expect(metrics).toContain('mediastream_errors_total')
-
-			service.reset()
-
-			metrics = await service.getMetrics()
-			// After reset, counters should be back to 0 or not present
-			expect(metrics).not.toContain('mediastream_http_requests_total{')
-			expect(metrics).not.toContain('mediastream_errors_total{')
-		})
-	})
-
 	describe('performance Metrics', () => {
 		it('should record event loop lag', async () => {
 			service.recordEventLoopLag(0.02)
@@ -369,11 +337,7 @@ describe('metricsService', () => {
 		})
 
 		it('should handle disabled monitoring', async () => {
-			configService.get.mockImplementation((key: string) => {
-				if (key === 'monitoring.enabled')
-					return false
-				return undefined
-			})
+			const disabledConfigService = createConfigServiceMock({ 'monitoring.enabled': false })
 
 			// Create new service instance with monitoring disabled
 			const module: TestingModule = await Test.createTestingModule({
@@ -381,7 +345,7 @@ describe('metricsService', () => {
 					MetricsService,
 					{
 						provide: ConfigService,
-						useValue: configService,
+						useValue: disabledConfigService,
 					},
 				],
 			}).compile()

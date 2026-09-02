@@ -1,8 +1,7 @@
 import type { INestApplication } from '@nestjs/common'
-import * as process from 'node:process'
 import { Test, TestingModule } from '@nestjs/testing'
 import request from 'supertest'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import MediaStreamModule from '#microservice/media-stream.module'
 
 const TEXT_PLAIN_RE = /text\/plain/
@@ -17,11 +16,9 @@ describe('MediaStreamModule (e2e)', () => {
 	let moduleFixture: TestingModule
 
 	beforeAll(async () => {
-		// Disable scheduled tasks in e2e tests
-		process.env.DISABLE_CRON = 'true'
 		// Set the secret BEFORE module compilation so ConfigService
 		// picks it up at startup.
-		process.env.INTERNAL_ADMIN_SECRET = TEST_INTERNAL_SECRET
+		vi.stubEnv('INTERNAL_ADMIN_SECRET', TEST_INTERNAL_SECRET)
 
 		moduleFixture = await Test.createTestingModule({
 			imports: [MediaStreamModule],
@@ -58,9 +55,7 @@ describe('MediaStreamModule (e2e)', () => {
 			}
 		}
 
-		// Give extra time for all async operations to complete
-		// This includes Redis disconnection and scheduled tasks
-		await new Promise(resolve => setTimeout(resolve, 1000))
+		vi.unstubAllEnvs()
 	})
 
 	// eslint-disable-next-line test/expect-expect

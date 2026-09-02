@@ -1,5 +1,6 @@
 import { IMAGE } from '#microservice/common/constants/route-prefixes.constant'
-import { TENANT_SCHEMA_SEGMENT } from '#microservice/common/constants/tenant.constant'
+import { PUBLIC_TENANT_SCHEMA, TENANT_SCHEMA_SEGMENT } from '#microservice/common/constants/tenant.constant'
+import { decodePathFully } from '#microservice/common/utils/percent-decode.util'
 
 /**
  * Matches the tenant-scoped media route only: /media_stream-image/media/{tenantSchema}/uploads/...
@@ -10,13 +11,6 @@ import { TENANT_SCHEMA_SEGMENT } from '#microservice/common/constants/tenant.con
  * validation needed here.
  */
 const TENANT_MEDIA_PATH_RE = new RegExp(`^/${IMAGE}/media/(${TENANT_SCHEMA_SEGMENT})/uploads/`)
-
-/**
- * Maximum percent-decoding passes, matching the controller's own loop
- * (MediaStreamImageController). TinyMCE-authored URLs arrive
- * double-encoded, so one pass is not enough.
- */
-const MAX_DECODE_PASSES = 3
 
 /**
  * Extract the tenantSchema from a request pathname.
@@ -37,21 +31,15 @@ const MAX_DECODE_PASSES = 3
  * and RateLimit (per-tenant image-processing bucket key).
  */
 export function extractTenantSchemaFromPath(pathname: string): string {
-	let path = pathname
-	for (let i = 0; i < MAX_DECODE_PASSES && path.includes('%'); i++) {
-		let decoded: string
-		try {
-			decoded = decodeURIComponent(path)
-		}
-		catch {
-			// Malformed encoding: the controller rejects it, and an
-			// unmatched path is 'public' either way.
-			break
-		}
-		if (decoded === path)
-			break
-		path = decoded
+	let path: string
+	try {
+		path = decodePathFully(pathname)
+	}
+	catch {
+		// Malformed encoding: the controller rejects it, and an unmatched path
+		// is 'public' either way.
+		return PUBLIC_TENANT_SCHEMA
 	}
 	const match = TENANT_MEDIA_PATH_RE.exec(path)
-	return match ? match[1] : 'public'
+	return match ? match[1] : PUBLIC_TENANT_SCHEMA
 }

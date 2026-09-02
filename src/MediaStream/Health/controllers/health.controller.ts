@@ -14,7 +14,9 @@ import { HealthCheck, HealthCheckService } from '@nestjs/terminus'
 import { CacheHealthIndicator } from '#microservice/Cache/indicators/cache-health.indicator'
 import { RedisHealthIndicator } from '#microservice/Cache/indicators/redis-health.indicator'
 import { InternalSecretGuard } from '#microservice/common/guards/internal-secret.guard'
+import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { isShuttingDown } from '#microservice/common/utils/graceful-shutdown.util'
+import { nodeEnv } from '#microservice/common/utils/runtime-env.util'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
@@ -22,7 +24,7 @@ import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage
 import { TenantDomainsHealthIndicator } from '#microservice/Validation/indicators/tenant-domains-health.indicator'
 import { HealthDetailGuard } from '../guards/health-detail.guard.js'
 import { DiskSpaceHealthIndicator } from '../indicators/disk-space-health.indicator.js'
-import { MemoryHealthIndicator } from '../indicators/memory-health.indicator.js'
+import { HEAP_CRITICAL_RATIO, MemoryHealthIndicator } from '../indicators/memory-health.indicator.js'
 import { SharpHealthIndicator } from '../indicators/sharp-health.indicator.js'
 
 @Controller('health')
@@ -39,6 +41,20 @@ export class HealthController {
 		private readonly tenantDomainsHealthIndicator: TenantDomainsHealthIndicator,
 		private readonly httpClientService: HttpClientService,
 	) {}
+
+	/** Every indicator, in report order; /health and /health/detailed share it. */
+	private get allChecks(): HealthIndicatorFunction[] {
+		return [
+			() => this.diskSpaceIndicator.isHealthy(),
+			() => this.memoryIndicator.isHealthy(),
+			() => this.httpHealthIndicator.isHealthy(),
+			() => this.cacheHealthIndicator.isHealthy(),
+			() => this.redisHealthIndicator.isHealthy(),
+			() => this.storageHealthIndicator.isHealthy(),
+			() => this.sharpHealthIndicator.isHealthy(),
+			() => this.tenantDomainsHealthIndicator.isHealthy(),
+		]
+	}
 
 	/**
 	 * Run an aggregate health check and always answer with the health report.
@@ -73,16 +89,7 @@ export class HealthController {
 	@Get()
 	@HealthCheck()
 	async check(@Res({ passthrough: true }) res: Response): Promise<HealthCheckResult> {
-		return this.runCheck(res, [
-			() => this.diskSpaceIndicator.isHealthy(),
-			() => this.memoryIndicator.isHealthy(),
-			() => this.httpHealthIndicator.isHealthy(),
-			() => this.cacheHealthIndicator.isHealthy(),
-			() => this.redisHealthIndicator.isHealthy(),
-			() => this.storageHealthIndicator.isHealthy(),
-			() => this.sharpHealthIndicator.isHealthy(),
-			() => this.tenantDomainsHealthIndicator.isHealthy(),
-		])
+		return this.runCheck(res, this.allChecks)
 	}
 
 	@Get('detailed')
@@ -100,16 +107,7 @@ export class HealthController {
 			memory: MemoryInfo | null
 		}
 	}> {
-		const healthResults = await this.runCheck(res, [
-			() => this.diskSpaceIndicator.isHealthy(),
-			() => this.memoryIndicator.isHealthy(),
-			() => this.httpHealthIndicator.isHealthy(),
-			() => this.cacheHealthIndicator.isHealthy(),
-			() => this.redisHealthIndicator.isHealthy(),
-			() => this.storageHealthIndicator.isHealthy(),
-			() => this.sharpHealthIndicator.isHealthy(),
-			() => this.tenantDomainsHealthIndicator.isHealthy(),
-		])
+		const healthResults = await this.runCheck(res, this.allChecks)
 
 		// These read the resources directly, outside the indicator machinery, so
 		// an unreadable disk used to throw straight out of the handler and take
@@ -119,14 +117,14 @@ export class HealthController {
 		const [diskInfo, memoryInfo] = await Promise.all([
 			this.diskSpaceIndicator.getCurrentDiskInfo().catch((error: unknown) => {
 				CorrelatedLogger.warn(
-					`Detailed health: disk snapshot unavailable: ${(error as Error).message}`,
+					`Detailed health: disk snapshot unavailable: ${errorMessage(error)}`,
 					HealthController.name,
 				)
 				return null
 			}),
 			Promise.resolve().then(() => this.memoryIndicator.getCurrentMemoryInfo()).catch((error: unknown) => {
 				CorrelatedLogger.warn(
-					`Detailed health: memory snapshot unavailable: ${(error as Error).message}`,
+					`Detailed health: memory snapshot unavailable: ${errorMessage(error)}`,
 					HealthController.name,
 				)
 				return null
@@ -140,7 +138,7 @@ export class HealthController {
 			details: healthResults.details,
 			timestamp: new Date().toISOString(),
 			uptime: process.uptime(),
-			environment: process.env.NODE_ENV || 'development',
+			environment: nodeEnv(),
 			resources: {
 				disk: diskInfo,
 				memory: memoryInfo,
@@ -230,17 +228,14 @@ export class HealthController {
 		// fail during graceful shutdown (that is /health/ready's job) — failing
 		// it would make kubelet send SIGKILL and race the in-progress shutdown.
 		//
-		// We compare RSS against V8's actual heap ceiling
-		// (`heap_size_limit` ≈ --max-old-space-size). The previous check used
-		// `heapUsed / heapTotal`, which is meaningless: V8 grows `heapTotal`
-		// lazily up to the ceiling, so apps routinely sit at >95% of the
-		// currently-allocated heap during normal GC churn — that is not OOM.
-		// True OOM is handled by the kernel / K8s memory limit; this is a
-		// soft guard that fires only when we are within 5% of the V8 ceiling.
+		// heapUsed against V8's actual ceiling (`heap_size_limit`), not heapTotal,
+		// which V8 grows lazily during normal GC churn. True OOM is handled by
+		// the kernel / K8s memory limit; this soft guard shares its threshold
+		// with MemoryHealthIndicator.
 		const memUsage = process.memoryUsage()
 		const heapLimit = v8.getHeapStatistics().heap_size_limit
 		const heapPercent = memUsage.heapUsed / heapLimit
-		if (heapPercent > 0.95) {
+		if (heapPercent > HEAP_CRITICAL_RATIO) {
 			throw new ServiceUnavailableException({
 				status: 'heap-pressure',
 				heapUsed: memUsage.heapUsed,

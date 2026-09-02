@@ -1,15 +1,15 @@
 import { IsNumber, IsString, Min } from 'class-validator'
 
 export class TenantDomainsConfigDto {
-	// May be blank ("derive from BACKEND_URL") — not validated as a URL here.
+	// May be blank ("derive from backend.url") — not validated as a URL here.
 	@IsString()
-	refreshUrl: string = ''
+	refreshUrl!: string
 
 	// Blank disables the feature; not a secret-strength check, just shape.
 	@IsString()
-	secret: string = ''
+	secret!: string
 
 	@IsNumber()
 	@Min(5000)
-	refreshIntervalMs: number = 300000
+	refreshIntervalMs!: number
 }

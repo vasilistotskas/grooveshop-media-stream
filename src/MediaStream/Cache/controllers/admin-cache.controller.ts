@@ -1,8 +1,10 @@
-import { BadRequestException, Body, Controller, HttpCode, HttpStatus, Logger, Post, UseGuards } from '@nestjs/common'
+import { BadRequestException, Body, Controller, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common'
 import { TENANT_SCHEMA_PATTERN } from '#microservice/common/constants/tenant.constant'
 import { InternalSecretGuard } from '#microservice/common/guards/internal-secret.guard'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { StorageCleanupService } from '#microservice/Storage/services/storage-cleanup.service'
 import { MultiLayerCacheManager } from '../services/multi-layer-cache.manager.js'
+import { imageNamespace } from '../utils/cache-namespace.util.js'
 
 export interface FlushTenantBody {
 	tenantSchema: string
@@ -15,8 +17,6 @@ export interface FlushTenantBody {
 @Controller('admin/cache')
 @UseGuards(InternalSecretGuard)
 export class AdminCacheController {
-	private readonly _logger = new Logger(AdminCacheController.name)
-
 	constructor(
 		private readonly cacheManager: MultiLayerCacheManager,
 		private readonly storageCleanupService: StorageCleanupService,
@@ -60,18 +60,19 @@ export class AdminCacheController {
 			)
 		}
 
-		const namespace = `image:${tenantSchema}`
-		this._logger.log(`Flushing cache for tenant namespace: ${namespace}`)
+		const namespace = imageNamespace(tenantSchema)
+		CorrelatedLogger.log(`Flushing cache for tenant namespace: ${namespace}`, AdminCacheController.name)
 
 		await this.cacheManager.invalidateNamespace(namespace)
 
 		const diskResult = await this.storageCleanupService.removeTenantFiles(tenantSchema)
-		this._logger.log(
+		CorrelatedLogger.log(
 			`Disk sweep for tenant namespace ${namespace}: ${diskResult.filesRemoved} file pair(s) removed${
 				diskResult.errors.length ? `, ${diskResult.errors.length} error(s)` : ''}`,
+			AdminCacheController.name,
 		)
 
-		this._logger.log(`Cache flush complete for tenant namespace: ${namespace}`)
+		CorrelatedLogger.log(`Cache flush complete for tenant namespace: ${namespace}`, AdminCacheController.name)
 
 		return {
 			flushed: true,

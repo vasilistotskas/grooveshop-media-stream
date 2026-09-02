@@ -20,7 +20,6 @@ describe('multiLayerCacheManager Integration', () => {
 	beforeEach(async () => {
 		mockConfigService = {
 			get: vi.fn(),
-			getOptional: vi.fn(),
 		} as any
 
 		mockMetricsService = {
@@ -56,17 +55,6 @@ describe('multiLayerCacheManager Integration', () => {
 					return './test-cache'
 				default:
 					return undefined
-			}
-		})
-
-		mockConfigService.getOptional.mockImplementation((key: string, defaultValue: any) => {
-			switch (key) {
-				case 'cache.preloading.enabled':
-					return false
-				case 'cache.preloading.interval':
-					return 300000
-				default:
-					return defaultValue
 			}
 		})
 
@@ -110,7 +98,7 @@ describe('multiLayerCacheManager Integration', () => {
 			expect(mockMemoryCacheService.get).toHaveBeenCalledWith('image:test-key')
 			// Sequential: stops on first hit, redis should not be called
 			expect(mockRedisCacheService.get).not.toHaveBeenCalled()
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'memory', 'hit')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'memory', 'hit', undefined, 'public')
 		})
 
 		it('should fallback to Redis when memory cache misses', async () => {
@@ -125,7 +113,7 @@ describe('multiLayerCacheManager Integration', () => {
 			expect(mockMemoryCacheService.get).toHaveBeenCalledWith('image:test-key')
 			expect(mockRedisCacheService.get).toHaveBeenCalledWith('image:test-key')
 			expect(mockMemoryCacheService.set).toHaveBeenCalledWith('image:test-key', testValue, undefined)
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'redis', 'hit')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'redis', 'hit', undefined, 'public')
 		})
 
 		it('should return null when all layers miss', async () => {
@@ -135,7 +123,7 @@ describe('multiLayerCacheManager Integration', () => {
 			const result = await cacheManager.get('image', 'test-key')
 
 			expect(result).toBeNull()
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'miss')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'miss', undefined, 'public')
 		})
 
 		it('should handle layer failures gracefully', async () => {
@@ -161,7 +149,7 @@ describe('multiLayerCacheManager Integration', () => {
 
 			expect(mockMemoryCacheService.set).toHaveBeenCalledWith('image:test-key', testValue, 3600)
 			expect(mockRedisCacheService.set).toHaveBeenCalledWith('image:test-key', testValue, 3600)
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('set', 'multi-layer', 'success')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('set', 'multi-layer', 'success', undefined, 'public')
 		})
 
 		it('should delete from all layers', async () => {
@@ -172,7 +160,7 @@ describe('multiLayerCacheManager Integration', () => {
 
 			expect(mockMemoryCacheService.delete).toHaveBeenCalledWith('image:test-key')
 			expect(mockRedisCacheService.delete).toHaveBeenCalledWith('image:test-key')
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('delete', 'multi-layer', 'success')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('delete', 'multi-layer', 'success', undefined, 'public')
 		})
 
 		it('should check existence in priority order', async () => {
@@ -196,32 +184,6 @@ describe('multiLayerCacheManager Integration', () => {
 			expect(mockMemoryCacheService.clear).toHaveBeenCalled()
 			expect(mockRedisCacheService.clear).toHaveBeenCalled()
 			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('flush', 'multi-layer', 'success')
-		})
-	})
-
-	describe('key Generation', () => {
-		it('should generate consistent keys', async () => {
-			const testValue = { data: 'test' }
-			mockMemoryCacheService.get.mockResolvedValue(testValue)
-
-			await cacheManager.get('image', 'test-key', { width: 100, height: 200 })
-
-			// Key should include hashed parameters
-			expect(mockMemoryCacheService.get).toHaveBeenCalledWith(
-				expect.stringMatching(/^image:test-key:[a-z0-9]{1,16}$/),
-			)
-		})
-
-		it('should generate same key for same parameters', async () => {
-			const testValue = { data: 'test' }
-			mockMemoryCacheService.get.mockResolvedValue(testValue)
-
-			await cacheManager.get('image', 'test-key', { width: 100, height: 200 })
-			await cacheManager.get('image', 'test-key', { height: 200, width: 100 }) // Different order
-
-			// Should generate the same key both times
-			const calls = mockMemoryCacheService.get.mock.calls
-			expect(calls[0][0]).toBe(calls[1][0])
 		})
 	})
 
@@ -291,7 +253,7 @@ describe('multiLayerCacheManager Integration', () => {
 			// The layers use the underlying service methods internally
 			await cacheManager.invalidateNamespace('image')
 
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('clear', 'multi-layer', 'success')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('clear', 'multi-layer', 'success', undefined, 'public')
 		})
 	})
 

@@ -1,60 +1,52 @@
 import { Type } from 'class-transformer'
-import { IsBoolean, IsNumber, IsString, Min, ValidateNested } from 'class-validator'
+import { IsArray, IsBoolean, IsDefined, IsNumber, IsString, Min, ValidateNested } from 'class-validator'
 
-export class RateLimitThrottlerConfigDto {
+export class RateLimitBucketConfigDto {
 	@IsNumber()
 	@Min(1000)
-	windowMs: number = 60000
+	windowMs!: number
 
 	@IsNumber()
 	@Min(1)
-	max: number = 100
-
-	constructor(data?: Partial<RateLimitThrottlerConfigDto>) {
-		if (data) {
-			Object.assign(this, data)
-		}
-	}
+	max!: number
 }
 
 export class BypassConfigDto {
 	@IsBoolean()
-	healthChecks: boolean = true
+	healthChecks!: boolean
 
 	@IsBoolean()
-	staticAssets: boolean = true
+	staticAssets!: boolean
 
 	@IsBoolean()
-	bots: boolean = true
+	bots!: boolean
 
-	// Comma-separated domain list; parsed by RateLimitService.getWhitelistedDomains()
-	@IsString()
-	whitelistedDomains: string = ''
+	@IsArray()
+	@IsString({ each: true })
+	whitelistedDomains!: string[]
 }
 
 export class RateLimitConfigDto {
 	@IsBoolean()
-	enabled: boolean = true
+	enabled!: boolean
 
+	@IsDefined()
 	@ValidateNested()
-	@Type(() => RateLimitThrottlerConfigDto)
-	default: RateLimitThrottlerConfigDto = new RateLimitThrottlerConfigDto()
+	@Type(() => RateLimitBucketConfigDto)
+	default!: RateLimitBucketConfigDto
 
+	@IsDefined()
 	@ValidateNested()
-	@Type(() => RateLimitThrottlerConfigDto)
-	imageProcessing: RateLimitThrottlerConfigDto = new RateLimitThrottlerConfigDto({
-		windowMs: 60000,
-		max: 50,
-	})
+	@Type(() => RateLimitBucketConfigDto)
+	imageProcessing!: RateLimitBucketConfigDto
 
+	@IsDefined()
 	@ValidateNested()
-	@Type(() => RateLimitThrottlerConfigDto)
-	healthCheck: RateLimitThrottlerConfigDto = new RateLimitThrottlerConfigDto({
-		windowMs: 10000,
-		max: 1000,
-	})
+	@Type(() => RateLimitBucketConfigDto)
+	healthCheck!: RateLimitBucketConfigDto
 
+	@IsDefined()
 	@ValidateNested()
 	@Type(() => BypassConfigDto)
-	bypass: BypassConfigDto = new BypassConfigDto()
+	bypass!: BypassConfigDto
 }

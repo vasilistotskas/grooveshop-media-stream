@@ -1,127 +1,111 @@
 import type { OnModuleInit } from '@nestjs/common'
-import type { FileTypeMap } from '#microservice/common/types/common.types'
-import { promises as fs, Stats } from 'node:fs'
-import { extname, join } from 'node:path'
+import type { StorageConfig } from '#microservice/Config/interfaces/app-config.interface'
+import { promises as fs } from 'node:fs'
+import { basename, extname, join } from 'node:path'
 import { Injectable } from '@nestjs/common'
-import { Cron, CronExpression } from '@nestjs/schedule'
+import { formatBytes } from '#microservice/common/utils/bytes.util'
+import { errorMessage } from '#microservice/common/utils/error-message.util'
+import { storageDirectory } from '#microservice/common/utils/storage-path.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
+import ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
 
-export interface StorageStats {
+/** An inventory snapshot is served from memory for this long before the directory is rescanned. */
+export const INVENTORY_TTL_MS = 30_000
+
+/** Files stat-ed / sidecars read per batch, so a large tier never opens thousands of handles at once. */
+const SCAN_BATCH_SIZE = 64
+
+/** In-flight download (`.rst`) and atomic-write (`.tmp`) files. */
+const TEMP_EXTENSIONS = new Set(['.rst', '.tmp'])
+
+/** A servable `{uuid}.rsc` + `{uuid}.rsm` pair. */
+export interface StorageEntry {
+	id: string
+	/** Bytes of the `.rsc` and `.rsm` files together. */
+	size: number
+	dateCreated: number
+	privateTTL: number
+	accessCount: number
+	tenantSchema: string
+}
+
+/** A file the cache can never serve: half a pair, an unparsable sidecar, or a temp file. */
+export interface StorageOrphan {
+	name: string
+	size: number
+	/** Last modification, epoch milliseconds. */
+	mtime: number
+}
+
+export interface StorageInventory {
+	entries: StorageEntry[]
+	orphans: StorageOrphan[]
+	/** Every file except `.gitkeep`, including the `default_optimized_*.webp` fallbacks. */
 	totalFiles: number
 	totalSize: number
-	averageFileSize: number
-	oldestFile: Date | null
-	newestFile: Date | null
-	fileTypes: FileTypeMap
-	accessPatterns: AccessPattern[]
+	scannedAt: number
 }
 
-export interface AccessPattern {
-	file: string
-	lastAccessed: Date
-	accessCount: number
-	size: number
-	extension: string
-}
+export type StorageStatus = 'healthy' | 'warning' | 'critical'
 
 export interface StorageThresholds {
 	warningSize: number
 	criticalSize: number
 	warningFileCount: number
 	criticalFileCount: number
-	maxFileAge: number
 }
 
+export interface StorageThresholdCheck {
+	status: StorageStatus
+	issues: string[]
+	inventory: StorageInventory
+}
+
+interface ScannedFile {
+	name: string
+	size: number
+	mtime: number
+}
+
+export function isExpired(entry: StorageEntry, now: number): boolean {
+	return entry.dateCreated + entry.privateTTL <= now
+}
+
+async function mapInBatches<T, R>(items: T[], fn: (item: T) => Promise<R>): Promise<R[]> {
+	const results: R[] = []
+	for (let index = 0; index < items.length; index += SCAN_BATCH_SIZE) {
+		results.push(...await Promise.all(items.slice(index, index + SCAN_BATCH_SIZE).map(fn)))
+	}
+	return results
+}
+
+/**
+ * Read-only view of the on-disk cache tier. One `readdir` plus a `stat` per
+ * file and a `readFile` per `.rsm` sidecar produce a {@link StorageInventory};
+ * the cleanup service and the health indicator both work from that snapshot.
+ */
 @Injectable()
 export class StorageMonitoringService implements OnModuleInit {
-	private readonly storageDirectory: string
-	private readonly thresholds: StorageThresholds
-	private accessPatterns = new Map<string, AccessPattern>()
+	readonly thresholds: StorageThresholds
+	private readonly directory: string
+	private snapshot: StorageInventory | null = null
+	private scan: Promise<StorageInventory> | null = null
 
-	constructor(private readonly _configService: ConfigService) {
-		this.storageDirectory = this._configService.getOptional('cache.file.directory', './storage')
-		this.thresholds = {
-			warningSize: this._configService.getOptional('storage.warningSize', 800 * 1024 * 1024),
-			criticalSize: this._configService.getOptional('storage.criticalSize', 1024 * 1024 * 1024),
-			warningFileCount: this._configService.getOptional('storage.warningFileCount', 5000),
-			criticalFileCount: this._configService.getOptional('storage.criticalFileCount', 10000),
-			maxFileAge: this._configService.getOptional('storage.maxFileAge', 30),
-		}
+	constructor(configService: ConfigService) {
+		this.directory = storageDirectory(configService)
+		const { warningSize, criticalSize, warningFileCount, criticalFileCount } = configService.get<StorageConfig>('storage')
+		this.thresholds = { warningSize, criticalSize, warningFileCount, criticalFileCount }
 	}
 
 	async onModuleInit(): Promise<void> {
-		await this.ensureStorageDirectory()
-		await this.scanStorageDirectory()
-		CorrelatedLogger.log('Storage monitoring service initialized', StorageMonitoringService.name)
-	}
-
-	/**
-	 * Get current storage statistics
-	 */
-	async getStorageStats(): Promise<StorageStats> {
 		try {
-			const allFiles = await fs.readdir(this.storageDirectory)
-			const files = allFiles.filter(f => f !== '.gitkeep')
-
-			// Batch stat calls in parallel for performance
-			const statResults = await Promise.all(
-				files.map(async (file) => {
-					try {
-						const stats = await fs.stat(join(this.storageDirectory, file))
-						return { file, stats }
-					}
-					catch {
-						return null
-					}
-				}),
-			)
-
-			let totalSize = 0
-			let processedFileCount = 0
-			let oldestFile: Date | null = null
-			let newestFile: Date | null = null
-			const fileTypes: FileTypeMap = {}
-
-			for (const result of statResults) {
-				if (!result)
-					continue
-
-				const { file, stats } = result
-				totalSize += stats.size
-				processedFileCount++
-
-				if (!oldestFile || stats.mtime < oldestFile) {
-					oldestFile = stats.mtime
-				}
-				if (!newestFile || stats.mtime > newestFile) {
-					newestFile = stats.mtime
-				}
-
-				const ext = extname(file).toLowerCase()
-				fileTypes[ext] = (fileTypes[ext] || 0) + 1
-
-				this.updateAccessPattern(file, stats)
-			}
-
-			const averageFileSize = processedFileCount > 0 ? totalSize / processedFileCount : 0
-
-			return {
-				totalFiles: processedFileCount,
-				totalSize,
-				averageFileSize,
-				oldestFile,
-				newestFile,
-				fileTypes,
-				accessPatterns: Array.from(this.accessPatterns.values())
-					.sort((a: any, b: any) => b.accessCount - a.accessCount)
-					.slice(0, 100),
-			}
+			await fs.mkdir(this.directory, { recursive: true })
 		}
 		catch (error: unknown) {
 			CorrelatedLogger.error(
-				`Failed to get storage stats: ${(error as Error).message}`,
-				(error as Error).stack,
+				`Failed to create storage directory ${this.directory}: ${errorMessage(error)}`,
+				error instanceof Error ? error.stack : undefined,
 				StorageMonitoringService.name,
 			)
 			throw error
@@ -129,184 +113,134 @@ export class StorageMonitoringService implements OnModuleInit {
 	}
 
 	/**
-	 * Check if storage exceeds thresholds
+	 * Snapshot of the tier, served from memory while younger than `maxAgeMs`.
+	 * `getInventory(0)` forces a rescan; concurrent callers share one scan.
 	 */
-	async checkThresholds(): Promise<{
-		status: 'healthy' | 'warning' | 'critical'
-		issues: string[]
-		stats: StorageStats
-	}> {
-		const stats = await this.getStorageStats()
+	async getInventory(maxAgeMs = INVENTORY_TTL_MS): Promise<StorageInventory> {
+		if (this.snapshot && Date.now() - this.snapshot.scannedAt < maxAgeMs) {
+			return this.snapshot
+		}
+		this.scan ??= this.scanDirectory().finally(() => {
+			this.scan = null
+		})
+		return this.scan
+	}
+
+	async checkThresholds(): Promise<StorageThresholdCheck> {
+		const inventory = await this.getInventory()
+		const { warningSize, criticalSize, warningFileCount, criticalFileCount } = this.thresholds
 		const issues: string[] = []
-		let status: 'healthy' | 'warning' | 'critical' = 'healthy'
+		let status: StorageStatus = 'healthy'
 
-		if (stats.totalSize >= this.thresholds.criticalSize) {
+		if (inventory.totalSize >= criticalSize) {
 			status = 'critical'
-			issues.push(`Storage size critical: ${this.formatBytes(stats.totalSize)} / ${this.formatBytes(this.thresholds.criticalSize)}`)
+			issues.push(`Storage size critical: ${formatBytes(inventory.totalSize)} / ${formatBytes(criticalSize)}`)
 		}
-		else if (stats.totalSize >= this.thresholds.warningSize) {
+		else if (inventory.totalSize >= warningSize) {
 			status = 'warning'
-			issues.push(`Storage size warning: ${this.formatBytes(stats.totalSize)} / ${this.formatBytes(this.thresholds.warningSize)}`)
+			issues.push(`Storage size warning: ${formatBytes(inventory.totalSize)} / ${formatBytes(warningSize)}`)
 		}
 
-		if (stats.totalFiles >= this.thresholds.criticalFileCount) {
+		if (inventory.totalFiles >= criticalFileCount) {
 			status = 'critical'
-			issues.push(`File count critical: ${stats.totalFiles} / ${this.thresholds.criticalFileCount}`)
+			issues.push(`File count critical: ${inventory.totalFiles} / ${criticalFileCount}`)
 		}
-		else if (stats.totalFiles >= this.thresholds.warningFileCount) {
-			if (status !== 'critical')
+		else if (inventory.totalFiles >= warningFileCount) {
+			if (status === 'healthy') {
 				status = 'warning'
-			issues.push(`File count warning: ${stats.totalFiles} / ${this.thresholds.warningFileCount}`)
+			}
+			issues.push(`File count warning: ${inventory.totalFiles} / ${warningFileCount}`)
 		}
 
-		const maxAge = this.thresholds.maxFileAge * 24 * 60 * 60 * 1000
-		const cutoffDate = new Date(Date.now() - maxAge)
-		const oldFiles = stats.accessPatterns.filter(pattern => pattern.lastAccessed < cutoffDate)
-
-		if (oldFiles.length > 0) {
-			if (status !== 'critical')
-				status = 'warning'
-			issues.push(`${oldFiles.length} files older than ${this.thresholds.maxFileAge} days`)
-		}
-
-		return { status, issues, stats }
+		return { status, issues, inventory }
 	}
 
-	/**
-	 * Get files recommended for eviction based on access patterns
-	 */
-	async getEvictionCandidates(targetSize?: number): Promise<AccessPattern[]> {
-		const stats = await this.getStorageStats()
+	private async scanDirectory(): Promise<StorageInventory> {
+		const names = (await fs.readdir(this.directory)).filter(name => name !== '.gitkeep')
+		const files = await mapInBatches(names, name => this.statFile(name))
 
-		const defaultTarget = Math.floor(stats.totalSize * 0.2)
-		const target = targetSize || defaultTarget
+		const pairs = new Map<string, { rsc?: ScannedFile, rsm?: ScannedFile }>()
+		const orphans: StorageOrphan[] = []
+		let totalFiles = 0
+		let totalSize = 0
 
-		const candidates = stats.accessPatterns
-			.map(pattern => ({
-				...pattern,
-				score: this.calculateEvictionScore(pattern),
-			}))
-			.sort((a: any, b: any) => a.score - b.score)
+		for (const file of files) {
+			if (!file) {
+				continue
+			}
+			totalFiles++
+			totalSize += file.size
 
-		const selected: AccessPattern[] = []
-		let freedSize = 0
-
-		for (const candidate of candidates) {
-			selected.push(candidate)
-			freedSize += candidate.size
-
-			if (freedSize >= target) {
-				break
+			const extension = extname(file.name)
+			if (extension === '.rsc' || extension === '.rsm') {
+				const id = basename(file.name, extension)
+				const pair = pairs.get(id) ?? {}
+				pair[extension === '.rsc' ? 'rsc' : 'rsm'] = file
+				pairs.set(id, pair)
+			}
+			else if (TEMP_EXTENSIONS.has(extension)) {
+				orphans.push(file)
 			}
 		}
 
-		return selected
+		const entries: StorageEntry[] = []
+		const resolved = await mapInBatches([...pairs], async ([id, { rsc, rsm }]) => {
+			const metadata = rsc && rsm ? await this.readMetadata(rsm.name) : null
+			return { id, rsc, rsm, metadata }
+		})
+
+		for (const { id, rsc, rsm, metadata } of resolved) {
+			if (rsc && rsm && metadata) {
+				entries.push({
+					id,
+					size: rsc.size + rsm.size,
+					dateCreated: metadata.dateCreated,
+					privateTTL: metadata.privateTTL,
+					accessCount: metadata.accessCount,
+					tenantSchema: metadata.tenantSchema,
+				})
+				continue
+			}
+			if (rsc) {
+				orphans.push(rsc)
+			}
+			if (rsm) {
+				orphans.push(rsm)
+			}
+		}
+
+		this.snapshot = { entries, orphans, totalFiles, totalSize, scannedAt: Date.now() }
+		CorrelatedLogger.debug(
+			`Storage scan: ${entries.length} entries, ${orphans.length} orphans, ${totalFiles} files, ${formatBytes(totalSize)}`,
+			StorageMonitoringService.name,
+		)
+		return this.snapshot
 	}
 
-	/**
-	 * Scan storage directory and update access patterns
-	 */
-	@Cron(CronExpression.EVERY_HOUR)
-	async scanStorageDirectory(): Promise<void> {
+	/** `null` for anything that is not a regular file or vanished since `readdir`. */
+	private async statFile(name: string): Promise<ScannedFile | null> {
 		try {
-			CorrelatedLogger.debug('Starting storage directory scan', StorageMonitoringService.name)
+			const stats = await fs.stat(join(this.directory, name))
+			return stats.isFile() ? { name, size: stats.size, mtime: stats.mtimeMs } : null
+		}
+		catch {
+			return null
+		}
+	}
 
-			const allFiles = await fs.readdir(this.storageDirectory)
-			const files = allFiles.filter(f => f !== '.gitkeep')
-			const currentFiles = new Set<string>(files)
-
-			// Batch stat calls in parallel
-			const statResults = await Promise.all(
-				files.map(async (file) => {
-					try {
-						const stats = await fs.stat(join(this.storageDirectory, file))
-						return { file, stats }
-					}
-					catch {
-						return null
-					}
-				}),
-			)
-
-			for (const result of statResults) {
-				if (result) {
-					this.updateAccessPattern(result.file, result.stats)
-				}
+	/** `null` when the sidecar cannot be read, parsed, or lacks the numeric fields the tier relies on. */
+	private async readMetadata(name: string): Promise<ResourceMetaData | null> {
+		try {
+			const parsed: unknown = JSON.parse(await fs.readFile(join(this.directory, name), 'utf8'))
+			if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+				return null
 			}
-
-			for (const [filename] of this.accessPatterns) {
-				if (!currentFiles.has(filename)) {
-					this.accessPatterns.delete(filename)
-				}
-			}
-
-			CorrelatedLogger.debug(
-				`Storage scan completed. Tracking ${this.accessPatterns.size} files`,
-				StorageMonitoringService.name,
-			)
+			const metadata = new ResourceMetaData(parsed as Partial<ResourceMetaData>)
+			return Number.isFinite(metadata.dateCreated) && Number.isFinite(metadata.privateTTL) ? metadata : null
 		}
 		catch (error: unknown) {
-			CorrelatedLogger.error(
-				`Storage directory scan failed: ${(error as Error).message}`,
-				(error as Error).stack,
-				StorageMonitoringService.name,
-			)
-		}
-	}
-
-	private updateAccessPattern(filename: string, stats: Stats): void {
-		const existing = this.accessPatterns.get(filename)
-
-		if (existing) {
-			existing.size = stats.size
-		}
-		else {
-			this.accessPatterns.set(filename, {
-				file: filename,
-				lastAccessed: stats.atime,
-				accessCount: 1,
-				size: stats.size,
-				extension: extname(filename).toLowerCase(),
-			})
-		}
-	}
-
-	private calculateEvictionScore(pattern: AccessPattern): number {
-		const now = Date.now()
-		const ageInDays = (now - pattern.lastAccessed.getTime()) / (1000 * 60 * 60 * 24)
-		const sizeWeight = pattern.size / (1024 * 1024)
-
-		const ageScore = Math.min(ageInDays * 10, 1000)
-		const accessScore = Math.max(1000 - (pattern.accessCount * 10), 0)
-		const sizeScore = Math.min(sizeWeight, 100)
-
-		return ageScore + accessScore + sizeScore
-	}
-
-	private formatBytes(bytes: number): string {
-		const units = ['B', 'KB', 'MB', 'GB']
-		let size = bytes
-		let unitIndex = 0
-
-		while (size >= 1024 && unitIndex < units.length - 1) {
-			size /= 1024
-			unitIndex++
-		}
-
-		return `${size.toFixed(1)} ${units[unitIndex]}`
-	}
-
-	private async ensureStorageDirectory(): Promise<void> {
-		try {
-			await fs.mkdir(this.storageDirectory, { recursive: true })
-		}
-		catch (error: unknown) {
-			CorrelatedLogger.error(
-				`Failed to create storage directory: ${(error as Error).message}`,
-				(error as Error).stack,
-				StorageMonitoringService.name,
-			)
-			throw error
+			CorrelatedLogger.debug(`Unreadable metadata sidecar ${name}: ${errorMessage(error)}`, StorageMonitoringService.name)
+			return null
 		}
 	}
 }

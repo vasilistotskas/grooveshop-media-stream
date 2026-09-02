@@ -1,30 +1,14 @@
-import { Test, TestingModule } from '@nestjs/testing'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ConfigService } from '#microservice/Config/config.service'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { SecurityCheckerService } from '#microservice/Validation/services/security-checker.service'
+import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 
 describe('securityCheckerService', () => {
 	let service: SecurityCheckerService
 
-	beforeEach(async () => {
-		// Setup mock BEFORE module creation so constructor reads correct values
-		const mockConfigService = {
-			getOptional: vi.fn().mockImplementation((key: string, defaultValue: any) => {
-				const configs: Record<string, any> = {
-					'validation.maxStringLength': 10000,
-				}
-				return configs[key] ?? defaultValue
-			}),
-		}
-
-		const module: TestingModule = await Test.createTestingModule({
-			providers: [
-				SecurityCheckerService,
-				{ provide: ConfigService, useValue: mockConfigService },
-			],
-		}).compile()
-
-		service = module.get<SecurityCheckerService>(SecurityCheckerService)
+	beforeEach(() => {
+		// maxStringLength is read once in the constructor; the over-length case
+		// below depends on this value.
+		service = new SecurityCheckerService(createConfigServiceMock({ 'validation.maxStringLength': 10000 }))
 	})
 
 	it('should be defined', () => {
@@ -32,7 +16,7 @@ describe('securityCheckerService', () => {
 	})
 
 	describe('checkForMaliciousContent', () => {
-		it('should detect script injection attempts', async () => {
+		it('should detect script injection attempts', () => {
 			const maliciousInputs = [
 				'<script>alert("xss")</script>',
 				'javascript:alert(1)',
@@ -42,12 +26,11 @@ describe('securityCheckerService', () => {
 			]
 
 			for (const input of maliciousInputs) {
-				const result = await service.checkForMaliciousContent(input)
-				expect(result).toBe(true)
+				expect(service.checkForMaliciousContent(input)).toBe(true)
 			}
 		})
 
-		it('should detect SQL injection attempts', async () => {
+		it('should detect SQL injection attempts', () => {
 			const maliciousInputs = [
 				'\'; DROP TABLE users; --',
 				'UNION SELECT * FROM passwords',
@@ -56,12 +39,11 @@ describe('securityCheckerService', () => {
 			]
 
 			for (const input of maliciousInputs) {
-				const result = await service.checkForMaliciousContent(input)
-				expect(result).toBe(true)
+				expect(service.checkForMaliciousContent(input)).toBe(true)
 			}
 		})
 
-		it('should detect path traversal attempts', async () => {
+		it('should detect path traversal attempts', () => {
 			const maliciousInputs = [
 				'../../../etc/passwd',
 				'..\\..\\windows\\system32',
@@ -70,12 +52,24 @@ describe('securityCheckerService', () => {
 			]
 
 			for (const input of maliciousInputs) {
-				const result = await service.checkForMaliciousContent(input)
-				expect(result).toBe(true)
+				expect(service.checkForMaliciousContent(input)).toBe(true)
 			}
 		})
 
-		it('should detect command injection attempts', async () => {
+		it('should detect traversal hidden behind mixed-case, partial, double and malformed percent-encoding', () => {
+			const maliciousInputs = [
+				'%2E%2E/etc/passwd', // mixed-case encoding, only visible after one decode
+				'..%2fetc%2fpasswd', // partially encoded separator
+				'%252e%252e%252fetc/passwd', // double-encoded ../
+				'photo%zz.jpg', // malformed escape: decodeURIComponent throws → rejected
+			]
+
+			for (const input of maliciousInputs) {
+				expect(service.checkForMaliciousContent(input)).toBe(true)
+			}
+		})
+
+		it('should detect command injection attempts', () => {
 			const maliciousInputs = [
 				'; rm -rf /',
 				'; cat /etc/passwd',
@@ -84,127 +78,65 @@ describe('securityCheckerService', () => {
 			]
 
 			for (const input of maliciousInputs) {
-				const result = await service.checkForMaliciousContent(input)
-				expect(result).toBe(true)
+				expect(service.checkForMaliciousContent(input)).toBe(true)
 			}
 		})
 
-		it('should allow safe content', async () => {
+		it('should detect XXE attempts', () => {
+			const maliciousInputs = [
+				'<!ENTITY xxe SYSTEM "file:///etc/passwd">',
+				'<!DOCTYPE foo [<!ELEMENT foo ANY>]>',
+			]
+
+			for (const input of maliciousInputs) {
+				expect(service.checkForMaliciousContent(input)).toBe(true)
+			}
+		})
+
+		it('should detect NoSQL operator injection attempts', () => {
+			const maliciousInputs = [
+				'{"$where": "this.password.length > 0"}',
+				'{"username": {"$ne": null}}',
+				'price[$gt]=0',
+				'{"age": {"$lt": 100}}',
+			]
+
+			for (const input of maliciousInputs) {
+				expect(service.checkForMaliciousContent(input)).toBe(true)
+			}
+		})
+
+		it('should allow safe content', () => {
 			const safeInputs = [
+				'',
 				'Hello World',
 				'user@example.com',
 				'https://example.com/image.jpg',
 				'Normal text with numbers 123',
-				{ name: 'John', age: 30 },
 			]
 
 			for (const input of safeInputs) {
-				const result = await service.checkForMaliciousContent(input)
-				expect(result).toBe(false)
+				expect(service.checkForMaliciousContent(input)).toBe(false)
 			}
 		})
 
-		it('should detect excessively long strings', async () => {
+		it('should detect excessively long strings', () => {
 			const longString = 'a'.repeat(15000)
-			const result = await service.checkForMaliciousContent(longString)
-			expect(result).toBe(true)
+			expect(service.checkForMaliciousContent(longString)).toBe(true)
 		})
 
-		it('should detect high entropy strings (potential encoded payloads)', async () => {
+		it('should detect high entropy strings (potential encoded payloads)', () => {
 			// Base64 encoded string with high entropy
 			const highEntropyString = 'SGVsbG8gV29ybGQhIFRoaXMgaXMgYSB0ZXN0IHN0cmluZyB3aXRoIGhpZ2ggZW50cm9weQ=='
-			const result = await service.checkForMaliciousContent(highEntropyString)
-			expect(result).toBe(true)
+			expect(service.checkForMaliciousContent(highEntropyString)).toBe(true)
 		})
 
-		it('should handle objects and detect prototype pollution', async () => {
-			const maliciousObject = {
-				__proto__: { admin: true },
-				constructor: { prototype: { admin: true } },
-				prototype: { admin: true },
-			}
-
-			const result = await service.checkForMaliciousContent(maliciousObject)
-			expect(result).toBe(true)
-		})
-
-		it('should detect excessively deep objects', async () => {
-			const deepObject: any = {}
-			let current = deepObject
-
-			// Create object with depth > 10
-			for (let i = 0; i < 15; i++) {
-				current.nested = {}
-				current = current.nested
-			}
-
-			const result = await service.checkForMaliciousContent(deepObject)
-			expect(result).toBe(true)
-		})
-
-		it('should handle arrays recursively', async () => {
-			const maliciousArray = [
-				'safe content',
-				'<script>alert("xss")</script>',
-				'more safe content',
-			]
-
-			const result = await service.checkForMaliciousContent(maliciousArray)
-			expect(result).toBe(true)
-		})
-
-		it('should handle null and undefined safely', async () => {
-			expect(await service.checkForMaliciousContent(null)).toBe(false)
-			expect(await service.checkForMaliciousContent(undefined)).toBe(false)
-		})
-	})
-
-	describe('logSecurityEvent', () => {
-		// getSecurityEvents/getSecurityStats were removed as test-only surface;
-		// the private in-memory buffer is asserted directly instead (same
-		// reach-in-private pattern used elsewhere in this suite).
-		it('should log security events', async () => {
-			const event = {
-				type: 'malicious_content' as const,
-				source: 'test',
-				details: { input: 'test' },
-				timestamp: new Date(),
-				clientIp: '127.0.0.1',
-				userAgent: 'test-agent',
-			}
-
-			await service.logSecurityEvent(event)
-
-			const events = (service as any).securityEvents as typeof event[]
-			expect(events).toHaveLength(1)
-			expect(events[0]).toMatchObject(event)
-		})
-
-		it('should add timestamp if not provided', async () => {
-			const event = {
-				type: 'invalid_url' as const,
-				source: 'test',
-				details: { url: 'test' },
-			}
-
-			await service.logSecurityEvent(event)
-
-			const events = (service as any).securityEvents
-			expect(events[0].timestamp).toBeInstanceOf(Date)
-		})
-
-		it('should limit stored events to 1000', async () => {
-			// Add more than 1000 events
-			for (let i = 0; i < 1100; i++) {
-				await service.logSecurityEvent({
-					type: 'malicious_content',
-					source: 'test',
-					details: { index: i },
-				})
-			}
-
-			const events = (service as any).securityEvents
-			expect(events.length).toBeLessThanOrEqual(1000)
+		it('should exempt image filenames from the entropy check (upload names carry random suffixes)', () => {
+			// Same payload as the high-entropy case above; only the image extension
+			// changes the verdict, so this proves the exemption is what is at work.
+			const highEntropyString = 'SGVsbG8gV29ybGQhIFRoaXMgaXMgYSB0ZXN0IHN0cmluZyB3aXRoIGhpZ2ggZW50cm9weQ=='
+			expect(service.checkForMaliciousContent(`${highEntropyString}.png`)).toBe(false)
+			expect(service.checkForMaliciousContent('hero-banner__a8Xk29QzLmT4vB7nW.webp')).toBe(false)
 		})
 	})
 })

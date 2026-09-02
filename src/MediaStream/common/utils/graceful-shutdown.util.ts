@@ -1,79 +1,55 @@
-/**
- * Graceful shutdown utility for handling process termination
- */
-
 import type { INestApplication } from '@nestjs/common'
+import type { NextFunction, Request, Response } from 'express'
+// Default import on purpose: `process.on` is inherited from EventEmitter and is
+// not a named export of the module namespace (undefined under `import * as`).
+import process from 'node:process'
 import { Logger } from '@nestjs/common'
-
-// Use global process object for signal handling (node:process import doesn't work with SWC)
-declare const process: NodeJS.Process
+import { errorMessage } from './error-message.util.js'
 
 const logger = new Logger('GracefulShutdown')
 
+/** How often the drain loop re-checks the in-flight request count. */
+const DRAIN_POLL_MS = 1000
+
 interface ShutdownOptions {
+	/** Soft limit: how long to wait for in-flight requests before closing anyway. */
 	timeout: number
+	/** Hard limit: `process.exit(1)` if the shutdown has not completed by then. */
 	forceTimeout: number
-	onShutdown?: () => Promise<void>
 }
 
-interface ShutdownState {
-	isShuttingDown: boolean
-	activeRequests: number
-}
-
-const state: ShutdownState = {
+const state = {
 	isShuttingDown: false,
 	activeRequests: 0,
 }
 
-/**
- * Track active request (call at start of request)
- */
-export function trackRequestStart(): void {
+/** Both 'finish' and 'close' fire for one response; count its completion once. */
+const trackedResponses = new WeakSet<object>()
+
+function trackRequestStart(): void {
 	if (!state.isShuttingDown) {
 		state.activeRequests++
 	}
 }
 
-/**
- * Track request completion (call at end of request)
- * Uses WeakSet to prevent double-counting when both 'finish' and 'close' events fire
- */
-const trackedResponses = new WeakSet<object>()
-
-export function trackRequestEnd(res?: object): void {
-	// If response object provided, check if already tracked to prevent double-counting
-	if (res) {
-		if (trackedResponses.has(res)) {
-			return // Already tracked this response completion
-		}
-		trackedResponses.add(res)
+function trackRequestEnd(res: object): void {
+	if (trackedResponses.has(res)) {
+		return
 	}
+	trackedResponses.add(res)
 	state.activeRequests = Math.max(0, state.activeRequests - 1)
 }
 
-/**
- * Check if shutdown is in progress
- */
 export function isShuttingDown(): boolean {
 	return state.isShuttingDown
 }
 
 /**
- * Get current active request count
+ * Two-tier shutdown on SIGTERM/SIGINT: wait for in-flight requests (soft
+ * timeout), close the Nest app, exit 0; a force timer exits 1 if that hangs.
  */
-export function getActiveRequestCount(): number {
-	return state.activeRequests
-}
-
-/**
- * Setup graceful shutdown handlers
- */
-export function setupGracefulShutdown(
-	app: INestApplication,
-	options: ShutdownOptions,
-): void {
-	const { timeout, forceTimeout, onShutdown } = options
+export function setupGracefulShutdown(app: INestApplication, options: ShutdownOptions): void {
+	const { timeout, forceTimeout } = options
 
 	const shutdown = async (signal: string): Promise<void> => {
 		if (state.isShuttingDown) {
@@ -84,18 +60,16 @@ export function setupGracefulShutdown(
 		state.isShuttingDown = true
 		logger.log(`Received ${signal}, starting graceful shutdown...`)
 
-		// Set force shutdown timer
 		const forceTimer = setTimeout(() => {
 			logger.error(`Force shutdown after ${forceTimeout}ms - some requests may have been dropped`)
 			process.exit(1)
 		}, forceTimeout)
 
 		try {
-			// Wait for active requests to complete (with timeout)
 			const waitStart = Date.now()
 			while (state.activeRequests > 0 && (Date.now() - waitStart) < timeout) {
 				logger.log(`Waiting for ${state.activeRequests} active requests to complete...`)
-				await new Promise(resolve => setTimeout(resolve, 1000))
+				await new Promise(resolve => setTimeout(resolve, DRAIN_POLL_MS))
 			}
 
 			if (state.activeRequests > 0) {
@@ -105,13 +79,6 @@ export function setupGracefulShutdown(
 				logger.log('All active requests completed')
 			}
 
-			// Run custom shutdown handler
-			if (onShutdown) {
-				logger.log('Running custom shutdown handler...')
-				await onShutdown()
-			}
-
-			// Close the NestJS application
 			logger.log('Closing NestJS application...')
 			await app.close()
 
@@ -119,38 +86,36 @@ export function setupGracefulShutdown(
 			logger.log('Graceful shutdown completed')
 			process.exit(0)
 		}
-		catch (error) {
-			logger.error('Error during shutdown:', error)
+		catch (error: unknown) {
+			logger.error(`Error during shutdown: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined)
 			clearTimeout(forceTimer)
 			process.exit(1)
 		}
 	}
 
-	// Register signal handlers
 	process.on('SIGTERM', () => shutdown('SIGTERM'))
 	process.on('SIGINT', () => shutdown('SIGINT'))
 
 	// Log unexpected errors but do NOT initiate shutdown. A transient
-	// fire-and-forget rejection (e.g. a failed cache backfill or a
-	// dropped upstream image fetch) is not a reason to tear down the
-	// pod and drop every other in-flight request. K8s probes cover the
-	// "process is wedged" case; this handler exists so the error is
-	// observable in logs instead of crashing the runtime.
+	// fire-and-forget rejection (a failed cache backfill, a dropped upstream
+	// fetch) is not a reason to tear down the pod and drop every other
+	// in-flight request; K8s probes cover the "process is wedged" case.
 	process.on('uncaughtException', (error) => {
-		logger.error('Uncaught exception (continuing):', error)
+		logger.error(`Uncaught exception (continuing): ${errorMessage(error)}`, error.stack)
 	})
 
 	process.on('unhandledRejection', (reason) => {
-		logger.error('Unhandled rejection (continuing):', reason)
+		logger.error(`Unhandled rejection (continuing): ${errorMessage(reason)}`, reason instanceof Error ? reason.stack : undefined)
 	})
 
 	logger.log('Graceful shutdown handlers registered')
 }
 
 /**
- * Middleware to reject new requests during shutdown
+ * First middleware in the chain: 503 for new requests while shutting down,
+ * otherwise count the request until its response finishes or closes.
  */
-export function shutdownMiddleware(_req: any, res: any, next: any): void {
+export function shutdownMiddleware(_req: Request, res: Response, next: NextFunction): void {
 	if (state.isShuttingDown) {
 		res.status(503).json({
 			error: 'Service Unavailable',
@@ -160,9 +125,6 @@ export function shutdownMiddleware(_req: any, res: any, next: any): void {
 	}
 
 	trackRequestStart()
-
-	// Track request completion - pass res to prevent double-counting
-	// Both 'finish' and 'close' can fire for the same response
 	res.on('finish', () => trackRequestEnd(res))
 	res.on('close', () => trackRequestEnd(res))
 

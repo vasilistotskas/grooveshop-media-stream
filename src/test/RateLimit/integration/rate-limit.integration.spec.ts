@@ -1,37 +1,42 @@
 import type { INestApplication } from '@nestjs/common'
 import { Controller, Get, UseGuards } from '@nestjs/common'
 import { ScheduleModule } from '@nestjs/schedule'
-import { Test, TestingModule } from '@nestjs/testing'
+import { Test } from '@nestjs/testing'
 import request from 'supertest'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { ConfigModule } from '#microservice/Config/config.module'
-import { ConfigService } from '#microservice/Config/config.service'
 import { MetricsModule } from '#microservice/Metrics/metrics.module'
-import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-
 import { AdaptiveRateLimitGuard } from '#microservice/RateLimit/guards/adaptive-rate-limit.guard'
 import { RateLimitModule } from '#microservice/RateLimit/rate-limit.module'
 import { RateLimitService } from '#microservice/RateLimit/services/rate-limit.service'
 
-// Test controller for integration testing
-// Uses media_stream-image prefix for image routes to match AdaptiveRateLimitGuard.getRequestType()
+// Both the guard and RateLimitService read `rateLimit` once at construction,
+// so the limits are fixed through the environment before the module compiles;
+// per-test window/limit changes go through a `getRateLimitConfig` spy instead.
+const DEFAULT_LIMIT = 12
+const IMAGE_LIMIT = 8
+
+// Uses the media_stream-image prefix so the guard classifies the route as
+// image-processing; every route carries the guard the way APP_GUARD does in
+// production, so the health bypass is actually exercised.
 @Controller()
 class TestController {
 	@Get('media_stream-image/test-image')
 	@UseGuards(AdaptiveRateLimitGuard)
-	async imageProcessing() {
+	imageProcessing() {
 		return { message: 'Image processed' }
 	}
 
 	@Get('health')
-	async health() {
+	@UseGuards(AdaptiveRateLimitGuard)
+	health() {
 		return { status: 'ok' }
 	}
 
 	@Get('test/default')
 	@UseGuards(AdaptiveRateLimitGuard)
-	async defaultEndpoint() {
+	defaultEndpoint() {
 		return { message: 'Default endpoint' }
 	}
 }
@@ -39,107 +44,54 @@ class TestController {
 describe('rate Limiting Integration', () => {
 	let app: INestApplication
 	let rateLimitService: RateLimitService
-	let configService: ConfigService
-	let metricsService: MetricsService
 	let redisCacheService: RedisCacheService
 
+	/** All supertest requests share one socket IP and UA, so counters must be reset between tests. */
+	async function flushRateLimitKeys(): Promise<void> {
+		await redisCacheService.getClient()?.flushdb()
+	}
+
+	async function exhaust(path: string, limit: number): Promise<void> {
+		for (let i = 0; i < limit; i++) {
+			const response = await request(app.getHttpServer()).get(path)
+			expect(response.status, `request ${i + 1}/${limit} to ${path}`).toBe(200)
+		}
+	}
+
 	beforeEach(async () => {
-		const moduleFixture: TestingModule = await Test.createTestingModule({
+		vi.stubEnv('RATE_LIMIT_ENABLED', 'true')
+		vi.stubEnv('RATE_LIMIT_DEFAULT_WINDOW_MS', '60000')
+		vi.stubEnv('RATE_LIMIT_DEFAULT_MAX', String(DEFAULT_LIMIT))
+		vi.stubEnv('RATE_LIMIT_IMAGE_PROCESSING_WINDOW_MS', '60000')
+		vi.stubEnv('RATE_LIMIT_IMAGE_PROCESSING_MAX', String(IMAGE_LIMIT))
+		vi.stubEnv('RATE_LIMIT_BYPASS_HEALTH_CHECKS', 'true')
+		vi.stubEnv('MONITORING_ENABLED', 'false')
+
+		const moduleFixture = await Test.createTestingModule({
 			imports: [
 				ConfigModule,
 				MetricsModule,
 				ScheduleModule.forRoot(),
-				// Remove ThrottlerModule to avoid conflicts with our custom rate limiting
 				RateLimitModule,
 			],
 			controllers: [TestController],
-			providers: [
-				// Don't use global guard for testing - apply manually to test controller
-			],
 		}).compile()
 
 		app = moduleFixture.createNestApplication()
-		rateLimitService = moduleFixture.get<RateLimitService>(RateLimitService)
-		configService = moduleFixture.get<ConfigService>(ConfigService)
-		metricsService = moduleFixture.get<MetricsService>(MetricsService)
-		redisCacheService = moduleFixture.get<RedisCacheService>(RedisCacheService)
+		rateLimitService = moduleFixture.get(RateLimitService)
+		redisCacheService = moduleFixture.get(RedisCacheService)
 
-		// Mock configuration for testing with much higher limits for CI stability
-		vi.spyOn(configService, 'getOptional').mockImplementation((key: string, defaultValue?: any) => {
-			const configs: Record<string, any> = {
-				'rateLimit.default.windowMs': 60000,
-				'rateLimit.default.max': process.env.CI ? 30 : 12, // Increased limits for better stability
-				'rateLimit.imageProcessing.windowMs': 60000,
-				'rateLimit.imageProcessing.max': process.env.CI ? 20 : 8, // Increased limits for better stability
-				'rateLimit.healthCheck.windowMs': 10000,
-				'rateLimit.healthCheck.max': 100,
-				'monitoring.enabled': false, // Disable monitoring in tests
-			}
-			return (configs as any)[key] || defaultValue
-		})
-
-		await app.init()
-
-		// Flush Redis rate limit keys to ensure clean state between tests
-		// Since all requests now share the same socket IP, Redis counters must be reset
-		try {
-			await redisCacheService.flushAll()
-		}
-		catch {
-			// Ignore if Redis is not available
-		}
-
-		// Add small delay in CI to ensure clean state
-		if (process.env.CI) {
-			await new Promise(resolve => setTimeout(resolve, 150))
-		}
+		// Listen once so concurrent supertest calls share a server instead of
+		// each spinning one up and tearing it down under the others.
+		await app.listen(0, '127.0.0.1')
+		await flushRateLimitKeys()
 	})
+
 	afterEach(async () => {
-		// Flush Redis rate limit keys
-		try {
-			await redisCacheService.flushAll()
-		}
-		catch {
-			// Ignore if Redis is not available
-		}
-
-		// Stop metrics collection to prevent open handles
-		if (metricsService && typeof metricsService.stopMetricsCollection === 'function') {
-			metricsService.stopMetricsCollection()
-		}
-
-		// Add delay to allow pending requests to complete
-		await new Promise(resolve => setTimeout(resolve, 300))
-
-		// Gracefully close the app with proper error handling
-		if (app) {
-			try {
-				await app.close()
-			}
-			catch (error) {
-				console.warn('Error closing app:', error)
-			}
-		}
-
-		vi.clearAllMocks()
-
-		// Additional cleanup delay for CI stability
-		if (process.env.CI) {
-			await new Promise(resolve => setTimeout(resolve, 300))
-		}
-	})
-
-	// Global cleanup to ensure all handles are closed
-	afterAll(async () => {
-		// Force garbage collection if available
-		if (globalThis.gc) {
-			globalThis.gc()
-		}
-
-		// Additional delay for CI to ensure all connections are closed
-		if (process.env.CI) {
-			await new Promise(resolve => setTimeout(resolve, 500))
-		}
+		await flushRateLimitKeys()
+		await app.close()
+		vi.restoreAllMocks()
+		vi.unstubAllEnvs()
 	})
 
 	describe('basic Rate Limiting', () => {
@@ -148,626 +100,174 @@ describe('rate Limiting Integration', () => {
 				.get('/test/default')
 				.expect(200)
 
-			expect(response.headers['x-ratelimit-limit']).toBeDefined()
-			expect(response.headers['x-ratelimit-remaining']).toBeDefined()
+			expect(response.headers['x-ratelimit-limit']).toBe(String(DEFAULT_LIMIT))
+			expect(response.headers['x-ratelimit-remaining']).toBe(String(DEFAULT_LIMIT - 1))
 			expect(response.headers['x-ratelimit-reset']).toBeDefined()
 		})
 
 		it('should block requests when rate limit is exceeded', async () => {
-			const limit = process.env.CI ? 30 : 12 // Use increased limits for better stability
+			await exhaust('/test/default', DEFAULT_LIMIT)
 
-			// Make requests up to the limit
-			for (let i = 0; i < limit; i++) {
-				const response = await request(app.getHttpServer())
-					.get('/test/default')
-
-				if (response.status !== 200) {
-					console.log(`Request ${i + 1}/${limit} failed with status ${response.status}`)
-				}
-				expect(response.status).toBe(200)
-			}
-
-			// Next request should be blocked
-			await request(app.getHttpServer())
+			const response = await request(app.getHttpServer())
 				.get('/test/default')
-				.expect(429) // Too Many Requests
+				.expect(429)
+
+			expect(response.headers['x-ratelimit-remaining']).toBe('0')
+			expect(Number(response.headers['retry-after'])).toBeGreaterThanOrEqual(1)
 		})
 
 		// eslint-disable-next-line test/expect-expect
 		it('should reset rate limit after window expires', async () => {
-			// Mock short window for testing
+			vi.spyOn(rateLimitService, 'getRateLimitConfig').mockReturnValue({ windowMs: 100, max: 2 })
 
-			const originalMock = vi.spyOn(configService, 'getOptional')
+			await request(app.getHttpServer()).get('/test/default').expect(200)
+			await request(app.getHttpServer()).get('/test/default').expect(200)
+			await request(app.getHttpServer()).get('/test/default').expect(429)
 
-			originalMock.mockImplementation((key: string, defaultValue?: any) => {
-				if (key === 'rateLimit.default.windowMs')
+			// The Redis key TTL is ceil(100ms / 1000) = 1 second
+			await new Promise(resolve => setTimeout(resolve, 1200))
 
-					return 100 // 100ms window
-
-				if (key === 'rateLimit.default.max')
-
-					return 2
-
-				const configs: Record<string, any> = {
-
-					'rateLimit.imageProcessing.windowMs': 60000,
-
-					'rateLimit.imageProcessing.max': 5,
-
-					'rateLimit.healthCheck.windowMs': 10000,
-
-					'rateLimit.healthCheck.max': 100,
-
-					'monitoring.enabled': true,
-
-				}
-
-				return configs[key] || defaultValue
-			})
-
-			try {
-				// Make requests up to limit
-
-				await request(app.getHttpServer())
-
-					.get('/test/default')
-
-					.expect(200)
-
-				await request(app.getHttpServer())
-
-					.get('/test/default')
-
-					.expect(200)
-
-				// Next request should be blocked
-
-				await request(app.getHttpServer())
-
-					.get('/test/default')
-
-					.expect(429)
-
-				// Wait for Redis key TTL to expire (ceil(100ms / 1000) = 1 second)
-
-				await new Promise(resolve => setTimeout(resolve, 1200))
-
-				// Should be allowed again
-
-				await request(app.getHttpServer())
-
-					.get('/test/default')
-
-					.expect(200)
-			}
-
-			finally {
-				// Restore the original mock
-
-				originalMock.mockRestore()
-			}
-		}, 10000)
+			await request(app.getHttpServer()).get('/test/default').expect(200)
+		}, 10_000)
 	})
 
 	describe('request Type Specific Limits', () => {
 		it('should apply different limits for image processing requests', async () => {
-			const limit = process.env.CI ? 20 : 8 // Use increased limits for better stability
+			await exhaust('/media_stream-image/test-image', IMAGE_LIMIT)
 
-			// Add delay in CI for better isolation
-
-			if (process.env.CI) {
-				await new Promise(resolve => setTimeout(resolve, 200))
-			}
-
-			// Image processing has limit of 8 (or 20 in CI)
-
-			for (let i = 0; i < limit; i++) {
-				const response = await request(app.getHttpServer())
-
-					.get('/media_stream-image/test-image')
-
-				if (response.status !== 200) {
-					console.log(`Request ${i + 1}/${limit} failed with status ${response.status}`)
-				}
-
-				expect(response.status).toBe(200)
-			}
-
-			// Next request should be blocked
-
-			const response = await request(app.getHttpServer())
-
-				.get('/media_stream-image/test-image')
+			const response = await request(app.getHttpServer()).get('/media_stream-image/test-image')
 
 			expect(response.status).toBe(429)
 		})
 
 		it('should track different request types independently', async () => {
-			const imageLimit = process.env.CI ? 20 : 8 // Use increased limits for better stability
-
-			// Add delay in CI for better isolation
-
-			if (process.env.CI) {
-				await new Promise(resolve => setTimeout(resolve, 200))
-			}
-
-			// Use up image processing limit
-
-			for (let i = 0; i < imageLimit; i++) {
-				const response = await request(app.getHttpServer())
-
-					.get('/media_stream-image/test-image')
-
-				if (response.status !== 200) {
-					console.log(`Image processing request ${i + 1}/${imageLimit} failed with status ${response.status}`)
-				}
-
-				expect(response.status).toBe(200)
-			}
-
-			// Add small delay between different request types in CI
-
-			if (process.env.CI) {
-				await new Promise(resolve => setTimeout(resolve, 100))
-			}
+			await exhaust('/media_stream-image/test-image', IMAGE_LIMIT)
 
 			// Default endpoint should still work (different limit and different request type)
-
-			const defaultResponse = await request(app.getHttpServer())
-
-				.get('/test/default')
-
-			if (defaultResponse.status !== 200) {
-				console.log(`Default request failed with status ${defaultResponse.status}`)
-			}
+			const defaultResponse = await request(app.getHttpServer()).get('/test/default')
 
 			expect(defaultResponse.status).toBe(200)
 		})
 	})
 
 	describe('health Check Bypass', () => {
+		// eslint-disable-next-line test/expect-expect
 		it('should bypass rate limiting for health checks', async () => {
-			const limit = process.env.CI ? 30 : 12 // Use increased limits for better stability
+			await exhaust('/test/default', DEFAULT_LIMIT)
 
-			// Add delay in CI for better isolation
+			await request(app.getHttpServer()).get('/test/default').expect(429)
 
-			if (process.env.CI) {
-				await new Promise(resolve => setTimeout(resolve, 200))
-			}
-
-			// First, exhaust the regular rate limit
-
-			for (let i = 0; i < limit; i++) {
-				const response = await request(app.getHttpServer())
-
-					.get('/test/default')
-
-				if (response.status !== 200) {
-					console.log(`Default request ${i + 1}/${limit} failed with status ${response.status}`)
-				}
-
-				expect(response.status).toBe(200)
-			}
-
-			// Regular requests should be blocked
-
-			await request(app.getHttpServer())
-
-				.get('/test/default')
-
-				.expect(429)
-
-			// But health checks should still work (they bypass rate limiting)
-
-			await request(app.getHttpServer())
-
-				.get('/health')
-
-				.expect(200)
+			// Health checks are guarded too, yet skip the throttle entirely
+			await request(app.getHttpServer()).get('/health').expect(200)
 		})
 	})
 
 	describe('iP-based Rate Limiting', () => {
+		// eslint-disable-next-line test/expect-expect
 		it('should use socket IP for rate limiting (X-Forwarded-For not trusted)', async () => {
-			const limit = process.env.CI ? 30 : 12 // Use increased limits for better stability
+			await exhaust('/test/default', DEFAULT_LIMIT)
 
-			// Add delay in CI for better isolation
+			await request(app.getHttpServer()).get('/test/default').expect(429)
 
-			if (process.env.CI) {
-				await new Promise(resolve => setTimeout(resolve, 200))
-			}
-
-			// All supertest requests come from the same socket IP regardless of X-Forwarded-For
-			// Verify that setting different X-Forwarded-For headers does NOT create independent counters
-
-			for (let i = 0; i < limit; i++) {
-				const response = await request(app.getHttpServer())
-
-					.get('/test/default')
-
-				if (response.status !== 200) {
-					console.log(`Request ${i + 1}/${limit} failed with status ${response.status}`)
-				}
-
-				expect(response.status).toBe(200)
-			}
-
-			// Should be blocked now (same socket IP for all requests)
-
+			// The guard keys on request.ip / socket.remoteAddress, so a forged
+			// X-Forwarded-For does not open a fresh bucket.
 			await request(app.getHttpServer())
-
 				.get('/test/default')
-
-				.expect(429)
-
-			// Setting X-Forwarded-For should NOT bypass the rate limit
-			// because the guard uses request.ip / socket.remoteAddress, not headers
-
-			await request(app.getHttpServer())
-
-				.get('/test/default')
-
 				.set('X-Forwarded-For', '192.168.100.99')
-
 				.expect(429)
 		})
 
 		it('should use socket IP and ignore X-Forwarded-For / X-Real-IP headers', async () => {
-			// All requests share the same socket IP, so rate limit headers should reflect shared counters
 			const response1 = await request(app.getHttpServer())
-
 				.get('/test/default')
-
 				.set('X-Forwarded-For', '192.168.100.9,192.168.100.10')
-
 				.expect(200)
-
-			expect(response1.headers['x-ratelimit-remaining']).toBeDefined()
 
 			const response2 = await request(app.getHttpServer())
-
 				.get('/test/default')
-
 				.set('X-Real-IP', '192.168.100.11')
-
 				.expect(200)
 
-			expect(response2.headers['x-ratelimit-remaining']).toBeDefined()
-
-			// Both requests should share the same counter since X-Forwarded-For/X-Real-IP are ignored
+			// Both requests share the same counter since the headers are ignored
 			const remaining1 = Number(response1.headers['x-ratelimit-remaining'])
 			const remaining2 = Number(response2.headers['x-ratelimit-remaining'])
-			expect(remaining2).toBeLessThan(remaining1)
+			expect(remaining2).toBe(remaining1 - 1)
 		})
 	})
 
 	describe('rate Limit Headers', () => {
 		it('should include proper rate limit headers in response', async () => {
-			// Clear rate limits to ensure clean state
-
-			const rateLimitServicePrivate = rateLimitService as any
-
-			if (rateLimitServicePrivate.requestCounts) {
-				rateLimitServicePrivate.requestCounts.clear()
-			}
-
 			const response = await request(app.getHttpServer())
-
 				.get('/test/default')
-
 				.expect(200)
 
-			// Check that headers exist and are reasonable
-
 			expect(response.headers['x-ratelimit-limit']).toBeDefined()
-
 			expect(response.headers['x-ratelimit-remaining']).toBeDefined()
-
 			expect(response.headers['x-ratelimit-used']).toBeDefined()
-
 			expect(response.headers['x-ratelimit-reset']).toBeDefined()
 
-			// Verify the values are numbers
-
 			expect(Number(response.headers['x-ratelimit-limit'])).toBeGreaterThan(0)
-
 			expect(Number(response.headers['x-ratelimit-remaining'])).toBeGreaterThanOrEqual(0)
-
 			expect(Number(response.headers['x-ratelimit-used'])).toBeGreaterThan(0)
 		})
 
 		it('should update headers correctly with multiple requests', async () => {
-			// Clear rate limits to ensure clean state
-
-			const rateLimitServicePrivate = rateLimitService as any
-
-			if (rateLimitServicePrivate.requestCounts) {
-				rateLimitServicePrivate.requestCounts.clear()
-			}
-
-			// First request
-
-			let response = await request(app.getHttpServer())
-
-				.get('/test/default')
-
-				.expect(200)
-
+			let response = await request(app.getHttpServer()).get('/test/default').expect(200)
 			const firstRemaining = Number(response.headers['x-ratelimit-remaining'])
-
 			const firstUsed = Number(response.headers['x-ratelimit-used'])
 
-			// Second request (same socket IP)
-
-			response = await request(app.getHttpServer())
-
-				.get('/test/default')
-
-				.expect(200)
-
+			response = await request(app.getHttpServer()).get('/test/default').expect(200)
 			const secondRemaining = Number(response.headers['x-ratelimit-remaining'])
-
 			const secondUsed = Number(response.headers['x-ratelimit-used'])
 
-			// Verify the progression
-
-			expect(secondRemaining).toBeLessThan(firstRemaining)
-
-			expect(secondUsed).toBeGreaterThan(firstUsed)
+			expect(secondRemaining).toBe(firstRemaining - 1)
+			expect(secondUsed).toBe(firstUsed + 1)
 		})
 	})
 
 	describe('adaptive Rate Limiting', () => {
-		it('should reduce limits under high system load', async () => {
-			// Temporarily override NODE_ENV to test adaptive behavior
+		it('should reduce limits under high heap pressure', async () => {
+			vi.spyOn(rateLimitService, 'getHeapPressurePercent').mockReturnValue(90)
 
-			const originalEnv = process.env.NODE_ENV
+			const adaptiveLimit = await rateLimitService.calculateAdaptiveLimit(5)
 
-			process.env.NODE_ENV = 'production'
-
-			try {
-				// Mock high heap pressure
-
-				vi.spyOn(rateLimitService, 'getSystemLoad').mockResolvedValue({
-
-					memoryUsage: 90, // High memory
-
-				})
-
-				// The adaptive limit should be lower than the configured limit
-
-				const adaptiveLimit = await rateLimitService.calculateAdaptiveLimit(5)
-
-				expect(adaptiveLimit).toBeLessThan(5)
-
-				expect(adaptiveLimit).toBeGreaterThanOrEqual(1)
-			}
-
-			finally {
-				// Restore original environment
-
-				process.env.NODE_ENV = originalEnv
-			}
+			expect(adaptiveLimit).toBeLessThan(5)
+			expect(adaptiveLimit).toBeGreaterThanOrEqual(1)
 		})
 
-		it('should maintain limits under normal system load', async () => {
-			// Temporarily override NODE_ENV to test adaptive behavior
+		it('should maintain limits under normal heap pressure', async () => {
+			vi.spyOn(rateLimitService, 'getHeapPressurePercent').mockReturnValue(60)
 
-			const originalEnv = process.env.NODE_ENV
-
-			process.env.NODE_ENV = 'production'
-
-			try {
-				// Mock normal heap pressure
-
-				vi.spyOn(rateLimitService, 'getSystemLoad').mockResolvedValue({
-
-					memoryUsage: 60, // Normal memory
-
-				})
-
-				const adaptiveLimit = await rateLimitService.calculateAdaptiveLimit(5)
-
-				expect(adaptiveLimit).toBe(5)
-			}
-
-			finally {
-				// Restore original environment
-
-				process.env.NODE_ENV = originalEnv
-			}
+			await expect(rateLimitService.calculateAdaptiveLimit(5)).resolves.toBe(5)
 		})
 	})
 
 	describe('error Handling', () => {
-		// eslint-disable-next-line test/expect-expect
-		it('should handle rate limit service errors gracefully', async () => {
-			// Mock an error in the rate limit service
-
+		it('should handle rate limit service errors gracefully (fail open)', async () => {
 			vi.spyOn(rateLimitService, 'checkRateLimit').mockRejectedValue(new Error('Service error'))
 
-			// Request should still be allowed (fail-open behavior)
-
-			await request(app.getHttpServer())
-
+			const response = await request(app.getHttpServer())
 				.get('/test/default')
-
 				.expect(200)
-		})
 
-		// eslint-disable-next-line test/expect-expect
-		it('should handle configuration errors gracefully', async () => {
-			// Mock configuration error for specific keys only, not bot bypass
-
-			vi.spyOn(configService, 'getOptional').mockImplementation((key: string, defaultValue?: any) => {
-				if (key === 'rateLimit.bypass.bots') {
-					return true
-				}
-
-				if (key.startsWith('rateLimit')) {
-					throw new Error('Config error')
-				}
-
-				return defaultValue
-			})
-
-			// Request should still be allowed
-
-			await request(app.getHttpServer())
-
-				.get('/test/default')
-
-				.expect(200)
+			expect(response.headers['x-ratelimit-limit']).toBeUndefined()
 		})
 	})
 
 	describe('concurrent Requests', () => {
-		it('should handle concurrent requests correctly', async () => {
-			// Clear rate limits to ensure clean state
+		it('should count concurrent requests atomically', async () => {
+			vi.spyOn(rateLimitService, 'getRateLimitConfig').mockReturnValue({ windowMs: 60_000, max: 3 })
+			const concurrentRequests = 6
 
-			const rateLimitServicePrivate = rateLimitService as any
+			const responses = await Promise.all(
+				Array.from({ length: concurrentRequests }, () => request(app.getHttpServer()).get('/test/default')),
+			)
 
-			if (rateLimitServicePrivate.requestCounts) {
-				rateLimitServicePrivate.requestCounts.clear()
-			}
-
-			// Create a temporary mock for this test only
-
-			const originalMock = vi.spyOn(configService, 'getOptional')
-
-			originalMock.mockImplementation((key: string, defaultValue?: any) => {
-				if (key === 'rateLimit.default.max')
-
-					return 3 // Very low limit
-
-				if (key === 'rateLimit.default.windowMs')
-
-					return 60000
-
-				const configs: Record<string, any> = {
-
-					'rateLimit.imageProcessing.windowMs': 60000,
-
-					'rateLimit.imageProcessing.max': 5,
-
-					'rateLimit.healthCheck.windowMs': 10000,
-
-					'rateLimit.healthCheck.max': 100,
-
-					'monitoring.enabled': true,
-
-				}
-
-				return configs[key] || defaultValue
-			})
-
-			const concurrentRequests = process.env.CI ? 4 : 6 // Reduced for CI stability
-
-			try {
-				// Add small delay to ensure clean state
-
-				await new Promise(resolve => setTimeout(resolve, 50))
-
-				// Make concurrent requests that should exceed the limit of 3
-
-				const promises = []
-
-				for (let i = 0; i < concurrentRequests; i++) {
-					promises.push(
-
-						request(app.getHttpServer())
-
-							.get('/test/default')
-
-							.timeout(10000) // Increased timeout for CI
-
-							.retry(0), // Disable retries to avoid confusion
-
-					)
-				}
-
-				// Use Promise.allSettled to handle potential connection errors gracefully
-
-				const results = await Promise.allSettled(promises)
-
-				// Filter out rejected promises (connection errors) and extract responses
-
-				const responses = results
-
-					.filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled')
-
-					.map(result => result.value)
-
-				// If we have connection errors, log them but don't fail the test
-
-				const rejectedCount = results.filter(result => result.status === 'rejected').length
-
-				if (rejectedCount > 0) {
-					console.log(`${rejectedCount} requests failed due to connection issues (likely ECONNRESET)`)
-				}
-
-				// Only proceed if we have enough successful connections to test rate limiting
-
-				if (responses.length < 3) {
-					console.log('Too many connection failures, skipping rate limit validation')
-
-					return
-				}
-
-				// Count responses
-
-				const successCount = responses.filter(r => r.status === 200).length
-
-				const rateLimitedCount = responses.filter(r => r.status === 429).length
-
-				const otherCount = responses.filter(r => r.status !== 200 && r.status !== 429).length
-
-				console.log(`Success: ${successCount}, Rate limited: ${rateLimitedCount}, Other: ${otherCount}, Connection errors: ${rejectedCount}`)
-
-				// All successful responses should be accounted for
-
-				expect(successCount + rateLimitedCount + otherCount).toBe(responses.length)
-
-				// Ensure the service is responding and not completely broken
-				expect(successCount + rateLimitedCount).toBeGreaterThan(0)
-
-				// With a limit of 3, we should see some rate limiting if we have enough requests
-				// Allow generous tolerance for race conditions and CI environment differences
-				// In practice, concurrent requests can slip through before rate limiting kicks in
-				const hasEnoughResponses = responses.length >= 4
-				expect(hasEnoughResponses ? successCount : 0).toBeLessThanOrEqual(responses.length)
-				expect(hasEnoughResponses ? successCount > 0 : true).toBe(true)
-
-				// In local environment with enough responses, rate limiting may or may not occur
-				// depending on timing - this is acceptable behavior for concurrent requests
-				// The important thing is that the service handles all requests without crashing
-				const totalHandled = successCount + rateLimitedCount
-				expect(totalHandled).toBeGreaterThan(0)
-			}
-
-			catch (error) {
-				console.error('Concurrent requests test failed:', error)
-
-				// In CI, don't fail the test for connection issues
-
-				if (process.env.CI && (error as any).message?.includes('ECONNRESET')) {
-					console.log('Skipping test due to CI connection issues')
-
-					return
-				}
-
-				throw error
-			}
-
-			finally {
-				// Restore the original mock
-
-				originalMock.mockRestore()
-
-				// Add delay to allow connections to close properly
-
-				await new Promise(resolve => setTimeout(resolve, 100))
-			}
-		}, 20000) // Increased timeout for CI stability
+			const statuses = responses.map(response => response.status)
+			// INCR+EXPIRE runs as one Lua script, so exactly `max` requests win
+			// no matter how they interleave; nothing errors out.
+			expect(statuses.filter(status => status === 200)).toHaveLength(3)
+			expect(statuses.filter(status => status === 429)).toHaveLength(concurrentRequests - 3)
+		}, 20_000)
 	})
 })

@@ -1,10 +1,13 @@
+import type { MemoryCacheConfig } from '#microservice/Config/interfaces/app-config.interface'
 import type { CacheStats, ICacheManager } from '../interfaces/cache-manager.interface.js'
 import { Buffer } from 'node:buffer'
 import { Injectable } from '@nestjs/common'
 import NodeCache from 'node-cache'
+import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
+import { keyNamespacePrefix } from '../utils/cache-namespace.util.js'
 
 @Injectable()
 export class MemoryCacheService implements ICacheManager {
@@ -22,64 +25,38 @@ export class MemoryCacheService implements ICacheManager {
 		private readonly _configService: ConfigService,
 		private readonly metricsService: MetricsService,
 	) {
-		const config = this._configService.get('cache.memory') || {}
-		this.maxByteSize = config.maxSize || 100 * 1024 * 1024 // 100MB default
-		this.maxKeys = config.maxKeys || 1000
+		const config = this._configService.get<MemoryCacheConfig>('cache.memory')
+		this.maxByteSize = config.maxSize
+		this.maxKeys = config.maxKeys
 
 		this.cache = new NodeCache({
-			stdTTL: config.defaultTtl || 3600,
-			checkperiod: config.checkPeriod || 600,
+			stdTTL: config.defaultTtl,
+			checkperiod: config.checkPeriod,
 			useClones: false,
 			deleteOnExpire: true,
 			maxKeys: this.maxKeys,
 		})
 
-		this.cache.on('set', (key: string, _value: any) => {
-			this.metricsService.recordCacheOperation('set', 'memory', 'success')
-			CorrelatedLogger.debug(`Memory cache SET: ${key}`, MemoryCacheService.name)
-		})
-
-		this.cache.on('get', (key: string, value: any) => {
-			if (value !== undefined) {
-				this.metricsService.recordCacheOperation('get', 'memory', 'hit')
-				CorrelatedLogger.debug(`Memory cache HIT: ${key}`, MemoryCacheService.name)
-			}
-			else {
-				this.metricsService.recordCacheOperation('get', 'memory', 'miss')
-				CorrelatedLogger.debug(`Memory cache MISS: ${key}`, MemoryCacheService.name)
-			}
-		})
-
-		this.cache.on('del', (key: string, _value: any) => {
+		// Per-operation metrics are recorded once by MultiLayerCacheManager;
+		// expiry is the one event only this layer can observe.
+		this.cache.on('del', (key: string) => {
 			this.trackRemoval(key)
-			this.metricsService.recordCacheOperation('delete', 'memory', 'success')
-			CorrelatedLogger.debug(`Memory cache DELETE: ${key}`, MemoryCacheService.name)
 		})
 
-		this.cache.on('expired', (key: string, _value: any) => {
+		this.cache.on('expired', (key: string) => {
 			this.trackRemoval(key)
 			this.metricsService.recordCacheOperation('expire', 'memory', 'success')
-			CorrelatedLogger.debug(`Memory cache EXPIRED: ${key}`, MemoryCacheService.name)
 		})
 
 		this.cache.on('flush', () => {
 			this.currentByteSize = 0
 			this.sizeMap.clear()
-			this.metricsService.recordCacheOperation('flush', 'memory', 'success')
-			CorrelatedLogger.debug('Memory cache FLUSHED', MemoryCacheService.name)
 		})
 	}
 
 	async get<T>(key: string): Promise<T | null> {
-		try {
-			const value = this.cache.get<T>(key)
-			return value !== undefined ? value : null
-		}
-		catch (error: unknown) {
-			this.metricsService.recordCacheOperation('get', 'memory', 'error')
-			CorrelatedLogger.error(`Memory cache GET error for key ${key}: ${(error as Error).message}`, (error as Error).stack, MemoryCacheService.name)
-			return null
-		}
+		const value = this.cache.get<T>(key)
+		return value !== undefined ? value : null
 	}
 
 	async set<T>(key: string, value: T, ttl?: number): Promise<void> {
@@ -112,101 +89,45 @@ export class MemoryCacheService implements ICacheManager {
 				this.sizeMap.set(key, valueSize)
 			}
 			else {
-				this.metricsService.recordCacheOperation('set', 'memory', 'error')
-				CorrelatedLogger.warn(`Failed to set memory cache key: ${key}`, MemoryCacheService.name)
+				throw new Error(`Failed to set memory cache key: ${key}`)
 			}
 		}
 		catch (error: unknown) {
-			this.metricsService.recordCacheOperation('set', 'memory', 'error')
-			CorrelatedLogger.error(`Memory cache SET error for key ${key}: ${(error as Error).message}`, (error as Error).stack, MemoryCacheService.name)
+			CorrelatedLogger.error(`Memory cache SET error for key ${key}: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, MemoryCacheService.name)
 			throw error
 		}
 	}
 
 	async delete(key: string): Promise<void> {
-		try {
-			this.cache.del(key)
-		}
-		catch (error: unknown) {
-			this.metricsService.recordCacheOperation('delete', 'memory', 'error')
-			CorrelatedLogger.error(`Memory cache DELETE error for key ${key}: ${(error as Error).message}`, (error as Error).stack, MemoryCacheService.name)
-			throw error
-		}
+		this.cache.del(key)
 	}
 
 	async clear(): Promise<void> {
-		try {
-			this.cache.flushAll()
-		}
-		catch (error: unknown) {
-			this.metricsService.recordCacheOperation('clear', 'memory', 'error')
-			CorrelatedLogger.error(`Memory cache CLEAR error: ${(error as Error).message}`, (error as Error).stack, MemoryCacheService.name)
-			throw error
-		}
+		this.cache.flushAll()
 	}
 
 	async getStats(): Promise<CacheStats> {
-		try {
-			const stats = this.cache.getStats()
-			const hitRate = stats.hits + stats.misses > 0 ? stats.hits / (stats.hits + stats.misses) : 0
+		const stats = this.cache.getStats()
+		const hitRate = stats.hits + stats.misses > 0 ? stats.hits / (stats.hits + stats.misses) : 0
 
-			this.metricsService.updateCacheHitRatio('memory', hitRate)
+		this.metricsService.updateCacheHitRatio('memory', hitRate)
 
-			return {
-				hits: stats.hits,
-				misses: stats.misses,
-				keys: stats.keys,
-				ksize: stats.ksize,
-				vsize: stats.vsize,
-				hitRate,
-			}
-		}
-		catch (error: unknown) {
-			CorrelatedLogger.error(`Memory cache STATS error: ${(error as Error).message}`, (error as Error).stack, MemoryCacheService.name)
-			return {
-				hits: 0,
-				misses: 0,
-				keys: 0,
-				ksize: 0,
-				vsize: 0,
-				hitRate: 0,
-			}
+		return {
+			hits: stats.hits,
+			misses: stats.misses,
+			keys: stats.keys,
+			ksize: stats.ksize,
+			vsize: stats.vsize,
+			hitRate,
 		}
 	}
 
 	async has(key: string): Promise<boolean> {
-		try {
-			return this.cache.has(key)
-		}
-		catch (error: unknown) {
-			CorrelatedLogger.error(`Memory cache HAS error for key ${key}: ${(error as Error).message}`, (error as Error).stack, MemoryCacheService.name)
-			return false
-		}
-	}
-
-	async exists(key: string): Promise<boolean> {
-		return this.has(key)
+		return this.cache.has(key)
 	}
 
 	async keys(): Promise<string[]> {
-		try {
-			return this.cache.keys()
-		}
-		catch (error: unknown) {
-			CorrelatedLogger.error(`Memory cache KEYS error: ${(error as Error).message}`, (error as Error).stack, MemoryCacheService.name)
-			return []
-		}
-	}
-
-	async flushAll(): Promise<void> {
-		try {
-			this.cache.flushAll()
-		}
-		catch (error: unknown) {
-			this.metricsService.recordCacheOperation('flush', 'memory', 'error')
-			CorrelatedLogger.error(`Memory cache FLUSH error: ${(error as Error).message}`, (error as Error).stack, MemoryCacheService.name)
-			throw error
-		}
+		return this.cache.keys()
 	}
 
 	getTtl(key: string): number {
@@ -258,23 +179,6 @@ export class MemoryCacheService implements ICacheManager {
 	}
 
 	/**
-	 * Tenant-fairness: derive the namespace prefix of a cache key
-	 * (`image:{schema}:` for image entries). Returns null for keys
-	 * without at least two segments.
-	 */
-	private namespacePrefix(key: string): string | null {
-		const first = key.indexOf(':')
-		if (first === -1) {
-			return null
-		}
-		const second = key.indexOf(':', first + 1)
-		if (second === -1) {
-			return null
-		}
-		return key.slice(0, second + 1)
-	}
-
-	/**
 	 * Evict entries until we have enough space for the new value.
 	 *
 	 * Fairness policy: the WRITER's own namespace is evicted first
@@ -315,7 +219,7 @@ export class MemoryCacheService implements ICacheManager {
 			.map(key => ({ key, ttl: this.cache.getTtl(key) ?? Infinity }))
 			.sort((a, b) => a.ttl - b.ttl)
 
-		const ownPrefix = forKey ? this.namespacePrefix(forKey) : null
+		const ownPrefix = forKey ? keyNamespacePrefix(forKey) : null
 		const ordered = ownPrefix
 			? [
 					...keysByTtl.filter(e => e.key.startsWith(ownPrefix)),

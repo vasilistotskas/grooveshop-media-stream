@@ -1,144 +1,51 @@
 import type { HealthIndicatorResult } from '@nestjs/terminus'
-import type { HealthCheckOptions } from '../interfaces/health-indicator.interface.js'
 import { Buffer } from 'node:buffer'
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import sharp from 'sharp'
+import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { BaseHealthIndicator } from '../base/base-health-indicator.js'
 
-/**
- * Health indicator for Sharp image processing library
- * Verifies that Sharp can process images correctly
- */
+/** Image processing may legitimately take a while under load. */
+const TIMEOUT_MS = 5000
+
+/** A 1×1 transparent PNG, decoded once: the smallest input that exercises the full Sharp pipeline. */
+const TEST_PNG = Buffer.from(
+	'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==',
+	'base64',
+)
+
 @Injectable()
 export class SharpHealthIndicator extends BaseHealthIndicator {
-	private readonly _logger = new Logger(SharpHealthIndicator.name)
-
-	// Minimal 1x1 transparent PNG for health check (68 bytes)
-	private readonly testPngBuffer = Buffer.from([
-		0x89,
-		0x50,
-		0x4E,
-		0x47,
-		0x0D,
-		0x0A,
-		0x1A,
-		0x0A,
-		0x00,
-		0x00,
-		0x00,
-		0x0D,
-		0x49,
-		0x48,
-		0x44,
-		0x52,
-		0x00,
-		0x00,
-		0x00,
-		0x01,
-		0x00,
-		0x00,
-		0x00,
-		0x01,
-		0x08,
-		0x06,
-		0x00,
-		0x00,
-		0x00,
-		0x1F,
-		0x15,
-		0xC4,
-		0x89,
-		0x00,
-		0x00,
-		0x00,
-		0x0A,
-		0x49,
-		0x44,
-		0x41,
-		0x54,
-		0x78,
-		0x9C,
-		0x63,
-		0x00,
-		0x01,
-		0x00,
-		0x00,
-		0x05,
-		0x00,
-		0x01,
-		0x0D,
-		0x0A,
-		0x2D,
-		0xB4,
-		0x00,
-		0x00,
-		0x00,
-		0x00,
-		0x49,
-		0x45,
-		0x4E,
-		0x44,
-		0xAE,
-		0x42,
-		0x60,
-		0x82,
-	])
-
 	constructor() {
-		const options: HealthCheckOptions = {
-			timeout: 5000, // 5 second timeout for image processing
-			threshold: 0.95,
-		}
-		super('sharp', options)
+		super('sharp', TIMEOUT_MS)
 	}
 
 	protected async performHealthCheck(): Promise<HealthIndicatorResult> {
 		return this.executeWithTimeout(async () => {
 			const startTime = Date.now()
+			const sharpInfo = this.getSharpInfo()
+			const processingResult = await this.testImageProcessing()
+			const cacheStats = sharp.cache()
+			const processingTime = Date.now() - startTime
 
-			try {
-				// Test 1: Get Sharp version and format support
-				const sharpInfo = this.getSharpInfo()
-
-				// Test 2: Process a minimal test image
-				const processingResult = await this.testImageProcessing()
-
-				// Test 3: Check memory/cache status
-				const cacheStats = sharp.cache()
-
-				const processingTime = Date.now() - startTime
-
-				if (!processingResult.success) {
-					return this.createUnhealthyResult(
-						`Sharp image processing failed: ${processingResult.error}`,
-						{
-							...sharpInfo,
-							processingTime,
-							error: processingResult.error,
-						},
-					)
-				}
-
-				return this.createHealthyResult({
+			if (!processingResult.success) {
+				return this.createUnhealthyResult(`Sharp image processing failed: ${processingResult.error}`, {
 					...sharpInfo,
 					processingTime,
-					testResult: processingResult,
-					cache: {
-						memory: cacheStats.memory,
-						files: cacheStats.files,
-						items: cacheStats.items,
-					},
+					error: processingResult.error,
 				})
 			}
-			catch (error: unknown) {
-				const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-				this._logger.error(`Sharp health check failed: ${errorMessage}`)
 
-				return this.createUnhealthyResult(
-					`Sharp health check failed: ${errorMessage}`,
-					{ error: errorMessage },
-				)
-			}
+			return this.createHealthyResult({
+				...sharpInfo,
+				processingTime,
+				testResult: processingResult,
+				cache: {
+					memory: cacheStats.memory,
+					files: cacheStats.files,
+					items: cacheStats.items,
+				},
+			})
 		})
 	}
 
@@ -146,24 +53,13 @@ export class SharpHealthIndicator extends BaseHealthIndicator {
 		return 'Monitors Sharp image processing library health and capabilities'
 	}
 
-	/**
-	 * Get Sharp library information
-	 */
 	private getSharpInfo(): {
 		versions: { sharp: string, libvips: string }
 		formats: { input: string[], output: string[] }
 		simd: boolean
 		concurrency: number
 	} {
-		const format = sharp.format
-
-		const inputFormats = Object.entries(format)
-			.filter(([_, info]) => info.input?.file || info.input?.buffer)
-			.map(([name]) => name)
-
-		const outputFormats = Object.entries(format)
-			.filter(([_, info]) => info.output?.file || info.output?.buffer)
-			.map(([name]) => name)
+		const formats = Object.entries(sharp.format)
 
 		return {
 			versions: {
@@ -171,17 +67,14 @@ export class SharpHealthIndicator extends BaseHealthIndicator {
 				libvips: sharp.versions.vips || 'unknown',
 			},
 			formats: {
-				input: inputFormats,
-				output: outputFormats,
+				input: formats.filter(([, info]) => info.input?.file || info.input?.buffer).map(([name]) => name),
+				output: formats.filter(([, info]) => info.output?.file || info.output?.buffer).map(([name]) => name),
 			},
 			simd: sharp.simd(),
 			concurrency: sharp.concurrency(),
 		}
 	}
 
-	/**
-	 * Test actual image processing capability
-	 */
 	private async testImageProcessing(): Promise<{
 		success: boolean
 		inputSize: number
@@ -190,27 +83,25 @@ export class SharpHealthIndicator extends BaseHealthIndicator {
 		error?: string
 	}> {
 		try {
-			// Process the test PNG: resize and convert to WebP
-			const result = await sharp(this.testPngBuffer)
+			const result = await sharp(TEST_PNG)
 				.resize(1, 1)
 				.webp({ quality: 80 })
 				.toBuffer({ resolveWithObject: true })
 
 			return {
 				success: true,
-				inputSize: this.testPngBuffer.length,
+				inputSize: TEST_PNG.length,
 				outputSize: result.data.length,
 				format: result.info.format,
 			}
 		}
 		catch (error: unknown) {
-			const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 			return {
 				success: false,
-				inputSize: this.testPngBuffer.length,
+				inputSize: TEST_PNG.length,
 				outputSize: 0,
 				format: 'unknown',
-				error: errorMessage,
+				error: errorMessage(error),
 			}
 		}
 	}

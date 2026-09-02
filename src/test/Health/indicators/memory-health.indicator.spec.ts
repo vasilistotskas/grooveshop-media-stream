@@ -169,18 +169,6 @@ describe('memoryHealthIndicator', () => {
 		})
 	})
 
-	describe('getDetails', () => {
-		it('should return indicator details', () => {
-			const details = indicator.getDetails()
-
-			expect(details).toHaveProperty('key')
-			expect(details).toHaveProperty('options')
-			expect(details).toHaveProperty('description')
-			expect(details.key).toBe('memory')
-			expect(details.description).toContain('Monitors system and process memory usage')
-		})
-	})
-
 	describe('timeout Handling', () => {
 		it('should complete within timeout period', async () => {
 			const startTime = Date.now()

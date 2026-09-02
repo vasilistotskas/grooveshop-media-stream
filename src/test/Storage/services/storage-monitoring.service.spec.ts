@@ -1,272 +1,392 @@
 import type { MockedObject } from 'vitest'
+import type ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
 import { promises as fs } from 'node:fs'
+import { resolve } from 'node:path'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConfigService } from '#microservice/Config/config.service'
-import { StorageMonitoringService } from '#microservice/Storage/services/storage-monitoring.service'
+import { INVENTORY_TTL_MS, StorageMonitoringService } from '#microservice/Storage/services/storage-monitoring.service'
+import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 
-// Mock fs module
 vi.mock('node:fs', () => ({
 	promises: {
 		readdir: vi.fn(),
 		stat: vi.fn(),
 		mkdir: vi.fn(),
+		readFile: vi.fn(),
 	},
 }))
 
 const mockFs = fs as MockedObject<typeof fs>
 
+const STORAGE_DIR = resolve('/test/storage')
+const MB = 1024 * 1024
+const NOW = new Date('2026-09-01T12:00:00.000Z').getTime()
+
+interface DiskFile {
+	size: number
+	mtime?: number
+	content?: string
+	directory?: boolean
+	missing?: boolean
+}
+
+function fileName(filePath: unknown): string {
+	return String(filePath).split(/[/\\]/).pop() ?? ''
+}
+
+function metaJson(overrides: Partial<ResourceMetaData> = {}): string {
+	return JSON.stringify({
+		version: 1,
+		size: '1000',
+		format: 'webp',
+		dateCreated: NOW - 60_000,
+		privateTTL: 1000 * 60 * 60,
+		publicTTL: 1000 * 60 * 60 * 2,
+		accessCount: 3,
+		tenantSchema: 'acme',
+		...overrides,
+	})
+}
+
+/** Points the mocked `fs.promises` at an in-memory flat directory. */
+function useDisk(files: Record<string, DiskFile>): void {
+	mockFs.readdir.mockResolvedValue(Object.keys(files) as any)
+	mockFs.stat.mockImplementation((filePath: any) => {
+		const file = files[fileName(filePath)]
+		if (!file || file.missing) {
+			const error: NodeJS.ErrnoException = new Error('no such file')
+			error.code = 'ENOENT'
+			return Promise.reject(error)
+		}
+		return Promise.resolve({
+			size: file.size,
+			mtimeMs: file.mtime ?? NOW,
+			isFile: () => !file.directory,
+		} as any)
+	})
+	mockFs.readFile.mockImplementation((filePath: any) => {
+		const file = files[fileName(filePath)]
+		return file?.content !== undefined
+			? Promise.resolve(file.content)
+			: Promise.reject(new Error(`unexpected readFile: ${fileName(filePath)}`))
+	})
+}
+
 describe('storageMonitoringService', () => {
 	let service: StorageMonitoringService
-	let configService: MockedObject<ConfigService>
-
-	const mockStorageDirectory = '/test/storage'
-	const mockFiles = [
-		'image1.webp',
-		'image2.jpg',
-		'cache1.json',
-		'cache2.json',
-		'.gitkeep',
-	]
+	let configService: ConfigService
 
 	beforeEach(async () => {
-		const mockConfigService = {
-			get: vi.fn().mockImplementation((_key: string) => {
-				return undefined
-			}),
-			getOptional: vi.fn().mockImplementation((key: string, defaultValue: any) => {
-				const defaults: Record<string, any> = {
-					'cache.file.directory': mockStorageDirectory,
-					'storage.warningSize': 800 * 1024 * 1024,
-					'storage.criticalSize': 1024 * 1024 * 1024,
-					'storage.warningFileCount': 5000,
-					'storage.criticalFileCount': 10000,
-					'storage.maxFileAge': 30,
-				}
-				return defaults[key] || defaultValue
-			}),
-		}
+		vi.useFakeTimers()
+		vi.setSystemTime(NOW)
+
+		configService = createConfigServiceMock({
+			'cache.file.directory': '/test/storage',
+			'storage.warningSize': 800 * MB,
+			'storage.criticalSize': 1024 * MB,
+			'storage.warningFileCount': 5000,
+			'storage.criticalFileCount': 10000,
+		})
 
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [
 				StorageMonitoringService,
-				{
-					provide: ConfigService,
-					useValue: mockConfigService,
-				},
+				{ provide: ConfigService, useValue: configService },
 			],
 		}).compile()
 
 		service = module.get<StorageMonitoringService>(StorageMonitoringService)
-		configService = module.get(ConfigService)
-
-		// Setup fs mocks
 		mockFs.mkdir.mockResolvedValue(undefined)
-		mockFs.readdir.mockResolvedValue(mockFiles as any)
 	})
 
 	afterEach(() => {
 		vi.clearAllMocks()
+		vi.useRealTimers()
 	})
 
-	describe('getStorageStats', () => {
-		it('should return correct storage statistics', async () => {
-			// Mock file stats
-			const mockStats = {
-				size: 1024 * 1024, // 1MB
-				mtime: new Date('2024-01-01'),
-				atime: new Date('2024-01-02'),
-			}
+	describe('getInventory', () => {
+		it('groups an .rsc/.rsm pair into one entry read from the sidecar', async () => {
+			useDisk({
+				'abc.rsc': { size: 4 * MB },
+				'abc.rsm': { size: 200, content: metaJson({ dateCreated: NOW - 5000, privateTTL: 9000, accessCount: 7, tenantSchema: 'acme' }) },
+			})
 
-			mockFs.stat.mockResolvedValue(mockStats as any)
+			const inventory = await service.getInventory()
 
-			const stats = await service.getStorageStats()
-
-			expect(stats.totalFiles).toBe(4) // Excluding .gitkeep
-			expect(stats.totalSize).toBe(4 * 1024 * 1024) // 4MB total
-			expect(stats.averageFileSize).toBe(1024 * 1024) // 1MB average
-			expect(stats.fileTypes['.webp']).toBe(1)
-			expect(stats.fileTypes['.jpg']).toBe(1)
-			expect(stats.fileTypes['.json']).toBe(2)
+			expect(inventory.entries).toEqual([{
+				id: 'abc',
+				size: 4 * MB + 200,
+				dateCreated: NOW - 5000,
+				privateTTL: 9000,
+				accessCount: 7,
+				tenantSchema: 'acme',
+			}])
+			expect(inventory.orphans).toEqual([])
+			expect(inventory.totalFiles).toBe(2)
+			expect(inventory.totalSize).toBe(4 * MB + 200)
+			expect(inventory.scannedAt).toBe(NOW)
+			expect(mockFs.readdir).toHaveBeenCalledWith(STORAGE_DIR)
+			expect(mockFs.readFile).toHaveBeenCalledTimes(1)
+			expect(mockFs.readFile).toHaveBeenCalledWith(expect.stringContaining('abc.rsm'), 'utf8')
 		})
 
-		it('should handle empty directory', async () => {
-			mockFs.readdir.mockResolvedValue(['.gitkeep'] as any)
+		it('fills legacy sidecar defaults: tenantSchema "public", accessCount 0', async () => {
+			const legacy = JSON.stringify({ version: 1, size: '10', format: 'webp', dateCreated: NOW - 1000, privateTTL: 5000, publicTTL: 5000 })
+			useDisk({
+				'legacy.rsc': { size: 10 },
+				'legacy.rsm': { size: legacy.length, content: legacy },
+			})
 
-			const stats = await service.getStorageStats()
+			const { entries } = await service.getInventory()
 
-			expect(stats.totalFiles).toBe(0)
-			expect(stats.totalSize).toBe(0)
-			expect(stats.averageFileSize).toBe(0)
-			expect(stats.accessPatterns).toEqual([])
+			expect(entries).toHaveLength(1)
+			expect(entries[0].tenantSchema).toBe('public')
+			expect(entries[0].accessCount).toBe(0)
 		})
 
-		it('should handle file stat errors gracefully', async () => {
-			mockFs.stat.mockRejectedValue(new Error('File not found'))
+		it('classifies half pairs and temp files as orphans without reading them', async () => {
+			useDisk({
+				'lonely-data.rsc': { size: 100, mtime: NOW - 1000 },
+				'lonely-meta.rsm': { size: 50, mtime: NOW - 2000 },
+				'download.rst': { size: 300, mtime: NOW - 3000 },
+				'write.rsm.tmp': { size: 20, mtime: NOW - 4000 },
+			})
 
-			// Individual stat failures are caught per-file; getStorageStats returns empty results
-			const result = await service.getStorageStats()
-			expect(result.totalFiles).toBe(0)
-			expect(result.totalSize).toBe(0)
+			const inventory = await service.getInventory()
+
+			expect(inventory.entries).toEqual([])
+			expect(inventory.orphans).toEqual(expect.arrayContaining([
+				{ name: 'lonely-data.rsc', size: 100, mtime: NOW - 1000 },
+				{ name: 'lonely-meta.rsm', size: 50, mtime: NOW - 2000 },
+				{ name: 'download.rst', size: 300, mtime: NOW - 3000 },
+				{ name: 'write.rsm.tmp', size: 20, mtime: NOW - 4000 },
+			]))
+			expect(inventory.orphans).toHaveLength(4)
+			expect(inventory.totalFiles).toBe(4)
+			expect(inventory.totalSize).toBe(470)
+			expect(mockFs.readFile).not.toHaveBeenCalled()
+		})
+
+		it('turns a pair with an unparsable sidecar into two orphans', async () => {
+			useDisk({
+				'bad.rsc': { size: 100 },
+				'bad.rsm': { size: 5, content: '{not json' },
+			})
+
+			const { entries, orphans } = await service.getInventory()
+
+			expect(entries).toEqual([])
+			expect(orphans.map(orphan => orphan.name).sort()).toEqual(['bad.rsc', 'bad.rsm'])
+		})
+
+		it('treats a sidecar without numeric dateCreated/privateTTL as unparsable', async () => {
+			useDisk({
+				'odd.rsc': { size: 100 },
+				'odd.rsm': { size: 5, content: JSON.stringify({ dateCreated: 'yesterday', privateTTL: 1000 }) },
+				'arr.rsc': { size: 100 },
+				'arr.rsm': { size: 5, content: '[1,2,3]' },
+			})
+
+			const { entries, orphans } = await service.getInventory()
+
+			expect(entries).toEqual([])
+			expect(orphans).toHaveLength(4)
+		})
+
+		it('skips .gitkeep and counts default_optimized_* files without classifying them', async () => {
+			useDisk({
+				'.gitkeep': { size: 0 },
+				'default_optimized_0123abcd.webp': { size: 3 * MB },
+				'img.rsc': { size: 1 * MB },
+				'img.rsm': { size: 100, content: metaJson() },
+			})
+
+			const inventory = await service.getInventory()
+
+			expect(inventory.totalFiles).toBe(3)
+			expect(inventory.totalSize).toBe(4 * MB + 100)
+			expect(inventory.entries.map(entry => entry.id)).toEqual(['img'])
+			expect(inventory.orphans).toEqual([])
+			expect(mockFs.stat).not.toHaveBeenCalledWith(expect.stringContaining('.gitkeep'))
+		})
+
+		it('ignores directories and files that vanish between readdir and stat', async () => {
+			useDisk({
+				'nested': { size: 4096, directory: true },
+				'gone.rsc': { size: 100, missing: true },
+				'keep.rst': { size: 10 },
+			})
+
+			const inventory = await service.getInventory()
+
+			expect(inventory.totalFiles).toBe(1)
+			expect(inventory.totalSize).toBe(10)
+			expect(inventory.orphans.map(orphan => orphan.name)).toEqual(['keep.rst'])
+		})
+
+		it('rejects when the directory cannot be listed', async () => {
+			mockFs.readdir.mockRejectedValue(new Error('Permission denied'))
+
+			await expect(service.getInventory()).rejects.toThrow('Permission denied')
+		})
+	})
+
+	describe('snapshot caching', () => {
+		beforeEach(() => {
+			useDisk({ 'a.rst': { size: 1 } })
+		})
+
+		it('serves the snapshot without rescanning while it is younger than the TTL', async () => {
+			const first = await service.getInventory()
+			vi.advanceTimersByTime(INVENTORY_TTL_MS - 1)
+			const second = await service.getInventory()
+
+			expect(second).toBe(first)
+			expect(mockFs.readdir).toHaveBeenCalledTimes(1)
+		})
+
+		it('rescans once the snapshot is older than the TTL', async () => {
+			const first = await service.getInventory()
+			vi.advanceTimersByTime(INVENTORY_TTL_MS)
+			const second = await service.getInventory()
+
+			expect(second).not.toBe(first)
+			expect(second.scannedAt).toBe(NOW + INVENTORY_TTL_MS)
+			expect(mockFs.readdir).toHaveBeenCalledTimes(2)
+		})
+
+		it('honours a caller-supplied maximum age', async () => {
+			await service.getInventory()
+			vi.advanceTimersByTime(10)
+
+			await service.getInventory(5)
+
+			expect(mockFs.readdir).toHaveBeenCalledTimes(2)
+		})
+
+		it('rescans immediately for maxAge 0', async () => {
+			await service.getInventory()
+			await service.getInventory(0)
+
+			expect(mockFs.readdir).toHaveBeenCalledTimes(2)
+		})
+
+		it('shares one scan between concurrent callers', async () => {
+			const [first, second] = await Promise.all([service.getInventory(0), service.getInventory(0)])
+
+			expect(second).toBe(first)
+			expect(mockFs.readdir).toHaveBeenCalledTimes(1)
+		})
+
+		it('does not cache a failed scan', async () => {
+			mockFs.readdir.mockRejectedValueOnce(new Error('EIO'))
+
+			await expect(service.getInventory()).rejects.toThrow('EIO')
+			const inventory = await service.getInventory()
+
+			expect(inventory.totalFiles).toBe(1)
+			expect(mockFs.readdir).toHaveBeenCalledTimes(2)
 		})
 	})
 
 	describe('checkThresholds', () => {
-		it('should return healthy status when under thresholds', async () => {
-			const mockStats = {
-				size: 100 * 1024 * 1024, // 100MB
-				mtime: new Date(),
-				atime: new Date(),
+		function useFiles(count: number, sizeEach: number): void {
+			const files: Record<string, DiskFile> = {}
+			for (let index = 0; index < count; index++) {
+				files[`file-${index}.rst`] = { size: sizeEach }
 			}
+			useDisk(files)
+		}
 
-			mockFs.stat.mockResolvedValue(mockStats as any)
-
-			const result = await service.checkThresholds()
-
-			expect(result.status).toBe('healthy')
-			expect(result.issues).toEqual([])
+		it('exposes the configured thresholds', () => {
+			expect(service.thresholds).toEqual({
+				warningSize: 800 * MB,
+				criticalSize: 1024 * MB,
+				warningFileCount: 5000,
+				criticalFileCount: 10000,
+			})
 		})
 
-		it('should return warning status when approaching thresholds', async () => {
-			const mockStats = {
-				size: 210 * 1024 * 1024, // 210MB per file, 4 files = 840MB total (over warning threshold but under critical)
-				mtime: new Date(),
-				atime: new Date(),
-			}
+		it('is healthy below every threshold', async () => {
+			useFiles(10, MB)
 
-			mockFs.stat.mockResolvedValue(mockStats as any)
+			const check = await service.checkThresholds()
 
-			const result = await service.checkThresholds()
-
-			expect(result.status).toBe('warning')
-			expect(result.issues).toHaveLength(1)
-			expect(result.issues[0]).toContain('Storage size warning')
+			expect(check.status).toBe('healthy')
+			expect(check.issues).toEqual([])
+			expect(check.inventory.totalFiles).toBe(10)
 		})
 
-		it('should return critical status when exceeding thresholds', async () => {
-			const mockStats = {
-				size: 1100 * 1024 * 1024, // 1.1GB (over critical threshold)
-				mtime: new Date(),
-				atime: new Date(),
-			}
+		it('warns at the size warning threshold', async () => {
+			useFiles(8, 100 * MB)
 
-			mockFs.stat.mockResolvedValue(mockStats as any)
+			const check = await service.checkThresholds()
 
-			const result = await service.checkThresholds()
-
-			expect(result.status).toBe('critical')
-			expect(result.issues).toHaveLength(1)
-			expect(result.issues[0]).toContain('Storage size critical')
+			expect(check.status).toBe('warning')
+			expect(check.issues).toEqual(['Storage size warning: 800.0 MB / 800.0 MB'])
 		})
 
-		it('should detect old files', async () => {
-			const oldDate = new Date(Date.now() - 35 * 24 * 60 * 60 * 1000) // 35 days ago
-			const mockStats = {
-				size: 100 * 1024 * 1024,
-				mtime: new Date(),
-				atime: oldDate,
-			}
+		it('is critical at the size critical threshold', async () => {
+			useFiles(8, 128 * MB)
 
-			mockFs.stat.mockResolvedValue(mockStats as any)
+			const check = await service.checkThresholds()
 
-			const result = await service.checkThresholds()
+			expect(check.status).toBe('critical')
+			expect(check.issues).toEqual(['Storage size critical: 1.0 GB / 1.0 GB'])
+		})
 
-			expect(result.status).toBe('warning')
-			expect(result.issues.some(issue => issue.includes('older than 30 days'))).toBe(true)
+		it('warns at the file count warning threshold', async () => {
+			useFiles(5000, 1)
+
+			const check = await service.checkThresholds()
+
+			expect(check.status).toBe('warning')
+			expect(check.issues).toEqual(['File count warning: 5000 / 5000'])
+		})
+
+		it('is critical at the file count critical threshold', async () => {
+			useFiles(10000, 1)
+
+			const check = await service.checkThresholds()
+
+			expect(check.status).toBe('critical')
+			expect(check.issues).toEqual(['File count critical: 10000 / 10000'])
+		})
+
+		it('reports both issues and keeps critical when size is critical and count warns', async () => {
+			useFiles(8192, 128 * 1024)
+
+			const check = await service.checkThresholds()
+
+			expect(check.status).toBe('critical')
+			expect(check.issues).toEqual([
+				'Storage size critical: 1.0 GB / 1.0 GB',
+				'File count warning: 8192 / 5000',
+			])
+		})
+
+		it('reuses the inventory snapshot', async () => {
+			useFiles(1, 1)
+
+			await service.checkThresholds()
+			await service.checkThresholds()
+
+			expect(mockFs.readdir).toHaveBeenCalledTimes(1)
 		})
 	})
 
-	describe('getEvictionCandidates', () => {
-		beforeEach(() => {
-			const mockStats = {
-				size: 1024 * 1024,
-				mtime: new Date(),
-				atime: new Date(),
-			}
-			mockFs.stat.mockResolvedValue(mockStats as any)
+	describe('onModuleInit', () => {
+		it('creates the storage directory', async () => {
+			await service.onModuleInit()
+
+			expect(mockFs.mkdir).toHaveBeenCalledWith(STORAGE_DIR, { recursive: true })
 		})
 
-		it('should return candidates sorted by eviction score', async () => {
-			const candidates = await service.getEvictionCandidates()
-
-			expect(candidates).toBeDefined()
-			expect(Array.isArray(candidates)).toBe(true)
-		})
-
-		it('should respect target size when specified', async () => {
-			const targetSize = 2 * 1024 * 1024 // 2MB
-			const candidates = await service.getEvictionCandidates(targetSize)
-
-			const totalSize = candidates.reduce((sum, candidate) => sum + candidate.size, 0)
-			expect(totalSize).toBeGreaterThanOrEqual(targetSize)
-		})
-
-		it('should return default 20% of storage when no target specified', async () => {
-			const candidates = await service.getEvictionCandidates()
-
-			// Should return some candidates for eviction
-			expect(candidates.length).toBeGreaterThan(0)
-		})
-	})
-
-	describe('scanStorageDirectory', () => {
-		it('should update access patterns during scan', async () => {
-			const mockStats = {
-				size: 1024 * 1024,
-				mtime: new Date(),
-				atime: new Date(),
-			}
-			mockFs.stat.mockResolvedValue(mockStats as any)
-
-			await service.scanStorageDirectory()
-
-			// getLastScanTime/its backing field were removed as test-only
-			// surface; assert the scan's actual effect (populated access
-			// patterns) instead.
-			const patterns = (service as any).accessPatterns as Map<string, unknown>
-			expect(patterns.size).toBeGreaterThan(0)
-		})
-
-		it('should handle scan errors gracefully', async () => {
-			mockFs.readdir.mockRejectedValue(new Error('Permission denied'))
-
-			// Should not throw, but log error
-			await expect(service.scanStorageDirectory()).resolves.toBeUndefined()
-		})
-
-		it('should remove patterns for deleted files', async () => {
-			// First scan with all files
-			const mockStats = {
-				size: 1024 * 1024,
-				mtime: new Date(),
-				atime: new Date(),
-			}
-			mockFs.stat.mockResolvedValue(mockStats as any)
-			await service.scanStorageDirectory()
-
-			// Second scan with fewer files
-			mockFs.readdir.mockResolvedValue(['image1.webp', '.gitkeep'] as any)
-
-			// Should handle the change without errors
-			await expect(service.scanStorageDirectory()).resolves.toBeUndefined()
-		})
-	})
-
-	describe('initialization', () => {
-		it('should create storage directory if it does not exist', async () => {
-			// Create a new service instance to test initialization
-			const newService = new StorageMonitoringService(configService)
-			await newService.onModuleInit()
-
-			expect(mockFs.mkdir).toHaveBeenCalledWith(mockStorageDirectory, { recursive: true })
-		})
-
-		it('should handle directory creation errors', async () => {
+		it('rethrows when the directory cannot be created', async () => {
 			mockFs.mkdir.mockRejectedValue(new Error('Permission denied'))
 
-			// Should still initialize but log error
-			const newService = new StorageMonitoringService(configService)
-			await expect(newService.onModuleInit()).rejects.toThrow('Permission denied')
+			await expect(service.onModuleInit()).rejects.toThrow('Permission denied')
 		})
 	})
 })

@@ -1,10 +1,8 @@
-import type { ISecurityChecker, SecurityEvent } from '../interfaces/validator.interface.js'
-import { Inject, Injectable, Optional } from '@nestjs/common'
-import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
+import { Injectable } from '@nestjs/common'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 
-const SUSPICIOUS_PATTERNS: RegExp[] = [
+const SUSPICIOUS_PATTERNS: readonly RegExp[] = [
 	/<script\b[^>]{0,100}>/i,
 	/javascript:/i,
 	/vbscript:/i,
@@ -39,88 +37,55 @@ const SUSPICIOUS_PATTERNS: RegExp[] = [
 	/\$lt\b/i,
 ]
 
+/** Upload filenames carry random suffixes (`__ytXSDgf`), so image names skip the entropy test. */
 const IMAGE_EXTENSION_RE = /\.(?:jpe?g|png|gif|webp|svg|bmp|tiff?|ico|avif)$/i
-const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
 
-const REDIS_SECURITY_EVENTS_KEY = 'security:events'
-const REDIS_SECURITY_EVENTS_MAX = 10000
+/** Patterns are tested on a prefix so a huge value cannot turn matching into a DoS. */
+const PATTERN_TEST_MAX_LENGTH = 5000
+const ENTROPY_MIN_LENGTH = 20
+const ENTROPY_MAX_LENGTH = 1000
+const ENTROPY_SAMPLE_LENGTH = 500
+const ENTROPY_MAX_DISTINCT_CHARS = 256
+const ENTROPY_THRESHOLD_BITS = 4.5
 
+/**
+ * Detects injection, traversal and encoded-payload shapes in route parameters.
+ * Every parameter reaching the image pipeline is a string, so this is a
+ * string check only.
+ */
 @Injectable()
-export class SecurityCheckerService implements ISecurityChecker {
-	private readonly suspiciousPatterns: RegExp[]
-	private readonly securityEvents: SecurityEvent[] = []
+export class SecurityCheckerService {
 	private readonly maxStringLength: number
 
-	constructor(
-		private readonly _configService: ConfigService,
-		// The `| null` union erases design:paramtypes to `Object`, so Nest has no
-		// token to resolve and @Optional() would silently inject undefined —
-		// disabling Redis persistence entirely. The explicit token fixes that;
-		// @Optional() still covers contexts without CacheModule (unit specs).
-		@Optional() @Inject(RedisCacheService) private readonly _redisCacheService: RedisCacheService | null,
-	) {
-		this.suspiciousPatterns = SUSPICIOUS_PATTERNS
-		this.maxStringLength = this._configService.getOptional('validation.maxStringLength', 10000)
+	constructor(configService: ConfigService) {
+		this.maxStringLength = configService.get<number>('validation.maxStringLength')
 	}
 
-	async checkForMaliciousContent(input: any): Promise<boolean> {
-		if (input === null || input === undefined) {
+	checkForMaliciousContent(input: string): boolean {
+		if (input.length === 0) {
 			return false
 		}
 
-		if (typeof input === 'string') {
-			return this.checkString(input)
-		}
-
-		if (Array.isArray(input)) {
-			for (const item of input) {
-				if (await this.checkForMaliciousContent(item)) {
-					return true
-				}
-			}
-			return false
-		}
-
-		if (typeof input === 'object') {
-			return this.checkObject(input)
-		}
-
-		return false
-	}
-
-	private checkString(str: string): boolean {
-		if (str.length === 0) {
-			return false
-		}
-		if (str.length > this.maxStringLength) {
-			CorrelatedLogger.warn(`Excessively long string detected: ${str.length} characters`, SecurityCheckerService.name)
+		if (input.length > this.maxStringLength) {
+			CorrelatedLogger.warn(`Excessively long string detected: ${input.length} characters`, SecurityCheckerService.name)
 			return true
 		}
 
-		const maxPatternTestLength = 5000
-		const testStr = str.length > maxPatternTestLength ? str.substring(0, maxPatternTestLength) : str
-
-		for (const pattern of this.suspiciousPatterns) {
-			try {
-				if (pattern.test(testStr)) {
-					CorrelatedLogger.warn(`Suspicious pattern detected: ${pattern.source}`, SecurityCheckerService.name)
-					return true
-				}
-			}
-			catch {
-				CorrelatedLogger.warn(`Pattern matching failed, potential ReDoS attempt: ${pattern.source}`, SecurityCheckerService.name)
-				return true
-			}
+		const sample = input.length > PATTERN_TEST_MAX_LENGTH ? input.substring(0, PATTERN_TEST_MAX_LENGTH) : input
+		const matched = SUSPICIOUS_PATTERNS.find(pattern => pattern.test(sample))
+		if (matched) {
+			CorrelatedLogger.warn(`Suspicious pattern detected: ${matched.source}`, SecurityCheckerService.name)
+			return true
 		}
 
-		// Check decoded variants to catch mixed-case encoding (%2E%2E/),
-		// partial encoding (..%2f), and overlong UTF-8 sequences (%c0%ae...)
-		if (this.containsPathTraversal(str)) {
+		// Decoded variants catch mixed-case encoding (%2E%2E/), partial encoding
+		// (..%2f) and double encoding (%252e%252e%252f → ../).
+		if (this.containsEncodedTraversal(input)) {
 			CorrelatedLogger.warn('Path traversal detected in decoded input', SecurityCheckerService.name)
 			return true
 		}
 
-		if (this.hasHighEntropy(str)) {
+		if (this.hasHighEntropy(input)) {
 			CorrelatedLogger.warn('High entropy string detected (potential encoded payload)', SecurityCheckerService.name)
 			return true
 		}
@@ -128,141 +93,48 @@ export class SecurityCheckerService implements ISecurityChecker {
 		return false
 	}
 
-	private containsPathTraversal(path: string): boolean {
-		// Raw string already checked by suspiciousPatterns above — only need decoded variants
+	private containsEncodedTraversal(value: string): boolean {
 		try {
-			const decoded = decodeURIComponent(path)
-			if (decoded !== path && this.suspiciousPatterns.some((p) => {
-				try {
-					return p.test(decoded)
-				}
-				catch {
-					return true
-				}
-			})) {
+			const decoded = decodeURIComponent(value)
+			if (decoded !== value && SUSPICIOUS_PATTERNS.some(pattern => pattern.test(decoded))) {
 				return true
 			}
 
-			// Double-decode catches sequences encoded twice (%252e%252e%252f → ../)
 			const doubleDecoded = decodeURIComponent(decoded)
-			if (doubleDecoded !== decoded && this.suspiciousPatterns.some((p) => {
-				try {
-					return p.test(doubleDecoded)
-				}
-				catch {
-					return true
-				}
-			})) {
-				return true
-			}
+			return doubleDecoded !== decoded && SUSPICIOUS_PATTERNS.some(pattern => pattern.test(doubleDecoded))
 		}
 		catch {
 			// Malformed percent-encoding is inherently suspicious — reject it
 			return true
 		}
-
-		return false
 	}
 
-	private async checkObject(obj: any): Promise<boolean> {
-		for (const key of Object.keys(obj)) {
-			if (DANGEROUS_KEYS.has(key)) {
-				CorrelatedLogger.warn(`Dangerous object key detected: ${key}`, SecurityCheckerService.name)
-				return true
-			}
-
-			if (await this.checkForMaliciousContent(obj[key])) {
-				return true
-			}
-		}
-
-		if (this.getObjectDepth(obj) > 10) {
-			CorrelatedLogger.warn('Excessively deep object detected (potential DoS)', SecurityCheckerService.name)
-			return true
-		}
-
-		return false
-	}
-
-	private hasHighEntropy(str: string): boolean {
-		const maxLengthForEntropy = 1000
-		if (str.length < 20 || str.length > maxLengthForEntropy)
-			return false
-
-		// Skip entropy check for filenames with common image extensions
-		// file upload system could adds random suffixes like __ytXSDgf which have high entropy
-		if (IMAGE_EXTENSION_RE.test(str)) {
+	private hasHighEntropy(value: string): boolean {
+		if (value.length < ENTROPY_MIN_LENGTH || value.length > ENTROPY_MAX_LENGTH) {
 			return false
 		}
 
-		const sampleStr = str.length > 500 ? str.substring(0, 500) : str
-
-		const charCount: { [key: string]: number } = {}
-		for (const char of sampleStr) {
-			charCount[char] = (charCount[char] || 0) + 1
+		if (IMAGE_EXTENSION_RE.test(value)) {
+			return false
 		}
 
-		if (Object.keys(charCount).length > 256) {
+		const sample = value.length > ENTROPY_SAMPLE_LENGTH ? value.substring(0, ENTROPY_SAMPLE_LENGTH) : value
+
+		const charCount = new Map<string, number>()
+		for (const char of sample) {
+			charCount.set(char, (charCount.get(char) ?? 0) + 1)
+		}
+
+		if (charCount.size > ENTROPY_MAX_DISTINCT_CHARS) {
 			return false
 		}
 
 		let entropy = 0
-		const length = sampleStr.length
-		for (const count of Object.values(charCount)) {
-			const probability = count / length
+		for (const count of charCount.values()) {
+			const probability = count / sample.length
 			entropy -= probability * Math.log2(probability)
 		}
 
-		return entropy > 4.5
-	}
-
-	private getObjectDepth(obj: any, depth = 0): number {
-		if (depth > 20)
-			return depth
-
-		if (obj === null || typeof obj !== 'object') {
-			return depth
-		}
-
-		let maxDepth = depth
-		for (const value of Object.values(obj)) {
-			if (typeof value === 'object' && value !== null) {
-				const childDepth = this.getObjectDepth(value, depth + 1)
-				maxDepth = Math.max(maxDepth, childDepth)
-			}
-		}
-
-		return maxDepth
-	}
-
-	async logSecurityEvent(event: SecurityEvent): Promise<void> {
-		if (!event.timestamp) {
-			event.timestamp = new Date()
-		}
-
-		// Fast in-memory store for health/stats endpoints (capped at 1000)
-		this.securityEvents.push(event)
-		if (this.securityEvents.length > 1000) {
-			this.securityEvents.shift()
-		}
-
-		CorrelatedLogger.warn(`Security event: ${event.type} (source: ${event.source}, ip: ${event.clientIp || 'n/a'}, ua: ${event.userAgent || 'n/a'}, details: ${JSON.stringify(event.details)})`, SecurityCheckerService.name)
-
-		// Persist to Redis for cross-replica visibility and crash durability (fire-and-forget)
-		this.persistEventToRedis(event)
-	}
-
-	private persistEventToRedis(event: SecurityEvent): void {
-		const redisClient = this._redisCacheService?.getClient()
-		if (!redisClient) {
-			return
-		}
-
-		const serialized = JSON.stringify(event)
-		redisClient.lpush(REDIS_SECURITY_EVENTS_KEY, serialized)
-			.then(() => redisClient.ltrim(REDIS_SECURITY_EVENTS_KEY, 0, REDIS_SECURITY_EVENTS_MAX - 1))
-			.catch((error: unknown) => {
-				CorrelatedLogger.warn(`Failed to persist security event to Redis: ${(error as Error).message}`, SecurityCheckerService.name)
-			})
+		return entropy > ENTROPY_THRESHOLD_BITS
 	}
 }

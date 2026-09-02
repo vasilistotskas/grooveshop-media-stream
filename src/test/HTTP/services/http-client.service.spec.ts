@@ -5,17 +5,16 @@ import { AxiosError } from 'axios'
 import { Observable, of, throwError } from 'rxjs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
+import { CircuitBreakerOpenError } from '#microservice/common/errors/media-stream.errors'
 import { ConfigService } from '#microservice/Config/config.service'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
+import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 
 describe('httpClientService', () => {
 	let service: HttpClientService
 	let httpService: HttpService
 
-	const mockConfigService = {
-		getOptional: vi.fn(),
-		get: vi.fn(),
-	}
+	let mockConfigService: ConfigService
 
 	const mockRedisCacheService = {
 		set: vi.fn(),
@@ -24,14 +23,7 @@ describe('httpClientService', () => {
 
 	beforeEach(async () => {
 		vi.clearAllMocks()
-
-		// Setup default config values
-		const configImplementation = (_key: string, defaultValue: any) => {
-			return defaultValue
-		}
-
-		mockConfigService.getOptional.mockImplementation(configImplementation)
-		// Removed Redis config mock for get() as it is no longer used manually
+		mockConfigService = createConfigServiceMock()
 
 		const module: TestingModule = await Test.createTestingModule({
 			imports: [NestHttpModule],
@@ -57,16 +49,8 @@ describe('httpClientService', () => {
 			expect(service).toBeDefined()
 		})
 
-		it('should load configuration from ConfigService', () => {
-			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.maxRetries', 3)
-			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.retryDelay', 1000)
-			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.maxRetryDelay', 10000)
-			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.timeout', 30000)
-			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.circuitBreaker.enabled', true)
-			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.circuitBreaker.failureThreshold', 50)
-			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.circuitBreaker.resetTimeout', 30000)
-			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.circuitBreaker.monitoringPeriod', 60000)
-			expect(mockConfigService.getOptional).toHaveBeenCalledWith('http.circuitBreaker.minimumRequests', 10)
+		it('should load the http configuration group once', () => {
+			expect(mockConfigService.get).toHaveBeenCalledWith('http')
 		})
 	})
 
@@ -85,23 +69,6 @@ describe('httpClientService', () => {
 			const result = await service.get('https://example.com')
 			expect(result).toEqual(mockResponse)
 			expect(httpService.get).toHaveBeenCalledWith(expect.stringContaining('example.com'), expect.any(Object))
-		})
-
-		it('should execute POST requests', async () => {
-			const mockResponse: AxiosResponse = {
-				data: { test: 'data' },
-				status: 200,
-				statusText: 'OK',
-				headers: {},
-				config: { url: 'https://example.com', method: 'post' } as any,
-			}
-
-			const postData = { foo: 'bar' }
-			vi.spyOn(httpService, 'post').mockReturnValueOnce(of(mockResponse))
-
-			const result = await service.post('https://example.com', postData)
-			expect(result).toEqual(mockResponse)
-			expect(httpService.post).toHaveBeenCalledWith('https://example.com', postData, expect.any(Object))
 		})
 	})
 
@@ -189,6 +156,37 @@ describe('httpClientService', () => {
 			expect(stats.successfulRequests).toBe(0)
 			expect(stats.failedRequests).toBe(2)
 		}, 15000)
+
+		it('rejects with CircuitBreakerOpenError, without a request, once the breaker is open', async () => {
+			const module: TestingModule = await Test.createTestingModule({
+				imports: [NestHttpModule],
+				providers: [
+					HttpClientService,
+					{
+						provide: ConfigService,
+						useValue: createConfigServiceMock({
+							'http.maxRetries': 0,
+							'http.circuitBreaker.minimumRequests': 1,
+							'http.circuitBreaker.failureThreshold': 50,
+						}),
+					},
+					{ provide: RedisCacheService, useValue: mockRedisCacheService },
+				],
+			}).compile()
+			const trippable = module.get<HttpClientService>(HttpClientService)
+			const trippableHttp = module.get<HttpService>(HttpService)
+
+			const upstreamError = new Error('HTTP Error') as AxiosError
+			upstreamError.response = { status: 503, data: 'Unavailable' } as any
+			const getSpy = vi.spyOn(trippableHttp, 'get').mockReturnValue(throwError(() => upstreamError))
+
+			await expect(trippable.get('https://example.com')).rejects.toBe(upstreamError)
+			expect(trippable.isCircuitOpen()).toBe(true)
+
+			getSpy.mockClear()
+			await expect(trippable.get('https://example.com')).rejects.toBeInstanceOf(CircuitBreakerOpenError)
+			expect(getSpy).not.toHaveBeenCalled()
+		})
 	})
 
 	describe('concurrency Control', () => {

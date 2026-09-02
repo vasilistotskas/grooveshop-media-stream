@@ -1,7 +1,5 @@
-import type { Metadata } from '#microservice/common/types/common.types'
 import * as process from 'node:process'
 import { requestContextStorage } from '../async-local-storage.js'
-
 import { CorrelatedLogger } from './logger.util.js'
 
 interface PerformancePhase {
@@ -9,69 +7,44 @@ interface PerformancePhase {
 	startTime: bigint
 	endTime?: bigint
 	duration?: number
-	metadata?: Metadata
 }
 
+const MAX_TRACKED_REQUESTS = 1000
+const MAX_AGE_MS = 5 * 60 * 1000
+/** Phases slower than this are logged at warn. */
+const SLOW_PHASE_MS = 1000
+
+/**
+ * Per-request phase timings, keyed by the correlation id from
+ * AsyncLocalStorage. TimingMiddleware logs and clears them when the
+ * response ends; the caps below bound the map if a request never ends.
+ */
 export class PerformanceTracker {
-	private static readonly MAX_TRACKED_REQUESTS = 1000
-	private static readonly MAX_AGE_MS = 5 * 60 * 1000 // 5 minutes
 	private static phases = new Map<string, PerformancePhase[]>()
 	private static timestamps = new Map<string, number>()
 
 	private static getCorrelationId(): string | null {
-		const store = requestContextStorage.getStore()
-		return store?.correlationId || null
+		return requestContextStorage.getStore()?.correlationId || null
 	}
 
-	/**
-	 * Start tracking a performance phase
-	 */
-	static startPhase(phaseName: string, metadata?: Metadata): void {
+	static startPhase(phaseName: string): void {
 		const correlationId = this.getCorrelationId()
 		if (!correlationId)
 			return
 
-		const phase: PerformancePhase = {
-			name: phaseName,
-			startTime: process.hrtime.bigint(),
-			metadata,
-		}
-
 		if (!this.phases.has(correlationId)) {
-			// Evict stale entries (older than MAX_AGE_MS) and oldest if map is too large
-			const now = Date.now()
-			if (this.phases.size >= this.MAX_TRACKED_REQUESTS) {
-				for (const [key, ts] of this.timestamps) {
-					if (now - ts > this.MAX_AGE_MS) {
-						this.phases.delete(key)
-						this.timestamps.delete(key)
-					}
-				}
-				// If still too large after TTL eviction, drop oldest
-				if (this.phases.size >= this.MAX_TRACKED_REQUESTS) {
-					const firstKey = this.phases.keys().next().value
-					if (firstKey) {
-						this.phases.delete(firstKey)
-						this.timestamps.delete(firstKey)
-					}
-				}
-			}
+			this.evictStale()
 			this.phases.set(correlationId, [])
-			this.timestamps.set(correlationId, now)
+			this.timestamps.set(correlationId, Date.now())
 		}
 
-		this.phases.get(correlationId)!.push(phase)
+		this.phases.get(correlationId)!.push({ name: phaseName, startTime: process.hrtime.bigint() })
 
-		CorrelatedLogger.debug(
-			`Performance phase started: ${phaseName}${metadata ? ` (${JSON.stringify(metadata)})` : ''}`,
-			'PerformanceTracker',
-		)
+		CorrelatedLogger.debug(`Performance phase started: ${phaseName}`, PerformanceTracker.name)
 	}
 
-	/**
-	 * End tracking a performance phase
-	 */
-	static endPhase(phaseName: string, metadata?: Metadata): number | null {
+	/** Ends the most recent open phase with this name; returns its duration in ms. */
+	static endPhase(phaseName: string): number | null {
 		const correlationId = this.getCorrelationId()
 		if (!correlationId)
 			return null
@@ -80,7 +53,6 @@ export class PerformanceTracker {
 		if (!phases)
 			return null
 
-		// Find last uncompleted phase with this name — backward loop avoids array copy
 		let phase: PerformancePhase | undefined
 		for (let i = phases.length - 1; i >= 0; i--) {
 			if (phases[i].name === phaseName && !phases[i].endTime) {
@@ -90,46 +62,29 @@ export class PerformanceTracker {
 		}
 
 		if (!phase) {
-			CorrelatedLogger.warn(
-				`Performance phase not found or already ended: ${phaseName}`,
-				'PerformanceTracker',
-			)
+			CorrelatedLogger.warn(`Performance phase not found or already ended: ${phaseName}`, PerformanceTracker.name)
 			return null
 		}
 
 		phase.endTime = process.hrtime.bigint()
 		phase.duration = Number(phase.endTime - phase.startTime) / 1_000_000
 
-		if (metadata) {
-			phase.metadata = { ...phase.metadata, ...metadata }
-		}
-
-		const message = `Performance phase completed: ${phaseName} - ${phase.duration.toFixed(2)}ms${phase.metadata ? ` (${JSON.stringify(phase.metadata)})` : ''}`
-
-		if (phase.duration > 1000) {
-			CorrelatedLogger.warn(message, 'PerformanceTracker')
+		const message = `Performance phase completed: ${phaseName} - ${phase.duration.toFixed(2)}ms`
+		if (phase.duration > SLOW_PHASE_MS) {
+			CorrelatedLogger.warn(message, PerformanceTracker.name)
 		}
 		else {
-			CorrelatedLogger.debug(message, 'PerformanceTracker')
+			CorrelatedLogger.debug(message, PerformanceTracker.name)
 		}
 
 		return phase.duration
 	}
 
-	/**
-	 * Get all performance phases for the current request
-	 */
 	static getPhases(): PerformancePhase[] {
 		const correlationId = this.getCorrelationId()
-		if (!correlationId)
-			return []
-
-		return this.phases.get(correlationId) || []
+		return correlationId ? this.phases.get(correlationId) || [] : []
 	}
 
-	/**
-	 * Get performance summary for the current request
-	 */
 	static getSummary(): {
 		totalPhases: number
 		completedPhases: number
@@ -138,10 +93,12 @@ export class PerformanceTracker {
 		phases: PerformancePhase[]
 	} {
 		const phases = this.getPhases()
-		const completedPhases = phases.filter(p => p.duration !== undefined)
-		const totalDuration = completedPhases.reduce((sum: any, p: any) => sum + (p.duration || 0), 0)
-		const slowestPhase = completedPhases.reduce((slowest: any, current: any) =>
-			!slowest || (current.duration || 0) > (slowest.duration || 0) ? current : slowest, undefined as PerformancePhase | undefined)
+		const completedPhases = phases.filter(phase => phase.duration !== undefined)
+		const totalDuration = completedPhases.reduce((sum, phase) => sum + (phase.duration ?? 0), 0)
+		const slowestPhase = completedPhases.reduce<PerformancePhase | undefined>(
+			(slowest, current) => !slowest || (current.duration ?? 0) > (slowest.duration ?? 0) ? current : slowest,
+			undefined,
+		)
 
 		return {
 			totalPhases: phases.length,
@@ -152,10 +109,6 @@ export class PerformanceTracker {
 		}
 	}
 
-	/**
-	 * Clean up tracking data for a request
-	 * effectively preventing memory leaks
-	 */
 	static cleanup(correlationId?: string): void {
 		const id = correlationId || this.getCorrelationId()
 		if (id) {
@@ -165,46 +118,46 @@ export class PerformanceTracker {
 	}
 
 	/**
-	 * Measure the execution time of a function
-	 */
-	static async measure<T>(
-		phaseName: string,
-		fn: () => Promise<T> | T,
-		metadata?: Metadata,
-	): Promise<T> {
-		this.startPhase(phaseName, metadata)
-		try {
-			const result = await fn()
-			this.endPhase(phaseName, { success: true })
-			return result
-		}
-		catch (error: unknown) {
-			this.endPhase(phaseName, {
-				success: false,
-				error: error instanceof Error ? (error as Error).message : 'Unknown error',
-			})
-			throw error
-		}
-	}
-
-	/**
-	 * Log performance summary at the end of a request
+	 * One debug line per request with the phase breakdown. Debug, not info:
+	 * the default LOG_LEVEL exists so logs are not flooded with one entry per
+	 * request; TimingMiddleware already escalates slow/failed requests.
 	 */
 	static logSummary(): void {
 		const summary = this.getSummary()
 		if (summary.totalPhases === 0)
 			return
 
-		const store = requestContextStorage.getStore()
-		const requestDuration = store?.duration
+		const requestDuration = requestContextStorage.getStore()?.duration
 
-		CorrelatedLogger.log(
+		CorrelatedLogger.debug(
 			`Performance Summary: ${summary.completedPhases}/${summary.totalPhases} phases completed, `
-			+ `total phase time: ${summary.totalDuration.toFixed(2)}ms${requestDuration ? `, request time: ${requestDuration.toFixed(2)}ms` : ''
-			}${summary.slowestPhase ? `, slowest: ${summary.slowestPhase.name} (${summary.slowestPhase.duration?.toFixed(2)}ms)` : ''}`,
-			'PerformanceTracker',
+			+ `total phase time: ${summary.totalDuration.toFixed(2)}ms${requestDuration ? `, request time: ${requestDuration.toFixed(2)}ms` : ''}`
+			+ `${summary.slowestPhase ? `, slowest: ${summary.slowestPhase.name} (${summary.slowestPhase.duration?.toFixed(2)}ms)` : ''}`,
+			PerformanceTracker.name,
 		)
 
 		this.cleanup()
+	}
+
+	/** Drop requests older than MAX_AGE_MS, then the oldest one if still over the cap. */
+	private static evictStale(): void {
+		if (this.phases.size < MAX_TRACKED_REQUESTS)
+			return
+
+		const now = Date.now()
+		for (const [key, timestamp] of this.timestamps) {
+			if (now - timestamp > MAX_AGE_MS) {
+				this.phases.delete(key)
+				this.timestamps.delete(key)
+			}
+		}
+
+		if (this.phases.size >= MAX_TRACKED_REQUESTS) {
+			const oldest = this.phases.keys().next().value
+			if (oldest) {
+				this.phases.delete(oldest)
+				this.timestamps.delete(oldest)
+			}
+		}
 	}
 }

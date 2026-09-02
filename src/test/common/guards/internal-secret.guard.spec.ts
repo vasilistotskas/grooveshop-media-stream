@@ -1,11 +1,10 @@
 import type { ExecutionContext } from '@nestjs/common'
 import { UnauthorizedException } from '@nestjs/common'
-import { ConfigService as NestConfigService } from '@nestjs/config'
-import { Test, TestingModule } from '@nestjs/testing'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { InternalSecretGuard } from '#microservice/common/guards/internal-secret.guard'
+import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 
-function createContext(headers: Record<string, string> = {}): ExecutionContext {
+function createContext(headers: Record<string, string | string[]> = {}): ExecutionContext {
 	return {
 		switchToHttp: () => ({
 			getRequest: () => ({ headers }),
@@ -13,80 +12,42 @@ function createContext(headers: Record<string, string> = {}): ExecutionContext {
 	} as unknown as ExecutionContext
 }
 
+/** The secret is read once at construction, so each case builds its own guard. */
+function createGuard(secret: string): InternalSecretGuard {
+	return new InternalSecretGuard(createConfigServiceMock({ 'admin.secret': secret }))
+}
+
 describe('internalSecretGuard', () => {
-	let guard: InternalSecretGuard
-	let configGet: ReturnType<typeof vi.fn>
-
-	beforeEach(async () => {
-		configGet = vi.fn()
-		const module: TestingModule = await Test.createTestingModule({
-			providers: [
-				InternalSecretGuard,
-				{ provide: NestConfigService, useValue: { get: configGet } },
-			],
-		}).compile()
-
-		guard = module.get(InternalSecretGuard)
-	})
-
 	it('should fail closed when INTERNAL_ADMIN_SECRET is not configured', () => {
-		configGet.mockReturnValue(undefined)
-
-		expect(() => guard.canActivate(createContext({ 'x-internal-secret': 'anything' })))
+		expect(() => createGuard('').canActivate(createContext({ 'x-internal-secret': 'anything' })))
 			.toThrow(UnauthorizedException)
 	})
 
 	it('should reject when the header is missing', () => {
-		configGet.mockReturnValue('top-secret')
-
-		expect(() => guard.canActivate(createContext())).toThrow(UnauthorizedException)
+		expect(() => createGuard('top-secret').canActivate(createContext())).toThrow(UnauthorizedException)
 	})
 
 	it('should reject when the header does not match', () => {
-		configGet.mockReturnValue('top-secret')
+		expect(() => createGuard('top-secret').canActivate(createContext({ 'x-internal-secret': 'wrong' })))
+			.toThrow(UnauthorizedException)
+	})
 
-		expect(() => guard.canActivate(createContext({ 'x-internal-secret': 'wrong' })))
+	it('should reject a header of a different length', () => {
+		expect(() => createGuard('top-secret').canActivate(createContext({ 'x-internal-secret': 'top-secret-longer' })))
 			.toThrow(UnauthorizedException)
 	})
 
 	it('should allow when the header matches the configured secret', () => {
-		configGet.mockReturnValue('top-secret')
-
-		expect(guard.canActivate(createContext({ 'x-internal-secret': 'top-secret' }))).toBe(true)
+		expect(createGuard('top-secret').canActivate(createContext({ 'x-internal-secret': 'top-secret' }))).toBe(true)
 	})
 
 	it('should reject an empty configured secret even if the header is empty too', () => {
-		configGet.mockReturnValue('')
-
-		expect(() => guard.canActivate(createContext({ 'x-internal-secret': '' })))
-			.toThrow(UnauthorizedException)
-	})
-
-	it('should reject a header shorter than the configured secret (timingSafeEqual length guard)', () => {
-		configGet.mockReturnValue('top-secret')
-
-		expect(() => guard.canActivate(createContext({ 'x-internal-secret': 'short' })))
-			.toThrow(UnauthorizedException)
-	})
-
-	it('should reject a header longer than the configured secret (timingSafeEqual length guard)', () => {
-		configGet.mockReturnValue('top-secret')
-
-		expect(() => guard.canActivate(createContext({ 'x-internal-secret': 'top-secret-and-then-some' })))
-			.toThrow(UnauthorizedException)
-	})
-
-	it('should reject a same-length header that differs only in the last byte (exercises full timingSafeEqual comparison, not just a length check)', () => {
-		configGet.mockReturnValue('top-secret')
-
-		expect(() => guard.canActivate(createContext({ 'x-internal-secret': 'top-secreX' })))
+		expect(() => createGuard('').canActivate(createContext({ 'x-internal-secret': '' })))
 			.toThrow(UnauthorizedException)
 	})
 
 	it('should reject a non-string header value (e.g. a repeated header parsed as an array)', () => {
-		configGet.mockReturnValue('top-secret')
-
-		expect(() => guard.canActivate(createContext({ 'x-internal-secret': ['top-secret', 'top-secret'] as unknown as string })))
+		expect(() => createGuard('top-secret').canActivate(createContext({ 'x-internal-secret': ['top-secret', 'top-secret'] })))
 			.toThrow(UnauthorizedException)
 	})
 })

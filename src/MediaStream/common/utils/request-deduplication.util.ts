@@ -60,24 +60,6 @@ export class RequestDeduplicator<T = void> implements OnModuleDestroy {
 		return promise
 	}
 
-	/**
-	 * Get statistics about pending requests
-	 */
-	getStats(): { pending: number, keys: string[] } {
-		return {
-			pending: this.pendingRequests.size,
-			keys: Array.from(this.pendingRequests.keys()),
-		}
-	}
-
-	/**
-	 * Clear all pending requests (use with caution)
-	 */
-	clear(): void {
-		this.pendingRequests.clear()
-		CorrelatedLogger.warn('All pending requests cleared', RequestDeduplicator.name)
-	}
-
 	private async executeWithCleanup(key: string, fn: () => Promise<T>): Promise<T> {
 		try {
 			const result = await fn()

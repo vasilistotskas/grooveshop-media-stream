@@ -20,25 +20,13 @@
         }
 
         .container {
-            max-width: 1000px;
+            max-width: 720px;
             margin: 0 auto;
-            animation: fadeIn 0.6s ease-out;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
         }
 
         .header {
             text-align: center;
-            margin-bottom: 50px;
+            margin-bottom: 40px;
         }
 
         .logo {
@@ -55,229 +43,80 @@
         .subtitle {
             color: #94a3b8;
             font-size: 1.1em;
-            font-weight: 400;
-        }
-
-        .version {
-            display: inline-block;
-            background: rgba(0, 255, 136, 0.1);
-            color: #00ff88;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.8em;
-            font-weight: 600;
-            margin-top: 10px;
-            border: 1px solid rgba(0, 255, 136, 0.2);
         }
 
         .card {
             background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 16px;
-            padding: 30px;
+            padding: 24px 30px;
             margin-bottom: 24px;
-            transition: all 0.3s ease;
-        }
-
-        .card:hover {
-            background: rgba(255, 255, 255, 0.05);
-            border-color: rgba(0, 255, 136, 0.3);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 32px rgba(0, 255, 136, 0.1);
         }
 
         .card-title {
-            font-size: 1.3em;
+            font-size: 1.1em;
             font-weight: 600;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            color: #f1f5f9;
-        }
-
-        .card-title::before {
-            content: '';
-            width: 4px;
-            height: 24px;
-            background: linear-gradient(135deg, #00ff88 0%, #00d4ff 100%);
-            border-radius: 2px;
-        }
-
-        .status-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-        }
-
-        .stat-box {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 12px;
-            padding: 20px;
-            transition: all 0.2s ease;
-        }
-
-        .stat-box:hover {
-            background: rgba(255, 255, 255, 0.04);
-            border-color: rgba(0, 255, 136, 0.2);
-        }
-
-        .stat-label {
-            color: #94a3b8;
-            font-size: 0.85em;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
-        }
-
-        .stat-value {
-            color: #00ff88;
-            font-size: 1.5em;
-            font-weight: 700;
-        }
-
-        .stat-value.loading::after {
-            content: '...';
-            animation: dots 1.5s steps(3, end) infinite;
-        }
-
-        @keyframes dots {
-            0%, 20% { content: '.'; }
-            40% { content: '..'; }
-            60%, 100% { content: '...'; }
-        }
-
-        .status-indicator {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            background: rgba(0, 255, 136, 0.1);
-            border: 1px solid rgba(0, 255, 136, 0.2);
-            border-radius: 8px;
-            font-size: 0.9em;
-            font-weight: 500;
-        }
-
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #00ff88;
-            box-shadow: 0 0 10px #00ff88;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% {
-                opacity: 1;
-                transform: scale(1);
-            }
-            50% {
-                opacity: 0.6;
-                transform: scale(1.2);
-            }
-        }
-
-        .endpoint-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
+            color: #00d4ff;
+            margin-bottom: 16px;
         }
 
         .endpoint {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 14px 18px;
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 12px 16px;
             border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            font-size: 0.95em;
+            color: inherit;
+            text-decoration: none;
+            transition: background 0.15s ease;
         }
 
         .endpoint:hover {
-            background: rgba(0, 255, 136, 0.05);
-            border-color: rgba(0, 255, 136, 0.3);
-            transform: translateX(4px);
+            background: rgba(0, 212, 255, 0.08);
         }
 
         .method {
-            padding: 4px 10px;
-            border-radius: 6px;
             font-size: 0.75em;
             font-weight: 700;
-            text-transform: uppercase;
             letter-spacing: 0.5px;
-        }
-
-        .method.get {
-            background: rgba(59, 130, 246, 0.2);
-            color: #60a5fa;
-            border: 1px solid rgba(59, 130, 246, 0.3);
+            padding: 3px 8px;
+            border-radius: 6px;
+            background: rgba(0, 255, 136, 0.15);
+            color: #00ff88;
         }
 
         .endpoint-path {
-            color: #cbd5e1;
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 0.9em;
-            flex: 1;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        }
+
+        .endpoint-note {
+            margin-left: auto;
+            color: #94a3b8;
+            font-size: 0.85em;
         }
 
         .footer {
             text-align: center;
-            padding: 40px 20px 20px;
-            color: #64748b;
+            color: #94a3b8;
             font-size: 0.9em;
         }
 
         .footer a {
-            color: #00ff88;
+            color: #00d4ff;
             text-decoration: none;
-            transition: all 0.2s ease;
         }
 
         .footer a:hover {
-            color: #00d4ff;
+            text-decoration: underline;
         }
 
-        .tech-stack {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            flex-wrap: wrap;
-            margin-top: 16px;
-        }
-
-        .tech-badge {
-            padding: 6px 14px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: 500;
-        }
-
-        @media (max-width: 768px) {
-            body {
-                padding: 20px 10px;
-            }
-
+        @media (max-width: 600px) {
             .logo {
                 font-size: 2em;
             }
 
             .card {
                 padding: 20px;
-            }
-
-            .tech-stack {
-                gap: 10px;
             }
         }
     </style>
@@ -286,112 +125,36 @@
     <div class="container">
         <div class="header">
             <div class="logo">GrooveShop Media Stream</div>
-            <div class="subtitle">High-Performance Image Processing API</div>
-            <span class="version">v2.60.4</span>
+            <div class="subtitle">Image processing and streaming service</div>
         </div>
 
         <div class="card">
-            <div class="card-title">System Status</div>
-            <div class="status-grid">
-                <div class="stat-box">
-                    <div class="stat-label">Status</div>
-                    <div class="stat-value loading" id="healthStatus">Loading</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Uptime</div>
-                    <div class="stat-value" id="uptime">--</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Environment</div>
-                    <div class="stat-value" id="environment">--</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Node.js</div>
-                    <div class="stat-value" id="nodeVersion">--</div>
-                </div>
-            </div>
-            <div style="margin-top: 20px;">
-                <div class="status-indicator">
-                    <div class="status-dot" id="statusDot"></div>
-                    <span id="statusText">Checking system health...</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-title">Quick Links</div>
-            <div class="endpoint-list">
-                <div class="endpoint" onclick="openEndpoint('/health')">
-                    <span class="method get">GET</span>
-                    <span class="endpoint-path">/health</span>
-                </div>
-                <div class="endpoint" onclick="openEndpoint('/metrics')">
-                    <span class="method get">GET</span>
-                    <span class="endpoint-path">/metrics</span>
-                </div>
+            <div class="card-title">Endpoints</div>
+            <a class="endpoint" href="/health">
+                <span class="method">GET</span>
+                <span class="endpoint-path">/health</span>
+                <span class="endpoint-note">full health report</span>
+            </a>
+            <a class="endpoint" href="/health/live">
+                <span class="method">GET</span>
+                <span class="endpoint-path">/health/live</span>
+                <span class="endpoint-note">liveness</span>
+            </a>
+            <a class="endpoint" href="/health/ready">
+                <span class="method">GET</span>
+                <span class="endpoint-path">/health/ready</span>
+                <span class="endpoint-note">readiness</span>
+            </a>
+            <div class="endpoint">
+                <span class="method">GET</span>
+                <span class="endpoint-path">/media_stream-image/…</span>
+                <span class="endpoint-note">image routes</span>
             </div>
         </div>
 
         <div class="footer">
-            <div>Built with ❤️ for <a href="https://github.com/vasilistotskas/grooveshop-media-stream" target="_blank">GrooveShop</a></div>
-            <div class="tech-stack">
-                <span class="tech-badge">NestJS 11</span>
-                <span class="tech-badge">Sharp 0.34</span>
-                <span class="tech-badge">Redis 7</span>
-                <span class="tech-badge">Bull 4</span>
-            </div>
+            Built for <a href="https://github.com/vasilistotskas/grooveshop-media-stream" target="_blank" rel="noopener">GrooveShop</a>
         </div>
     </div>
-
-    <script>
-        function openEndpoint(path) {
-            window.open(path, '_blank');
-        }
-
-        function formatUptime(seconds) {
-            const days = Math.floor(seconds / 86400);
-            const hours = Math.floor((seconds % 86400) / 3600);
-            const minutes = Math.floor((seconds % 3600) / 60);
-
-            if (days > 0) return `${days}d ${hours}h`;
-            if (hours > 0) return `${hours}h ${minutes}m`;
-            if (minutes > 0) return `${minutes}m`;
-            return `${Math.floor(seconds)}s`;
-        }
-
-        async function loadHealthStatus() {
-            try {
-                const response = await fetch('/health/detailed');
-                if (!response.ok) throw new Error('Health check failed');
-
-                const data = await response.json();
-
-                document.getElementById('healthStatus').textContent = data.status.toUpperCase();
-                document.getElementById('healthStatus').className = 'stat-value';
-
-                document.getElementById('uptime').textContent = formatUptime(data.uptime);
-                document.getElementById('environment').textContent = data.environment.toUpperCase();
-                document.getElementById('nodeVersion').textContent = data.systemInfo.nodeVersion;
-
-                document.getElementById('statusText').textContent = 'All systems operational';
-                document.getElementById('statusDot').style.background = '#00ff88';
-                document.getElementById('statusDot').style.boxShadow = '0 0 10px #00ff88';
-            } catch (error) {
-                document.getElementById('healthStatus').textContent = 'ERROR';
-                document.getElementById('uptime').textContent = 'N/A';
-                document.getElementById('environment').textContent = 'N/A';
-                document.getElementById('nodeVersion').textContent = 'N/A';
-
-                document.getElementById('statusText').textContent = 'Service unavailable';
-                document.getElementById('statusDot').style.background = '#ef4444';
-                document.getElementById('statusDot').style.boxShadow = '0 0 10px #ef4444';
-            }
-        }
-
-        window.addEventListener('DOMContentLoaded', () => {
-            loadHealthStatus();
-            setInterval(loadHealthStatus, 30000);
-        });
-    </script>
 </body>
 </html>

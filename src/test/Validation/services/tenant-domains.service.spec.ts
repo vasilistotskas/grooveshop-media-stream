@@ -1,8 +1,9 @@
 import type { MockedObject } from 'vitest'
+import type { ConfigOverrides } from '../../helpers/config-service.mock.js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ConfigService } from '#microservice/Config/config.service'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { TenantDomainsService } from '#microservice/Validation/services/tenant-domains.service'
+import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 
 function jsonResponse(body: unknown, ok = true, status = 200): Response {
 	return {
@@ -13,29 +14,28 @@ function jsonResponse(body: unknown, ok = true, status = 200): Response {
 }
 
 describe('tenantDomainsService', () => {
-	let configService: MockedObject<ConfigService>
-	let configValues: Record<string, any>
+	let configValues: ConfigOverrides
 	let fetchMock: ReturnType<typeof vi.fn>
 	let metricsService: MockedObject<MetricsService>
+	let activeService: TenantDomainsService | undefined
 
+	// Config is read in the constructor, so each test builds its service after
+	// setting configValues. The instance is tracked so afterEach can clear the
+	// refresh interval onModuleInit registers.
 	function createService(): TenantDomainsService {
-		return new TenantDomainsService(configService, metricsService)
+		activeService = new TenantDomainsService(createConfigServiceMock(configValues), metricsService)
+		return activeService
 	}
 
 	beforeEach(() => {
+		// Schema defaults apply otherwise: empty secret (disabled), empty
+		// refreshUrl (derive from backend.url), 300000ms interval.
 		configValues = {
-			'tenantDomains.secret': '',
-			'tenantDomains.refreshUrl': '',
-			'tenantDomains.refreshIntervalMs': 300000,
+			'backend.url': 'http://backend.internal:8000',
 		}
-		configService = {
-			getOptional: vi.fn((key: string, defaultValue: any) =>
-				key in configValues ? configValues[key] : defaultValue),
-		} as unknown as MockedObject<ConfigService>
 
 		fetchMock = vi.fn()
 		vi.stubGlobal('fetch', fetchMock)
-		process.env.BACKEND_URL = 'http://backend.internal:8000'
 
 		metricsService = {
 			updateTenantDomainsMetrics: vi.fn(),
@@ -43,9 +43,9 @@ describe('tenantDomainsService', () => {
 	})
 
 	afterEach(() => {
+		activeService?.onModuleDestroy()
+		activeService = undefined
 		vi.unstubAllGlobals()
-		vi.restoreAllMocks()
-		delete process.env.BACKEND_URL
 	})
 
 	describe('disabled (no secret)', () => {
@@ -79,7 +79,7 @@ describe('tenantDomainsService', () => {
 			configValues['tenantDomains.secret'] = 's3cr3t'
 		})
 
-		it('fetches the derived BACKEND_URL feed with the internal token header and populates domains', async () => {
+		it('fetches the feed derived from backend.url with the internal token header and populates domains', async () => {
 			fetchMock.mockResolvedValue(jsonResponse({ domains: ['acme.example', 'api.acme.example'] }))
 
 			const service = createService()
@@ -107,7 +107,7 @@ describe('tenantDomainsService', () => {
 			expect(service.isAllowed('ACME.EXAMPLE')).toBe(true)
 		})
 
-		it('uses an explicit refreshUrl override instead of deriving from BACKEND_URL', async () => {
+		it('uses an explicit refreshUrl override instead of deriving from backend.url', async () => {
 			configValues['tenantDomains.refreshUrl'] = 'https://internal.override/domains-feed'
 			fetchMock.mockResolvedValue(jsonResponse({ domains: [] }))
 
@@ -214,8 +214,6 @@ describe('tenantDomainsService', () => {
 
 		it('refreshes again after the configured interval, and stops after onModuleDestroy', async () => {
 			vi.useFakeTimers()
-			const originalNodeEnv = process.env.NODE_ENV
-			process.env.NODE_ENV = 'production'
 
 			try {
 				fetchMock.mockResolvedValue(jsonResponse({ domains: ['acme.example'] }))
@@ -231,7 +229,6 @@ describe('tenantDomainsService', () => {
 				expect(fetchMock).toHaveBeenCalledTimes(2)
 			}
 			finally {
-				process.env.NODE_ENV = originalNodeEnv
 				vi.useRealTimers()
 			}
 		})

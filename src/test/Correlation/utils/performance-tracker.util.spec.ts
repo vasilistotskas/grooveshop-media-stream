@@ -95,22 +95,6 @@ describe('performanceTracker', () => {
 			})
 		})
 
-		it('should handle phases with metadata', () => {
-			runWithContext(() => {
-				const metadata = { operation: 'image-resize', size: '1024x768' }
-
-				PerformanceTracker.startPhase('resize-phase', metadata)
-				PerformanceTracker.endPhase('resize-phase', { result: 'success' })
-
-				const phases = PerformanceTracker.getPhases()
-				expect(phases[0].metadata).toEqual({
-					operation: 'image-resize',
-					size: '1024x768',
-					result: 'success',
-				})
-			})
-		})
-
 		it('should handle multiple phases', () => {
 			runWithContext(() => {
 				PerformanceTracker.startPhase('phase-1')
@@ -232,7 +216,7 @@ describe('performanceTracker', () => {
 
 				PerformanceTracker.logSummary()
 
-				expect(consoleSpy.log).toHaveBeenCalledWith(
+				expect(consoleSpy.debug).toHaveBeenCalledWith(
 					expect.stringContaining('Performance Summary:'),
 					'PerformanceTracker',
 				)
@@ -241,76 +225,13 @@ describe('performanceTracker', () => {
 
 		it('should not log summary when no phases exist', () => {
 			runWithContext(() => {
-				consoleSpy.log.mockClear()
+				consoleSpy.debug.mockClear()
 				PerformanceTracker.logSummary()
 
-				const summaryCalls = consoleSpy.log.mock.calls.filter(
+				const summaryCalls = consoleSpy.debug.mock.calls.filter(
 					(call: any[]) => typeof call[0] === 'string' && call[0].includes('Performance Summary'),
 				)
 				expect(summaryCalls).toHaveLength(0)
-			})
-		})
-	})
-
-	describe('measure Function', () => {
-		it('should measure synchronous function execution', async () => {
-			await runWithContext(async () => {
-				const testFn = () => {
-					// Simulate some work
-					const start = Date.now()
-					while (Date.now() - start < 10) {
-						// Busy wait for 10ms
-					}
-					return 'result'
-				}
-
-				const result = await PerformanceTracker.measure('sync-test', testFn)
-
-				expect(result).toBe('result')
-
-				const phases = PerformanceTracker.getPhases()
-				expect(phases).toHaveLength(1)
-				expect(phases[0].name).toBe('sync-test')
-				expect(phases[0].duration).toBeGreaterThan(0)
-				expect(phases[0].metadata?.success).toBe(true)
-			})
-		})
-
-		it('should measure asynchronous function execution', async () => {
-			await runWithContext(async () => {
-				const testFn = async () => {
-					await new Promise(resolve => setTimeout(resolve, 10))
-					return 'async-result'
-				}
-
-				const result = await PerformanceTracker.measure('async-test', testFn)
-
-				expect(result).toBe('async-result')
-
-				const phases = PerformanceTracker.getPhases()
-				expect(phases).toHaveLength(1)
-				expect(phases[0].name).toBe('async-test')
-				expect(phases[0].duration).toBeGreaterThan(0)
-				expect(phases[0].metadata?.success).toBe(true)
-			})
-		})
-
-		it('should handle function errors', async () => {
-			await runWithContext(async () => {
-				const testFn = () => {
-					throw new Error('Test error')
-				}
-
-				await expect(
-					PerformanceTracker.measure('error-test', testFn),
-				).rejects.toThrow('Test error')
-
-				const phases = PerformanceTracker.getPhases()
-				expect(phases).toHaveLength(1)
-				expect(phases[0].name).toBe('error-test')
-				expect(phases[0].duration).toBeGreaterThan(0)
-				expect(phases[0].metadata?.success).toBe(false)
-				expect(phases[0].metadata?.error).toBe('Test error')
 			})
 		})
 	})

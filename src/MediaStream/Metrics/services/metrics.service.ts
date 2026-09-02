@@ -4,6 +4,8 @@ import * as os from 'node:os'
 import * as process from 'node:process'
 import { Injectable, Logger } from '@nestjs/common'
 import * as promClient from 'prom-client'
+import { errorMessage } from '#microservice/common/utils/error-message.util'
+import { storageDirectory } from '#microservice/common/utils/storage-path.util'
 import { ConfigService } from '#microservice/Config/config.service'
 
 @Injectable()
@@ -28,6 +30,7 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	private readonly imageProcessingDuration: promClient.Histogram
 	private readonly imageProcessingTotal: promClient.Counter
 	private readonly imageProcessingErrors: promClient.Counter
+	private readonly imageRequestsTotal: promClient.Counter
 
 	private readonly activeConnections: promClient.Gauge
 	private readonly errorTotal: promClient.Counter
@@ -46,20 +49,20 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	private requestsInFlightCount: number = 0
 	private systemMetricsInterval?: NodeJS.Timeout
 	private performanceMetricsInterval?: NodeJS.Timeout
-	private readonly dynamicCounters = new Map<string, promClient.Counter>()
 	private previousCpuUsage: { user: number, system: number } = { user: 0, system: 0 }
 	private previousCpuTime: number = Date.now()
 
-	// ✅ Load intervals from configuration
 	private readonly systemMetricsIntervalMs: number
 	private readonly performanceMetricsIntervalMs: number
+	private readonly storagePath: string
 
 	constructor(private readonly _configService: ConfigService) {
 		this.register = new promClient.Registry()
 
 		// Load monitoring configuration
-		this.systemMetricsIntervalMs = this._configService.getOptional('monitoring.systemMetricsInterval', 60000)
-		this.performanceMetricsIntervalMs = this._configService.getOptional('monitoring.performanceMetricsInterval', 30000)
+		this.systemMetricsIntervalMs = this._configService.get('monitoring.systemMetricsInterval')
+		this.performanceMetricsIntervalMs = this._configService.get('monitoring.performanceMetricsInterval')
+		this.storagePath = storageDirectory(this._configService)
 
 		promClient.collectDefaultMetrics({
 			register: this.register,
@@ -151,6 +154,12 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			registers: [this.register],
 		})
 
+		this.imageRequestsTotal = new promClient.Counter({
+			name: 'mediastream_image_requests_total',
+			help: 'Total number of image requests received by the image route',
+			registers: [this.register],
+		})
+
 		this.eventLoopLag = new promClient.Histogram({
 			name: 'mediastream_event_loop_lag_seconds',
 			help: 'Event loop lag in seconds',
@@ -230,15 +239,12 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	async onModuleInit(): Promise<void> {
-		const isTestEnv = process.env.NODE_ENV === 'test'
-		const monitoringEnabled = this._configService.get('monitoring.enabled')
-
-		if (monitoringEnabled && !isTestEnv) {
+		if (this._configService.get<boolean>('monitoring.enabled')) {
 			this._logger.log('Metrics collection initialized')
 			this.startPeriodicMetricsCollection()
 		}
 		else {
-			this._logger.log(`Metrics collection disabled${isTestEnv ? ' (test environment)' : ''}`)
+			this._logger.log('Metrics collection disabled')
 		}
 	}
 
@@ -252,13 +258,6 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	 */
 	async getMetrics(): Promise<string> {
 		return this.register.metrics()
-	}
-
-	/**
-	 * Get metrics registry for custom integrations
-	 */
-	getRegistry(): promClient.Registry {
-		return this.register
 	}
 
 	/**
@@ -361,25 +360,9 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		}
 	}
 
-	/**
-	 * Increment a generic counter metric
-	 * @param name - Counter name (will be prefixed with mediastream_)
-	 * @param value - Value to increment by (default: 1)
-	 */
-	incrementCounter(name: string, value: number = 1): void {
-		const prefixedName = name.startsWith('mediastream_') ? name : `mediastream_${name}`
-
-		let counter = this.dynamicCounters.get(prefixedName)
-		if (!counter) {
-			counter = new promClient.Counter({
-				name: prefixedName,
-				help: `Dynamic counter: ${name}`,
-				registers: [this.register],
-			})
-			this.dynamicCounters.set(prefixedName, counter)
-		}
-
-		counter.inc(value)
+	/** One image request reached the image route (before cache lookup). */
+	recordImageRequest(): void {
+		this.imageRequestsTotal.inc()
 	}
 
 	/**
@@ -453,13 +436,6 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	/**
-	 * Reset all metrics (useful for testing)
-	 */
-	reset(): void {
-		this.register.resetMetrics()
-	}
-
-	/**
 	 * Stop all metric collection intervals (useful for testing and shutdown)
 	 */
 	stopMetricsCollection(): void {
@@ -477,14 +453,14 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	private startPeriodicMetricsCollection(): void {
-		// ✅ Use configurable intervals instead of hardcoded values
+		// unref: collection must never keep the process (or a spec worker) alive.
 		this.systemMetricsInterval = setInterval(() => {
 			this.collectSystemMetrics()
-		}, this.systemMetricsIntervalMs)
+		}, this.systemMetricsIntervalMs).unref()
 
 		this.performanceMetricsInterval = setInterval(() => {
 			this.collectPerformanceMetrics()
-		}, this.performanceMetricsIntervalMs)
+		}, this.performanceMetricsIntervalMs).unref()
 
 		this._logger.log(`Started periodic metrics collection (system: ${this.systemMetricsIntervalMs}ms, performance: ${this.performanceMetricsIntervalMs}ms)`)
 	}
@@ -524,7 +500,7 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			this._logger.debug('System metrics collected')
 		}
 		catch (error: unknown) {
-			this._logger.error('Failed to collect system metrics:', error)
+			this._logger.error(`Failed to collect system metrics: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined)
 			this.recordError('metrics_collection', 'system_metrics')
 		}
 	}
@@ -538,48 +514,29 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			})
 		}
 		catch (error: unknown) {
-			this._logger.error('Failed to collect performance metrics:', error)
+			this._logger.error(`Failed to collect performance metrics: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined)
 			this.recordError('metrics_collection', 'performance_metrics')
 		}
 	}
 
+	/**
+	 * statfs reports filesystem-level usage, so the cache directory is the only
+	 * path worth sampling. `bavail` (space available to this process) matches
+	 * DiskSpaceHealthIndicator. A missing directory is not an error here.
+	 */
 	private async collectDiskSpaceMetrics(): Promise<void> {
 		try {
-			// statfs reports filesystem-level usage, so the configured cache
-			// directory is the only path worth sampling (./public and ./build
-			// live on the same filesystem and produced identical duplicates).
-			const storagePath = this._configService.getOptional('cache.file.directory', './storage')
-
-			try {
-				await fs.promises.access(storagePath)
-				const stats = await fs.promises.stat(storagePath)
-				if (stats.isDirectory()) {
-					const diskUsage = await this.getDiskUsage(storagePath)
-					if (diskUsage) {
-						this.updateDiskSpaceMetrics(storagePath, diskUsage.total, diskUsage.used, diskUsage.free)
-					}
-				}
-			}
-			catch {
-				// Path doesn't exist or not accessible, ignore
-			}
+			const stats = await fs.promises.statfs(this.storagePath)
+			const total = stats.bsize * stats.blocks
+			const free = stats.bsize * stats.bavail
+			this.updateDiskSpaceMetrics(this.storagePath, total, total - free, free)
 		}
 		catch (error: unknown) {
-			this._logger.error('Failed to collect disk space metrics:', error)
+			if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+				return
+			}
+			this._logger.error(`Failed to collect disk space metrics: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined)
 			this.recordError('metrics_collection', 'disk_space')
-		}
-	}
-
-	private async getDiskUsage(path: string): Promise<{ total: number, used: number, free: number } | null> {
-		try {
-			const stats = await fs.promises.statfs(path)
-			const total = stats.bsize * stats.blocks
-			const free = stats.bsize * stats.bfree
-			const used = total - free
-			return { total, used, free }
-		}
-		catch {
-			return null
 		}
 	}
 }

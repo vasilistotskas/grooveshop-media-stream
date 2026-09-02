@@ -5,9 +5,19 @@ export interface ServerConfig {
 }
 
 export interface CorsConfig {
-	origin: string | string[]
+	origin: string
 	methods: string
 	maxAge: number
+}
+
+export interface BackendConfig {
+	/** Upstream Django API base URL; required in production. */
+	url: string
+}
+
+export interface AdminConfig {
+	/** Shared secret for internal admin endpoints; empty keeps them closed. */
+	secret: string
 }
 
 export interface MemoryCacheConfig {
@@ -41,11 +51,6 @@ export interface CacheWarmingConfig {
 	baseTtl: number
 }
 
-export interface CachePreloadingConfig {
-	enabled: boolean
-	interval: number
-}
-
 export interface ImageCacheConfig {
 	publicTtl: number
 	privateTtl: number
@@ -57,7 +62,6 @@ export interface CacheConfig {
 	redis: RedisConfig
 	file: FileCacheConfig
 	warming: CacheWarmingConfig
-	preloading: CachePreloadingConfig
 	image: ImageCacheConfig
 }
 
@@ -69,10 +73,6 @@ export interface MonitoringConfig {
 	enabled: boolean
 	systemMetricsInterval: number
 	performanceMetricsInterval: number
-}
-
-export interface ExternalServicesConfig {
-	requestTimeout: number
 }
 
 export interface CircuitBreakerConfig {
@@ -103,7 +103,7 @@ export interface HttpConfig {
 	healthCheck: HttpHealthCheckConfig
 }
 
-export interface RateLimitThrottlerConfig {
+export interface RateLimitBucketConfig {
 	windowMs: number
 	max: number
 }
@@ -111,15 +111,15 @@ export interface RateLimitThrottlerConfig {
 export interface RateLimitBypassConfig {
 	healthChecks: boolean
 	staticAssets: boolean
-	whitelistedDomains: string
+	whitelistedDomains: string[]
 	bots: boolean
 }
 
 export interface RateLimitConfig {
 	enabled: boolean
-	default: RateLimitThrottlerConfig
-	imageProcessing: RateLimitThrottlerConfig
-	healthCheck: RateLimitThrottlerConfig
+	default: RateLimitBucketConfig
+	imageProcessing: RateLimitBucketConfig
+	healthCheck: RateLimitBucketConfig
 	bypass: RateLimitBypassConfig
 }
 
@@ -129,7 +129,7 @@ export interface ValidationConfig {
 }
 
 export interface TenantDomainsConfig {
-	/** Empty means "derive from BACKEND_URL" — see TenantDomainsService. */
+	/** Empty means "derive from backend.url" — see TenantDomainsService. */
 	refreshUrl: string
 	/** Empty disables the dynamic-domain feature entirely. */
 	secret: string
@@ -144,30 +144,17 @@ export interface StorageCleanupConfig {
 }
 
 export interface StorageEvictionConfig {
-	strategy: string
-	aggressiveness: string
-	preservePopular: boolean
+	/** Pairs with at least this many recorded cache hits are evicted last. */
 	minAccessCount: number
-	maxFileAge: number
-}
-
-export interface StorageOptimizationConfig {
-	enabled: boolean
-	strategies: string[]
-	popularThreshold: number
-	maxTime: number
 }
 
 export interface StorageConfig {
-	maxSize: number
-	maxFileAge: number
 	warningSize: number
 	criticalSize: number
 	warningFileCount: number
 	criticalFileCount: number
 	cleanup: StorageCleanupConfig
 	eviction: StorageEvictionConfig
-	optimization: StorageOptimizationConfig
 }
 
 export interface ShutdownConfig {
@@ -177,10 +164,11 @@ export interface ShutdownConfig {
 
 export interface AppConfig {
 	server: ServerConfig
+	backend: BackendConfig
+	admin: AdminConfig
 	cache: CacheConfig
 	processing: ProcessingConfig
 	monitoring: MonitoringConfig
-	externalServices: ExternalServicesConfig
 	http: HttpConfig
 	rateLimit: RateLimitConfig
 	validation: ValidationConfig

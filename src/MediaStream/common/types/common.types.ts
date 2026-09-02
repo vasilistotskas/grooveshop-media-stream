@@ -1,40 +1,13 @@
 /**
  * Common type definitions used across the MediaStream application
- * These types replace generic Record<string, T> with semantic, reusable types
  */
 
 /**
- * Generic key-value map with string keys and any values
- * Use for flexible metadata, context objects, or configuration
- */
-export type StringMap = Record<string, any>
-
-/**
- * String-to-string mapping
- * Use for headers, tags, environment variables, or simple key-value pairs
- */
-export type StringRecord = Record<string, string>
-
-/**
- * Metadata object for additional contextual information
- * Use for error context, logging metadata, or extensible data structures
+ * Loose bag of contextual data: error context, health-check details.
  */
 export type Metadata = Record<string, any>
 
 /**
- * Generic details object for health checks or status information
- * Use for health indicator details, diagnostic information, or status reports
- */
-export type DetailsMap = Record<string, any>
-
-/**
- * File type distribution or categorization
- * Use for counting file types, extensions, or categories
- */
-export type FileTypeMap = Record<string, number>
-
-/**
- * Layer statistics or distribution
- * Use for cache layer metrics, service layer stats, or hierarchical data
+ * Per-layer counts (cache layer hit distribution)
  */
 export type LayerDistribution = Record<string, number>

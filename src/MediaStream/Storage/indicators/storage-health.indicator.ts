@@ -1,23 +1,27 @@
 import type { HealthIndicatorResult } from '@nestjs/terminus'
-import type { HealthCheckOptions } from '#microservice/Health/interfaces/health-indicator.interface'
-import type { AccessPattern } from '../services/storage-monitoring.service.js'
 import { Injectable } from '@nestjs/common'
-import { ConfigService } from '#microservice/Config/config.service'
+import { formatBytes } from '#microservice/common/utils/bytes.util'
 import { BaseHealthIndicator } from '#microservice/Health/base/base-health-indicator'
 import { StorageCleanupService } from '../services/storage-cleanup.service.js'
-import { StorageMonitoringService } from '../services/storage-monitoring.service.js'
+import { isExpired, StorageMonitoringService } from '../services/storage-monitoring.service.js'
+
+const HEALTH_CHECK_TIMEOUT_MS = 5000
 
 export interface StorageHealthDetails {
 	totalFiles: number
 	totalSize: string
+	/** Whole percent of `storage.criticalSize` in use. */
 	usagePercentage: number
-	oldestFile: string | null
-	newestFile: string | null
-	topFileTypes: Array<{ extension: string, count: number }>
+	entries: number
+	orphans: number
+	expired: number
+	oldestEntry: string | null
+	newestEntry: string | null
 	cleanupStatus: {
 		enabled: boolean
-		lastCleanup: string
-		nextCleanup: string
+		dryRun: boolean
+		lastCleanup: string | null
+		nextCleanup: string | null
 	}
 	thresholds: {
 		warningSize: string
@@ -25,135 +29,69 @@ export interface StorageHealthDetails {
 		warningFileCount: number
 		criticalFileCount: number
 	}
-	recommendations: string[]
 }
 
 @Injectable()
 export class StorageHealthIndicator extends BaseHealthIndicator {
 	constructor(
-		private readonly _configService: ConfigService,
 		private readonly storageMonitoring: StorageMonitoringService,
 		private readonly storageCleanup: StorageCleanupService,
 	) {
-		const options: HealthCheckOptions = {
-			timeout: 5000,
-			threshold: 0.9,
-		}
-
-		super('storage', options)
+		super('storage', HEALTH_CHECK_TIMEOUT_MS)
 	}
 
 	protected async performHealthCheck(): Promise<HealthIndicatorResult> {
 		return this.executeWithTimeout(async () => {
-			const thresholdCheck = await this.storageMonitoring.checkThresholds()
-			const stats = thresholdCheck.stats
-			const cleanupStatus = this.storageCleanup.getCleanupStatus()
+			const { status, issues, inventory } = await this.storageMonitoring.checkThresholds()
+			const cleanup = this.storageCleanup.getCleanupStatus()
+			const { thresholds } = this.storageMonitoring
+			const now = Date.now()
 
-			const maxSize = this._configService.getOptional('storage.maxSize', 1024 * 1024 * 1024)
-			const usagePercentage = stats.totalSize / maxSize
-
-			const recommendations = this.generateRecommendations(thresholdCheck, cleanupStatus)
+			let expired = 0
+			let oldest = Number.POSITIVE_INFINITY
+			let newest = Number.NEGATIVE_INFINITY
+			for (const entry of inventory.entries) {
+				if (isExpired(entry, now)) {
+					expired++
+				}
+				oldest = Math.min(oldest, entry.dateCreated)
+				newest = Math.max(newest, entry.dateCreated)
+			}
 
 			const details: StorageHealthDetails = {
-				totalFiles: stats.totalFiles,
-				totalSize: this.formatBytes(stats.totalSize),
-				usagePercentage: Math.round(usagePercentage * 100),
-				oldestFile: stats.oldestFile ? stats.oldestFile.toISOString() : null,
-				newestFile: stats.newestFile ? stats.newestFile.toISOString() : null,
-				topFileTypes: Object.entries(stats.fileTypes)
-					.map(([extension, count]) => ({ extension, count }))
-					.sort((a: any, b: any) => b.count - a.count)
-					.slice(0, 5),
+				totalFiles: inventory.totalFiles,
+				totalSize: formatBytes(inventory.totalSize),
+				usagePercentage: Math.round((inventory.totalSize / thresholds.criticalSize) * 100),
+				entries: inventory.entries.length,
+				orphans: inventory.orphans.length,
+				expired,
+				oldestEntry: inventory.entries.length ? new Date(oldest).toISOString() : null,
+				newestEntry: inventory.entries.length ? new Date(newest).toISOString() : null,
 				cleanupStatus: {
-					enabled: cleanupStatus.enabled,
-					lastCleanup: cleanupStatus.lastCleanup.toISOString(),
-					nextCleanup: cleanupStatus.nextCleanup.toISOString(),
+					enabled: cleanup.enabled,
+					dryRun: cleanup.dryRun,
+					lastCleanup: cleanup.lastCleanup?.toISOString() ?? null,
+					nextCleanup: cleanup.nextCleanup?.toISOString() ?? null,
 				},
 				thresholds: {
-					warningSize: this.formatBytes(this._configService.getOptional('storage.warningSize', 800 * 1024 * 1024)),
-					criticalSize: this.formatBytes(this._configService.getOptional('storage.criticalSize', 1024 * 1024 * 1024)),
-					warningFileCount: this._configService.getOptional('storage.warningFileCount', 5000),
-					criticalFileCount: this._configService.getOptional('storage.criticalFileCount', 10000),
+					warningSize: formatBytes(thresholds.warningSize),
+					criticalSize: formatBytes(thresholds.criticalSize),
+					warningFileCount: thresholds.warningFileCount,
+					criticalFileCount: thresholds.criticalFileCount,
 				},
-				recommendations,
 			}
 
-			if (thresholdCheck.status === 'critical') {
-				return this.createUnhealthyResult(
-					`Storage in critical state: ${thresholdCheck.issues.join(', ')}`,
-					details,
-				)
+			if (status === 'critical') {
+				return this.createUnhealthyResult(`Storage in critical state: ${issues.join(', ')}`, details)
 			}
-
-			if (thresholdCheck.status === 'warning') {
-				return this.createHealthyResult({
-					...details,
-					detailStatus: 'warning',
-					warnings: thresholdCheck.issues,
-				})
+			if (status === 'warning') {
+				return this.createHealthyResult({ ...details, detailStatus: 'warning', warnings: issues })
 			}
-
 			return this.createHealthyResult(details)
 		})
 	}
 
 	protected getDescription(): string {
-		return 'Monitors storage usage, file patterns, and cleanup status with intelligent recommendations'
-	}
-
-	private generateRecommendations(
-		thresholdCheck: any,
-		cleanupStatus: any,
-	): string[] {
-		const recommendations: string[] = []
-
-		if (thresholdCheck.status === 'critical') {
-			recommendations.push('URGENT: Run immediate cleanup to free storage space')
-			recommendations.push('Consider increasing storage capacity or reducing retention periods')
-		}
-		else if (thresholdCheck.status === 'warning') {
-			recommendations.push('Schedule cleanup soon to prevent storage issues')
-			recommendations.push('Review retention policies for optimization')
-		}
-
-		if (!cleanupStatus.enabled) {
-			recommendations.push('Enable automatic cleanup to maintain storage health')
-		}
-		else {
-			const timeSinceLastCleanup = Date.now() - cleanupStatus.lastCleanup.getTime()
-			const daysSinceCleanup = timeSinceLastCleanup / (1000 * 60 * 60 * 24)
-
-			if (daysSinceCleanup > 7) {
-				recommendations.push('Last cleanup was over a week ago - consider running manual cleanup')
-			}
-		}
-
-		if (thresholdCheck.stats.fileTypes['.json'] > 1000) {
-			recommendations.push('High number of JSON cache files - consider shorter TTL for cache entries')
-		}
-
-		if (thresholdCheck.stats.fileTypes['.webp'] > 500) {
-			recommendations.push('Many WebP files stored - ensure image optimization is working correctly')
-		}
-
-		const lowAccessFiles = thresholdCheck.stats.accessPatterns.filter((p: AccessPattern) => p.accessCount < 2).length
-		if (lowAccessFiles > thresholdCheck.stats.totalFiles * 0.5) {
-			recommendations.push('Over 50% of files have low access counts - consider more aggressive eviction')
-		}
-
-		return recommendations
-	}
-
-	private formatBytes(bytes: number): string {
-		const units = ['B', 'KB', 'MB', 'GB']
-		let size = bytes
-		let unitIndex = 0
-
-		while (size >= 1024 && unitIndex < units.length - 1) {
-			size /= 1024
-			unitIndex++
-		}
-
-		return `${size.toFixed(1)} ${units[unitIndex]}`
+		return 'Cache tier inventory against the storage thresholds, plus cleanup status'
 	}
 }

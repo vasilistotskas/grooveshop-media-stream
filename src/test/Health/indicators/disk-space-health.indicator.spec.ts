@@ -100,17 +100,24 @@ describe('diskSpaceHealthIndicator', () => {
 		})
 
 		it('should timeout if check takes too long', async () => {
-			vi.spyOn(indicator as any, 'getDiskSpaceInfo').mockImplementation(() =>
-				new Promise(resolve => setTimeout(resolve, 5000)), // 5 second delay
-			)
+			vi.useFakeTimers()
+			try {
+				vi.spyOn(indicator as any, 'getDiskSpaceInfo').mockImplementation(() => new Promise(() => {}))
 
-			// BaseHealthIndicator.isHealthy() resolves with a `down` result when the check
-			// fails — terminus 12 rethrows anything an indicator throws as a 500.
-			const failed = await indicator.isHealthy()
-			expect(failed).toHaveProperty('disk_space')
-			expect(failed.disk_space.status).toBe('down')
-			expect(failed.disk_space.message).toContain('timeout')
-		}, 10000)
+				// BaseHealthIndicator.isHealthy() resolves with a `down` result when the check
+				// fails — terminus 12 rethrows anything an indicator throws as a 500.
+				const pending = indicator.isHealthy()
+				await vi.advanceTimersByTimeAsync(3000)
+				const failed = await pending
+
+				expect(failed).toHaveProperty('disk_space')
+				expect(failed.disk_space.status).toBe('down')
+				expect(failed.disk_space.message).toContain('timeout')
+			}
+			finally {
+				vi.useRealTimers()
+			}
+		})
 	})
 
 	describe('configuration', () => {
@@ -118,10 +125,8 @@ describe('diskSpaceHealthIndicator', () => {
 			expect(configService.get).toHaveBeenCalledWith('cache.file.directory')
 		})
 
-		it('should have correct thresholds', () => {
-			const details = indicator.getDetails()
-			expect(details.key).toBe('disk_space')
-			expect(details.description).toContain('./test-storage')
+		it('should expose its terminus key', () => {
+			expect(indicator.key).toBe('disk_space')
 		})
 	})
 
@@ -143,18 +148,6 @@ describe('diskSpaceHealthIndicator', () => {
 			expect(diskInfo).toHaveProperty('usedPercentage')
 			expect(diskInfo).toHaveProperty('path')
 			expect(diskInfo.path).toBe('./test-storage')
-		})
-	})
-
-	describe('getDetails', () => {
-		it('should return indicator details', () => {
-			const details = indicator.getDetails()
-
-			expect(details).toHaveProperty('key')
-			expect(details).toHaveProperty('options')
-			expect(details).toHaveProperty('description')
-			expect(details.key).toBe('disk_space')
-			expect(details.description).toContain('Monitors disk space usage')
 		})
 	})
 })

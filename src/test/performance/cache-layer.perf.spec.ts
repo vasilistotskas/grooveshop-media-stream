@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createConfigServiceMock } from '../helpers/config-service.mock.js'
 
 /**
  * Performance tests for the cache layer.
@@ -298,7 +299,7 @@ describe('bot Detection Performance', () => {
 		const { RateLimitService } = await import('#microservice/RateLimit/services/rate-limit.service')
 
 		// Create a minimal mock for the service
-		const mockConfig = { getOptional: vi.fn().mockReturnValue('') }
+		const mockConfig = createConfigServiceMock()
 		const mockMetrics = {
 			recordError: vi.fn(),
 			getRegistry: vi.fn(),

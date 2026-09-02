@@ -4,5 +4,5 @@ export class ProcessingConfigDto {
 	@IsNumber()
 	@Min(0.1)
 	@Max(64)
-	cpuCores: number = 1.5
+	cpuCores!: number
 }

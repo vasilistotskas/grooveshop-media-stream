@@ -2,6 +2,10 @@ import type { CacheLayer, CacheLayerStats } from '../interfaces/cache-layer.inte
 import { Injectable } from '@nestjs/common'
 import { RedisCacheService } from '../services/redis-cache.service.js'
 
+/**
+ * Redis tier. Errors propagate: MultiLayerCacheManager catches them per layer
+ * and records exactly one error sample, so nothing is swallowed here.
+ */
 @Injectable()
 export class RedisCacheLayer implements CacheLayer {
 	private readonly layerName = 'redis'
@@ -9,103 +13,59 @@ export class RedisCacheLayer implements CacheLayer {
 
 	constructor(private readonly redisCacheService: RedisCacheService) {}
 
-	async get<T>(key: string): Promise<T | null> {
-		try {
-			return await this.redisCacheService.get<T>(key)
-		}
-		catch {
-			return null
-		}
+	get<T>(key: string): Promise<T | null> {
+		return this.redisCacheService.get<T>(key)
 	}
 
-	async set<T>(key: string, value: T, ttl?: number): Promise<void> {
-		try {
-			await this.redisCacheService.set(key, value, ttl)
-		}
-		catch {
-			// Silently fail for Redis layer
-		}
+	set<T>(key: string, value: T, ttl?: number): Promise<void> {
+		return this.redisCacheService.set(key, value, ttl)
 	}
 
-	async delete(key: string): Promise<void> {
-		try {
-			await this.redisCacheService.delete(key)
-		}
-		catch {
-			// Silently fail for Redis layer
-		}
+	delete(key: string): Promise<void> {
+		return this.redisCacheService.delete(key)
 	}
 
 	async deleteByPrefix(prefix: string): Promise<number> {
-		try {
-			const client = this.redisCacheService.getClient()
-			if (!client)
-				return 0
-			let count = 0
-			let cursor = '0'
-			do {
-				const [nextCursor, keys] = await client.scan(cursor, 'MATCH', `${prefix}*`, 'COUNT', 100)
-				cursor = nextCursor
-				if (keys.length > 0) {
-					await client.del(...keys)
-					count += keys.length
-				}
-			} while (cursor !== '0')
-			return count
-		}
-		catch {
+		const client = this.redisCacheService.getClient()
+		if (!client) {
 			return 0
 		}
+
+		let count = 0
+		let cursor = '0'
+		do {
+			const [nextCursor, keys] = await client.scan(cursor, 'MATCH', `${prefix}*`, 'COUNT', 100)
+			cursor = nextCursor
+			if (keys.length > 0) {
+				await client.del(...keys)
+				count += keys.length
+			}
+		} while (cursor !== '0')
+
+		return count
 	}
 
-	async exists(key: string): Promise<boolean> {
-		try {
-			return await this.redisCacheService.has(key)
-		}
-		catch {
-			return false
-		}
+	exists(key: string): Promise<boolean> {
+		return this.redisCacheService.has(key)
 	}
 
-	async clear(): Promise<void> {
-		try {
-			await this.redisCacheService.clear()
-		}
-		catch {
-			// Silently fail for Redis layer
-		}
+	clear(): Promise<void> {
+		return this.redisCacheService.clear()
 	}
 
 	async getStats(): Promise<CacheLayerStats> {
-		try {
-			const stats = await this.redisCacheService.getStats()
-			const connectionStatus = this.redisCacheService.getConnectionStatus()
-			return {
-				hits: stats.hits,
-				misses: stats.misses,
-				keys: stats.keys,
-				hitRate: stats.hitRate,
-				errors: connectionStatus.stats.errors,
-			}
-		}
-		catch {
-			return {
-				hits: 0,
-				misses: 0,
-				keys: 0,
-				hitRate: 0,
-				errors: 1,
-			}
+		const stats = await this.redisCacheService.getStats()
+		return {
+			hits: stats.hits,
+			misses: stats.misses,
+			keys: stats.keys,
+			hitRate: stats.hitRate,
+			errors: this.redisCacheService.getConnectionStatus().stats.errors,
 		}
 	}
 
-	async getTtl(key: string): Promise<number> {
-		try {
-			return await this.redisCacheService.getTtl(key)
-		}
-		catch {
-			return -1
-		}
+	getTtl(key: string): Promise<number> {
+		return this.redisCacheService.getTtl(key)
 	}
 
 	getLayerName(): string {

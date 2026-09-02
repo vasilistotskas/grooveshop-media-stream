@@ -40,18 +40,6 @@ export class MediaStreamError extends Error {
 }
 
 /**
- * Error thrown when there's an issue with streaming a resource
- */
-export class ResourceStreamingError extends MediaStreamError {
-	constructor(
-		message: string = 'Failed to stream resource',
-		context: Metadata = {},
-	) {
-		super(message, HttpStatus.INTERNAL_SERVER_ERROR, 'RESOURCE_STREAMING_ERROR', context)
-	}
-}
-
-/**
  * Error thrown when there's an issue with the default image fallback
  */
 export class DefaultImageFallbackError extends MediaStreamError {
@@ -72,5 +60,26 @@ export class InvalidRequestError extends MediaStreamError {
 		context: Metadata = {},
 	) {
 		super(message, HttpStatus.BAD_REQUEST, 'INVALID_REQUEST', context)
+	}
+}
+
+/**
+ * The upstream HTTP circuit breaker is open; no request was attempted.
+ */
+export class CircuitBreakerOpenError extends MediaStreamError {
+	constructor(context: Metadata = {}) {
+		super('Circuit breaker is open', HttpStatus.SERVICE_UNAVAILABLE, 'CIRCUIT_BREAKER_OPEN', context)
+	}
+}
+
+/**
+ * The upstream resource exceeds the per-format size limit (declared or streamed).
+ */
+export class UpstreamResourceTooLargeError extends MediaStreamError {
+	constructor(
+		message: string = 'Upstream resource exceeds the size limit',
+		context: Metadata = {},
+	) {
+		super(message, HttpStatus.BAD_GATEWAY, 'UPSTREAM_RESOURCE_TOO_LARGE', context)
 	}
 }

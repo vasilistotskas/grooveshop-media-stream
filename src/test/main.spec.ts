@@ -40,10 +40,11 @@ describe('bootstrap', () => {
 							},
 						}
 					}
+					if (key === 'shutdown.timeout')
+						return 30000
+					if (key === 'shutdown.forceTimeout')
+						return 60000
 					return undefined
-				}),
-				getOptional: vi.fn().mockImplementation((_key: any, defaultValue: any) => {
-					return defaultValue
 				}),
 			}),
 		}

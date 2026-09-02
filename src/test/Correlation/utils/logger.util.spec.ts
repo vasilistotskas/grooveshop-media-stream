@@ -1,4 +1,6 @@
+import type { MockInstance } from 'vitest'
 import type { RequestContext } from '#microservice/Correlation/interfaces/correlation.interface'
+import * as process from 'node:process'
 import { Logger } from '@nestjs/common'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { requestContextStorage } from '#microservice/Correlation/async-local-storage'
@@ -15,116 +17,127 @@ function createRequestContext(correlationId: string): RequestContext {
 	}
 }
 
+/** The context of the Nest `Logger` instance the last call went through. */
+function contextOfLastCall(spy: MockInstance): string | undefined {
+	const instance = spy.mock.contexts.at(-1) as unknown as { context?: string }
+	return instance.context
+}
+
+function withCorrelationId(fn: () => void): void {
+	requestContextStorage.run(createRequestContext('test-correlation-id'), fn)
+}
+
 describe('correlatedLogger', () => {
-	let loggerSpy: {
-		log: ReturnType<typeof vi.spyOn>
-		error: ReturnType<typeof vi.spyOn>
-		warn: ReturnType<typeof vi.spyOn>
-		debug: ReturnType<typeof vi.spyOn>
-		verbose: ReturnType<typeof vi.spyOn>
-	}
+	let log: MockInstance
+	let error: MockInstance
+	let warn: MockInstance
+	let debug: MockInstance
 
 	beforeEach(() => {
-		loggerSpy = {
-			log: vi.spyOn(Logger.prototype, 'log').mockImplementation(() => {}),
-			error: vi.spyOn(Logger.prototype, 'error').mockImplementation(() => {}),
-			warn: vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => {}),
-			debug: vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => {}),
-			verbose: vi.spyOn(Logger.prototype, 'verbose').mockImplementation(() => {}),
-		}
+		log = vi.spyOn(Logger.prototype, 'log').mockImplementation(() => {})
+		error = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => {})
+		warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => {})
+		debug = vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => {})
 	})
 
 	afterEach(() => {
-		Object.values(loggerSpy).forEach(spy => spy.mockRestore())
+		vi.restoreAllMocks()
 	})
 
 	describe('log', () => {
-		it('should log with correlation ID when available', () => {
-			requestContextStorage.run(createRequestContext('test-correlation-id'), () => {
+		it('prefixes the correlation id when a request context is active', () => {
+			withCorrelationId(() => {
 				CorrelatedLogger.log('Test message')
-
-				expect(loggerSpy.log).toHaveBeenCalledWith('[test-correlation-id] Test message', undefined)
 			})
+
+			expect(log).toHaveBeenCalledWith('[test-correlation-id] Test message')
+			expect(contextOfLastCall(log)).toBe('CorrelatedLogger')
 		})
 
-		it('should log without correlation ID when not available', () => {
+		it('logs the bare message outside a request context', () => {
 			CorrelatedLogger.log('Test message')
 
-			expect(loggerSpy.log).toHaveBeenCalledWith('Test message', undefined)
+			expect(log).toHaveBeenCalledWith('Test message')
 		})
 
-		it('should include context when provided', () => {
-			requestContextStorage.run(createRequestContext('test-correlation-id'), () => {
+		it('routes the context through the logger instance, never as a call argument', () => {
+			withCorrelationId(() => {
 				CorrelatedLogger.log('Test message', 'TestContext')
-
-				expect(loggerSpy.log).toHaveBeenCalledWith('[test-correlation-id] Test message', 'TestContext')
 			})
+
+			expect(log).toHaveBeenCalledWith('[test-correlation-id] Test message')
+			expect(contextOfLastCall(log)).toBe('TestContext')
 		})
 
-		it('should handle missing correlation ID and context', () => {
-			CorrelatedLogger.log('Test message', 'TestContext')
+		it('reuses one logger instance per context', () => {
+			CorrelatedLogger.log('first', 'SharedContext')
+			CorrelatedLogger.log('second', 'SharedContext')
 
-			expect(loggerSpy.log).toHaveBeenCalledWith('Test message', 'TestContext')
+			expect(log.mock.contexts[0]).toBe(log.mock.contexts[1])
 		})
 	})
 
 	describe('error', () => {
-		it('should log error with correlation ID', () => {
-			requestContextStorage.run(createRequestContext('test-correlation-id'), () => {
+		it('passes only the message when there is no trace', () => {
+			withCorrelationId(() => {
 				CorrelatedLogger.error('Error message')
-
-				expect(loggerSpy.error).toHaveBeenCalledWith('[test-correlation-id] Error message', undefined, undefined)
 			})
+
+			expect(error).toHaveBeenCalledWith('[test-correlation-id] Error message')
+			expect(contextOfLastCall(error)).toBe('CorrelatedLogger')
 		})
 
-		it('should log error with trace when provided', () => {
-			requestContextStorage.run(createRequestContext('test-correlation-id'), () => {
+		it('passes the trace as the second argument and the context via the instance', () => {
+			withCorrelationId(() => {
 				CorrelatedLogger.error('Error message', 'Stack trace here', 'ErrorContext')
-
-				expect(loggerSpy.error).toHaveBeenCalledWith('[test-correlation-id] Error message', 'Stack trace here', 'ErrorContext')
 			})
+
+			expect(error).toHaveBeenCalledWith('[test-correlation-id] Error message', 'Stack trace here')
+			expect(contextOfLastCall(error)).toBe('ErrorContext')
 		})
 
-		it('should handle missing correlation ID', () => {
+		it('logs the bare message outside a request context', () => {
 			CorrelatedLogger.error('Error message')
 
-			expect(loggerSpy.error).toHaveBeenCalledWith('Error message', undefined, undefined)
+			expect(error).toHaveBeenCalledWith('Error message')
 		})
 	})
 
 	describe('warn', () => {
-		it('should log warning with correlation ID', () => {
-			requestContextStorage.run(createRequestContext('test-correlation-id'), () => {
+		it('prefixes the correlation id', () => {
+			withCorrelationId(() => {
 				CorrelatedLogger.warn('Warning message')
-
-				expect(loggerSpy.warn).toHaveBeenCalledWith('[test-correlation-id] Warning message', undefined)
 			})
+
+			expect(warn).toHaveBeenCalledWith('[test-correlation-id] Warning message')
 		})
 
-		it('should log warning with context', () => {
-			requestContextStorage.run(createRequestContext('test-correlation-id'), () => {
+		it('uses the given context', () => {
+			withCorrelationId(() => {
 				CorrelatedLogger.warn('Warning message', 'WarnContext')
-
-				expect(loggerSpy.warn).toHaveBeenCalledWith('[test-correlation-id] Warning message', 'WarnContext')
 			})
+
+			expect(warn).toHaveBeenCalledWith('[test-correlation-id] Warning message')
+			expect(contextOfLastCall(warn)).toBe('WarnContext')
 		})
 	})
 
 	describe('debug', () => {
-		it('should log debug message with correlation ID', () => {
-			requestContextStorage.run(createRequestContext('test-correlation-id'), () => {
+		it('prefixes the correlation id', () => {
+			withCorrelationId(() => {
 				CorrelatedLogger.debug('Debug message')
-
-				expect(loggerSpy.debug).toHaveBeenCalledWith('[test-correlation-id] Debug message', undefined)
 			})
+
+			expect(debug).toHaveBeenCalledWith('[test-correlation-id] Debug message')
 		})
 
-		it('should log debug message with context', () => {
-			requestContextStorage.run(createRequestContext('test-correlation-id'), () => {
+		it('uses the given context', () => {
+			withCorrelationId(() => {
 				CorrelatedLogger.debug('Debug message', 'DebugContext')
-
-				expect(loggerSpy.debug).toHaveBeenCalledWith('[test-correlation-id] Debug message', 'DebugContext')
 			})
+
+			expect(debug).toHaveBeenCalledWith('[test-correlation-id] Debug message')
+			expect(contextOfLastCall(debug)).toBe('DebugContext')
 		})
 	})
 })

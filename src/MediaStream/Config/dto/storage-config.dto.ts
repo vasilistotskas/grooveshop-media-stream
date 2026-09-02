@@ -1,91 +1,51 @@
 import { Type } from 'class-transformer'
-import { IsArray, IsBoolean, IsIn, IsNumber, IsString, Min, ValidateNested } from 'class-validator'
+import { IsBoolean, IsDefined, IsNumber, IsString, Min, ValidateNested } from 'class-validator'
 
 export class StorageCleanupConfigDto {
 	@IsBoolean()
-	enabled: boolean = true
+	enabled!: boolean
 
 	@IsString()
-	cronSchedule: string = '0 2 * * *'
+	cronSchedule!: string
 
 	@IsBoolean()
-	dryRun: boolean = false
+	dryRun!: boolean
 
 	@IsNumber()
 	@Min(1000)
-	maxDuration: number = 300000
+	maxDuration!: number
 }
 
 export class StorageEvictionConfigDto {
-	@IsIn(['lru', 'lfu', 'size-based', 'age-based', 'intelligent'])
-	strategy: string = 'intelligent'
-
-	@IsIn(['conservative', 'moderate', 'aggressive'])
-	aggressiveness: string = 'moderate'
-
-	@IsBoolean()
-	preservePopular: boolean = true
-
 	@IsNumber()
 	@Min(1)
-	minAccessCount: number = 5
-
-	@IsNumber()
-	@Min(1)
-	maxFileAge: number = 7
-}
-
-export class StorageOptimizationConfigDto {
-	@IsBoolean()
-	enabled: boolean = true
-
-	@IsArray()
-	@IsString({ each: true })
-	strategies: string[] = ['deduplication']
-
-	@IsNumber()
-	@Min(1)
-	popularThreshold: number = 10
-
-	@IsNumber()
-	@Min(1000)
-	maxTime: number = 600000
+	minAccessCount!: number
 }
 
 export class StorageConfigDto {
 	@IsNumber()
 	@Min(1)
-	maxSize: number = 1073741824
+	warningSize!: number
 
 	@IsNumber()
 	@Min(1)
-	maxFileAge: number = 30
+	criticalSize!: number
 
 	@IsNumber()
 	@Min(1)
-	warningSize: number = 838860800
+	warningFileCount!: number
 
 	@IsNumber()
 	@Min(1)
-	criticalSize: number = 1073741824
+	criticalFileCount!: number
 
-	@IsNumber()
-	@Min(1)
-	warningFileCount: number = 5000
-
-	@IsNumber()
-	@Min(1)
-	criticalFileCount: number = 10000
-
+	@IsDefined()
 	@ValidateNested()
 	@Type(() => StorageCleanupConfigDto)
-	cleanup: StorageCleanupConfigDto = new StorageCleanupConfigDto()
+	cleanup!: StorageCleanupConfigDto
 
+	@IsDefined()
 	@ValidateNested()
 	@Type(() => StorageEvictionConfigDto)
-	eviction: StorageEvictionConfigDto = new StorageEvictionConfigDto()
-
-	@ValidateNested()
-	@Type(() => StorageOptimizationConfigDto)
-	optimization: StorageOptimizationConfigDto = new StorageOptimizationConfigDto()
+	eviction!: StorageEvictionConfigDto
 }
