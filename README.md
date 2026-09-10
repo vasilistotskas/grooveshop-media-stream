@@ -47,7 +47,7 @@ This service provides image processing capabilities for the Grooveshop platform,
 - `CACHE_FILE_DIRECTORY`: File cache directory (default: `./storage`)
 - `PROCESSING_CPU_CORES`: Sharp concurrency, CPU cores (fractions allowed, default: 1.5)
 - `MONITORING_ENABLED`: Enable monitoring (default: true)
-- `CORS_ORIGIN`: CORS origin (default: `*`)
+- `CORS_ORIGIN`: comma-separated platform origins, `scheme://host[:port]` (default: `*`, refused in production). Store origins are never listed: any hostname in the tenant-domain feed is allowed per request
 - `CORS_METHODS`: Allowed HTTP methods (default: `GET`)
 
 See `.env.example` for the full list of configuration options.
@@ -80,9 +80,10 @@ Images are published to Docker Hub (`gro0ve/grooveshop-media-stream`) and GitHub
 
 ### CORS Configuration
 
-The application is configured with CORS enabled by default:
+CORS is always enabled; the allowed origins are decided per request:
 
-- Origin: `*` (all origins allowed)
+- The request `Origin` is reflected when it is one of the platform origins in `CORS_ORIGIN`, or when its hostname belongs to an active tenant per the dynamic tenant-domain feed (`INTERNAL_DOMAINS_SECRET`). Everything else gets no CORS headers.
+- `CORS_ORIGIN=*` is a development convenience; production start-up refuses it and any entry that is not an http(s) origin.
 - Methods: `GET` (only GET requests allowed)
 - Max Age: `86400` (24 hours)
 

@@ -5,7 +5,7 @@ export interface ServerConfig {
 }
 
 export interface CorsConfig {
-	origin: string
+	origin: string[]
 	methods: string
 	maxAge: number
 }

@@ -6,6 +6,7 @@ import { ConfigService as NestConfigService } from '@nestjs/config'
 import { plainToInstance } from 'class-transformer'
 import { validate } from 'class-validator'
 import { APP_CONFIG_SCHEMA, buildConfigFromSchema } from '#microservice/common/utils/config-schema.util'
+import { parseHttpOrigin } from '#microservice/common/utils/cors-origin.util'
 import { isProduction } from '#microservice/common/utils/runtime-env.util'
 import { AppConfigDto } from './dto/app-config.dto.js'
 
@@ -78,11 +79,19 @@ export class ConfigService implements OnModuleInit {
 
 		if (isProduction()) {
 			// A wildcard origin is a development convenience, never a production
-			// setting; fail fast rather than serve with broken CORS.
-			const origin = this.config.server.cors.origin.trim()
-			if (!origin || origin === '*') {
+			// setting; fail fast rather than serve with broken CORS. Every entry
+			// must be a real http(s) origin — a bare hostname would silently
+			// match nothing.
+			const origins = this.config.server.cors.origin
+			if (origins.length === 0 || origins.includes('*')) {
 				throw new Error(
-					'Configuration error: CORS_ORIGIN must be an explicit origin allow-list in production (e.g. https://store.example.com).',
+					'Configuration error: CORS_ORIGIN must be an explicit origin allow-list in production (e.g. https://platform.example.com).',
+				)
+			}
+			const malformed = origins.filter(origin => parseHttpOrigin(origin) === undefined)
+			if (malformed.length > 0) {
+				throw new Error(
+					`Configuration error: CORS_ORIGIN entries must be http(s) origins (scheme://host[:port]); got: ${malformed.join(', ')}.`,
 				)
 			}
 

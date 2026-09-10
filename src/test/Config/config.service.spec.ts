@@ -139,6 +139,13 @@ describe('configService', () => {
 		it('rejects a wildcard or empty CORS origin', async () => {
 			await expect(productionService({ CORS_ORIGIN: '*' }).validate()).rejects.toThrow('CORS_ORIGIN')
 			await expect(productionService({ CORS_ORIGIN: '' }).validate()).rejects.toThrow('CORS_ORIGIN')
+			await expect(productionService({ CORS_ORIGIN: 'https://a.example,*' }).validate()).rejects.toThrow('CORS_ORIGIN')
+		})
+
+		it('rejects a CORS origin entry that is not an http(s) origin', async () => {
+			await expect(productionService({ CORS_ORIGIN: 'https://a.example,store.example' }).validate())
+				.rejects
+				.toThrow('store.example')
 		})
 
 		it('rejects an empty BACKEND_URL', async () => {
@@ -147,8 +154,11 @@ describe('configService', () => {
 				.toThrow('BACKEND_URL')
 		})
 
-		it('accepts an explicit origin and backend URL', async () => {
-			await expect(productionService({ CORS_ORIGIN: 'https://store.example.com' }).validate()).resolves.not.toThrow()
+		it('accepts an explicit origin list and backend URL', async () => {
+			await expect(productionService({ CORS_ORIGIN: 'https://platform.example.com, https://assets.example.com' }).validate())
+				.resolves
+				.not
+				.toThrow()
 		})
 	})
 

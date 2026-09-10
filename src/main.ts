@@ -7,11 +7,13 @@ import { Logger } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import compression from 'compression'
 import helmet from 'helmet'
+import { buildCorsOrigin } from '#microservice/common/utils/cors-origin.util'
 import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { setupGracefulShutdown, shutdownMiddleware } from '#microservice/common/utils/graceful-shutdown.util'
 import { isTest } from '#microservice/common/utils/runtime-env.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import MediaStreamModule from '#microservice/media-stream.module'
+import { TenantDomainsService } from '#microservice/Validation/services/tenant-domains.service'
 
 const logger = new Logger('Bootstrap')
 
@@ -126,8 +128,9 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<void> {
 		app.useStaticAssets('public')
 
 		const serverConfig = configService.get('server')
+		const tenantDomains = app.get(TenantDomainsService)
 		app.enableCors({
-			origin: serverConfig.cors.origin,
+			origin: buildCorsOrigin(serverConfig.cors.origin, hostname => tenantDomains.isAllowed(hostname)),
 			methods: serverConfig.cors.methods,
 			maxAge: serverConfig.cors.maxAge,
 		})

@@ -1,9 +1,10 @@
 import { Type } from 'class-transformer'
-import { IsDefined, IsNumber, IsString, Max, Min, ValidateNested } from 'class-validator'
+import { IsArray, IsDefined, IsNumber, IsString, Max, Min, ValidateNested } from 'class-validator'
 
 export class CorsConfigDto {
-	@IsString()
-	origin!: string
+	@IsArray()
+	@IsString({ each: true })
+	origin!: string[]
 
 	@IsString()
 	methods!: string

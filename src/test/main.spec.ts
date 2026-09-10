@@ -34,7 +34,7 @@ describe('bootstrap', () => {
 							port: Number.parseInt(process.env.PORT || '3003'),
 							host: '0.0.0.0',
 							cors: {
-								origin: '*',
+								origin: ['*'],
 								methods: 'GET',
 								maxAge: 86400,
 							},

@@ -100,7 +100,10 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	// Server configuration
 	'server.port': { env: 'PORT', default: 3003, type: 'number' },
 	'server.host': { env: 'HOST', default: '0.0.0.0', type: 'string' },
-	'server.cors.origin': { env: 'CORS_ORIGIN', default: '*', type: 'string' },
+	// Comma-separated PLATFORM origins (scheme://host[:port]). Store origins are
+	// never listed here — they are admitted per request from the dynamic
+	// tenant-domain allowlist (see buildCorsOrigin). '*' is a dev-only default.
+	'server.cors.origin': { env: 'CORS_ORIGIN', default: ['*'], type: 'array' },
 	'server.cors.methods': { env: 'CORS_METHODS', default: 'GET', type: 'string' },
 	'server.cors.maxAge': { env: 'CORS_MAX_AGE', default: 86400, type: 'number' },
 
