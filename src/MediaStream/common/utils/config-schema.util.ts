@@ -152,6 +152,14 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 
 	// Processing configuration — container CPU limit used to derive Sharp concurrency
 	'processing.cpuCores': { env: 'PROCESSING_CPU_CORES', default: 1.5, type: 'number' },
+	// Admission control for Sharp pipelines: 0 = derive from cpuCores (ceil)
+	'processing.maxConcurrent': { env: 'PROCESSING_MAX_CONCURRENT', default: 0, type: 'number' },
+	// Requests allowed to wait for a pipeline slot; beyond this the request is answered 503
+	'processing.maxQueue': { env: 'PROCESSING_MAX_QUEUE', default: 16, type: 'number' },
+	// Longest a request waits for a slot before it is answered 503
+	'processing.queueTimeoutMs': { env: 'PROCESSING_QUEUE_TIMEOUT_MS', default: 10000, type: 'number' },
+	// Sharp per-pipeline processing timeout (seconds); 0 disables
+	'processing.timeoutSeconds': { env: 'PROCESSING_TIMEOUT_SECONDS', default: 20, type: 'number' },
 
 	// Monitoring configuration
 	'monitoring.enabled': { env: 'MONITORING_ENABLED', default: true, type: 'boolean' },

@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CacheImageRequest, { ResizeOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
 import { ImageStreamService } from '#microservice/API/services/image-stream.service'
 import CacheImageResourceOperation from '#microservice/Cache/operations/cache-image-resource.operation'
-import { CircuitBreakerOpenError, DefaultImageFallbackError } from '#microservice/common/errors/media-stream.errors'
+import { CircuitBreakerOpenError, DefaultImageFallbackError, ProcessingOverloadedError, ProcessingTimeoutError } from '#microservice/common/errors/media-stream.errors'
 import { generateWeakETag } from '#microservice/common/utils/etag.util'
 import { RequestDeduplicator } from '#microservice/common/utils/request-deduplication.util'
 import ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
@@ -317,6 +317,30 @@ describe('imageStreamService', () => {
 			cacheOp.setup.mockRejectedValue(new Error('Circuit breaker is open'))
 			await service.processAndStream(createContext(), createRequest(), createMockResponse())
 			expect(metricsService.recordError).toHaveBeenCalledWith('image_request', 'Error')
+		})
+
+		it('propagates capacity errors (overloaded, timed out) instead of serving the default image', async () => {
+			for (const error of [new ProcessingOverloadedError(2), new ProcessingTimeoutError()]) {
+				const res = createMockResponse()
+				cacheOp.execute.mockRejectedValue(error)
+
+				await expect(service.processAndStream(createContext(), createRequest(), res)).rejects.toBe(error)
+
+				expect(cacheOp.optimizeAndServeDefaultImage).not.toHaveBeenCalled()
+				expect(res.send).not.toHaveBeenCalled()
+				expect(metricsService.recordError).toHaveBeenCalledWith('image_request', error.code)
+			}
+		})
+
+		it('propagates an overload raised while producing the fallback itself', async () => {
+			const res = createMockResponse()
+			const overloaded = new ProcessingOverloadedError(2)
+			cacheOp.setup.mockRejectedValue(new Error('Setup failed'))
+			cacheOp.optimizeAndServeDefaultImage.mockRejectedValue(overloaded)
+
+			await expect(service.processAndStream(createContext(), createRequest(), res)).rejects.toBe(overloaded)
+
+			expect(metricsService.recordError).not.toHaveBeenCalledWith('default_image_fallback', 'fallback_error')
 		})
 
 		it('propagates DefaultImageFallbackError when the fallback itself fails', async () => {

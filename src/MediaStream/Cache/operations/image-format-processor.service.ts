@@ -12,6 +12,7 @@ import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import ResourceMetaData, { resourceMetaVersion } from '#microservice/HTTP/dto/resource-meta-data.dto'
 import WebpImageManipulationJob, { outputFormat } from '#microservice/Processing/jobs/webp-image-manipulation.job'
+import { ProcessingAdmissionService } from '#microservice/Processing/services/processing-admission.service'
 import { isSvgHeader, sanitizeSvg, SVG_SNIFF_BYTES } from '../utils/svg-sanitizer.util.js'
 
 export interface ProcessedImage {
@@ -26,7 +27,9 @@ const DEFAULT_IMAGE_HEIGHT = 600
 /**
  * Turns a fetched temp file into processed image bytes + metadata: SVG
  * detection and sanitisation, raster processing via Sharp, and the
- * default-image fallback pipeline.
+ * default-image fallback pipeline. Every Sharp pipeline goes through
+ * ProcessingAdmissionService so a burst of misses is queued and shed
+ * instead of oversubscribing the CPU.
  */
 @Injectable()
 export class ImageFormatProcessor {
@@ -38,6 +41,7 @@ export class ImageFormatProcessor {
 
 	constructor(
 		private readonly webpImageManipulationJob: WebpImageManipulationJob,
+		private readonly admission: ProcessingAdmissionService,
 		configService: ConfigService,
 	) {
 		this.publicTtl = configService.get('cache.image.publicTtl')
@@ -85,12 +89,12 @@ export class ImageFormatProcessor {
 		// Sharp reads by path — overwrite the temp file with the sanitised markup.
 		await writeFile(tempPath, sanitized, 'utf8')
 		CorrelatedLogger.debug('SVG needs resizing, sanitized and converting to raster via Sharp', ImageFormatProcessor.name)
-		const result = await this.webpImageManipulationJob.handle(tempPath, resizeOptions)
+		const result = await this.runJob(tempPath, resizeOptions)
 		return { data: result.buffer, metadata: this.buildMetadata(result.size, result.format, tenantSchema) }
 	}
 
 	async processRaster(tempPath: string, resizeOptions: ResizeOptions, tenantSchema: string = PUBLIC_TENANT_SCHEMA): Promise<ProcessedImage> {
-		const result = await this.webpImageManipulationJob.handle(tempPath, resizeOptions)
+		const result = await this.runJob(tempPath, resizeOptions)
 		return { data: result.buffer, metadata: this.buildMetadata(result.size, result.format, tenantSchema) }
 	}
 
@@ -120,9 +124,13 @@ export class ImageFormatProcessor {
 			}
 		}
 
-		const result = await this.webpImageManipulationJob.handle(this.defaultImagePath, options)
+		const result = await this.runJob(this.defaultImagePath, options)
 		await writeFile(optimizedPath, result.buffer)
 		return result.buffer
+	}
+
+	private runJob(path: string, resizeOptions: ResizeOptions): ReturnType<WebpImageManipulationJob['handle']> {
+		return this.admission.run(() => this.webpImageManipulationJob.handle(path, resizeOptions))
 	}
 
 	private buildMetadata(size: string, format: string, tenantSchema: string): ResourceMetaData {

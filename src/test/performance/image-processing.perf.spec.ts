@@ -7,6 +7,7 @@ import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { BackgroundOptions, FitOptions, PositionOptions, ResizeOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
 import WebpImageManipulationJob from '#microservice/Processing/jobs/webp-image-manipulation.job'
+import { createConfigServiceMock } from '../helpers/config-service.mock.js'
 
 /**
  * Performance tests for the image processing pipeline.
@@ -174,7 +175,7 @@ describe('image Processing Performance', () => {
 		let job: WebpImageManipulationJob
 
 		beforeAll(() => {
-			job = new WebpImageManipulationJob()
+			job = new WebpImageManipulationJob(createConfigServiceMock())
 		})
 
 		it('should process default.png via job under 200ms', async () => {
@@ -236,7 +237,7 @@ describe('image Processing Performance', () => {
 		let job: WebpImageManipulationJob
 
 		beforeAll(() => {
-			job = new WebpImageManipulationJob()
+			job = new WebpImageManipulationJob(createConfigServiceMock())
 		})
 
 		it('should handle 5 concurrent medium image resizes under 2s', async () => {

@@ -28,8 +28,24 @@ FROM node:${NODE_VERSION}-slim AS production
 
 WORKDIR /usr/src/app
 
+# libvips allocates through GLib, and glibc's per-thread malloc arenas
+# fragment badly in a long-running multi-threaded process (sharp and imgproxy
+# both document this). Preload jemalloc (the allocator sharp recommends) and
+# cap glibc arenas as a fallback for anything that runs without the preload.
+# The multiarch path is resolved at build time so amd64 and arm64 images work.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends libjemalloc2 \
+  && rm -rf /var/lib/apt/lists/* \
+  && ln -s "/usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2" /usr/local/lib/libjemalloc.so.2
+
+ENV LD_PRELOAD=/usr/local/lib/libjemalloc.so.2
+ENV MALLOC_ARENA_MAX=2
+
 ENV NODE_ENV=production
-ENV NODE_OPTIONS="--max-old-space-size=1024 --max-semi-space-size=64"
+# The JS heap stays small (~120 MB under load); image bytes live outside it
+# as Buffers and libvips memory. A 1024 MB ceiling plus that native footprint
+# does not fit the 1280Mi pod limit, so cap the heap well below it.
+ENV NODE_OPTIONS="--max-old-space-size=512 --max-semi-space-size=32"
 
 COPY --from=build --chown=node:node /usr/src/app/build ./build
 COPY --from=build --chown=node:node /usr/src/app/public ./public

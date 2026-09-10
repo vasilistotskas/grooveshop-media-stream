@@ -3,7 +3,7 @@ import type { Mock } from 'vitest'
 import { HttpException, HttpStatus } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MediaStreamError } from '#microservice/common/errors/media-stream.errors'
+import { MediaStreamError, ProcessingOverloadedError, ProcessingTimeoutError } from '#microservice/common/errors/media-stream.errors'
 import { MediaStreamExceptionFilter } from '#microservice/common/filters/media-stream-exception.filter'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
@@ -112,6 +112,18 @@ describe('mediaStreamExceptionFilter', () => {
 			expect(typedErrorResponse.context).toBeUndefined()
 		})
 
+		it('answers ProcessingOverloadedError with 503 and a Retry-After header', () => {
+			mockResponse.setHeader = vi.fn()
+			const error = new ProcessingOverloadedError(2, { reason: 'queue_full' })
+
+			filter.catch(error, mockArgumentsHost)
+
+			expect(mockResponse.setHeader).toHaveBeenCalledWith('Retry-After', '2')
+			const [, errorResponseArg, statusArg] = mockHttpAdapterReply.mock.calls[0]
+			expect(statusArg).toBe(HttpStatus.SERVICE_UNAVAILABLE)
+			expect((errorResponseArg as Record<string, any>).code).toBe('PROCESSING_OVERLOADED')
+		})
+
 		it('should handle HttpException', () => {
 			const error = new HttpException('Forbidden', HttpStatus.FORBIDDEN)
 
@@ -203,6 +215,15 @@ describe('mediaStreamExceptionFilter', () => {
 
 			expect(errorSpy).toHaveBeenCalledTimes(1)
 			expect(warnSpy).not.toHaveBeenCalled()
+		})
+
+		it('logs a capacity shed (503 overloaded / timed out) at WARN, not ERROR', () => {
+			mockResponse.setHeader = vi.fn()
+			filter.catch(new ProcessingOverloadedError(2), mockArgumentsHost)
+			filter.catch(new ProcessingTimeoutError(), mockArgumentsHost)
+
+			expect(warnSpy).toHaveBeenCalledTimes(2)
+			expect(errorSpy).not.toHaveBeenCalled()
 		})
 
 		it('logs an unknown (500) error at ERROR, not WARN', () => {

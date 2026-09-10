@@ -5,6 +5,7 @@ import { MetricsModule } from '#microservice/Metrics/metrics.module'
 import FetchResourceResponseJob from '#microservice/Processing/jobs/fetch-resource-response.job'
 import GenerateResourceIdentityFromRequestJob from '#microservice/Processing/jobs/generate-resource-identity-from-request.job'
 import WebpImageManipulationJob from '#microservice/Processing/jobs/webp-image-manipulation.job'
+import { ProcessingAdmissionService } from '#microservice/Processing/services/processing-admission.service'
 import { SharpConfigService } from '#microservice/Processing/services/sharp-config.service'
 import { ValidationModule } from '#microservice/Validation/validation.module'
 import { CacheModule } from './cache.module.js'
@@ -34,6 +35,7 @@ import { ResourceFetcher } from './operations/resource-fetcher.service.js'
 		FetchResourceResponseJob,
 		WebpImageManipulationJob,
 		SharpConfigService,
+		ProcessingAdmissionService,
 	],
 	exports: [
 		CacheImageResourceOperation,

@@ -4,7 +4,7 @@ import { Catch, HttpException, HttpStatus } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
-import { MediaStreamError } from '../errors/media-stream.errors.js'
+import { MediaStreamError, ProcessingOverloadedError, ProcessingTimeoutError } from '../errors/media-stream.errors.js'
 
 /** The JSON body every error response carries. */
 export interface ErrorResponseBody {
@@ -71,7 +71,15 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 
 		const body = this.formatErrorResponse(shape, request)
 
-		if (shape.status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+		if (exception instanceof ProcessingOverloadedError) {
+			response.setHeader('Retry-After', String(exception.retryAfterSeconds))
+		}
+
+		// Load shedding (503 + Retry-After) is the service working as designed
+		// under pressure, not a fault: keep it out of the ERROR stream.
+		const isCapacityShed = exception instanceof ProcessingOverloadedError || exception instanceof ProcessingTimeoutError
+
+		if (shape.status >= HttpStatus.INTERNAL_SERVER_ERROR && !isCapacityShed) {
 			CorrelatedLogger.error(`${shape.name}: ${exception.message}`, logDetail, MediaStreamExceptionFilter.name)
 		}
 		else {
