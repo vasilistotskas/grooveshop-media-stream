@@ -1,3 +1,10 @@
+## [3.1.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.1.0...v3.1.1) (2026-09-10)
+
+
+### Bug Fixes
+
+* **cors:** decide the allowed origin per request from the tenant-domain feed ([62b3ab3](https://github.com/vasilistotskas/grooveshop-media-stream/commit/62b3ab31e225ea6ebacd39fe68ae9b560cf3d4c5))
+
 # [3.1.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.0.0...v3.1.0) (2026-09-09)
 
 
