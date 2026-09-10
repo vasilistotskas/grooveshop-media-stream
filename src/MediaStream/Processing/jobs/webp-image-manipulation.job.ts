@@ -128,14 +128,18 @@ export default class WebpImageManipulationJob {
 	 * shrink-on-load off whenever a trim is present (lovell/sharp#888), so a
 	 * trimmed request decodes the source at full resolution: 540 ms instead
 	 * of 25 ms for a 4000×3000 JPEG. Shrink first on its own pipeline, then
-	 * trim the small working copy; the crop scales with the image and the
-	 * copy is kept at least twice the target so the final resize never
-	 * upscales trimmed content.
+	 * trim the small working copy; the crop scales with the image. The copy
+	 * covers (`fit: outside`) at least twice the target on every requested
+	 * axis, never enlarged, so the final resize cannot upscale trimmed
+	 * content even for `cover` on a very wide or very tall source.
 	 */
 	private async trimOnWorkingCopy(source: Sharp, options: ResizeOptions, target: { width?: number, height?: number }): Promise<Sharp> {
-		const workingSize = Math.max(TRIM_WORKING_SIZE, 2 * Math.max(target.width ?? 0, target.height ?? 0))
+		const box = {
+			width: target.width ? Math.max(TRIM_WORKING_SIZE, 2 * target.width) : undefined,
+			height: target.height ? Math.max(TRIM_WORKING_SIZE, 2 * target.height) : undefined,
+		}
 		const { data, info } = await this.toBuffer(
-			source.resize({ width: workingSize, height: workingSize, fit: 'inside', withoutEnlargement: true }).raw(),
+			source.resize({ ...box, fit: 'outside', withoutEnlargement: true }).raw(),
 			'trim working copy',
 		)
 		source.destroy()

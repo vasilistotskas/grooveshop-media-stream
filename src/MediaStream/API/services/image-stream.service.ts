@@ -154,9 +154,9 @@ export class ImageStreamService {
 			res.send(imageBuffer)
 		}
 		catch (error: unknown) {
-			// The fallback needs a Sharp slot too; when none is available that
-			// is still a capacity answer, not a broken fallback.
-			if (error instanceof ProcessingOverloadedError) {
+			// The fallback needs a Sharp slot too; no slot, or a pipeline cut
+			// by the timeout, is still a capacity answer, not a broken fallback.
+			if (error instanceof ProcessingOverloadedError || error instanceof ProcessingTimeoutError) {
 				throw error
 			}
 			CorrelatedLogger.error(`Failed to serve fallback image: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, ImageStreamService.name)

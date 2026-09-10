@@ -237,7 +237,7 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 
 		this.processingRejectedTotal = new promClient.Counter({
 			name: 'mediastream_processing_rejected_total',
-			help: 'Image requests answered 503 by processing admission control, by reason',
+			help: 'Processing attempts rejected by admission control, by reason (one per shed pipeline; deduplicated waiters share a rejection)',
 			labelNames: ['reason'],
 			registers: [this.register],
 		})

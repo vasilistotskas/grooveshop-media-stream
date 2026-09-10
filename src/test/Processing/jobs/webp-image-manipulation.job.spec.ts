@@ -167,8 +167,8 @@ describe('webpImageManipulationJob', () => {
 
 				await job.handle('test.webp', options({ trimThreshold: 10 }))
 
-				// Pass 1: the source pipeline is shrunk (inside, never enlarged) to raw pixels...
-				expect(mockManipulation.resize).toHaveBeenNthCalledWith(1, { width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+				// Pass 1: the source pipeline is shrunk (covering twice the target, never enlarged) to raw pixels...
+				expect(mockManipulation.resize).toHaveBeenNthCalledWith(1, { width: 1600, height: 1200, fit: 'outside', withoutEnlargement: true })
 				expect(mockManipulation.raw).toHaveBeenCalledTimes(1)
 				expect(mockManipulation.toBuffer).toHaveBeenNthCalledWith(1, { resolveWithObject: true })
 				// ...pass 2: a second pipeline over those pixels trims, then resizes to the target.
@@ -190,6 +190,14 @@ describe('webpImageManipulationJob', () => {
 				primeTrimmedRun()
 				await job.handle('a.jpg', options({ width: 1536, height: 1536 }))
 				expect(mockManipulation.resize).toHaveBeenNthCalledWith(1, expect.objectContaining({ width: 3072, height: 3072 }))
+
+				// Only the requested axes constrain the copy: a width-only target
+				// leaves the height free, so a tall or wide source keeps its ratio.
+				vi.clearAllMocks()
+				;(sharp as any).mockReturnValue(mockManipulation)
+				primeTrimmedRun()
+				await job.handle('a.jpg', options({ width: 300, height: 0 }))
+				expect(mockManipulation.resize).toHaveBeenNthCalledWith(1, { width: TRIM_WORKING_SIZE, height: undefined, fit: 'outside', withoutEnlargement: true })
 			})
 
 			it('is skipped entirely (one pipeline, shrink-on-load intact) when the threshold is unset', async () => {

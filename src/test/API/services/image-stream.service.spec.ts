@@ -332,15 +332,16 @@ describe('imageStreamService', () => {
 			}
 		})
 
-		it('propagates an overload raised while producing the fallback itself', async () => {
-			const res = createMockResponse()
-			const overloaded = new ProcessingOverloadedError(2)
-			cacheOp.setup.mockRejectedValue(new Error('Setup failed'))
-			cacheOp.optimizeAndServeDefaultImage.mockRejectedValue(overloaded)
+		it('propagates a capacity error (overload or timeout) raised while producing the fallback itself', async () => {
+			for (const error of [new ProcessingOverloadedError(2), new ProcessingTimeoutError()]) {
+				const res = createMockResponse()
+				cacheOp.setup.mockRejectedValue(new Error('Setup failed'))
+				cacheOp.optimizeAndServeDefaultImage.mockRejectedValue(error)
 
-			await expect(service.processAndStream(createContext(), createRequest(), res)).rejects.toBe(overloaded)
+				await expect(service.processAndStream(createContext(), createRequest(), res)).rejects.toBe(error)
 
-			expect(metricsService.recordError).not.toHaveBeenCalledWith('default_image_fallback', 'fallback_error')
+				expect(metricsService.recordError).not.toHaveBeenCalledWith('default_image_fallback', 'fallback_error')
+			}
 		})
 
 		it('propagates DefaultImageFallbackError when the fallback itself fails', async () => {
