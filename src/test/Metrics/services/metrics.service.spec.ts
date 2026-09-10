@@ -205,6 +205,21 @@ describe('metricsService', () => {
 		})
 	})
 
+	describe('processing admission metrics', () => {
+		it('exposes pipeline occupancy by state and counts sheds by reason', async () => {
+			service.setProcessingAdmission(2, 5)
+			service.recordProcessingRejected('queue_full')
+			service.recordProcessingRejected('queue_timeout')
+			service.recordProcessingRejected('queue_timeout')
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_processing_pipelines{state="in_flight"} 2')
+			expect(metrics).toContain('mediastream_processing_pipelines{state="queued"} 5')
+			expect(metrics).toContain('mediastream_processing_rejected_total{reason="queue_full"} 1')
+			expect(metrics).toContain('mediastream_processing_rejected_total{reason="queue_timeout"} 2')
+		})
+	})
+
 	describe('system Metrics', () => {
 		it('should update memory metrics', async () => {
 			const memoryInfo = {

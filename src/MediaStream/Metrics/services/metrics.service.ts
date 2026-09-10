@@ -45,6 +45,9 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	private readonly tenantDomainsCount: promClient.Gauge
 	private readonly tenantDomainsLastRefreshTimestamp: promClient.Gauge
 
+	private readonly processingPipelines: promClient.Gauge
+	private readonly processingRejectedTotal: promClient.Counter
+
 	private startTime: number = Date.now()
 	private requestsInFlightCount: number = 0
 	private systemMetricsInterval?: NodeJS.Timeout
@@ -225,6 +228,20 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			registers: [this.register],
 		})
 
+		this.processingPipelines = new promClient.Gauge({
+			name: 'mediastream_processing_pipelines',
+			help: 'Sharp pipelines by admission state: in_flight (running) or queued (waiting for a slot)',
+			labelNames: ['state'],
+			registers: [this.register],
+		})
+
+		this.processingRejectedTotal = new promClient.Counter({
+			name: 'mediastream_processing_rejected_total',
+			help: 'Processing attempts rejected by admission control, by reason (one per shed pipeline; deduplicated waiters share a rejection)',
+			labelNames: ['reason'],
+			registers: [this.register],
+		})
+
 		this.tenantDomainsCount = new promClient.Gauge({
 			name: 'mediastream_tenant_domains_count',
 			help: 'Number of hostnames currently in the dynamic per-tenant domain allowlist (TenantDomainsService)',
@@ -346,6 +363,17 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	 */
 	recordError(type: string, operation: string): void {
 		this.errorTotal.inc({ type, operation })
+	}
+
+	/** Current Sharp pipeline occupancy as seen by ProcessingAdmissionService. */
+	setProcessingAdmission(inFlight: number, queued: number): void {
+		this.processingPipelines.set({ state: 'in_flight' }, inFlight)
+		this.processingPipelines.set({ state: 'queued' }, queued)
+	}
+
+	/** One image request shed by admission control (503). */
+	recordProcessingRejected(reason: 'queue_full' | 'queue_timeout'): void {
+		this.processingRejectedTotal.inc({ reason })
 	}
 
 	/**

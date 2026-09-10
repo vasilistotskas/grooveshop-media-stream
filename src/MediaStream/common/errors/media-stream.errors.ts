@@ -73,6 +73,29 @@ export class CircuitBreakerOpenError extends MediaStreamError {
 }
 
 /**
+ * Every Sharp pipeline slot is busy and the wait queue is full (or the wait
+ * timed out). Answered 503 with Retry-After so clients and CDNs back off
+ * instead of receiving the default image for a perfectly good source.
+ */
+export class ProcessingOverloadedError extends MediaStreamError {
+	public readonly retryAfterSeconds: number
+
+	constructor(retryAfterSeconds: number = 2, context: Metadata = {}) {
+		super('Image processing capacity exhausted', HttpStatus.SERVICE_UNAVAILABLE, 'PROCESSING_OVERLOADED', context)
+		this.retryAfterSeconds = retryAfterSeconds
+	}
+}
+
+/**
+ * Sharp aborted a pipeline because it exceeded `processing.timeoutSeconds`.
+ */
+export class ProcessingTimeoutError extends MediaStreamError {
+	constructor(context: Metadata = {}) {
+		super('Image processing timed out', HttpStatus.SERVICE_UNAVAILABLE, 'PROCESSING_TIMEOUT', context)
+	}
+}
+
+/**
  * The upstream resource exceeds the per-format size limit (declared or streamed).
  */
 export class UpstreamResourceTooLargeError extends MediaStreamError {

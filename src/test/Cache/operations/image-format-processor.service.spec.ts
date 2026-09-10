@@ -10,6 +10,7 @@ import { storageDirectory } from '#microservice/common/utils/storage-path.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import ManipulationJobResult from '#microservice/Processing/dto/manipulation-job-result.dto'
 import WebpImageManipulationJob from '#microservice/Processing/jobs/webp-image-manipulation.job'
+import { ProcessingAdmissionService } from '#microservice/Processing/services/processing-admission.service'
 import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 
 vi.mock('node:fs/promises')
@@ -29,6 +30,7 @@ const SVG = '<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'
 describe('imageFormatProcessor', () => {
 	let processor: ImageFormatProcessor
 	let mockWebpImageManipulationJob: WebpImageManipulationJob
+	let admission: { run: ReturnType<typeof vi.fn> }
 	let storageDir: string
 	const optimized = Buffer.from('optimized-image-data')
 
@@ -46,10 +48,14 @@ describe('imageFormatProcessor', () => {
 		const configService = createConfigServiceMock()
 		storageDir = storageDirectory(configService)
 
+		// Admission is a pass-through here; its queueing is covered by its own spec.
+		admission = { run: vi.fn((fn: () => Promise<unknown>) => fn()) }
+
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [
 				ImageFormatProcessor,
 				{ provide: WebpImageManipulationJob, useValue: mockWebpImageManipulationJob },
+				{ provide: ProcessingAdmissionService, useValue: admission },
 				{ provide: ConfigService, useValue: configService },
 			],
 		}).compile()

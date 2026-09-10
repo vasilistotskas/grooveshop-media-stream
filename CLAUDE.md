@@ -107,8 +107,11 @@ Two registered layers, checked in priority order: Memory (node-cache, priority 1
 ### Processing Pipeline
 
 - **No job queue**: every request is processed synchronously through `CacheImageResourceOperation.execute()`; concurrent requests for the same resource share one processing via `RequestDeduplicator`
+- **Admission control**: every Sharp pipeline runs through `ProcessingAdmissionService` (`PROCESSING_MAX_CONCURRENT`, 0 = ceil of `PROCESSING_CPU_CORES`; `PROCESSING_MAX_QUEUE`; `PROCESSING_QUEUE_TIMEOUT_MS`). Beyond the queue or the wait budget the request gets `ProcessingOverloadedError` (503 + `Retry-After`), and `ImageStreamService` propagates it instead of serving the default image. `PROCESSING_TIMEOUT_SECONDS` is Sharp's per-pipeline `timeout()`; exceeding it is `ProcessingTimeoutError` (503). Occupancy is `mediastream_processing_pipelines{state}`, sheds are `mediastream_processing_rejected_total{reason}`
 - **Output format** is always explicit in the URL (`:quality.:format`); there is no Accept-header negotiation and no `Vary` header. `format=svg` produces PNG bytes (`outputFormat()`)
-- **Sharp config**: concurrency derived from `PROCESSING_CPU_CORES` (fractions allowed), 100 MB memory cache, SIMD enabled, applied at boot by `Processing/services/sharp-config.service.ts`. AVIF falls back to WebP above 1920×1080
+- **Sharp config**: concurrency derived from `PROCESSING_CPU_CORES` (fractions allowed), 100 MB memory cache, SIMD enabled, applied at boot by `Processing/services/sharp-config.service.ts`. AVIF is encoded at effort 2 / 4:2:0 for every source size (measured at parity with WebP)
+- **Trim** (`trimThreshold` > 0) never runs on the full-resolution source: Sharp disables shrink-on-load for any trim, so the job shrinks to a working copy first (`TRIM_WORKING_SIZE`, or twice the target) and trims that. A threshold of 0 skips trim entirely; the storefront sends 0 by default
+- **Memory**: the production image preloads jemalloc and sets `MALLOC_ARENA_MAX=2` (libvips allocates through GLib and fragments glibc arenas); the Node heap is capped at 512 MB because image bytes live outside it
 - **Image limits**: max 8192×8192, max 7680×4320 total pixels (`common/constants/image-limits.constant.ts`); per-format upstream file sizes in `MAX_FILE_SIZES` (JPEG 5 MB, PNG 8 MB, WebP 3 MB, GIF 2 MB, SVG 1 MB, default 10 MB), enforced on the declared Content-Length and again while streaming; `SHARP_INPUT_PIXEL_LIMIT` on every Sharp input
 
 ### Additional Endpoints

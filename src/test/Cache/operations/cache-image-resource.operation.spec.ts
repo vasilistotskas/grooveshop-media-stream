@@ -17,7 +17,7 @@ import CacheImageResourceOperation from '#microservice/Cache/operations/cache-im
 import { ImageFormatProcessor } from '#microservice/Cache/operations/image-format-processor.service'
 import { ResourceFetcher } from '#microservice/Cache/operations/resource-fetcher.service'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
-import { UpstreamResourceTooLargeError } from '#microservice/common/errors/media-stream.errors'
+import { ProcessingOverloadedError, UpstreamResourceTooLargeError } from '#microservice/common/errors/media-stream.errors'
 import { storageDirectory } from '#microservice/common/utils/storage-path.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
@@ -27,6 +27,7 @@ import ManipulationJobResult from '#microservice/Processing/dto/manipulation-job
 import FetchResourceResponseJob from '#microservice/Processing/jobs/fetch-resource-response.job'
 import GenerateResourceIdentityFromRequestJob from '#microservice/Processing/jobs/generate-resource-identity-from-request.job'
 import WebpImageManipulationJob from '#microservice/Processing/jobs/webp-image-manipulation.job'
+import { ProcessingAdmissionService } from '#microservice/Processing/services/processing-admission.service'
 import { ResourceValidationService } from '#microservice/Validation/services/resource-validation.service'
 import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 
@@ -132,6 +133,7 @@ describe('cacheImageResourceOperation', () => {
 				{ provide: GenerateResourceIdentityFromRequestJob, useValue: identityJob },
 				{ provide: FetchResourceResponseJob, useValue: fetchJob },
 				{ provide: WebpImageManipulationJob, useValue: webpJob },
+				{ provide: ProcessingAdmissionService, useValue: { run: (fn: () => Promise<unknown>) => fn() } },
 				{ provide: MultiLayerCacheManager, useValue: cacheManager },
 				{ provide: ResourceValidationService, useValue: validation },
 				{ provide: AccessCountTracker, useValue: tracker },
@@ -395,6 +397,17 @@ describe('cacheImageResourceOperation', () => {
 			expect(metricsService.recordError).toHaveBeenCalledWith('image_processing', 'execute')
 			expect(metricsService.recordImageProcessing).toHaveBeenCalledWith('process', 'unknown', 'error', expect.any(Number), 'public')
 			expect(metricsService.recordImageProcessing).toHaveBeenCalledWith('execute', 'unknown', 'error', expect.any(Number), 'public')
+		})
+
+		it('treats an admission shed as capacity, not a processing failure: no error metrics, error propagated', async () => {
+			const shed = new ProcessingOverloadedError(2)
+			webpJob.handle.mockRejectedValue(shed)
+
+			await expect(operation.execute(ctx)).rejects.toBe(shed)
+
+			expect(mockedFs.unlink).toHaveBeenCalledWith(operation.getResourceTempPath(ctx))
+			expect(metricsService.recordError).not.toHaveBeenCalledWith('image_processing', 'execute')
+			expect(metricsService.recordImageProcessing).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), 'error', expect.anything(), expect.anything())
 		})
 
 		it('propagates typed errors unchanged so the caller sees their HTTP status', async () => {

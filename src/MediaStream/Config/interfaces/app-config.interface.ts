@@ -67,6 +67,14 @@ export interface CacheConfig {
 
 export interface ProcessingConfig {
 	cpuCores: number
+	/** Concurrent Sharp pipelines; 0 derives ceil(cpuCores). */
+	maxConcurrent: number
+	/** Requests allowed to wait for a pipeline slot before 503. */
+	maxQueue: number
+	/** Longest wait for a slot before 503 (ms). */
+	queueTimeoutMs: number
+	/** Sharp per-pipeline timeout (seconds); 0 disables. */
+	timeoutSeconds: number
 }
 
 export interface MonitoringConfig {

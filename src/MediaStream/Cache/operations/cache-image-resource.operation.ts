@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
 import CacheImageRequest from '#microservice/API/dto/cache-image-request.dto'
 import { PUBLIC_TENANT_SCHEMA } from '#microservice/common/constants/tenant.constant'
-import { MediaStreamError } from '#microservice/common/errors/media-stream.errors'
+import { MediaStreamError, ProcessingOverloadedError } from '#microservice/common/errors/media-stream.errors'
 import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { storageDirectory } from '#microservice/common/utils/storage-path.util'
 import { ConfigService } from '#microservice/Config/config.service'
@@ -220,6 +220,12 @@ export default class CacheImageResourceOperation {
 		}
 		catch (error: unknown) {
 			const duration = PerformanceTracker.endPhase('execute')
+			// A shed request never reached a pipeline: it is capacity, not a
+			// processing failure, and is already counted by admission metrics.
+			if (error instanceof ProcessingOverloadedError) {
+				CorrelatedLogger.warn(`Shed by processing admission: ${errorMessage(error)}`, CacheImageResourceOperation.name)
+				throw error
+			}
 			CorrelatedLogger.error(`Failed to execute CacheImageResourceOperation: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, CacheImageResourceOperation.name)
 			this.metricsService.recordError('image_processing', 'execute')
 			this.metricsService.recordImageProcessing('execute', 'unknown', 'error', duration || 0, ctx.request.tenantSchema || PUBLIC_TENANT_SCHEMA)
@@ -302,7 +308,9 @@ export default class CacheImageResourceOperation {
 		}
 		catch (error: unknown) {
 			const duration = PerformanceTracker.endPhase('processing')
-			this.metricsService.recordImageProcessing('process', 'unknown', 'error', duration || 0, tenantSchema)
+			if (!(error instanceof ProcessingOverloadedError)) {
+				this.metricsService.recordImageProcessing('process', 'unknown', 'error', duration || 0, tenantSchema)
+			}
 			throw error
 		}
 	}

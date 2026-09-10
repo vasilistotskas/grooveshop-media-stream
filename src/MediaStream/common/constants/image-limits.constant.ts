@@ -45,9 +45,12 @@ export const MAX_TRIM_THRESHOLD = 100
 export const SHARP_INPUT_PIXEL_LIMIT = 268402689
 
 /**
- * AVIF encoding is too slow above Full HD; larger sources are encoded as WebP instead.
+ * Longest edge of the shrink-on-load working copy that `trim` runs on
+ * (raised to twice the requested output when that is larger). Trimming the
+ * full-resolution source costs a full decode; trimming a ≤1024 px copy costs
+ * a fraction of it and crops to the same region.
  */
-export const AVIF_MAX_INPUT_PIXELS = 1920 * 1080
+export const TRIM_WORKING_SIZE = 1024
 
 /**
  * Maximum file sizes by format (in bytes)

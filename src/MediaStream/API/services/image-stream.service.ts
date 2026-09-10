@@ -4,7 +4,7 @@ import type ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto
 import type { ImageProcessingContext } from '../types/image-source.types.js'
 import { Injectable } from '@nestjs/common'
 import CacheImageResourceOperation from '#microservice/Cache/operations/cache-image-resource.operation'
-import { CircuitBreakerOpenError, DefaultImageFallbackError } from '#microservice/common/errors/media-stream.errors'
+import { CircuitBreakerOpenError, DefaultImageFallbackError, ProcessingOverloadedError, ProcessingTimeoutError } from '#microservice/common/errors/media-stream.errors'
 import { getMimeType } from '#microservice/common/utils/content-negotiation.util'
 import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { checkETagMatch, checkIfModifiedSince, formatLastModified, generateWeakETag } from '#microservice/common/utils/etag.util'
@@ -154,6 +154,11 @@ export class ImageStreamService {
 			res.send(imageBuffer)
 		}
 		catch (error: unknown) {
+			// The fallback needs a Sharp slot too; no slot, or a pipeline cut
+			// by the timeout, is still a capacity answer, not a broken fallback.
+			if (error instanceof ProcessingOverloadedError || error instanceof ProcessingTimeoutError) {
+				throw error
+			}
 			CorrelatedLogger.error(`Failed to serve fallback image: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, ImageStreamService.name)
 			this.metricsService.recordError('default_image_fallback', 'fallback_error')
 			throw new DefaultImageFallbackError('Failed to process image request', { error: errorMessage(error), correlationId })
@@ -161,6 +166,14 @@ export class ImageStreamService {
 	}
 
 	private async handleStreamError(error: unknown, request: CacheImageRequest, res: Response, correlationId: string): Promise<void> {
+		// Capacity, not content: the source is fine, this pod is not. A 503
+		// with Retry-After lets the client and CDN retry instead of caching
+		// the default image for a perfectly good URL.
+		if (error instanceof ProcessingOverloadedError || error instanceof ProcessingTimeoutError) {
+			this.metricsService.recordError('image_request', error.code)
+			throw error
+		}
+
 		if (error instanceof CircuitBreakerOpenError) {
 			CorrelatedLogger.warn('Circuit breaker open, serving fallback', ImageStreamService.name)
 			this.metricsService.recordError('image_request', 'circuit_breaker_open')
