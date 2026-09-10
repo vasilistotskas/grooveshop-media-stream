@@ -1,3 +1,10 @@
+# [3.2.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.1.1...v3.2.0) (2026-09-10)
+
+
+### Features
+
+* **processing:** admission control, cheap trim, jemalloc and honest 503s under load ([#15](https://github.com/vasilistotskas/grooveshop-media-stream/issues/15)) ([9213f19](https://github.com/vasilistotskas/grooveshop-media-stream/commit/9213f196d65208dc499903c067c61124cacb42e7))
+
 ## [3.1.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.1.0...v3.1.1) (2026-09-10)
 
 
