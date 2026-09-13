@@ -36,7 +36,7 @@ jobs:
       security-events: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Run Trivy filesystem scan
         # SHA-pinned: trivy-action's mutable tags were hijacked in the
@@ -82,7 +82,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install pnpm
         uses: pnpm/action-setup@v5
@@ -173,7 +173,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           token: ${{ secrets.MEDIA_STREAM_GITHUB_TOKEN }}
