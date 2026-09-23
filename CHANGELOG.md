@@ -1,3 +1,10 @@
+## [3.4.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.4.0...v3.4.1) (2026-09-23)
+
+
+### Bug Fixes
+
+* **metrics:** export admission metrics at zero from boot ([8e8b4be](https://github.com/vasilistotskas/grooveshop-media-stream/commit/8e8b4be67815d8e6a9a04a4bc874c06c88137d6f))
+
 # [3.4.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.3.0...v3.4.0) (2026-09-23)
 
 
