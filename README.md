@@ -103,7 +103,7 @@ CORS is always enabled; the allowed origins are decided per request:
 - `POST /health/circuit-breaker/reset` — Reset circuit breaker
 
 ### Metrics
-- `GET /metrics` — Prometheus-format metrics
+- `GET /metrics` — Prometheus-format metrics. Requires `Authorization: Bearer <METRICS_BEARER_TOKEN>` (`MetricsTokenGuard`), a read-only credential separate from `INTERNAL_ADMIN_SECRET`
 
 ### Admin
 - `POST /admin/cache/flush-tenant` — Flush all cache entries (memory, Redis, file system) for a tenant. Protected by `InternalSecretGuard` (`x-internal-secret` header matching `INTERNAL_ADMIN_SECRET`)
@@ -163,7 +163,7 @@ src/MediaStream/
 ### Rate Limiting
 - Adaptive rate limiting based on system load
 - IP + user-agent + request type keying
-- Bypasses for health checks, static assets, whitelisted domains, and bots (bot bypass requires the request to originate from an internal IP). `/metrics` is deliberately NOT exempt — it stays behind the rate limiter as defence-in-depth alongside its own internal-secret guard.
+- Bypasses for health checks, static assets, whitelisted domains, and bots (bot bypass requires the request to originate from an internal IP). `/metrics` is deliberately NOT exempt — it stays behind the rate limiter as defence-in-depth alongside its own bearer-token guard.
 
 ### Error Handling
 - Global exception filter with correlation ID enrichment

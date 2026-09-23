@@ -6,19 +6,18 @@ import MediaStreamModule from '#microservice/media-stream.module'
 
 const TEXT_PLAIN_RE = /text\/plain/
 
-// /metrics is protected by ``InternalSecretGuard`` since the
-// audit-hardening pass.  E2E tests load a known secret via
-// ``INTERNAL_ADMIN_SECRET`` env var and attach the matching header.
-const TEST_INTERNAL_SECRET = 'test-internal-secret-for-e2e-spec'
+// /metrics is protected by ``MetricsTokenGuard``. E2E tests load a known
+// token via ``METRICS_BEARER_TOKEN`` and send it as a bearer token.
+const TEST_METRICS_TOKEN = 'test-metrics-token-for-e2e-spec'
 
 describe('MediaStreamModule (e2e)', () => {
 	let app: INestApplication
 	let moduleFixture: TestingModule
 
 	beforeAll(async () => {
-		// Set the secret BEFORE module compilation so ConfigService
+		// Set the token BEFORE module compilation so ConfigService
 		// picks it up at startup.
-		vi.stubEnv('INTERNAL_ADMIN_SECRET', TEST_INTERNAL_SECRET)
+		vi.stubEnv('METRICS_BEARER_TOKEN', TEST_METRICS_TOKEN)
 
 		moduleFixture = await Test.createTestingModule({
 			imports: [MediaStreamModule],
@@ -64,7 +63,7 @@ describe('MediaStreamModule (e2e)', () => {
 
 			.get('/metrics')
 
-			.set('x-internal-secret', TEST_INTERNAL_SECRET)
+			.set('Authorization', `Bearer ${TEST_METRICS_TOKEN}`)
 
 			.expect(200)
 

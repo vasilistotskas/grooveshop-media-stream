@@ -81,6 +81,8 @@ export interface MonitoringConfig {
 	enabled: boolean
 	systemMetricsInterval: number
 	performanceMetricsInterval: number
+	/** Bearer token for `GET /metrics`; empty keeps the endpoint closed. */
+	metricsToken: string
 }
 
 export interface CircuitBreakerConfig {

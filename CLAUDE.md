@@ -116,7 +116,7 @@ Two registered layers, checked in priority order: Memory (node-cache, priority 1
 
 ### Additional Endpoints
 
-- `GET /metrics` — Prometheus-format metrics (`x-internal-secret` required; also rate-limited as defence in depth)
+- `GET /metrics` — Prometheus-format metrics (`Authorization: Bearer <METRICS_BEARER_TOKEN>` required, checked by `MetricsTokenGuard`; also rate-limited as defence in depth). The token is deliberately NOT `INTERNAL_ADMIN_SECRET`: the scraper gets a read-only credential that cannot flush caches or reset the circuit breaker. vmagent scrapes it via a `VMPodScrape` in `grooveshop-infrastructure`
 
 ### Health Endpoints
 
@@ -130,7 +130,8 @@ Two registered layers, checked in priority order: Memory (node-cache, priority 1
 - `SecurityCheckerService`: XSS, SQL injection, path traversal (single and double percent-decoding, malformed encoding rejected), command injection, XXE, NoSQL patterns; entropy-based payload detection (image filenames exempt)
 - `AdaptiveRateLimitGuard`: health probes (except `POST /health/circuit-breaker/reset`) and static assets under `public/` bypass; bot User-Agents bypass only from internal IPs (`common/utils/ip.util.ts`); Referer/Origin whitelist only for internal-IP callers. Image processing is keyed per tenant + IP; the limit shrinks under heap pressure measured against V8's `heap_size_limit`
 - `HttpClientService`: `maxRedirects: 0` (a redirect could pivot to an internal host), retry with exponential backoff, circuit breaker persisted to Redis; only 5xx/network faults count as upstream failures (a 404 is an answer, not an outage)
-- `InternalSecretGuard`: constant-time comparison of `x-internal-secret` against `admin.secret` (`INTERNAL_ADMIN_SECRET`); fail-closed when empty
+- `InternalSecretGuard`: constant-time comparison of `x-internal-secret` against `admin.secret` (`INTERNAL_ADMIN_SECRET`); fail-closed when empty. Guards the admin endpoints only
+- `MetricsTokenGuard`: constant-time comparison of the `Authorization: Bearer` value against `monitoring.metricsToken` (`METRICS_BEARER_TOKEN`); fail-closed when empty. Both guards share `common/utils/secret-compare.util.ts`
 
 ### Request Context & Observability
 
@@ -155,7 +156,7 @@ Two-tier timeout: soft (`SHUTDOWN_TIMEOUT`, 30 s) waits for in-flight requests, 
 
 ### Key Environment Variables
 
-Copy `.env.example` to `.env`. Critical ones: `PORT` (default 3003), `BACKEND_URL` (upstream image server; required in production), `REDIS_HOST`/`REDIS_PORT`, `INTERNAL_ADMIN_SECRET`, `CACHE_WARMING_CRON`, `STORAGE_CLEANUP_CRON`. Every env var maps to a key in `APP_CONFIG_SCHEMA` — `.env.example` mirrors the schema 1:1 — except `NODE_ENV` and `LOG_LEVEL`, which are read directly from the environment (`LOG_LEVEL` configures the Nest logger before any provider exists). `cron` is a direct dependency because `SchedulerRegistry.addCronJob()` uses `CronJob` from it directly.
+Copy `.env.example` to `.env`. Critical ones: `PORT` (default 3003), `BACKEND_URL` (upstream image server; required in production), `REDIS_HOST`/`REDIS_PORT`, `INTERNAL_ADMIN_SECRET`, `METRICS_BEARER_TOKEN`, `CACHE_WARMING_CRON`, `STORAGE_CLEANUP_CRON`. Every env var maps to a key in `APP_CONFIG_SCHEMA` — `.env.example` mirrors the schema 1:1 — except `NODE_ENV` and `LOG_LEVEL`, which are read directly from the environment (`LOG_LEVEL` configures the Nest logger before any provider exists). `cron` is a direct dependency because `SchedulerRegistry.addCronJob()` uses `CronJob` from it directly.
 
 ## Code Style
 

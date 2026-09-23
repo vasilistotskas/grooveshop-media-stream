@@ -7,9 +7,9 @@ import { MetricsModule } from '#microservice/Metrics/metrics.module'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import 'reflect-metadata'
 
-// /metrics is now protected by InternalSecretGuard.  Tests load a known
-// secret via INTERNAL_ADMIN_SECRET env var and attach the matching
-// x-internal-secret header to every protected request.
+// /metrics is protected by MetricsTokenGuard. Tests load a known token via
+// METRICS_BEARER_TOKEN and send it as a bearer token on every request.
+const TEST_METRICS_TOKEN = 'test-metrics-token-for-metrics-spec'
 const TEST_INTERNAL_SECRET = 'test-internal-secret-for-metrics-spec'
 
 describe('metrics Integration', () => {
@@ -17,8 +17,10 @@ describe('metrics Integration', () => {
 	let metricsService: MetricsService
 
 	beforeAll(async () => {
-		// Set the secret BEFORE creating the test module so the
-		// ConfigService picks it up at startup.
+		// Set both credentials BEFORE creating the test module so the
+		// ConfigService picks them up at startup. The admin secret is set
+		// only to prove it does NOT open /metrics.
+		vi.stubEnv('METRICS_BEARER_TOKEN', TEST_METRICS_TOKEN)
 		vi.stubEnv('INTERNAL_ADMIN_SECRET', TEST_INTERNAL_SECRET)
 
 		const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -41,12 +43,35 @@ describe('metrics Integration', () => {
 		vi.unstubAllEnvs()
 	})
 
-	// Helper: every /metrics request must carry the internal secret header
-	// now that InternalSecretGuard protects the controller.
+	// Helper: every /metrics request must carry the bearer token.
 	const metricsRequest = (path: string) =>
 		request(app.getHttpServer())
 			.get(path)
-			.set('x-internal-secret', TEST_INTERNAL_SECRET)
+			.set('Authorization', `Bearer ${TEST_METRICS_TOKEN}`)
+
+	describe('metrics Authentication', () => {
+		it('should reject a request without credentials', async () => {
+			const response = await request(app.getHttpServer()).get('/metrics')
+
+			expect(response.status).toBe(401)
+		})
+
+		it('should reject the admin secret, which is not a metrics credential', async () => {
+			const response = await request(app.getHttpServer())
+				.get('/metrics')
+				.set('x-internal-secret', TEST_INTERNAL_SECRET)
+
+			expect(response.status).toBe(401)
+		})
+
+		it('should reject the admin secret sent as a bearer token', async () => {
+			const response = await request(app.getHttpServer())
+				.get('/metrics')
+				.set('Authorization', `Bearer ${TEST_INTERNAL_SECRET}`)
+
+			expect(response.status).toBe(401)
+		})
+	})
 
 	describe('metrics Endpoint', () => {
 		it('should expose metrics at /metrics endpoint', async () => {

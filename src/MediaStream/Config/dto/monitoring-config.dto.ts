@@ -1,4 +1,4 @@
-import { IsBoolean, IsNumber, Min } from 'class-validator'
+import { IsBoolean, IsNumber, IsString, Min } from 'class-validator'
 
 export class MonitoringConfigDto {
 	@IsBoolean()
@@ -13,4 +13,8 @@ export class MonitoringConfigDto {
 	@IsNumber()
 	@Min(5000)
 	performanceMetricsInterval!: number
+
+	// Blank keeps /metrics closed (MetricsTokenGuard fails closed).
+	@IsString()
+	metricsToken!: string
 }

@@ -111,7 +111,7 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	// (ConfigService.validate); empty in specs, which never fetch.
 	'backend.url': { env: 'BACKEND_URL', default: '', type: 'string' },
 
-	// Shared secret for the internal admin endpoints (/metrics, cache flush,
+	// Shared secret for the internal admin endpoints (cache flush,
 	// circuit-breaker reset). Empty keeps those endpoints closed.
 	'admin.secret': { env: 'INTERNAL_ADMIN_SECRET', default: '', type: 'string' },
 
@@ -165,6 +165,9 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	'monitoring.enabled': { env: 'MONITORING_ENABLED', default: true, type: 'boolean' },
 	'monitoring.systemMetricsInterval': { env: 'MONITORING_SYSTEM_METRICS_INTERVAL', default: 60000, type: 'number' },
 	'monitoring.performanceMetricsInterval': { env: 'MONITORING_PERFORMANCE_METRICS_INTERVAL', default: 30000, type: 'number' },
+	// Bearer token for GET /metrics. Separate from admin.secret so the scraper
+	// holds a read-only credential. Empty keeps /metrics closed.
+	'monitoring.metricsToken': { env: 'METRICS_BEARER_TOKEN', default: '', type: 'string' },
 
 	// HTTP client configuration
 	'http.timeout': { env: 'HTTP_TIMEOUT', default: 30000, type: 'number' },
