@@ -8,6 +8,10 @@ import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { storageDirectory } from '#microservice/common/utils/storage-path.util'
 import { ConfigService } from '#microservice/Config/config.service'
 
+/** Every reason admission control sheds an image request for. */
+export const PROCESSING_REJECT_REASONS = ['queue_full', 'queue_timeout'] as const
+export type ProcessingRejectReason = (typeof PROCESSING_REJECT_REASONS)[number]
+
 @Injectable()
 export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	private readonly _logger = new Logger(MetricsService.name)
@@ -253,6 +257,16 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			help: 'Unix timestamp (seconds) of the last successful TenantDomainsService feed refresh, 0 if it has never succeeded',
 			registers: [this.register],
 		})
+
+		// A labelled series does not exist until its first write, so without
+		// this an idle pod exports no admission metrics at all and "nothing
+		// shed" is indistinguishable from "not scraped". Both label sets are
+		// closed, so every value is initialised to zero at boot (Prometheus
+		// instrumentation guidance: avoid missing metrics).
+		this.setProcessingAdmission(0, 0)
+		for (const reason of PROCESSING_REJECT_REASONS) {
+			this.processingRejectedTotal.inc({ reason }, 0)
+		}
 	}
 
 	async onModuleInit(): Promise<void> {
@@ -372,7 +386,7 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	/** One image request shed by admission control (503). */
-	recordProcessingRejected(reason: 'queue_full' | 'queue_timeout'): void {
+	recordProcessingRejected(reason: ProcessingRejectReason): void {
 		this.processingRejectedTotal.inc({ reason })
 	}
 

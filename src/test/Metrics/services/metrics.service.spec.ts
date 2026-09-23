@@ -206,6 +206,14 @@ describe('metricsService', () => {
 	})
 
 	describe('processing admission metrics', () => {
+		it('exports every admission series at zero before anything is processed', async () => {
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_processing_pipelines{state="in_flight"} 0')
+			expect(metrics).toContain('mediastream_processing_pipelines{state="queued"} 0')
+			expect(metrics).toContain('mediastream_processing_rejected_total{reason="queue_full"} 0')
+			expect(metrics).toContain('mediastream_processing_rejected_total{reason="queue_timeout"} 0')
+		})
+
 		it('exposes pipeline occupancy by state and counts sheds by reason', async () => {
 			service.setProcessingAdmission(2, 5)
 			service.recordProcessingRejected('queue_full')
