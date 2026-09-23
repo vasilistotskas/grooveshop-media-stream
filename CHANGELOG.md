@@ -1,3 +1,10 @@
+# [3.5.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.4.1...v3.5.0) (2026-09-23)
+
+
+### Features
+
+* **logging:** JSON logs in production ([2d915d4](https://github.com/vasilistotskas/grooveshop-media-stream/commit/2d915d4f8a86eb82a043ccd6b95b64cdf1078da6))
+
 ## [3.4.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.4.0...v3.4.1) (2026-09-23)
 
 
