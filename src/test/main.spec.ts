@@ -1,4 +1,5 @@
 import * as process from 'node:process'
+import { ConsoleLogger } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import MediaStreamModule from '#microservice/media-stream.module'
@@ -58,6 +59,7 @@ describe('bootstrap', () => {
 		Object.assign(process.env, originalEnv)
 
 		vi.clearAllMocks()
+		vi.unstubAllEnvs()
 	})
 
 	it('should bootstrap the application successfully', async () => {
@@ -67,7 +69,7 @@ describe('bootstrap', () => {
 
 		expect(NestFactory.create).toHaveBeenCalledWith(
 			MediaStreamModule,
-			expect.objectContaining({ logger: expect.any(Array) }),
+			expect.objectContaining({ logger: expect.any(ConsoleLogger) }),
 		)
 
 		expect(mockApp.useStaticAssets).toHaveBeenCalledWith('public')
@@ -77,6 +79,36 @@ describe('bootstrap', () => {
 			maxAge: 86400,
 		})
 		expect(mockApp.listen).toHaveBeenCalledWith(4000, '0.0.0.0')
+	})
+
+	/** Bootstrap, then capture one line written by the logger handed to Nest. */
+	async function firstLogLine(nodeEnv: string): Promise<string> {
+		vi.stubEnv('NODE_ENV', nodeEnv)
+		await bootstrap({ exitProcess: false, enableGracefulShutdown: false })
+		const options = vi.mocked(NestFactory.create).mock.calls[0][1] as unknown as { logger: ConsoleLogger }
+		const { logger } = options
+
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+		try {
+			logger.log('image served', 'ImageStreamService')
+			return String(write.mock.calls[0][0])
+		}
+		finally {
+			write.mockRestore()
+		}
+	}
+
+	it('should log one JSON object per line in production', async () => {
+		const line = JSON.parse(await firstLogLine('production'))
+
+		expect(line).toMatchObject({ level: 'log', context: 'ImageStreamService', message: 'image served' })
+	})
+
+	it('should keep the human-readable format outside production', async () => {
+		const line = await firstLogLine('development')
+
+		expect(() => JSON.parse(line)).toThrow()
+		expect(line).toContain('image served')
 	})
 
 	it('should use default port if PORT environment variable is not set', async () => {

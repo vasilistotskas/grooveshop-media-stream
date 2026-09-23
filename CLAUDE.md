@@ -135,6 +135,7 @@ Two registered layers, checked in priority order: Memory (node-cache, priority 1
 
 ### Request Context & Observability
 
+- **Production logs are JSON**: `main.ts` hands Nest a `ConsoleLogger({ json: isProduction() })`, one object per line with `level` (`log`/`warn`/`error`/`debug`/`verbose`/`fatal`), `context`, `message` and, on errors, `stack`. Vector parses it into `log.*`, which is what the log alerts and Grafana level mapping key on. Outside production the colourised text format stays
 - **AsyncLocalStorage** propagates correlation IDs across async boundaries. `CorrelatedLogger` prefixes every line with the id
 - **Logging convention**: request-path classes (API, Processing jobs, Validation, RateLimit, Cache, Storage, Health indicators, middleware) log via the static `CorrelatedLogger`; boot-time/interval-only classes (`ConfigService`, `SharpConfigService`, `MetricsService`, graceful shutdown, `main.ts`) use the plain Nest `Logger`. The logger's second argument is the context *string* (or the stack trace for `error`); put data in the message
 - **Middleware order**: shutdown check (503 while draining) → Correlation ID (`x-correlation-id`, set once, never re-set by services) → Timing headers (`x-response-time`, `x-request-start`, `x-request-end`) → Metrics collection

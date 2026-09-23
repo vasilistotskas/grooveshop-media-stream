@@ -3,14 +3,14 @@ import type { NestExpressApplication } from '@nestjs/platform-express'
 import type { ShutdownConfig } from '#microservice/Config/interfaces/app-config.interface'
 import * as process from 'node:process'
 import * as zlib from 'node:zlib'
-import { Logger } from '@nestjs/common'
+import { ConsoleLogger, Logger } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import compression from 'compression'
 import helmet from 'helmet'
 import { buildCorsOrigin } from '#microservice/common/utils/cors-origin.util'
 import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { setupGracefulShutdown, shutdownMiddleware } from '#microservice/common/utils/graceful-shutdown.util'
-import { isTest } from '#microservice/common/utils/runtime-env.util'
+import { isProduction, isTest } from '#microservice/common/utils/runtime-env.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import MediaStreamModule from '#microservice/media-stream.module'
 import { TenantDomainsService } from '#microservice/Validation/services/tenant-domains.service'
@@ -68,7 +68,12 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<void> {
 
 	try {
 		const app = await NestFactory.create<NestExpressApplication>(MediaStreamModule, {
-			logger: resolveLogLevels(),
+			// One JSON object per line in production, so the log pipeline
+			// (Vector → VictoriaLogs) parses `level`, `context` and `stack`
+			// into fields that alerts and dashboards can filter on. The
+			// colourised text format is for humans at a terminal and stays the
+			// development default.
+			logger: new ConsoleLogger({ logLevels: resolveLogLevels(), json: isProduction() }),
 		})
 
 		// Trust exactly 1 proxy hop (Traefik) so that req.ip reflects the real
