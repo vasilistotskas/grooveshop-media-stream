@@ -1,3 +1,10 @@
+# [3.6.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.5.1...v3.6.0) (2026-09-26)
+
+
+### Features
+
+* **observability:** one structured line per image request, and closed metric labels ([92c6bec](https://github.com/vasilistotskas/grooveshop-media-stream/commit/92c6becb04d70fba5d53b6cce178894d81fccd40))
+
 ## [3.5.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.5.0...v3.5.1) (2026-09-26)
 
 
