@@ -72,8 +72,11 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<void> {
 			// (Vector → VictoriaLogs) parses `level`, `context` and `stack`
 			// into fields that alerts and dashboards can filter on. The
 			// colourised text format is for humans at a terminal and stays the
-			// development default.
-			logger: new ConsoleLogger({ logLevels: resolveLogLevels(), json: isProduction() }),
+			// development default. `flattenParams` puts the fields of a
+			// structured event (CorrelatedLogger.event) at the top level of the
+			// line, next to `level` and `message`, the flat layout the Django
+			// and gateway logs use, so they arrive as `log.<field>`.
+			logger: new ConsoleLogger({ logLevels: resolveLogLevels(), json: isProduction(), flattenParams: true }),
 		})
 
 		// Trust exactly 1 proxy hop (Traefik) so that req.ip reflects the real

@@ -1,3 +1,6 @@
+/** The registered layers, fastest first. */
+export type CacheLayerName = 'memory' | 'redis'
+
 export interface CacheLayer {
 	get: <T>(key: string) => Promise<T | null>
 	set: <T>(key: string, value: T, ttl?: number) => Promise<void>
@@ -7,7 +10,7 @@ export interface CacheLayer {
 	deleteByPrefix: (prefix: string) => Promise<number>
 	clear: () => Promise<void>
 	getStats: () => Promise<CacheLayerStats>
-	getLayerName: () => string
+	getLayerName: () => CacheLayerName
 	/** Lower number = checked first. */
 	getPriority: () => number
 	/** Remaining TTL in seconds; -1 when unknown or the key has no expiry. */

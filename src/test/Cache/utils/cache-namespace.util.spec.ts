@@ -4,7 +4,6 @@ import {
 	IMAGE_KEY_PATTERN,
 	imageNamespace,
 	keyNamespacePrefix,
-	tenantFromNamespace,
 } from '#microservice/Cache/utils/cache-namespace.util'
 
 describe('cache-namespace.util', () => {
@@ -18,13 +17,6 @@ describe('cache-namespace.util', () => {
 	it('joins namespace and identifier', () => {
 		expect(cacheKey('image:acme', 'abc')).toBe('image:acme:abc')
 		expect(cacheKey('image:acme', '')).toBe('image:acme:')
-	})
-
-	it('extracts the tenant from a namespace', () => {
-		expect(tenantFromNamespace('image:acme')).toBe('acme')
-		expect(tenantFromNamespace('image:public')).toBe('public')
-		expect(tenantFromNamespace('ratelimit')).toBe('public')
-		expect(tenantFromNamespace('image:')).toBe('public')
 	})
 
 	it('derives the namespace prefix of a key', () => {

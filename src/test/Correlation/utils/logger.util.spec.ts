@@ -122,6 +122,17 @@ describe('correlatedLogger', () => {
 		})
 	})
 
+	describe('event', () => {
+		it('hands the fields to Nest as structured params, under the given context and level', () => {
+			CorrelatedLogger.event('log', 'image ok 200 3ms', { correlation_id: 'c-1', status: 200 }, 'ImageRequest')
+			expect(log).toHaveBeenCalledWith('image ok 200 3ms', { correlation_id: 'c-1', status: 200 })
+			expect(contextOfLastCall(log)).toBe('ImageRequest')
+
+			CorrelatedLogger.event('warn', 'image rejected 200 9ms', { correlation_id: 'c-2' }, 'ImageRequest')
+			expect(warn).toHaveBeenCalledWith('image rejected 200 9ms', { correlation_id: 'c-2' })
+		})
+	})
+
 	describe('debug', () => {
 		it('prefixes the correlation id', () => {
 			withCorrelationId(() => {

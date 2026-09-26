@@ -74,7 +74,7 @@ describe('multiLayerCacheManager Unit', () => {
 			expect(result).toEqual(testValue)
 			expect(mockMemoryLayer.get).toHaveBeenCalledWith('image:key1')
 			expect(mockRedisLayer.get).not.toHaveBeenCalled()
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'memory', 'hit', undefined, 'public')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'memory', 'hit')
 		})
 
 		it('should fall through to second layer when first misses', async () => {
@@ -87,7 +87,7 @@ describe('multiLayerCacheManager Unit', () => {
 			expect(result).toEqual(testValue)
 			expect(mockMemoryLayer.get).toHaveBeenCalled()
 			expect(mockRedisLayer.get).toHaveBeenCalled()
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'redis', 'hit', undefined, 'public')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'redis', 'hit')
 		})
 
 		it('should record miss when all layers miss', async () => {
@@ -97,7 +97,7 @@ describe('multiLayerCacheManager Unit', () => {
 			const result = await manager.get('image', 'key1')
 
 			expect(result).toBeNull()
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'miss', undefined, 'public')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'miss')
 		})
 
 		it('should skip failing layer and continue to next', async () => {
@@ -118,9 +118,9 @@ describe('multiLayerCacheManager Unit', () => {
 			const result = await manager.get('image', 'key1')
 
 			expect(result).toBeNull()
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'memory', 'error', undefined, 'public')
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'redis', 'error', undefined, 'public')
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'miss', undefined, 'public')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'memory', 'error')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'redis', 'error')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'miss')
 		})
 
 		it('should label metrics with the tenant of the namespace', async () => {
@@ -129,7 +129,7 @@ describe('multiLayerCacheManager Unit', () => {
 			await manager.get('image:acme', 'key1')
 
 			expect(mockMemoryLayer.get).toHaveBeenCalledWith('image:acme:key1')
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'memory', 'hit', undefined, 'acme')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'memory', 'hit')
 		})
 
 		it('should record exactly one sample per layer probed on a redis hit', async () => {
@@ -190,7 +190,7 @@ describe('multiLayerCacheManager Unit', () => {
 
 			expect(mockMemoryLayer.set).toHaveBeenCalledWith('image:key1', { data: 'test' }, 3600)
 			expect(mockRedisLayer.set).toHaveBeenCalledWith('image:key1', { data: 'test' }, 3600)
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('set', 'multi-layer', 'success', undefined, 'public')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('set', 'multi-layer', 'success')
 		})
 
 		it('should still succeed if one layer fails during set', async () => {
@@ -200,7 +200,7 @@ describe('multiLayerCacheManager Unit', () => {
 
 			// Should not throw, memory layer still succeeds
 			expect(mockMemoryLayer.set).toHaveBeenCalled()
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('set', 'multi-layer', 'success', undefined, 'public')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('set', 'multi-layer', 'success')
 		})
 	})
 
@@ -210,7 +210,7 @@ describe('multiLayerCacheManager Unit', () => {
 
 			expect(mockMemoryLayer.delete).toHaveBeenCalledWith('image:key1')
 			expect(mockRedisLayer.delete).toHaveBeenCalledWith('image:key1')
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('delete', 'multi-layer', 'success', undefined, 'public')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('delete', 'multi-layer', 'success')
 		})
 
 		it('should succeed if one layer fails during delete', async () => {
@@ -278,7 +278,7 @@ describe('multiLayerCacheManager Unit', () => {
 
 			expect(mockMemoryLayer.deleteByPrefix).toHaveBeenCalledWith('image:')
 			expect(mockRedisLayer.deleteByPrefix).toHaveBeenCalledWith('image:')
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('clear', 'multi-layer', 'success', undefined, 'public')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('clear', 'multi-layer', 'success')
 		})
 
 		it('should handle layer failures during invalidation', async () => {

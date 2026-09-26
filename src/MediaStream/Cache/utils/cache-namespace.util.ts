@@ -18,12 +18,6 @@ export function cacheKey(namespace: string, identifier: string): string {
 	return `${namespace}${SEPARATOR}${identifier}`
 }
 
-/** `image:acme` → `acme`; any other namespace shape → `public`. */
-export function tenantFromNamespace(namespace: string): string {
-	const [prefix, tenant] = namespace.split(SEPARATOR)
-	return prefix === IMAGE_PREFIX && tenant ? tenant : PUBLIC_TENANT_SCHEMA
-}
-
 /** `image:acme:uuid` → `image:acme:`; null when the key has fewer than two segments. */
 export function keyNamespacePrefix(key: string): string | null {
 	const first = key.indexOf(SEPARATOR)

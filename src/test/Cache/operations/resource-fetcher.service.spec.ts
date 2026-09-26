@@ -1,4 +1,5 @@
 import type { MockedObject } from 'vitest'
+import type { ImageRequestLog } from '#microservice/Correlation/utils/image-request-log.util'
 import { Buffer } from 'node:buffer'
 import { createWriteStream } from 'node:fs'
 import { unlink } from 'node:fs/promises'
@@ -10,8 +11,10 @@ import UnableToFetchResourceException from '#microservice/API/exceptions/unable-
 import UnableToStoreFetchedResourceException from '#microservice/API/exceptions/unable-to-store-fetched-resource.exception'
 import { ResourceFetcher } from '#microservice/Cache/operations/resource-fetcher.service'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
-import { UpstreamResourceTooLargeError } from '#microservice/common/errors/media-stream.errors'
+import { MAX_FILE_SIZES } from '#microservice/common/constants/image-limits.constant'
+import { UnsupportedSourceFormatError, UpstreamResourceTooLargeError } from '#microservice/common/errors/media-stream.errors'
 import { ConfigService } from '#microservice/Config/config.service'
+import { requestContextStorage } from '#microservice/Correlation/async-local-storage'
 import FetchResourceResponseJob from '#microservice/Processing/jobs/fetch-resource-response.job'
 import { ResourceValidationService } from '#microservice/Validation/services/resource-validation.service'
 import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
@@ -45,6 +48,29 @@ function okResponse(data: unknown, headers: Record<string, string> = {}): any {
 	return { status: 200, statusText: 'OK', headers, data, config: {} }
 }
 
+const MB = 1024 * 1024
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+
+/** A body that sniffs as PNG, `size` bytes long. */
+function pngBytes(size: number): Buffer {
+	return Buffer.concat([PNG_SIGNATURE, Buffer.alloc(size - PNG_SIGNATURE.length, 0x42)])
+}
+
+/** An SVG document, padded with a comment to `size` bytes. */
+function svgBytes(size: number): Buffer {
+	const open = '<svg xmlns="http://www.w3.org/2000/svg"><!--'
+	const close = '--></svg>'
+	return Buffer.from(open + 'x'.repeat(size - open.length - close.length) + close)
+}
+
+function logRecord(): ImageRequestLog {
+	return { correlationId: 'c', startedAt: 0n, path: 'p', admissionWaitMs: 0 }
+}
+
+function withLog<T>(log: ImageRequestLog, fn: () => Promise<T>): Promise<T> {
+	return requestContextStorage.run({ correlationId: 'c', timestamp: 0, clientIp: '127.0.0.1', method: 'GET', url: '/', startTime: 0n, imageRequest: log }, fn)
+}
+
 describe('resourceFetcher', () => {
 	let fetcher: ResourceFetcher
 	let fetchJob: MockedObject<FetchResourceResponseJob>
@@ -68,7 +94,8 @@ describe('resourceFetcher', () => {
 			}),
 			delete: vi.fn(),
 		} as any
-		validation = { validateFileSize: vi.fn().mockReturnValue(true) } as any
+		// The real rule, so the limits under test are MAX_FILE_SIZES themselves.
+		validation = { validateFileSize: vi.fn((bytes: number, format: keyof typeof MAX_FILE_SIZES) => bytes > 0 && bytes <= MAX_FILE_SIZES[format]) } as any
 
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [
@@ -84,15 +111,24 @@ describe('resourceFetcher', () => {
 	})
 
 	describe('storing the body', () => {
-		it('pipes the upstream body into a write stream on the temp path', async () => {
-			fetchJob.handle.mockResolvedValue(okResponse(Readable.from([Buffer.from('abc'), Buffer.from('def')]), { 'content-length': '6' }))
+		it('pipes the upstream body into a write stream on the temp path and reports the sniffed format and size', async () => {
+			const body = pngBytes(2048)
+			fetchJob.handle.mockResolvedValue(okResponse(Readable.from([body.subarray(0, 100), body.subarray(100)]), { 'content-length': String(body.length) }))
 
-			await fetcher.fetchToTempFile(requestFor('acme'), 'id', '/tmp/id.rst')
+			await expect(fetcher.fetchToTempFile(requestFor('acme'), 'id', '/tmp/id.rst')).resolves.toEqual({ format: 'png', bytes: body.length })
 
 			expect(mockCreateWriteStream).toHaveBeenCalledWith('/tmp/id.rst')
-			expect(Buffer.concat(sink.chunks).toString()).toBe('abcdef')
-			expect(validation.validateFileSize).toHaveBeenCalledWith(6, 'jpg')
+			expect(Buffer.concat(sink.chunks).equals(body)).toBe(true)
+			expect(validation.validateFileSize).toHaveBeenCalledWith(body.length, 'png')
 			expect(mockUnlink).not.toHaveBeenCalled()
+		})
+
+		it('passes a body shorter than the sniff window through once it ends', async () => {
+			const body = pngBytes(64)
+			fetchJob.handle.mockResolvedValue(okResponse(Readable.from([body])))
+
+			await expect(fetcher.fetchToTempFile(requestFor('acme'), 'id', '/tmp/id.rst')).resolves.toEqual({ format: 'png', bytes: 64 })
+			expect(Buffer.concat(sink.chunks).equals(body)).toBe(true)
 		})
 
 		it('rejects a response without a streamable body before opening the temp file', async () => {
@@ -107,7 +143,7 @@ describe('resourceFetcher', () => {
 			fetchJob.handle.mockResolvedValue(okResponse(upstream))
 
 			const fetching = fetcher.fetchToTempFile(requestFor('acme'), 'id', '/tmp/id.rst')
-			upstream.write(Buffer.from('partial'))
+			upstream.write(pngBytes(2048))
 			upstream.destroy(new Error('socket hang up'))
 
 			await expect(fetching).rejects.toBeInstanceOf(UnableToStoreFetchedResourceException)
@@ -120,46 +156,111 @@ describe('resourceFetcher', () => {
 					callback(Object.assign(new Error('ENOSPC: no space left on device'), { code: 'ENOSPC' }))
 				},
 			}) as any)
-			fetchJob.handle.mockResolvedValue(okResponse(Readable.from([Buffer.from('abc')])))
+			fetchJob.handle.mockResolvedValue(okResponse(Readable.from([pngBytes(64)])))
 
 			await expect(fetcher.fetchToTempFile(requestFor('acme'), 'id', '/tmp/id.rst')).rejects.toBeInstanceOf(UnableToStoreFetchedResourceException)
 			expect(mockUnlink).toHaveBeenCalledWith('/tmp/id.rst')
 		})
 	})
 
-	describe('size limits', () => {
-		it('rejects a declared Content-Length over the per-format limit without reading the body', async () => {
-			validation.validateFileSize.mockReturnValue(false)
-			fetchJob.handle.mockResolvedValue(okResponse(new PassThrough(), { 'content-length': String(50 * 1024 * 1024) }))
+	describe('format', () => {
+		it.each([
+			['a gzip stream (e.g. .svgz, which librsvg would rasterise unsanitised)', Buffer.from([0x1F, 0x8B, 0x08, 0x00, 0x00])],
+			['a libvips native .v file', Buffer.from([0x08, 0xF2, 0xA6, 0xB6, 0x00])],
+			['text that is not SVG', Buffer.from('<html><body>not an image</body></html>')],
+			['an empty body', Buffer.alloc(0)],
+		])('refuses %s before anything reaches the temp file', async (_label, body) => {
+			const upstream = Readable.from(body.length > 0 ? [body] : [])
+			fetchJob.handle.mockResolvedValue(okResponse(upstream))
 
-			await expect(fetcher.fetchToTempFile(requestFor('acme'), 'id', '/tmp/id.rst')).rejects.toBeInstanceOf(UpstreamResourceTooLargeError)
-			expect(validation.validateFileSize).toHaveBeenCalledWith(50 * 1024 * 1024, 'jpg')
-			expect(mockCreateWriteStream).not.toHaveBeenCalled()
+			await expect(fetcher.fetchToTempFile(requestFor('acme'), 'id', '/tmp/id.rst')).rejects.toBeInstanceOf(UnsupportedSourceFormatError)
+			expect(sink.chunks).toHaveLength(0)
+			expect(mockUnlink).toHaveBeenCalledWith('/tmp/id.rst')
 		})
+	})
 
-		it('resolves the format from the URL path, ignoring query and fragment', async () => {
-			fetchJob.handle.mockResolvedValue(okResponse(Readable.from([Buffer.from('x')]), { 'content-length': '1' }))
+	describe('size limits follow the sniffed format, not the URL extension', () => {
+		it('gives an SVG saved as .png the SVG limit on its declared Content-Length, after reading only the sniff window', async () => {
+			const upstream = new PassThrough()
+			fetchJob.handle.mockResolvedValue(okResponse(upstream, { 'content-length': String(2 * MB) }))
 
-			await fetcher.fetchToTempFile(requestFor('acme', 'https://example.com/a/b.PNG?w=800#frag'), 'id', '/tmp/id.rst')
+			const fetching = fetcher.fetchToTempFile(requestFor('acme', 'https://example.com/disguised.png'), 'id', '/tmp/id.rst')
+			upstream.write(svgBytes(2 * MB).subarray(0, 4096))
 
-			expect(validation.validateFileSize).toHaveBeenCalledWith(1, 'png')
+			await expect(fetching).rejects.toBeInstanceOf(UpstreamResourceTooLargeError)
+			await expect(fetching).rejects.toThrow(/svg limit/)
+			expect(validation.validateFileSize).toHaveBeenCalledWith(2 * MB, 'svg')
+			expect(sink.chunks).toHaveLength(0)
+			expect(upstream.destroyed).toBe(true)
+			expect(mockUnlink).toHaveBeenCalledWith('/tmp/id.rst')
 		})
 
 		// Servers that lie about (or omit) Content-Length: the guard trips mid-stream.
 		// pipeline() destroys every stream, so the upstream socket is not left dangling.
-		it('aborts the stream over the limit: typed error, upstream destroyed, temp file removed', async () => {
+		it('gives an SVG saved as .png without Content-Length the SVG limit while streaming', async () => {
 			const upstream = new PassThrough()
 			fetchJob.handle.mockResolvedValue(okResponse(upstream))
 
-			const fetching = fetcher.fetchToTempFile(requestFor('acme', 'https://example.com/huge.svg'), 'huge-id', '/tmp/huge.rst')
-			// SVG's format limit is 1MB (MAX_FILE_SIZES.svg) — exceed it in one chunk
-			upstream.write(Buffer.alloc(1024 * 1024 + 1))
+			const fetching = fetcher.fetchToTempFile(requestFor('acme', 'https://example.com/disguised.png'), 'huge-id', '/tmp/huge.rst')
+			upstream.write(svgBytes(MB + 1))
 
 			await expect(fetching).rejects.toBeInstanceOf(UpstreamResourceTooLargeError)
-			await expect(fetching).rejects.toThrow(/svg limit/)
+			await expect(fetching).rejects.toThrow(/svg limit after 1048577 bytes/)
 			expect(upstream.destroyed).toBe(true)
 			expect(sink.destroyed).toBe(true)
 			expect(mockUnlink).toHaveBeenCalledWith('/tmp/huge.rst')
+		})
+
+		it('gives a PNG saved as .svg the PNG limit', async () => {
+			const body = pngBytes(2 * MB)
+			fetchJob.handle.mockResolvedValue(okResponse(Readable.from([body]), { 'content-length': String(body.length) }))
+
+			await expect(fetcher.fetchToTempFile(requestFor('acme', 'https://example.com/disguised.svg'), 'id', '/tmp/id.rst')).resolves.toEqual({ format: 'png', bytes: 2 * MB })
+			expect(validation.validateFileSize).toHaveBeenCalledWith(2 * MB, 'png')
+		})
+
+		it('accepts a real PNG under its limit and rejects one over it', async () => {
+			mockCreateWriteStream.mockImplementation(() => memorySink() as any)
+			fetchJob.handle.mockResolvedValueOnce(okResponse(Readable.from([pngBytes(4096)]), { 'content-length': '4096' }))
+			await expect(fetcher.fetchToTempFile(requestFor('acme', 'https://example.com/real.png'), 'id', '/tmp/id.rst')).resolves.toEqual({ format: 'png', bytes: 4096 })
+
+			fetchJob.handle.mockResolvedValueOnce(okResponse(Readable.from([pngBytes(4096)]), { 'content-length': String(MAX_FILE_SIZES.png + 1) }))
+			await expect(fetcher.fetchToTempFile(requestFor('acme', 'https://example.com/real.png'), 'id', '/tmp/id.rst')).rejects.toThrow(/png limit/)
+		})
+
+		it('treats an unparsable Content-Length as absent', async () => {
+			fetchJob.handle.mockResolvedValue(okResponse(Readable.from([pngBytes(64)]), { 'content-length': 'lots' }))
+
+			await expect(fetcher.fetchToTempFile(requestFor('acme'), 'id', '/tmp/id.rst')).resolves.toEqual({ format: 'png', bytes: 64 })
+		})
+	})
+
+	describe('request log', () => {
+		it('records the sniffed format and the bytes actually stored', async () => {
+			const log = logRecord()
+			fetchJob.handle.mockResolvedValue(okResponse(Readable.from([pngBytes(4096)]), { 'content-length': '4096' }))
+
+			await withLog(log, () => fetcher.fetchToTempFile(requestFor('acme'), 'id', '/tmp/id.rst'))
+
+			expect(log).toMatchObject({ inputFormat: 'png', inputBytes: 4096 })
+		})
+
+		it('records the declared size of a source refused on it', async () => {
+			const log = logRecord()
+			fetchJob.handle.mockResolvedValue(okResponse(Readable.from([svgBytes(2048)]), { 'content-length': String(3 * MB) }))
+
+			await expect(withLog(log, () => fetcher.fetchToTempFile(requestFor('acme', 'https://example.com/x.png'), 'id', '/tmp/id.rst'))).rejects.toBeInstanceOf(UpstreamResourceTooLargeError)
+
+			expect(log).toMatchObject({ inputFormat: 'svg', inputBytes: 3 * MB })
+		})
+
+		it('records the streamed count of a source that outgrew its limit', async () => {
+			const log = logRecord()
+			fetchJob.handle.mockResolvedValue(okResponse(Readable.from([svgBytes(MB + 10)])))
+
+			await expect(withLog(log, () => fetcher.fetchToTempFile(requestFor('acme'), 'id', '/tmp/id.rst'))).rejects.toBeInstanceOf(UpstreamResourceTooLargeError)
+
+			expect(log).toMatchObject({ inputFormat: 'svg', inputBytes: MB + 10 })
 		})
 	})
 
@@ -183,7 +284,7 @@ describe('resourceFetcher', () => {
 
 		it('retries once the negative entry is older than the TTL', async () => {
 			cacheStore.set('image:acme:negative:shared-id', { status: 404, timestamp: Date.now() - 300 * 1000 - 1 })
-			fetchJob.handle.mockResolvedValue(okResponse(Readable.from([Buffer.from('x')])))
+			fetchJob.handle.mockResolvedValue(okResponse(Readable.from([pngBytes(64)])))
 
 			await fetcher.fetchToTempFile(requestFor('acme'), 'shared-id', '/tmp/id.rst')
 
@@ -194,7 +295,7 @@ describe('resourceFetcher', () => {
 			fetchJob.handle.mockResolvedValueOnce({ status: 404, headers: {}, data: null } as any)
 			await expect(fetcher.fetchToTempFile(requestFor('acme'), 'shared-id', '/tmp/id.rst')).rejects.toThrow()
 
-			fetchJob.handle.mockResolvedValueOnce(okResponse(Readable.from([Buffer.from('x')])))
+			fetchJob.handle.mockResolvedValueOnce(okResponse(Readable.from([pngBytes(64)])))
 			await fetcher.fetchToTempFile(requestFor('beta'), 'shared-id', '/tmp/id.rst')
 
 			expect(fetchJob.handle).toHaveBeenCalledTimes(2)

@@ -83,4 +83,20 @@ describe('MediaStreamModule (e2e)', () => {
 				expect(res.body).toHaveProperty('uptime')
 			})
 	})
+
+	// Label values come from the route table, never from the path a client sent.
+	it('labels HTTP metrics with the registered route and no tenant', async () => {
+		const server = app.getHttpServer()
+		await request(server).get('/media_stream-image/media/attacker_chosen_schema/uploads/x.png/1/1/contain/centre/transparent/0/80.exe')
+		await request(server).get('/no-such-route-7f3a/with/segments').expect(404)
+
+		const { text } = await request(server).get('/metrics').set('Authorization', `Bearer ${TEST_METRICS_TOKEN}`).expect(200)
+		const httpSeries = text.split('\n').filter(line => line.startsWith('mediastream_http_requests_total{'))
+
+		expect(httpSeries.some(line => line.includes('route="/media_stream-image/*path"'))).toBe(true)
+		expect(httpSeries.some(line => line.includes('route="unmatched",status_code="404"'))).toBe(true)
+		expect(text).not.toContain('tenant_schema')
+		expect(text).not.toContain('attacker_chosen_schema')
+		expect(text).not.toContain('no-such-route-7f3a')
+	})
 })

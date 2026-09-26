@@ -1,4 +1,6 @@
 import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
+import type { SourceImageFormat } from '#microservice/common/constants/image-limits.constant'
+import type { ImageRequestOutcome } from '#microservice/Correlation/utils/image-request-log.util'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as process from 'node:process'
@@ -35,6 +37,8 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	private readonly imageProcessingTotal: promClient.Counter
 	private readonly imageProcessingErrors: promClient.Counter
 	private readonly imageRequestsTotal: promClient.Counter
+	private readonly imageRequestDuration: promClient.Histogram
+	private readonly imageInputBytes: promClient.Histogram
 
 	private readonly activeConnections: promClient.Gauge
 	private readonly errorTotal: promClient.Counter
@@ -79,14 +83,14 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		this.httpRequestsTotal = new promClient.Counter({
 			name: 'mediastream_http_requests_total',
 			help: 'Total number of HTTP requests',
-			labelNames: ['method', 'route', 'status_code', 'tenant_schema'],
+			labelNames: ['method', 'route', 'status_code'],
 			registers: [this.register],
 		})
 
 		this.httpRequestDuration = new promClient.Histogram({
 			name: 'mediastream_http_request_duration_seconds',
 			help: 'Duration of HTTP requests in seconds',
-			labelNames: ['method', 'route', 'status_code', 'tenant_schema'],
+			labelNames: ['method', 'route', 'status_code'],
 			buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10],
 			registers: [this.register],
 		})
@@ -94,7 +98,7 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		this.httpRequestSize = new promClient.Histogram({
 			name: 'mediastream_http_request_size_bytes',
 			help: 'Size of HTTP requests in bytes',
-			labelNames: ['method', 'route', 'tenant_schema'],
+			labelNames: ['method', 'route'],
 			buckets: [100, 1000, 10000, 100000, 1000000, 10000000],
 			registers: [this.register],
 		})
@@ -102,7 +106,7 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		this.httpResponseSize = new promClient.Histogram({
 			name: 'mediastream_http_response_size_bytes',
 			help: 'Size of HTTP responses in bytes',
-			labelNames: ['method', 'route', 'status_code', 'tenant_schema'],
+			labelNames: ['method', 'route', 'status_code'],
 			buckets: [100, 1000, 10000, 100000, 1000000, 10000000],
 			registers: [this.register],
 		})
@@ -161,9 +165,32 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			registers: [this.register],
 		})
 
+		// Image-route labels are closed sets: `outcome` (ImageRequestOutcome),
+		// `format` (a SupportedResizeFormats value or "none" when the URL had
+		// no valid one), `cache` (ImageCacheResult or "none" when the lookup
+		// never ran). The tenant schema is deliberately not a label: any
+		// string matching the schema pattern reaches this route, so it is
+		// unbounded; it is a field of the per-request log line instead.
 		this.imageRequestsTotal = new promClient.Counter({
 			name: 'mediastream_image_requests_total',
-			help: 'Total number of image requests received by the image route',
+			help: 'Completed image-route requests by outcome, requested output format and cache result',
+			labelNames: ['outcome', 'format', 'cache'],
+			registers: [this.register],
+		})
+
+		this.imageRequestDuration = new promClient.Histogram({
+			name: 'mediastream_image_request_duration_seconds',
+			help: 'Image-route request duration from the first middleware to the response closing, by outcome and cache result',
+			labelNames: ['outcome', 'cache'],
+			buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30],
+			registers: [this.register],
+		})
+
+		this.imageInputBytes = new promClient.Histogram({
+			name: 'mediastream_image_input_bytes',
+			help: 'Size of each completed upstream download, by the format sniffed from its bytes',
+			labelNames: ['format'],
+			buckets: [16384, 65536, 262144, 524288, 1048576, 2097152, 4194304, 8388608, 10485760],
 			registers: [this.register],
 		})
 
@@ -184,7 +211,7 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		this.cacheOperationDuration = new promClient.Histogram({
 			name: 'mediastream_cache_operation_duration_seconds',
 			help: 'Duration of cache operations in seconds',
-			labelNames: ['operation', 'cache_type', 'status', 'tenant_schema'],
+			labelNames: ['operation', 'cache_type', 'status'],
 			buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1],
 			registers: [this.register],
 		})
@@ -192,7 +219,7 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		this.imageProcessingDuration = new promClient.Histogram({
 			name: 'mediastream_image_processing_duration_seconds',
 			help: 'Duration of image processing operations in seconds',
-			labelNames: ['operation', 'format', 'status', 'tenant_schema'],
+			labelNames: ['operation', 'format', 'status'],
 			buckets: [0.1, 0.5, 1, 2, 5, 10, 30],
 			registers: [this.register],
 		})
@@ -200,14 +227,14 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		this.imageProcessingTotal = new promClient.Counter({
 			name: 'mediastream_image_processing_total',
 			help: 'Total number of image processing operations',
-			labelNames: ['operation', 'format', 'status', 'tenant_schema'],
+			labelNames: ['operation', 'format', 'status'],
 			registers: [this.register],
 		})
 
 		this.cacheOperationsTotal = new promClient.Counter({
 			name: 'mediastream_cache_operations_total',
 			help: 'Total number of cache operations',
-			labelNames: ['operation', 'cache_type', 'status', 'tenant_schema'],
+			labelNames: ['operation', 'cache_type', 'status'],
 			registers: [this.register],
 		})
 
@@ -300,21 +327,18 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	 * @param duration - Request duration in seconds
 	 * @param requestSize - Optional request body size in bytes
 	 * @param responseSize - Optional response body size in bytes
-	 * @param tenantSchema - Optional tenant schema label for per-tenant observability.
-	 *   Pass the schema extracted from the request URL (e.g. 'acme', 'public').
-	 *   Defaults to 'public' for shared routes that carry no tenant context.
 	 */
-	recordHttpRequest(method: string, route: string, statusCode: number, duration: number, requestSize?: number, responseSize?: number, tenantSchema: string = 'public'): void {
+	recordHttpRequest(method: string, route: string, statusCode: number, duration: number, requestSize?: number, responseSize?: number): void {
 		const statusCodeStr = statusCode.toString()
-		this.httpRequestsTotal.inc({ method, route, status_code: statusCodeStr, tenant_schema: tenantSchema })
-		this.httpRequestDuration.observe({ method, route, status_code: statusCodeStr, tenant_schema: tenantSchema }, duration)
+		this.httpRequestsTotal.inc({ method, route, status_code: statusCodeStr })
+		this.httpRequestDuration.observe({ method, route, status_code: statusCodeStr }, duration)
 
 		if (requestSize !== undefined) {
-			this.httpRequestSize.observe({ method, route, tenant_schema: tenantSchema }, requestSize)
+			this.httpRequestSize.observe({ method, route }, requestSize)
 		}
 
 		if (responseSize !== undefined) {
-			this.httpResponseSize.observe({ method, route, status_code: statusCodeStr, tenant_schema: tenantSchema }, responseSize)
+			this.httpResponseSize.observe({ method, route, status_code: statusCodeStr }, responseSize)
 		}
 	}
 
@@ -341,12 +365,10 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	 * @param format - Image format (webp, jpeg, png, etc.)
 	 * @param status - Operation result: 'success' or 'error'
 	 * @param duration - Processing duration in seconds
-	 * @param tenantSchema - Optional tenant schema label for per-tenant observability.
-	 *   Defaults to 'public' for requests that carry no tenant context.
 	 */
-	recordImageProcessing(operation: string, format: string, status: 'success' | 'error', duration: number, tenantSchema: string = 'public'): void {
-		this.imageProcessingTotal.inc({ operation, format, status, tenant_schema: tenantSchema })
-		this.imageProcessingDuration.observe({ operation, format, status, tenant_schema: tenantSchema }, duration)
+	recordImageProcessing(operation: string, format: string, status: 'success' | 'error', duration: number): void {
+		this.imageProcessingTotal.inc({ operation, format, status })
+		this.imageProcessingDuration.observe({ operation, format, status }, duration)
 
 		if (status === 'error') {
 			this.imageProcessingErrors.inc({ operation, error_type: 'processing' })
@@ -360,15 +382,12 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	 * @param cacheType - Cache layer name (memory, redis, multi-layer, etc.)
 	 * @param status - Operation result: 'hit', 'miss', 'success', or 'error'
 	 * @param duration - Optional operation duration in seconds
-	 * @param tenantSchema - Optional tenant schema label for per-tenant observability.
-	 *   Defaults to 'public' for infrastructure-level cache calls (memory/Redis layers)
-	 *   that have no tenant context.  Pass the actual schema at call sites that do.
 	 */
-	recordCacheOperation(operation: 'get' | 'set' | 'delete' | 'clear' | 'expire' | 'flush' | 'warmup', cacheType: string, status: 'hit' | 'miss' | 'success' | 'error', duration?: number, tenantSchema: string = 'public'): void {
-		this.cacheOperationsTotal.inc({ operation, cache_type: cacheType, status, tenant_schema: tenantSchema })
+	recordCacheOperation(operation: 'get' | 'set' | 'delete' | 'clear' | 'expire' | 'flush' | 'warmup', cacheType: string, status: 'hit' | 'miss' | 'success' | 'error', duration?: number): void {
+		this.cacheOperationsTotal.inc({ operation, cache_type: cacheType, status })
 
 		if (duration !== undefined) {
-			this.cacheOperationDuration.observe({ operation, cache_type: cacheType, status, tenant_schema: tenantSchema }, duration)
+			this.cacheOperationDuration.observe({ operation, cache_type: cacheType, status }, duration)
 		}
 	}
 
@@ -402,9 +421,15 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		}
 	}
 
-	/** One image request reached the image route (before cache lookup). */
-	recordImageRequest(): void {
-		this.imageRequestsTotal.inc()
+	/** One completed image-route request; label values are normalised by the caller (ImageRequestLogMiddleware). */
+	recordImageRequest(outcome: ImageRequestOutcome, format: string, cache: string, durationSeconds: number): void {
+		this.imageRequestsTotal.inc({ outcome, format, cache })
+		this.imageRequestDuration.observe({ outcome, cache }, durationSeconds)
+	}
+
+	/** One completed upstream download, labelled by the format sniffed from its bytes. */
+	recordImageInput(format: SourceImageFormat, bytes: number): void {
+		this.imageInputBytes.observe({ format }, bytes)
 	}
 
 	/**

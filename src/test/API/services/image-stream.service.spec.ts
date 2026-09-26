@@ -2,15 +2,19 @@ import type { MockedObject } from 'vitest'
 import type { ImageProcessingContext } from '#microservice/API/types/image-source.types'
 import type { OperationContext } from '#microservice/Cache/operations/cache-image-resource.operation'
 import type { ProcessedImage } from '#microservice/Cache/operations/image-format-processor.service'
+import type { ImageRequestLog } from '#microservice/Correlation/utils/image-request-log.util'
 import { Buffer } from 'node:buffer'
 import { Test, TestingModule } from '@nestjs/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CacheImageRequest, { ResizeOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
+import UnableToFetchResourceException from '#microservice/API/exceptions/unable-to-fetch-resource.exception'
 import { ImageStreamService } from '#microservice/API/services/image-stream.service'
 import CacheImageResourceOperation from '#microservice/Cache/operations/cache-image-resource.operation'
-import { CircuitBreakerOpenError, DefaultImageFallbackError, ProcessingOverloadedError, ProcessingTimeoutError } from '#microservice/common/errors/media-stream.errors'
+import { CircuitBreakerOpenError, DefaultImageFallbackError, ProcessingOverloadedError, ProcessingTimeoutError, SvgSanitizationError, UnsupportedSourceFormatError, UpstreamResourceTooLargeError } from '#microservice/common/errors/media-stream.errors'
 import { generateWeakETag } from '#microservice/common/utils/etag.util'
 import { RequestDeduplicator } from '#microservice/common/utils/request-deduplication.util'
+import { requestContextStorage } from '#microservice/Correlation/async-local-storage'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import 'reflect-metadata'
@@ -68,6 +72,18 @@ function createProcessedImage(content: string, overrides: Partial<ResourceMetaDa
 	return { data: Buffer.from(content), metadata: createMetadata(overrides) }
 }
 
+function createLog(): ImageRequestLog {
+	return { correlationId: 'test-correlation-id', startedAt: 0n, path: 'media/acme/uploads/x.png/200/200/contain/entropy/transparent/0/80.webp', admissionWaitMs: 0 }
+}
+
+/** Run `fn` inside a request context carrying `log`, the way ImageRequestLogMiddleware sets it up. */
+function withLog<T>(log: ImageRequestLog, fn: () => Promise<T>): Promise<T> {
+	return requestContextStorage.run(
+		{ correlationId: log.correlationId, timestamp: 0, clientIp: '127.0.0.1', method: 'GET', url: '/', startTime: 0n, imageRequest: log },
+		fn,
+	)
+}
+
 function headerValue(res: any, name: string): string | undefined {
 	const call = res.header.mock.calls.find(([header]: [string]) => header === name)
 	return call?.[1]
@@ -85,6 +101,7 @@ describe('imageStreamService', () => {
 		cacheOp.checkResourceExists.mockImplementation(async (ctx) => {
 			ctx.metaData = cached.metadata
 			ctx.cached = onDisk ? null : cached
+			ctx.cacheTier = onDisk ? 'disk' : 'memory'
 			return true
 		})
 		cacheOp.loadResource.mockImplementation(async ctx => ctx.cached ?? cached)
@@ -96,6 +113,7 @@ describe('imageStreamService', () => {
 			id: 'test-resource',
 			metaData: null,
 			cached: null,
+			cacheTier: null,
 		}
 
 		cacheOp = {
@@ -107,7 +125,6 @@ describe('imageStreamService', () => {
 		} as any
 
 		metricsService = {
-			recordImageRequest: vi.fn(),
 			recordError: vi.fn(),
 		} as any
 
@@ -260,13 +277,6 @@ describe('imageStreamService', () => {
 			expect(first.end).toHaveBeenCalledWith(processed.data)
 			expect(second.end).toHaveBeenCalledWith(processed.data)
 		})
-
-		it('counts every request', async () => {
-			await service.processAndStream(createContext(), createRequest(), createMockResponse())
-
-			expect(metricsService.recordImageRequest).toHaveBeenCalledTimes(1)
-			expect(metricsService.recordImageRequest).toHaveBeenCalledWith()
-		})
 	})
 
 	describe('fallback image', () => {
@@ -319,6 +329,19 @@ describe('imageStreamService', () => {
 			expect(metricsService.recordError).toHaveBeenCalledWith('image_request', 'Error')
 		})
 
+		it('serves the default image for an unfetchable source without an ERROR line (the fetch already logged why)', async () => {
+			const error = vi.spyOn(CorrelatedLogger, 'error')
+			const res = createMockResponse()
+			cacheOp.execute.mockRejectedValue(new UnableToFetchResourceException('http://backend/missing.png'))
+
+			await service.processAndStream(createContext(), createRequest(), res)
+
+			expect(res.send).toHaveBeenCalledWith(Buffer.from('default-image-data'))
+			expect(error).not.toHaveBeenCalled()
+			expect(metricsService.recordError).toHaveBeenCalledWith('image_request', 'UnableToFetchResourceException')
+			error.mockRestore()
+		})
+
 		it('propagates capacity errors (overloaded, timed out) instead of serving the default image', async () => {
 			for (const error of [new ProcessingOverloadedError(2), new ProcessingTimeoutError()]) {
 				const res = createMockResponse()
@@ -353,6 +376,98 @@ describe('imageStreamService', () => {
 
 			expect(metricsService.recordError).toHaveBeenCalledWith('default_image_fallback', 'fallback_error')
 			expect(res.send).not.toHaveBeenCalled()
+		})
+	})
+	describe('request log record', () => {
+		it('records a layered hit: cache tier, outcome and what was sent', async () => {
+			const log = createLog()
+			const cached = createProcessedImage('image-data', { format: 'avif' })
+			primeHit(cached)
+
+			await withLog(log, () => service.processAndStream(createContext(), createRequest(), createMockResponse()))
+
+			expect(log).toMatchObject({ cache: 'memory', outcome: 'ok', outputFormat: 'avif', outputBytes: cached.data.length })
+			expect(log.error).toBeUndefined()
+		})
+
+		it('records a disk hit', async () => {
+			const log = createLog()
+			primeHit(createProcessedImage('disk-data'), true)
+
+			await withLog(log, () => service.processAndStream(createContext(), createRequest(), createMockResponse()))
+
+			expect(log).toMatchObject({ cache: 'disk', outcome: 'ok' })
+		})
+
+		it('records a 304 as not_modified from the tier that validated it, with no output', async () => {
+			const log = createLog()
+			const cached = createProcessedImage('image-data')
+			primeHit(cached)
+			const etag = generateWeakETag(cached.metadata.size, cached.metadata.dateCreated, cached.metadata.format)
+
+			await withLog(log, () => service.processAndStream(createContext(), createRequest(), createMockResponse(), createMockRequest({ 'if-none-match': etag })))
+
+			expect(log).toMatchObject({ cache: 'memory', outcome: 'not_modified' })
+			expect(log.outputBytes).toBeUndefined()
+		})
+
+		it('records a miss that led the processing', async () => {
+			const log = createLog()
+			const processed = createProcessedImage('processed', { format: 'png' })
+			cacheOp.execute.mockResolvedValue(processed)
+
+			await withLog(log, () => service.processAndStream(createContext(), createRequest(), createMockResponse()))
+
+			expect(log).toMatchObject({ cache: 'miss', outcome: 'ok', outputFormat: 'png', outputBytes: processed.data.length })
+			expect(log.coalesced).toBeUndefined()
+		})
+
+		it('marks a waiter that shared another request\'s processing as coalesced', async () => {
+			const log = createLog()
+			deduplicator.execute.mockResolvedValue(createProcessedImage('shared'))
+
+			await withLog(log, () => service.processAndStream(createContext(), createRequest(), createMockResponse()))
+
+			expect(log).toMatchObject({ cache: 'miss', coalesced: true, outcome: 'ok' })
+		})
+
+		it('records a fallback with the class of the error that caused it', async () => {
+			const log = createLog()
+			cacheOp.execute.mockRejectedValue(new CircuitBreakerOpenError())
+
+			await withLog(log, () => service.processAndStream(createContext(), createRequest(SupportedResizeFormats.svg), createMockResponse()))
+
+			expect(log).toMatchObject({
+				cache: 'miss',
+				outcome: 'fallback',
+				error: 'CircuitBreakerOpenError',
+				outputFormat: 'png',
+				outputBytes: Buffer.from('default-image-data').length,
+			})
+		})
+
+		it.each([
+			new UpstreamResourceTooLargeError('too big'),
+			new UnsupportedSourceFormatError(),
+			new SvgSanitizationError('SVG sanitization unavailable'),
+		])('records a refused source ($name) as rejected', async (error) => {
+			const log = createLog()
+			cacheOp.execute.mockRejectedValue(error)
+
+			await withLog(log, () => service.processAndStream(createContext(), createRequest(), createMockResponse()))
+
+			expect(log).toMatchObject({ outcome: 'rejected', error: error.constructor.name })
+			expect(metricsService.recordError).toHaveBeenCalledWith('image_request', error.code)
+		})
+
+		it('leaves the outcome of a propagated capacity error to the exception filter', async () => {
+			const log = createLog()
+			cacheOp.execute.mockRejectedValue(new ProcessingOverloadedError(2))
+
+			await expect(withLog(log, () => service.processAndStream(createContext(), createRequest(), createMockResponse()))).rejects.toBeInstanceOf(ProcessingOverloadedError)
+
+			expect(log.cache).toBe('miss')
+			expect(log.outcome).toBeUndefined()
 		})
 	})
 })

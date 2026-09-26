@@ -1,6 +1,7 @@
 import type { EventEmitter } from 'node:events'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { sanitizeSvg, SVG_SANITIZER_HEAP_LIMIT_MB } from '#microservice/Cache/utils/svg-sanitizer.util'
+import { SvgSanitizationError } from '#microservice/common/errors/media-stream.errors'
 
 // Isolated in its own file so the worker_threads mock doesn't affect the
 // real-worker behavioural spec. Each test scripts what the fake worker does.
@@ -44,7 +45,9 @@ describe('sanitizeSvg — fail closed', () => {
 	it('rejects the SVG when the worker runs out of heap', async () => {
 		reply.current = worker => worker.emit('error', Object.assign(new Error('Worker terminated due to reaching memory limit: JS heap out of memory'), { code: 'ERR_WORKER_OUT_OF_MEMORY' }))
 
-		await expect(sanitizeSvg(SVG, { timeoutMs: 1000 })).rejects.toThrow('SVG sanitization unavailable')
+		const rejection = sanitizeSvg(SVG, { timeoutMs: 1000 })
+		await expect(rejection).rejects.toBeInstanceOf(SvgSanitizationError)
+		await expect(rejection).rejects.toThrow('SVG sanitization unavailable')
 	})
 
 	it('rejects the SVG when the worker exits without replying', async () => {
@@ -57,7 +60,9 @@ describe('sanitizeSvg — fail closed', () => {
 		// Simulate a DOMPurify misconfiguration/regression that lets a script through.
 		reply.current = worker => worker.emit('message', '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>')
 
-		await expect(sanitizeSvg(SVG, { timeoutMs: 1000 })).rejects.toThrow('SVG sanitization incomplete')
+		const rejection = sanitizeSvg(SVG, { timeoutMs: 1000 })
+		await expect(rejection).rejects.toBeInstanceOf(SvgSanitizationError)
+		await expect(rejection).rejects.toThrow('SVG sanitization incomplete')
 	})
 
 	it('terminates a worker that outlives the budget', async () => {

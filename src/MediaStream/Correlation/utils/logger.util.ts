@@ -46,6 +46,18 @@ export class CorrelatedLogger {
 		CorrelatedLogger.loggerFor(context).warn(CorrelatedLogger.withCorrelationId(message))
 	}
 
+	/**
+	 * One structured event. `fields` travel as Nest's structured params:
+	 * top-level keys of the JSON line in production (main.ts sets
+	 * `flattenParams`; Nest's own `level`/`message`/`context`/... win on a
+	 * name clash), an inline object after the message in text mode. Name the
+	 * correlation id among the fields: this may run after the request's
+	 * async context has ended.
+	 */
+	static event(level: 'log' | 'warn', message: string, fields: Record<string, unknown>, context?: string): void {
+		CorrelatedLogger.loggerFor(context)[level](message, fields)
+	}
+
 	static debug(message: string, context?: string): void {
 		CorrelatedLogger.loggerFor(context).debug(CorrelatedLogger.withCorrelationId(message))
 	}

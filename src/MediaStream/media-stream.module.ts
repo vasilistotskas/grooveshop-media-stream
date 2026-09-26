@@ -4,6 +4,7 @@ import { APP_FILTER, APP_GUARD } from '@nestjs/core'
 import { ScheduleModule } from '@nestjs/schedule'
 import { ApiModule } from '#microservice/API/api.module'
 import MediaStreamImageController from '#microservice/API/controllers/media-stream-image.controller'
+import { ImageRequestLogMiddleware } from '#microservice/API/middleware/image-request-log.middleware'
 import { CacheOperationsModule } from '#microservice/Cache/cache-operations.module'
 import { CacheModule } from '#microservice/Cache/cache.module'
 import { MediaStreamExceptionFilter } from '#microservice/common/filters/media-stream-exception.filter'
@@ -58,5 +59,9 @@ export default class MediaStreamModule implements NestModule {
 		consumer
 			.apply(CorrelationMiddleware, TimingMiddleware, MetricsMiddleware)
 			.forRoutes('*')
+		// After CorrelationMiddleware: it extends that request context.
+		consumer
+			.apply(ImageRequestLogMiddleware)
+			.forRoutes(MediaStreamImageController)
 	}
 }

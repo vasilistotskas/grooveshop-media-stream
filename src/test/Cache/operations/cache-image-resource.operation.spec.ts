@@ -56,22 +56,17 @@ function metadata(overrides: Partial<ResourceMetaData> = {}): ResourceMetaData {
 	})
 }
 
-function streamResponse(): any {
+/** Bytes that sniff as PNG (the signature); Sharp is mocked, so nothing decodes them. */
+const PNG_BYTES = Buffer.concat([Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]), Buffer.from('mock-image-data')])
+
+function streamResponse(body: Buffer = PNG_BYTES): any {
 	return {
 		status: 200,
 		statusText: 'OK',
 		headers: { 'content-type': 'image/jpeg' },
-		data: Readable.from([Buffer.from('mock-image-data')]),
+		data: Readable.from([body]),
 		config: { url: 'https://example.com/image.jpg', method: 'GET' },
 	}
-}
-
-/** A non-SVG header for detectSvgByHeader(). */
-function mockRasterHeader(): void {
-	mockedFs.open.mockResolvedValue({
-		read: vi.fn(async (buffer: Buffer) => ({ bytesRead: buffer.write('PNG\r\n', 0, 'utf8'), buffer })),
-		close: vi.fn().mockResolvedValue(undefined),
-	} as any)
 }
 
 describe('cacheImageResourceOperation', () => {
@@ -94,7 +89,6 @@ describe('cacheImageResourceOperation', () => {
 		mockedFs.writeFile.mockResolvedValue()
 		mockedFs.rename.mockResolvedValue()
 		mockedFs.unlink.mockResolvedValue()
-		mockRasterHeader()
 
 		request = new CacheImageRequest({
 			resourceTarget: 'https://example.com/image.jpg',
@@ -108,6 +102,7 @@ describe('cacheImageResourceOperation', () => {
 		} as any
 		cacheManager = {
 			get: vi.fn().mockResolvedValue(null),
+			lookup: vi.fn().mockResolvedValue(null),
 			set: vi.fn().mockResolvedValue(undefined),
 			delete: vi.fn().mockResolvedValue(undefined),
 			exists: vi.fn().mockResolvedValue(false),
@@ -117,6 +112,7 @@ describe('cacheImageResourceOperation', () => {
 		metricsService = {
 			recordCacheOperation: vi.fn(),
 			recordImageProcessing: vi.fn(),
+			recordImageInput: vi.fn(),
 			recordError: vi.fn(),
 		} as any
 
@@ -161,7 +157,7 @@ describe('cacheImageResourceOperation', () => {
 	describe('setup', () => {
 		it('returns a context with the generated identity and nothing loaded yet', () => {
 			expect(identityJob.handle).toHaveBeenCalledWith(request)
-			expect(ctx).toEqual({ request, id: RESOURCE_ID, metaData: null, cached: null })
+			expect(ctx).toEqual({ request, id: RESOURCE_ID, metaData: null, cached: null, cacheTier: null })
 		})
 
 		it('records a validation error and rethrows when identity generation fails', async () => {
@@ -173,15 +169,16 @@ describe('cacheImageResourceOperation', () => {
 	})
 
 	describe('checkResourceExists', () => {
-		it('keeps a valid layered hit on the context and records no cache metric of its own', async () => {
+		it('keeps a valid layered hit and the layer that answered on the context, and records no cache metric of its own', async () => {
 			const cached: ProcessedImage = { data: Buffer.from('cached-data'), metadata: metadata() }
-			cacheManager.get.mockResolvedValue(cached)
+			cacheManager.lookup.mockResolvedValue({ value: cached, layer: 'redis' })
 
 			await expect(operation.checkResourceExists(ctx)).resolves.toBe(true)
 
-			expect(cacheManager.get).toHaveBeenCalledWith('image:public', RESOURCE_ID)
+			expect(cacheManager.lookup).toHaveBeenCalledWith('image:public', RESOURCE_ID)
 			expect(ctx.cached).toBe(cached)
 			expect(ctx.metaData).toBe(cached.metadata)
+			expect(ctx.cacheTier).toBe('redis')
 			expect(mockedFs.readFile).not.toHaveBeenCalled()
 			// The manager records the layered tier itself
 			expect(metricsService.recordCacheOperation).not.toHaveBeenCalled()
@@ -194,12 +191,12 @@ describe('cacheImageResourceOperation', () => {
 
 			await operation.checkResourceExists(ctx)
 
-			expect(cacheManager.get).toHaveBeenCalledWith('image:acme', RESOURCE_ID)
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'miss', expect.any(Number), 'acme')
+			expect(cacheManager.lookup).toHaveBeenCalledWith('image:acme', RESOURCE_ID)
+			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'miss', expect.any(Number))
 		})
 
 		it('deletes a corrupted layered entry and falls through to the disk check', async () => {
-			cacheManager.get.mockResolvedValue({ data: Buffer.from('x'), metadata: {} })
+			cacheManager.lookup.mockResolvedValue({ value: { data: Buffer.from('x'), metadata: {} }, layer: 'memory' })
 			mockedFs.readFile.mockRejectedValue(new Error('ENOENT'))
 
 			await expect(operation.checkResourceExists(ctx)).resolves.toBe(false)
@@ -209,7 +206,7 @@ describe('cacheImageResourceOperation', () => {
 		})
 
 		it('deletes an expired layered entry and falls through to the disk check', async () => {
-			cacheManager.get.mockResolvedValue({ data: Buffer.from('x'), metadata: metadata({ dateCreated: Date.now() - 7 * MONTH_MS }) })
+			cacheManager.lookup.mockResolvedValue({ value: { data: Buffer.from('x'), metadata: metadata({ dateCreated: Date.now() - 7 * MONTH_MS }) }, layer: 'memory' })
 			mockedFs.readFile.mockRejectedValue(new Error('ENOENT'))
 
 			await expect(operation.checkResourceExists(ctx)).resolves.toBe(false)
@@ -228,8 +225,9 @@ describe('cacheImageResourceOperation', () => {
 			expect(ctx.metaData).toBeInstanceOf(ResourceMetaData)
 			expect(ctx.metaData?.tenantSchema).toBe('acme')
 			expect(ctx.cached).toBeNull()
+			expect(ctx.cacheTier).toBe('disk')
 			expect(metricsService.recordCacheOperation).toHaveBeenCalledTimes(1)
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'hit', expect.any(Number), 'public')
+			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'hit', expect.any(Number))
 		})
 
 		it('records the filesystem duration in seconds', async () => {
@@ -239,7 +237,7 @@ describe('cacheImageResourceOperation', () => {
 
 			await operation.checkResourceExists(ctx)
 
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'hit', 0.25, 'public')
+			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'hit', 0.25)
 		})
 
 		it('is a miss without a sidecar', async () => {
@@ -249,7 +247,7 @@ describe('cacheImageResourceOperation', () => {
 
 			expect(mockedFs.access).not.toHaveBeenCalled()
 			expect(ctx.metaData).toBeNull()
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'miss', expect.any(Number), 'public')
+			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'miss', expect.any(Number))
 		})
 
 		it('is a miss for an orphan sidecar whose .rsc is gone', async () => {
@@ -274,16 +272,16 @@ describe('cacheImageResourceOperation', () => {
 
 			expect(ctx.metaData).toBeNull()
 			expect(metricsService.recordCacheOperation).toHaveBeenCalledTimes(3)
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'miss', expect.any(Number), 'public')
+			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'miss', expect.any(Number))
 		})
 
 		it('never throws: an unexpected failure is a recorded miss', async () => {
-			cacheManager.get.mockRejectedValue(new Error('Cache error'))
+			cacheManager.lookup.mockRejectedValue(new Error('Cache error'))
 
 			await expect(operation.checkResourceExists(ctx)).resolves.toBe(false)
 
 			expect(metricsService.recordError).toHaveBeenCalledWith('cache_check', 'resource_exists')
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'error', expect.any(Number), 'public')
+			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'error', expect.any(Number))
 		})
 	})
 
@@ -352,7 +350,8 @@ describe('cacheImageResourceOperation', () => {
 			expect(result.data).toBe(processedBuffer)
 			expect(result.metadata).toMatchObject({ version: 1, size: '1000', format: 'webp', tenantSchema: 'public' })
 			expect(cacheManager.set).toHaveBeenCalledWith('image:public', RESOURCE_ID, result, 6 * 30 * 24 * 3600)
-			expect(metricsService.recordImageProcessing).toHaveBeenCalledWith('process', 'webp', 'success', expect.any(Number), 'public')
+			expect(metricsService.recordImageProcessing).toHaveBeenCalledWith('process', 'webp', 'success', expect.any(Number))
+			expect(metricsService.recordImageInput).toHaveBeenCalledWith('png', PNG_BYTES.length)
 		})
 
 		it('writes the .rsc/.rsm pair atomically, counts the write as the first access and removes the temp file', async () => {
@@ -372,15 +371,14 @@ describe('cacheImageResourceOperation', () => {
 			expect(mockedFs.unlink).toHaveBeenCalledWith(operation.getResourceTempPath(ctx))
 		})
 
-		it('routes an SVG source through the SVG path', async () => {
-			mockedFs.open.mockResolvedValue({
-				read: vi.fn(async (buffer: Buffer) => ({ bytesRead: buffer.write('<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"/>', 0, 'utf8'), buffer })),
-				close: vi.fn().mockResolvedValue(undefined),
-			} as any)
-			mockedFs.readFile.mockResolvedValue('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>')
+		it('routes a source sniffed as SVG through the SVG path, whatever the URL extension', async () => {
+			const svg = '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'
+			fetchJob.handle.mockResolvedValue(streamResponse(Buffer.from(svg)))
+			mockedFs.readFile.mockResolvedValue(svg)
 
 			await operation.execute(ctx)
 
+			expect(metricsService.recordImageInput).toHaveBeenCalledWith('svg', svg.length)
 			// Sanitised markup is written back to the temp file before Sharp rasterises it
 			expect(mockedFs.writeFile).toHaveBeenCalledWith(operation.getResourceTempPath(ctx), expect.stringContaining('<svg'), 'utf8')
 			expect(webpJob.handle).toHaveBeenCalledWith(operation.getResourceTempPath(ctx), request.resizeOptions)
@@ -395,8 +393,8 @@ describe('cacheImageResourceOperation', () => {
 			expect(mockedFs.rename).not.toHaveBeenCalled()
 			expect(tracker.record).not.toHaveBeenCalled()
 			expect(metricsService.recordError).toHaveBeenCalledWith('image_processing', 'execute')
-			expect(metricsService.recordImageProcessing).toHaveBeenCalledWith('process', 'unknown', 'error', expect.any(Number), 'public')
-			expect(metricsService.recordImageProcessing).toHaveBeenCalledWith('execute', 'unknown', 'error', expect.any(Number), 'public')
+			expect(metricsService.recordImageProcessing).toHaveBeenCalledWith('process', 'unknown', 'error', expect.any(Number))
+			expect(metricsService.recordImageProcessing).toHaveBeenCalledWith('execute', 'unknown', 'error', expect.any(Number))
 		})
 
 		it('treats an admission shed as capacity, not a processing failure: no error metrics, error propagated', async () => {
@@ -415,7 +413,7 @@ describe('cacheImageResourceOperation', () => {
 			fetchJob.handle.mockResolvedValue({ ...streamResponse(), headers: { 'content-length': '50000000' } })
 
 			await expect(operation.execute(ctx)).rejects.toBeInstanceOf(UpstreamResourceTooLargeError)
-			expect(metricsService.recordImageProcessing).toHaveBeenCalledWith('execute', 'unknown', 'error', expect.any(Number), 'public')
+			expect(metricsService.recordImageProcessing).toHaveBeenCalledWith('execute', 'unknown', 'error', expect.any(Number))
 		})
 	})
 

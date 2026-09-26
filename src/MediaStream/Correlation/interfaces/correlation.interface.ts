@@ -1,3 +1,5 @@
+import type { ImageRequestLog } from '../utils/image-request-log.util.js'
+
 export interface RequestContext {
 	correlationId: string
 	timestamp: number
@@ -10,4 +12,6 @@ export interface RequestContext {
 	duration?: number
 	startTimestamp?: number
 	endTimestamp?: number
+	/** Set by ImageRequestLogMiddleware on image-route requests only. */
+	imageRequest?: ImageRequestLog
 }

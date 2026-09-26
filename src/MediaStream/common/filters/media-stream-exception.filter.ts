@@ -3,6 +3,7 @@ import type { Request, Response } from 'express'
 import { Catch, HttpException, HttpStatus } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
+import { currentImageRequest } from '#microservice/Correlation/utils/image-request-log.util'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MediaStreamError, ProcessingOverloadedError, ProcessingTimeoutError } from '../errors/media-stream.errors.js'
 
@@ -78,6 +79,19 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 		// Load shedding (503 + Retry-After) is the service working as designed
 		// under pressure, not a fault: keep it out of the ERROR stream.
 		const isCapacityShed = exception instanceof ProcessingOverloadedError || exception instanceof ProcessingTimeoutError
+
+		// The per-request image line (ImageRequestLogMiddleware) derives any
+		// other outcome from the status it sees when the response closes.
+		const imageRequest = currentImageRequest()
+		if (imageRequest) {
+			imageRequest.error = exception.constructor.name
+			if (exception instanceof ProcessingOverloadedError) {
+				imageRequest.outcome = 'overloaded'
+			}
+			else if (exception instanceof ProcessingTimeoutError) {
+				imageRequest.outcome = 'timeout'
+			}
+		}
 
 		if (shape.status >= HttpStatus.INTERNAL_SERVER_ERROR && !isCapacityShed) {
 			CorrelatedLogger.error(`${shape.name}: ${exception.message}`, logDetail, MediaStreamExceptionFilter.name)

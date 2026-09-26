@@ -25,10 +25,8 @@ const TENANT_MEDIA_PATH_RE = new RegExp(`^/${IMAGE}/media/(${TENANT_SCHEMA_SEGME
  * spellings bought a second full quota per IP, and the encoded half
  * landed in the shared 'public' bucket that static images use, so one
  * tenant's burst could throttle static assets for everyone on that IP.
- * The tenant_schema metric under-reported the same traffic.
  *
- * Single source of truth shared by MetricsMiddleware (tenant_schema label)
- * and RateLimit (per-tenant image-processing bucket key).
+ * Used by RateLimit for the per-tenant image-processing bucket key.
  */
 export function extractTenantSchemaFromPath(pathname: string): string {
 	let path: string

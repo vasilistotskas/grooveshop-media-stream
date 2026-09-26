@@ -1,13 +1,16 @@
 import type { Response } from 'express'
 import type { MockedObject } from 'vitest'
-import { NotFoundException } from '@nestjs/common'
+import type { ImageRequestLog } from '#microservice/Correlation/utils/image-request-log.util'
+import { BadRequestException, HttpException, HttpStatus, NotFoundException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import MediaStreamImageController from '#microservice/API/controllers/media-stream-image.controller'
 import { ImageStreamService } from '#microservice/API/services/image-stream.service'
 import { RequestValidatorService } from '#microservice/API/services/request-validator.service'
 import { UrlBuilderService } from '#microservice/API/services/url-builder.service'
+import { requestContextStorage } from '#microservice/Correlation/async-local-storage'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 
 vi.mock('#microservice/API/services/image-stream.service')
@@ -367,6 +370,78 @@ describe('mediaStreamImageController', () => {
 			await expect(controller.handleImageRequest(mockRequest, mockResponse))
 				.rejects
 				.toThrow(NotFoundException)
+		})
+	})
+
+	// The exception filter writes the one line for a thrown error; the controller adds none.
+	describe('log levels', () => {
+		const PATH = '/media_stream-image/media/acme/uploads/test/image.webp/100/100/contain/entropy/transparent/5/80.webp'
+
+		it.each([
+			['a validation 400', new BadRequestException('Invalid width')],
+			['a rate-limit 429', new HttpException('Rate limit exceeded', HttpStatus.TOO_MANY_REQUESTS)],
+			['an unexpected 500', new Error('boom')],
+		])('writes no line of its own for %s, and still counts it', async (_label, thrown) => {
+			const error = vi.spyOn(CorrelatedLogger, 'error')
+			const warn = vi.spyOn(CorrelatedLogger, 'warn')
+			mockRequestValidatorService.validateRequest.mockImplementation(() => {
+				throw thrown
+			})
+
+			await expect(controller.handleImageRequest({ path: PATH } as any, mockResponse)).rejects.toBe(thrown)
+
+			expect(error).not.toHaveBeenCalled()
+			expect(warn).not.toHaveBeenCalled()
+			expect(mockMetricsService.recordError).toHaveBeenCalledWith('uploaded_media_request', thrown.constructor.name)
+		})
+
+		it('writes no line of its own for an unmatched path', async () => {
+			const warn = vi.spyOn(CorrelatedLogger, 'warn')
+
+			await expect(controller.handleImageRequest({ path: '/media_stream-image/nowhere' } as any, mockResponse)).rejects.toBeInstanceOf(NotFoundException)
+			expect(warn).not.toHaveBeenCalled()
+		})
+	})
+
+	describe('request log record', () => {
+		function inRequest(log: ImageRequestLog, fn: () => Promise<void>): Promise<void> {
+			return requestContextStorage.run({ correlationId: 'c', timestamp: 0, clientIp: '127.0.0.1', method: 'GET', url: '/', startTime: 0n, imageRequest: log }, fn)
+		}
+
+		function newLog(): ImageRequestLog {
+			return { correlationId: 'c', startedAt: 0n, path: 'raw', admissionWaitMs: 0 }
+		}
+
+		it('describes the matched route: source, schema, decoded path and resize options', async () => {
+			const log = newLog()
+			const path = '/media_stream-image/media/acme/uploads/%CE%B1.png/640/480/cover/centre/transparent/0/80.avif'
+
+			await inRequest(log, () => controller.handleImageRequest({ path } as any, mockResponse))
+
+			expect(log).toMatchObject({
+				source: 'UPLOADED_MEDIA',
+				schema: 'acme',
+				path: 'media/acme/uploads/α.png/640/480/cover/centre/transparent/0/80.avif',
+				width: 640,
+				height: 480,
+				fit: 'cover',
+				position: 'centre',
+				format: 'avif',
+				quality: 80,
+			})
+		})
+
+		it('describes a request that fails validation, leaving out a number that does not parse', async () => {
+			mockRequestValidatorService.validateRequest.mockImplementation(() => {
+				throw new Error('Invalid parameters')
+			})
+			const log = newLog()
+			const path = '/media_stream-image/static/images/logo.png/wide/100/contain/entropy/transparent/5/80.webp'
+
+			await expect(inRequest(log, () => controller.handleImageRequest({ path } as any, mockResponse))).rejects.toThrow('Invalid parameters')
+
+			expect(log).toMatchObject({ source: 'STATIC_IMAGES', schema: 'public', height: 100, format: 'webp' })
+			expect(log.width).toBeUndefined()
 		})
 	})
 })

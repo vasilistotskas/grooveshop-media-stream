@@ -1,12 +1,13 @@
 import type { Request, Response } from 'express'
+import type { ImageRequestLog } from '#microservice/Correlation/utils/image-request-log.util'
 import type { ImageSourceKey } from '../config/image-sources.config.js'
 import type { ImageProcessingContext, ImageProcessingParams } from '../types/image-source.types.js'
 import { BadRequestException, Controller, Get, NotFoundException, Req, Res } from '@nestjs/common'
 import { IMAGE } from '#microservice/common/constants/route-prefixes.constant'
 import { PUBLIC_TENANT_SCHEMA } from '#microservice/common/constants/tenant.constant'
-import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { decodePathFully } from '#microservice/common/utils/percent-decode.util'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
+import { currentImageRequest } from '#microservice/Correlation/utils/image-request-log.util'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
@@ -16,6 +17,7 @@ import CacheImageRequest, {
 	ResizeOptions,
 	SupportedResizeFormats,
 } from '../dto/cache-image-request.dto.js'
+import { MAX_LOGGED_PATH_LENGTH, truncateForLog } from '../middleware/image-request-log.middleware.js'
 import { ImageStreamService } from '../services/image-stream.service.js'
 import { RequestValidatorService } from '../services/request-validator.service.js'
 import { UrlBuilderService } from '../services/url-builder.service.js'
@@ -25,6 +27,8 @@ const PARAM_PLUS_RE = /:([^/.]+)\+/g
 const PARAM_DOT_PARAM_RE = /:([^/.]+)\.([^/.]+)/g
 const PARAM_RE = /:([^/]+)/g
 const SLASH_RE = /\//g
+/** Longest route-param string (fit, position, format, schema) a log line carries. */
+const MAX_LOGGED_PARAM_LENGTH = 64
 
 /**
  * Controller for image streaming with dynamic route matching
@@ -84,14 +88,22 @@ export default class MediaStreamImageController {
 
 		CorrelatedLogger.debug(`Processing image request: ${fullPath} (original: ${req.path})`, MediaStreamImageController.name)
 
+		const log = currentImageRequest()
+		if (log) {
+			log.path = truncateForLog(fullPath, MAX_LOGGED_PATH_LENGTH)
+		}
+
 		const match = this.findMatchingSource(fullPath)
 
 		if (!match) {
-			CorrelatedLogger.warn(`No matching image source found: ${fullPath}`, MediaStreamImageController.name)
+			// The exception filter logs it at WARN.
 			throw new NotFoundException(`No image source matches path: ${fullPath}`)
 		}
 
 		const { sourceKey, params } = match
+		if (log) {
+			this.describeRequest(log, sourceKey, params)
+		}
 
 		await this.processImageRequest(sourceKey, params, res, req)
 	}
@@ -203,13 +215,11 @@ export default class MediaStreamImageController {
 			await this.imageStreamService.processAndStream(context, request, res, req)
 		}
 		catch (error: unknown) {
-			const errorName = error instanceof Error ? error.constructor.name : 'UnknownError'
-			CorrelatedLogger.error(
-				`Error in ${source.name} (params: ${JSON.stringify(params)}): ${errorMessage(error)}`,
-				error instanceof Error ? error.stack : undefined,
-				MediaStreamImageController.name,
-			)
-			this.metricsService.recordError(phaseKey, errorName)
+			// Not logged here: MediaStreamExceptionFilter writes the one line
+			// for a thrown error (ERROR for 5xx, WARN for 4xx and capacity
+			// sheds), and the image request line carries the params, status
+			// and error class. A second line here doubled every 400 at ERROR.
+			this.metricsService.recordError(phaseKey, error instanceof Error ? error.constructor.name : 'UnknownError')
 			throw error
 		}
 		finally {
@@ -233,5 +243,26 @@ export default class MediaStreamImageController {
 			format: params.format as SupportedResizeFormats | undefined,
 			quality: Number(params.quality),
 		})
+	}
+
+	/**
+	 * Copy the matched route into the request's log record before validation,
+	 * so a 400 still says what was asked for. Values are unvalidated here:
+	 * strings are capped, and a number that does not parse is left out.
+	 */
+	private describeRequest(log: ImageRequestLog, sourceKey: ImageSourceKey, params: ImageProcessingParams): void {
+		const text = (value: string | undefined): string | undefined => value === undefined ? undefined : truncateForLog(value, MAX_LOGGED_PARAM_LENGTH)
+		const number = (value: string | undefined): number | undefined => {
+			const parsed = Number(value)
+			return value !== undefined && Number.isFinite(parsed) ? parsed : undefined
+		}
+		log.source = sourceKey
+		log.schema = text(params.tenantSchema ?? PUBLIC_TENANT_SCHEMA)
+		log.width = number(params.width)
+		log.height = number(params.height)
+		log.fit = text(params.fit)
+		log.position = text(params.position)
+		log.format = text(params.format)
+		log.quality = number(params.quality)
 	}
 }

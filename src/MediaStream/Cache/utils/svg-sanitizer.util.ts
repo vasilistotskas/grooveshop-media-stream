@@ -1,7 +1,7 @@
 import { extname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Worker } from 'node:worker_threads'
-import { ProcessingTimeoutError } from '#microservice/common/errors/media-stream.errors'
+import { ProcessingTimeoutError, SvgSanitizationError } from '#microservice/common/errors/media-stream.errors'
 import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 
@@ -72,6 +72,7 @@ export interface SvgSanitizeLimits {
  * Fail closed: if the worker errors or exceeds its heap, or if its output
  * somehow still contains a `<script` element, the SVG is rejected (the
  * pipeline then serves the default image) rather than served unsanitized.
+ * @throws SvgSanitizationError when it fails closed
  * @throws ProcessingTimeoutError when the worker exceeds `timeoutMs`
  */
 export async function sanitizeSvg(svg: string, { timeoutMs, heapLimitMb = SVG_SANITIZER_HEAP_LIMIT_MB }: SvgSanitizeLimits): Promise<string> {
@@ -88,7 +89,7 @@ export async function sanitizeSvg(svg: string, { timeoutMs, heapLimitMb = SVG_SA
 			err instanceof Error ? err.stack : undefined,
 			'SvgSanitizer',
 		)
-		throw new Error('SVG sanitization unavailable')
+		throw new SvgSanitizationError('SVG sanitization unavailable', { cause: errorMessage(err) })
 	}
 
 	// Defence-in-depth tripwire: detection-and-reject, NOT stripping. DOMPurify's
@@ -96,7 +97,7 @@ export async function sanitizeSvg(svg: string, { timeoutMs, heapLimitMb = SVG_SA
 	// library regression or misconfiguration, so fail closed rather than serve it.
 	if (sanitized.toLowerCase().includes('<script')) {
 		CorrelatedLogger.error('Sanitized SVG unexpectedly still contains a <script element — rejecting', undefined, 'SvgSanitizer')
-		throw new Error('SVG sanitization incomplete')
+		throw new SvgSanitizationError('SVG sanitization incomplete')
 	}
 
 	return sanitized

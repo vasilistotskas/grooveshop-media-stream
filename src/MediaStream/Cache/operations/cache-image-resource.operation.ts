@@ -1,6 +1,7 @@
 import type { Buffer } from 'node:buffer'
 import type { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
 import type { ResourceIdentifierKP } from '#microservice/common/constants/key-properties.constant'
+import type { CacheLayerName } from '../interfaces/cache-layer.interface.js'
 import type { ProcessedImage } from './image-format-processor.service.js'
 import { access, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -11,6 +12,7 @@ import { MediaStreamError, ProcessingOverloadedError } from '#microservice/commo
 import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { storageDirectory } from '#microservice/common/utils/storage-path.util'
 import { ConfigService } from '#microservice/Config/config.service'
+import { currentImageRequest, IMAGE_DECODE_LOG_CONTEXT } from '#microservice/Correlation/utils/image-request-log.util'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
 import ResourceMetaData, { resourceMetaVersion } from '#microservice/HTTP/dto/resource-meta-data.dto'
@@ -33,6 +35,8 @@ export interface OperationContext {
 	metaData: ResourceMetaData | null
 	/** The full payload when the layered cache had it; a disk-only hit leaves this null until loadResource(). */
 	cached: ProcessedImage | null
+	/** Which tier checkResourceExists() found the valid copy in. */
+	cacheTier: CacheLayerName | 'disk' | null
 }
 
 /**
@@ -83,7 +87,7 @@ export default class CacheImageResourceOperation {
 		try {
 			const id = await this.generateResourceIdentityFromRequestJob.handle(cacheImageRequest)
 			CorrelatedLogger.debug(`Resource ID generated: ${id}`, CacheImageResourceOperation.name)
-			return { request: cacheImageRequest, id, metaData: null, cached: null }
+			return { request: cacheImageRequest, id, metaData: null, cached: null, cacheTier: null }
 		}
 		catch (error: unknown) {
 			CorrelatedLogger.error(`Setup failed: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, CacheImageResourceOperation.name)
@@ -102,12 +106,12 @@ export default class CacheImageResourceOperation {
 	 */
 	async checkResourceExists(ctx: OperationContext): Promise<boolean> {
 		PerformanceTracker.startPhase('resource_exists_check')
-		const tenantSchema = ctx.request.tenantSchema || PUBLIC_TENANT_SCHEMA
 		const namespace = imageNamespace(ctx.request.tenantSchema)
 
 		try {
-			const cached = await this.cacheManager.get<ProcessedImage>(namespace, ctx.id)
-			if (cached) {
+			const lookup = await this.cacheManager.lookup<ProcessedImage>(namespace, ctx.id)
+			if (lookup) {
+				const cached = lookup.value
 				if (typeof cached.metadata?.dateCreated !== 'number') {
 					CorrelatedLogger.warn(`Corrupted cache data found, deleting: ${ctx.id}`, CacheImageResourceOperation.name)
 					await this.cacheManager.delete(namespace, ctx.id)
@@ -116,6 +120,7 @@ export default class CacheImageResourceOperation {
 					CorrelatedLogger.debug(`Resource found in cache and is valid: ${ctx.id}`, CacheImageResourceOperation.name)
 					ctx.cached = cached
 					ctx.metaData = cached.metadata
+					ctx.cacheTier = lookup.layer
 					PerformanceTracker.endPhase('resource_exists_check')
 					return true
 				}
@@ -132,14 +137,14 @@ export default class CacheImageResourceOperation {
 			}
 			catch {
 				CorrelatedLogger.debug(`Metadata not found in filesystem: ${resourceMetaPath}`, CacheImageResourceOperation.name)
-				this.endPhaseAndRecord('resource_exists_check', 'miss', tenantSchema)
+				this.endPhaseAndRecord('resource_exists_check', 'miss')
 				return false
 			}
 
 			const resourcePath = this.getResourcePath(ctx)
 			if (!await access(resourcePath).then(() => true, () => false)) {
 				CorrelatedLogger.debug(`Resource data not found in filesystem: ${resourcePath}`, CacheImageResourceOperation.name)
-				this.endPhaseAndRecord('resource_exists_check', 'miss', tenantSchema)
+				this.endPhaseAndRecord('resource_exists_check', 'miss')
 				return false
 			}
 
@@ -149,27 +154,28 @@ export default class CacheImageResourceOperation {
 			}
 			catch {
 				CorrelatedLogger.warn(`Metadata sidecar is not valid JSON: ${resourceMetaPath}`, CacheImageResourceOperation.name)
-				this.endPhaseAndRecord('resource_exists_check', 'miss', tenantSchema)
+				this.endPhaseAndRecord('resource_exists_check', 'miss')
 				return false
 			}
 
 			if (headers.version !== resourceMetaVersion) {
 				CorrelatedLogger.warn(`Metadata sidecar has version ${headers.version}, expected ${resourceMetaVersion}: ${resourceMetaPath}`, CacheImageResourceOperation.name)
-				this.endPhaseAndRecord('resource_exists_check', 'miss', tenantSchema)
+				this.endPhaseAndRecord('resource_exists_check', 'miss')
 				return false
 			}
 
 			const isValid = this.isFresh(headers)
 			if (isValid) {
 				ctx.metaData = headers
+				ctx.cacheTier = 'disk'
 			}
-			this.endPhaseAndRecord('resource_exists_check', isValid ? 'hit' : 'miss', tenantSchema)
+			this.endPhaseAndRecord('resource_exists_check', isValid ? 'hit' : 'miss')
 			return isValid
 		}
 		catch (error: unknown) {
 			CorrelatedLogger.warn(`Error checking resource existence: ${errorMessage(error)}`, CacheImageResourceOperation.name)
 			this.metricsService.recordError('cache_check', 'resource_exists')
-			this.endPhaseAndRecord('resource_exists_check', 'error', tenantSchema)
+			this.endPhaseAndRecord('resource_exists_check', 'error')
 			return false
 		}
 	}
@@ -228,7 +234,7 @@ export default class CacheImageResourceOperation {
 			}
 			CorrelatedLogger.error(`Failed to execute CacheImageResourceOperation: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, CacheImageResourceOperation.name)
 			this.metricsService.recordError('image_processing', 'execute')
-			this.metricsService.recordImageProcessing('execute', 'unknown', 'error', duration || 0, ctx.request.tenantSchema || PUBLIC_TENANT_SCHEMA)
+			this.metricsService.recordImageProcessing('execute', 'unknown', 'error', duration || 0)
 			if (error instanceof MediaStreamError) {
 				throw error
 			}
@@ -252,9 +258,33 @@ export default class CacheImageResourceOperation {
 	}
 
 	/** End a performance phase and record the filesystem-tier cache metric (the histogram is in seconds). */
-	private endPhaseAndRecord(phase: string, result: 'hit' | 'miss' | 'error', tenantSchema: string): void {
+	private endPhaseAndRecord(phase: string, result: 'hit' | 'miss' | 'error'): void {
 		const durationMs = PerformanceTracker.endPhase(phase)
-		this.metricsService.recordCacheOperation('get', 'filesystem', result, (durationMs || 0) / 1000, tenantSchema)
+		this.metricsService.recordCacheOperation('get', 'filesystem', result, (durationMs || 0) / 1000)
+	}
+
+	/**
+	 * One info line before a fetched source reaches a decoder. The request
+	 * line is written when the response closes, so a decode that kills the
+	 * process (the 2026-09-25 heap OOM) leaves none; this line survives it,
+	 * and an `ImageDecode` line without a matching `ImageRequest` line
+	 * names the request that took the pod down. Misses only: cache hits,
+	 * the bulk of the traffic, never get here.
+	 */
+	private logDecodeStart(ctx: OperationContext): void {
+		const log = currentImageRequest()
+		if (!log) {
+			return
+		}
+		CorrelatedLogger.event('log', `image decode ${log.inputFormat ?? 'unknown'} ${log.inputBytes ?? 0}B`, {
+			correlation_id: log.correlationId,
+			schema: log.schema,
+			source: log.source,
+			path: log.path,
+			resource_id: ctx.id,
+			input_format: log.inputFormat,
+			input_bytes: log.inputBytes,
+		}, IMAGE_DECODE_LOG_CONTEXT)
 	}
 
 	private async processImage(ctx: OperationContext): Promise<ProcessedImage> {
@@ -263,16 +293,17 @@ export default class CacheImageResourceOperation {
 
 		try {
 			const resourceTempPath = this.getResourceTempPath(ctx)
-			await this.resourceFetcher.fetchToTempFile(ctx.request, ctx.id, resourceTempPath)
+			// The fetcher sniffs the real format from the bytes; it decides both
+			// the size limit and which pipeline runs.
+			const source = await this.resourceFetcher.fetchToTempFile(ctx.request, ctx.id, resourceTempPath)
+			this.metricsService.recordImageInput(source.format, source.bytes)
+			this.logDecodeStart(ctx)
 
 			let processed: ProcessedImage
 			// The .rst temp file is removed on every path — Sharp throws
 			// mid-pipeline on corrupt/unsupported sources.
 			try {
-				const isSourceSvg = await this.imageFormatProcessor.detectSvgByHeader(resourceTempPath)
-				CorrelatedLogger.debug(`Source file SVG detection: ${isSourceSvg}`, CacheImageResourceOperation.name)
-
-				processed = isSourceSvg
+				processed = source.format === 'svg'
 					? await this.imageFormatProcessor.processSvg(resourceTempPath, ctx.request.resizeOptions, tenantSchema)
 					: await this.imageFormatProcessor.processRaster(resourceTempPath, ctx.request.resizeOptions, tenantSchema)
 
@@ -302,14 +333,14 @@ export default class CacheImageResourceOperation {
 			}
 
 			const duration = PerformanceTracker.endPhase('processing')
-			this.metricsService.recordImageProcessing('process', processed.metadata.format || 'unknown', 'success', duration || 0, tenantSchema)
+			this.metricsService.recordImageProcessing('process', processed.metadata.format || 'unknown', 'success', duration || 0)
 			CorrelatedLogger.debug(`Image processed successfully: ${ctx.id}`, CacheImageResourceOperation.name)
 			return processed
 		}
 		catch (error: unknown) {
 			const duration = PerformanceTracker.endPhase('processing')
 			if (!(error instanceof ProcessingOverloadedError)) {
-				this.metricsService.recordImageProcessing('process', 'unknown', 'error', duration || 0, tenantSchema)
+				this.metricsService.recordImageProcessing('process', 'unknown', 'error', duration || 0)
 			}
 			throw error
 		}

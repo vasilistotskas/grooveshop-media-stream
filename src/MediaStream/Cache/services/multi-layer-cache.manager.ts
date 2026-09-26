@@ -1,13 +1,18 @@
 import type { OnModuleInit } from '@nestjs/common'
 import type { LayerDistribution } from '#microservice/common/types/common.types'
-import type { CacheLayer, CacheLayerStats } from '../interfaces/cache-layer.interface.js'
+import type { CacheLayer, CacheLayerName, CacheLayerStats } from '../interfaces/cache-layer.interface.js'
 import { Injectable } from '@nestjs/common'
 import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { MemoryCacheLayer } from '../layers/memory-cache.layer.js'
 import { RedisCacheLayer } from '../layers/redis-cache.layer.js'
-import { cacheKey, tenantFromNamespace } from '../utils/cache-namespace.util.js'
+import { cacheKey } from '../utils/cache-namespace.util.js'
+
+export interface CacheLookup<T> {
+	value: T
+	layer: CacheLayerName
+}
 
 export interface MultiLayerCacheStats {
 	layers: Record<string, CacheLayerStats>
@@ -44,31 +49,35 @@ export class MultiLayerCacheManager implements OnModuleInit {
 	}
 
 	async get<T>(namespace: string, identifier: string): Promise<T | null> {
+		return (await this.lookup<T>(namespace, identifier))?.value ?? null
+	}
+
+	/** Like get(), and names the layer that answered. */
+	async lookup<T>(namespace: string, identifier: string): Promise<CacheLookup<T> | null> {
 		const key = cacheKey(namespace, identifier)
-		const tenant = tenantFromNamespace(namespace)
 
 		for (const layer of this.layers) {
 			try {
 				const value = await layer.get<T>(key)
 				if (value !== null) {
 					CorrelatedLogger.debug(`Cache HIT in ${layer.getLayerName()} layer for key: ${key}`, MultiLayerCacheManager.name)
-					this.metricsService.recordCacheOperation('get', layer.getLayerName(), 'hit', undefined, tenant)
+					this.metricsService.recordCacheOperation('get', layer.getLayerName(), 'hit')
 
 					this.backfillLayers(key, value, layer).catch((error: unknown) => {
 						CorrelatedLogger.warn(`Backfill failed for key ${key}: ${errorMessage(error)}`, MultiLayerCacheManager.name)
 					})
 
-					return value
+					return { value, layer: layer.getLayerName() }
 				}
 			}
 			catch (error: unknown) {
 				CorrelatedLogger.warn(`Cache layer ${layer.getLayerName()} failed for key ${key}: ${errorMessage(error)}`, MultiLayerCacheManager.name)
-				this.metricsService.recordCacheOperation('get', layer.getLayerName(), 'error', undefined, tenant)
+				this.metricsService.recordCacheOperation('get', layer.getLayerName(), 'error')
 			}
 		}
 
 		CorrelatedLogger.debug(`Cache MISS for key: ${key}`, MultiLayerCacheManager.name)
-		this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss', undefined, tenant)
+		this.metricsService.recordCacheOperation('get', 'multi-layer', 'miss')
 
 		return null
 	}
@@ -76,7 +85,6 @@ export class MultiLayerCacheManager implements OnModuleInit {
 	/** Write to every layer; one layer failing never blocks the others. */
 	async set<T>(namespace: string, identifier: string, value: T, ttl?: number): Promise<void> {
 		const key = cacheKey(namespace, identifier)
-		const tenant = tenantFromNamespace(namespace)
 
 		await Promise.all(this.layers.map(async (layer) => {
 			try {
@@ -85,16 +93,15 @@ export class MultiLayerCacheManager implements OnModuleInit {
 			}
 			catch (error: unknown) {
 				CorrelatedLogger.warn(`Cache SET failed in ${layer.getLayerName()} layer for key ${key}: ${errorMessage(error)}`, MultiLayerCacheManager.name)
-				this.metricsService.recordCacheOperation('set', layer.getLayerName(), 'error', undefined, tenant)
+				this.metricsService.recordCacheOperation('set', layer.getLayerName(), 'error')
 			}
 		}))
 
-		this.metricsService.recordCacheOperation('set', 'multi-layer', 'success', undefined, tenant)
+		this.metricsService.recordCacheOperation('set', 'multi-layer', 'success')
 	}
 
 	async delete(namespace: string, identifier: string): Promise<void> {
 		const key = cacheKey(namespace, identifier)
-		const tenant = tenantFromNamespace(namespace)
 
 		await Promise.all(this.layers.map(async (layer) => {
 			try {
@@ -106,7 +113,7 @@ export class MultiLayerCacheManager implements OnModuleInit {
 			}
 		}))
 
-		this.metricsService.recordCacheOperation('delete', 'multi-layer', 'success', undefined, tenant)
+		this.metricsService.recordCacheOperation('delete', 'multi-layer', 'success')
 	}
 
 	async exists(namespace: string, identifier: string): Promise<boolean> {
@@ -156,7 +163,7 @@ export class MultiLayerCacheManager implements OnModuleInit {
 		}
 
 		CorrelatedLogger.debug(`Namespace ${namespace} invalidated: ${totalDeleted} keys deleted`, MultiLayerCacheManager.name)
-		this.metricsService.recordCacheOperation('clear', 'multi-layer', 'success', undefined, tenantFromNamespace(namespace))
+		this.metricsService.recordCacheOperation('clear', 'multi-layer', 'success')
 	}
 
 	async getStats(): Promise<MultiLayerCacheStats> {

@@ -106,3 +106,27 @@ export class UpstreamResourceTooLargeError extends MediaStreamError {
 		super(message, HttpStatus.BAD_GATEWAY, 'UPSTREAM_RESOURCE_TOO_LARGE', context)
 	}
 }
+
+/**
+ * The upstream bytes are not an image format the pipeline accepts (sniffed
+ * from the content, whatever the URL extension says), or an SVG document
+ * without an `<svg>` element. Refused before any decoder sees them.
+ */
+export class UnsupportedSourceFormatError extends MediaStreamError {
+	constructor(
+		message: string = 'Upstream resource is not a supported image format',
+		context: Metadata = {},
+	) {
+		super(message, HttpStatus.BAD_GATEWAY, 'UNSUPPORTED_SOURCE_FORMAT', context)
+	}
+}
+
+/**
+ * The SVG sanitiser failed closed: its worker errored, ran out of heap, or
+ * left a `<script` element behind. The SVG is never served unsanitised.
+ */
+export class SvgSanitizationError extends MediaStreamError {
+	constructor(message: string, context: Metadata = {}) {
+		super(message, HttpStatus.BAD_GATEWAY, 'SVG_SANITIZATION_FAILED', context)
+	}
+}

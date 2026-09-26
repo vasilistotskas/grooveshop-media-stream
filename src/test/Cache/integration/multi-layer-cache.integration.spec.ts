@@ -98,7 +98,7 @@ describe('multiLayerCacheManager Integration', () => {
 			expect(mockMemoryCacheService.get).toHaveBeenCalledWith('image:test-key')
 			// Sequential: stops on first hit, redis should not be called
 			expect(mockRedisCacheService.get).not.toHaveBeenCalled()
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'memory', 'hit', undefined, 'public')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'memory', 'hit')
 		})
 
 		it('should fallback to Redis when memory cache misses', async () => {
@@ -113,7 +113,7 @@ describe('multiLayerCacheManager Integration', () => {
 			expect(mockMemoryCacheService.get).toHaveBeenCalledWith('image:test-key')
 			expect(mockRedisCacheService.get).toHaveBeenCalledWith('image:test-key')
 			expect(mockMemoryCacheService.set).toHaveBeenCalledWith('image:test-key', testValue, undefined)
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'redis', 'hit', undefined, 'public')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'redis', 'hit')
 		})
 
 		it('should return null when all layers miss', async () => {
@@ -123,7 +123,7 @@ describe('multiLayerCacheManager Integration', () => {
 			const result = await cacheManager.get('image', 'test-key')
 
 			expect(result).toBeNull()
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'miss', undefined, 'public')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'multi-layer', 'miss')
 		})
 
 		it('should handle layer failures gracefully', async () => {
@@ -149,7 +149,7 @@ describe('multiLayerCacheManager Integration', () => {
 
 			expect(mockMemoryCacheService.set).toHaveBeenCalledWith('image:test-key', testValue, 3600)
 			expect(mockRedisCacheService.set).toHaveBeenCalledWith('image:test-key', testValue, 3600)
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('set', 'multi-layer', 'success', undefined, 'public')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('set', 'multi-layer', 'success')
 		})
 
 		it('should delete from all layers', async () => {
@@ -160,7 +160,7 @@ describe('multiLayerCacheManager Integration', () => {
 
 			expect(mockMemoryCacheService.delete).toHaveBeenCalledWith('image:test-key')
 			expect(mockRedisCacheService.delete).toHaveBeenCalledWith('image:test-key')
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('delete', 'multi-layer', 'success', undefined, 'public')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('delete', 'multi-layer', 'success')
 		})
 
 		it('should check existence in priority order', async () => {
@@ -253,7 +253,7 @@ describe('multiLayerCacheManager Integration', () => {
 			// The layers use the underlying service methods internally
 			await cacheManager.invalidateNamespace('image')
 
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('clear', 'multi-layer', 'success', undefined, 'public')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('clear', 'multi-layer', 'success')
 		})
 	})
 

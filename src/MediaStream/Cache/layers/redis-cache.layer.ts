@@ -1,4 +1,4 @@
-import type { CacheLayer, CacheLayerStats } from '../interfaces/cache-layer.interface.js'
+import type { CacheLayer, CacheLayerName, CacheLayerStats } from '../interfaces/cache-layer.interface.js'
 import { Injectable } from '@nestjs/common'
 import { RedisCacheService } from '../services/redis-cache.service.js'
 
@@ -8,7 +8,7 @@ import { RedisCacheService } from '../services/redis-cache.service.js'
  */
 @Injectable()
 export class RedisCacheLayer implements CacheLayer {
-	private readonly layerName = 'redis'
+	private readonly layerName: CacheLayerName = 'redis'
 	private readonly priority = 2
 
 	constructor(private readonly redisCacheService: RedisCacheService) {}
@@ -68,7 +68,7 @@ export class RedisCacheLayer implements CacheLayer {
 		return this.redisCacheService.getTtl(key)
 	}
 
-	getLayerName(): string {
+	getLayerName(): CacheLayerName {
 		return this.layerName
 	}
 

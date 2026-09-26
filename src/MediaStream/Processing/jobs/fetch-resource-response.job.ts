@@ -35,7 +35,15 @@ export default class FetchResourceResponseJob {
 
 				// HTTP error responses (4xx/5xx from upstream): return a shaped object
 				// so the caller can apply negative-cache logic based on status.
-				CorrelatedLogger.error(`Upstream returned ${error.response.status} for ${request.resourceTarget}: ${JSON.stringify(error.toJSON())}`, undefined, FetchResourceResponseJob.name)
+				// A 4xx is a missing or forbidden image, not a fault of either
+				// service: WARN. A 5xx is the backend failing: ERROR.
+				const detail = `Upstream returned ${error.response.status} for ${request.resourceTarget}: ${JSON.stringify(error.toJSON())}`
+				if (error.response.status >= 500) {
+					CorrelatedLogger.error(detail, undefined, FetchResourceResponseJob.name)
+				}
+				else {
+					CorrelatedLogger.warn(detail, FetchResourceResponseJob.name)
+				}
 				return {
 					status: error.response.status,
 					statusText: error.response.statusText,

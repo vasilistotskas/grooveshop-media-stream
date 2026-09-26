@@ -1,19 +1,20 @@
 import type { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
-import { open, readFile, writeFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { cwd } from 'node:process'
 import { Injectable } from '@nestjs/common'
 import { SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
 import { PUBLIC_TENANT_SCHEMA } from '#microservice/common/constants/tenant.constant'
+import { UnsupportedSourceFormatError } from '#microservice/common/errors/media-stream.errors'
 import { storageDirectory } from '#microservice/common/utils/storage-path.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import ResourceMetaData, { resourceMetaVersion } from '#microservice/HTTP/dto/resource-meta-data.dto'
-import WebpImageManipulationJob, { outputFormat } from '#microservice/Processing/jobs/webp-image-manipulation.job'
+import WebpImageManipulationJob from '#microservice/Processing/jobs/webp-image-manipulation.job'
 import { ProcessingAdmissionService } from '#microservice/Processing/services/processing-admission.service'
-import { isSvgHeader, sanitizeSvg, SVG_SNIFF_BYTES } from '../utils/svg-sanitizer.util.js'
+import { sanitizeSvg } from '../utils/svg-sanitizer.util.js'
 
 export interface ProcessedImage {
 	data: Buffer
@@ -26,7 +27,7 @@ const DEFAULT_IMAGE_HEIGHT = 600
 
 /**
  * Turns a fetched temp file into processed image bytes + metadata: SVG
- * detection and sanitisation, raster processing via Sharp, and the
+ * sanitisation, raster processing via Sharp, and the
  * default-image fallback pipeline. Every Sharp pipeline and every SVG
  * sanitisation goes through ProcessingAdmissionService so a burst of misses
  * is queued and shed instead of oversubscribing the CPU.
@@ -52,31 +53,16 @@ export class ImageFormatProcessor {
 		this.storageDir = storageDirectory(configService)
 	}
 
-	/** Detect an SVG source from its first bytes; unreadable files are treated as raster. */
-	async detectSvgByHeader(filePath: string): Promise<boolean> {
-		try {
-			const fh = await open(filePath, 'r')
-			try {
-				const headerBuf = Buffer.alloc(SVG_SNIFF_BYTES)
-				const { bytesRead } = await fh.read(headerBuf, 0, SVG_SNIFF_BYTES, 0)
-				return isSvgHeader(headerBuf.toString('utf8', 0, bytesRead))
-			}
-			finally {
-				await fh.close()
-			}
-		}
-		catch {
-			CorrelatedLogger.debug('Could not read file header, assuming not SVG', ImageFormatProcessor.name)
-			return false
-		}
-	}
-
+	/**
+	 * A source the fetcher sniffed as SVG.
+	 * @throws UnsupportedSourceFormatError when the document has no `<svg>` element
+	 * @throws SvgSanitizationError when the sanitiser fails closed
+	 */
 	async processSvg(tempPath: string, resizeOptions: ResizeOptions, tenantSchema: string = PUBLIC_TENANT_SCHEMA): Promise<ProcessedImage> {
 		const svgContent = await readFile(tempPath, 'utf8')
 
 		if (!svgContent.toLowerCase().includes('<svg')) {
-			CorrelatedLogger.warn('The file is not a valid SVG. Serving the default image.', ImageFormatProcessor.name)
-			return this.processDefault(resizeOptions, tenantSchema)
+			throw new UnsupportedSourceFormatError('SVG document without an <svg> element')
 		}
 
 		// Sanitise before the bytes reach either a browser (served as
@@ -100,11 +86,6 @@ export class ImageFormatProcessor {
 	async processRaster(tempPath: string, resizeOptions: ResizeOptions, tenantSchema: string = PUBLIC_TENANT_SCHEMA): Promise<ProcessedImage> {
 		const result = await this.runJob(tempPath, resizeOptions)
 		return { data: result.buffer, metadata: this.buildMetadata(result.size, result.format, tenantSchema) }
-	}
-
-	async processDefault(resizeOptions: ResizeOptions, tenantSchema: string = PUBLIC_TENANT_SCHEMA): Promise<ProcessedImage> {
-		const data = await this.optimizeAndServeDefaultImage(resizeOptions)
-		return { data, metadata: this.buildMetadata(String(data.length), outputFormat(resizeOptions.format), tenantSchema) }
 	}
 
 	/**

@@ -1,3 +1,4 @@
+import type { SourceImageFormat } from '#microservice/common/constants/image-limits.constant'
 import { Injectable } from '@nestjs/common'
 import { MAX_FILE_SIZES } from '#microservice/common/constants/image-limits.constant'
 import { errorMessage } from '#microservice/common/utils/error-message.util'
@@ -56,11 +57,8 @@ export class ResourceValidationService {
 		return true
 	}
 
-	/** Per-format upstream size cap from MAX_FILE_SIZES; unknown formats use the default. */
-	validateFileSize(sizeBytes: number, format?: string): boolean {
-		const maxSize = format
-			? (MAX_FILE_SIZES as Record<string, number>)[format.toLowerCase()] || MAX_FILE_SIZES.default
-			: MAX_FILE_SIZES.default
-		return sizeBytes > 0 && sizeBytes <= maxSize
+	/** Whether `sizeBytes` is within the upstream size cap of the format sniffed from the bytes (MAX_FILE_SIZES). */
+	validateFileSize(sizeBytes: number, format: SourceImageFormat): boolean {
+		return sizeBytes > 0 && sizeBytes <= MAX_FILE_SIZES[format]
 	}
 }

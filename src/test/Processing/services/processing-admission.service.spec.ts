@@ -1,6 +1,8 @@
+import type { ImageRequestLog } from '#microservice/Correlation/utils/image-request-log.util'
 import type { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ProcessingOverloadedError } from '#microservice/common/errors/media-stream.errors'
+import { requestContextStorage } from '#microservice/Correlation/async-local-storage'
 import { ProcessingAdmissionService } from '#microservice/Processing/services/processing-admission.service'
 import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 
@@ -127,6 +129,35 @@ describe('processingAdmissionService', () => {
 
 		gate.resolve()
 		await running
+	})
+
+	it('adds the time a request waited for a slot to its log record, granted or not', async () => {
+		const service = build()
+		const gate = deferred<void>()
+		const running = service.run(() => gate.promise)
+		const inRequest = <T>(log: ImageRequestLog, fn: () => Promise<T>): Promise<T> => requestContextStorage.run(
+			{ correlationId: 'c', timestamp: 0, clientIp: '127.0.0.1', method: 'GET', url: '/', startTime: 0n, imageRequest: log },
+			fn,
+		)
+
+		const granted: ImageRequestLog = { correlationId: 'c', startedAt: 0n, path: 'p', admissionWaitMs: 0 }
+		const grantedRun = inRequest(granted, () => service.run(async () => 'ok'))
+		await vi.advanceTimersByTimeAsync(400)
+		gate.resolve()
+		await Promise.all([running, grantedRun])
+		expect(granted.admissionWaitMs).toBeGreaterThanOrEqual(400)
+
+		const blocker = deferred<void>()
+		const blocking = service.run(() => blocker.promise)
+		const timedOut: ImageRequestLog = { correlationId: 'c', startedAt: 0n, path: 'p', admissionWaitMs: 0 }
+		const shed = inRequest(timedOut, () => service.run(async () => 'late'))
+		shed.catch(() => undefined)
+		await vi.advanceTimersByTimeAsync(1000)
+		await expect(shed).rejects.toBeInstanceOf(ProcessingOverloadedError)
+		expect(timedOut.admissionWaitMs).toBeGreaterThanOrEqual(1000)
+
+		blocker.resolve()
+		await blocking
 	})
 
 	it('fails every waiter on shutdown so no request hangs', async () => {

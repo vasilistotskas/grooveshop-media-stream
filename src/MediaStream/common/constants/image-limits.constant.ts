@@ -53,14 +53,27 @@ export const SHARP_INPUT_PIXEL_LIMIT = 268402689
 export const TRIM_WORKING_SIZE = 1024
 
 /**
- * Maximum file sizes by format (in bytes)
+ * Source formats the pipeline accepts, as sniffed from the fetched bytes
+ * (`Cache/utils/image-format-sniff.util.ts`), never from the URL extension.
+ * These are the inputs Sharp decodes from a file (`sharp.format`) minus
+ * libvips' own `.v` format: anything else is refused before it reaches a
+ * decoder, gzip-compressed SVG included (librsvg would rasterise it without
+ * the DOMPurify pass that plain SVG gets).
  */
-export const MAX_FILE_SIZES = Object.freeze({
-	default: 10 * 1024 * 1024, // 10MB
+export type SourceImageFormat = 'jpeg' | 'png' | 'webp' | 'gif' | 'tiff' | 'avif' | 'svg'
+
+/**
+ * Upstream size cap per sniffed source format (bytes), enforced on the
+ * declared Content-Length and again while streaming. Keyed on the content,
+ * so an SVG saved as `.png` gets the SVG limit and a PNG saved as `.svg`
+ * the PNG one.
+ */
+export const MAX_FILE_SIZES: Readonly<Record<SourceImageFormat, number>> = Object.freeze({
 	jpeg: 5 * 1024 * 1024, // 5MB
-	jpg: 5 * 1024 * 1024, // 5MB
 	png: 8 * 1024 * 1024, // 8MB
 	webp: 3 * 1024 * 1024, // 3MB
 	gif: 2 * 1024 * 1024, // 2MB
+	tiff: 10 * 1024 * 1024, // 10MB
+	avif: 10 * 1024 * 1024, // 10MB
 	svg: 1024 * 1024, // 1MB
 })

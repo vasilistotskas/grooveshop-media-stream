@@ -1,10 +1,12 @@
 import type { ArgumentsHost } from '@nestjs/common'
 import type { Mock } from 'vitest'
+import type { ImageRequestLog } from '#microservice/Correlation/utils/image-request-log.util'
 import { HttpException, HttpStatus } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MediaStreamError, ProcessingOverloadedError, ProcessingTimeoutError } from '#microservice/common/errors/media-stream.errors'
+import { InvalidRequestError, MediaStreamError, ProcessingOverloadedError, ProcessingTimeoutError } from '#microservice/common/errors/media-stream.errors'
 import { MediaStreamExceptionFilter } from '#microservice/common/filters/media-stream-exception.filter'
+import { requestContextStorage } from '#microservice/Correlation/async-local-storage'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 
@@ -239,6 +241,30 @@ describe('mediaStreamExceptionFilter', () => {
 
 			expect(warnSpy).toHaveBeenCalledTimes(1)
 			expect(errorSpy).not.toHaveBeenCalled()
+		})
+	})
+
+	describe('image request log', () => {
+		function catchFor(exception: Error): ImageRequestLog {
+			const log: ImageRequestLog = { correlationId: 'c', startedAt: 0n, path: 'p', admissionWaitMs: 0 }
+			mockResponse.setHeader = vi.fn()
+			requestContextStorage.run(
+				{ correlationId: 'c', timestamp: 0, clientIp: '127.0.0.1', method: 'GET', url: '/', startTime: 0n, imageRequest: log },
+				() => filter.catch(exception, mockArgumentsHost),
+			)
+			return log
+		}
+
+		it('records the error class, and classifies the capacity errors itself', () => {
+			expect(catchFor(new ProcessingOverloadedError(2))).toMatchObject({ error: 'ProcessingOverloadedError', outcome: 'overloaded' })
+			expect(catchFor(new ProcessingTimeoutError())).toMatchObject({ error: 'ProcessingTimeoutError', outcome: 'timeout' })
+		})
+
+		it('leaves every other outcome to the status the middleware sees', () => {
+			const log = catchFor(new InvalidRequestError('bad width'))
+
+			expect(log.error).toBe('InvalidRequestError')
+			expect(log.outcome).toBeUndefined()
 		})
 	})
 })

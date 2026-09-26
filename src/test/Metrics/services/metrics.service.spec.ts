@@ -48,12 +48,25 @@ describe('metricsService', () => {
 			}
 		})
 
-		it('should count image requests on a static counter', async () => {
-			service.recordImageRequest()
-			service.recordImageRequest()
+		it('counts completed image requests by outcome, format and cache, and times them by outcome and cache', async () => {
+			service.recordImageRequest('ok', 'webp', 'memory', 0.004)
+			service.recordImageRequest('ok', 'webp', 'memory', 0.02)
+			service.recordImageRequest('rejected', 'png', 'miss', 0.3)
 
 			const metrics = await service.getMetrics()
-			expect(metrics).toContain('mediastream_image_requests_total 2')
+			expect(metrics).toContain('mediastream_image_requests_total{outcome="ok",format="webp",cache="memory"} 2')
+			expect(metrics).toContain('mediastream_image_requests_total{outcome="rejected",format="png",cache="miss"} 1')
+			expect(metrics).toContain('mediastream_image_request_duration_seconds_bucket{le="0.005",outcome="ok",cache="memory"} 1')
+			expect(metrics).toContain('mediastream_image_request_duration_seconds_count{outcome="rejected",cache="miss"} 1')
+		})
+
+		it('records the size of each completed upstream download by sniffed format', async () => {
+			service.recordImageInput('png', 300_000)
+
+			const metrics = await service.getMetrics()
+			expect(metrics).toContain('mediastream_image_input_bytes_bucket{le="262144",format="png"} 0')
+			expect(metrics).toContain('mediastream_image_input_bytes_bucket{le="524288",format="png"} 1')
+			expect(metrics).toContain('mediastream_image_input_bytes_sum{format="png"} 300000')
 		})
 	})
 
@@ -117,41 +130,18 @@ describe('metricsService', () => {
 		})
 	})
 
-	describe('tenant_schema label', () => {
-		it('recordHttpRequest emits tenant_schema label defaulting to "public"', async () => {
-			service.recordHttpRequest('GET', '/test', 200, 0.5)
-			const metrics = await service.getMetrics()
-			expect(metrics).toContain('tenant_schema="public"')
-		})
+	// The schema segment is client-chosen, so it must never become a label value.
+	describe('no tenant_schema label', () => {
+		it('is absent from every per-request series', async () => {
+			service.recordHttpRequest('GET', '/media_stream-image/*path', 200, 0.5, 10, 20)
+			service.recordImageProcessing('process', 'webp', 'success', 1.0)
+			service.recordCacheOperation('get', 'redis', 'hit', 0.001)
+			service.recordImageRequest('ok', 'webp', 'redis', 0.01)
 
-		it('recordHttpRequest emits the supplied tenant_schema', async () => {
-			service.recordHttpRequest('GET', '/test', 200, 0.5, undefined, undefined, 'acme')
 			const metrics = await service.getMetrics()
-			expect(metrics).toContain('tenant_schema="acme"')
-		})
-
-		it('recordImageProcessing emits tenant_schema label defaulting to "public"', async () => {
-			service.recordImageProcessing('resize', 'webp', 'success', 1.0)
-			const metrics = await service.getMetrics()
-			expect(metrics).toContain('tenant_schema="public"')
-		})
-
-		it('recordImageProcessing emits the supplied tenant_schema', async () => {
-			service.recordImageProcessing('resize', 'webp', 'success', 1.0, 'tenant_xyz')
-			const metrics = await service.getMetrics()
-			expect(metrics).toContain('tenant_schema="tenant_xyz"')
-		})
-
-		it('recordCacheOperation emits tenant_schema label defaulting to "public"', async () => {
-			service.recordCacheOperation('get', 'memory', 'hit')
-			const metrics = await service.getMetrics()
-			expect(metrics).toContain('tenant_schema="public"')
-		})
-
-		it('recordCacheOperation emits the supplied tenant_schema', async () => {
-			service.recordCacheOperation('get', 'redis', 'hit', undefined, 'acme')
-			const metrics = await service.getMetrics()
-			expect(metrics).toContain('tenant_schema="acme"')
+			expect(metrics).not.toContain('tenant_schema')
+			expect(metrics).toContain('mediastream_http_requests_total{method="GET",route="/media_stream-image/*path",status_code="200"} 1')
+			expect(metrics).toContain('mediastream_cache_operations_total{operation="get",cache_type="redis",status="hit"} 1')
 		})
 	})
 
@@ -405,7 +395,7 @@ describe('metricsService', () => {
 			// Check that metrics are properly formatted
 			expect(metrics).toMatch(/^# HELP/)
 			expect(metrics).toMatch(/^# TYPE/m)
-			expect(metrics).toMatch(/mediastream_http_requests_total\{method="GET",route="\/test",status_code="200",tenant_schema="public"\} \d+/)
+			expect(metrics).toMatch(/mediastream_http_requests_total\{method="GET",route="\/test",status_code="200"\} \d+/)
 		})
 
 		it('should handle special characters in metric labels', async () => {

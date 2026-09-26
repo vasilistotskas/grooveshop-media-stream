@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { AxiosError, AxiosHeaders } from 'axios'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CacheImageRequest, { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 import FetchResourceResponseJob from '#microservice/Processing/jobs/fetch-resource-response.job'
 
@@ -85,6 +86,30 @@ describe('fetchResourceResponseJob', () => {
 				config: mockConfig,
 				data: null,
 			})
+		})
+
+		it.each([
+			[404, 'warn'],
+			[403, 'warn'],
+			[502, 'error'],
+		] as const)('logs an upstream %i at %s', async (status, level) => {
+			const warn = vi.spyOn(CorrelatedLogger, 'warn').mockImplementation(() => {})
+			const error = vi.spyOn(CorrelatedLogger, 'error').mockImplementation(() => {})
+			const config = { headers: new AxiosHeaders() }
+			httpClientService.request.mockRejectedValue(new AxiosError('upstream', 'ERR_BAD_RESPONSE', config, null, {
+				status,
+				statusText: '',
+				headers: {} as any,
+				config: config as any,
+				data: null,
+			} as any))
+
+			await job.handle(new CacheImageRequest({ resourceTarget: 'http://example.com/image.jpg', resizeOptions: new ResizeOptions() }))
+
+			expect(level === 'warn' ? warn : error).toHaveBeenCalledTimes(1)
+			expect(level === 'warn' ? error : warn).not.toHaveBeenCalled()
+			warn.mockRestore()
+			error.mockRestore()
 		})
 	})
 })

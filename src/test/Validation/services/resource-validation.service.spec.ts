@@ -115,18 +115,19 @@ describe('resourceValidationService', () => {
 
 	describe('validateFileSize', () => {
 		it('should accept files within size limits', () => {
-			expect(service.validateFileSize(1024 * 1024)).toBe(true) // 1MB
+			expect(service.validateFileSize(1024 * 1024, 'svg')).toBe(true) // 1MB SVG, exactly the limit
 			expect(service.validateFileSize(2 * 1024 * 1024, 'jpeg')).toBe(true) // 2MB JPEG
 		})
 
 		it('should reject files exceeding size limits', () => {
-			expect(service.validateFileSize(20 * 1024 * 1024)).toBe(false) // 20MB
+			expect(service.validateFileSize(1024 * 1024 + 1, 'svg')).toBe(false)
 			expect(service.validateFileSize(10 * 1024 * 1024, 'jpeg')).toBe(false) // 10MB JPEG
+			expect(service.validateFileSize(10 * 1024 * 1024 + 1, 'avif')).toBe(false)
 		})
 
 		it('should reject zero or negative sizes', () => {
-			expect(service.validateFileSize(0)).toBe(false)
-			expect(service.validateFileSize(-1000)).toBe(false)
+			expect(service.validateFileSize(0, 'png')).toBe(false)
+			expect(service.validateFileSize(-1000, 'png')).toBe(false)
 		})
 
 		it('should use format-specific limits', () => {

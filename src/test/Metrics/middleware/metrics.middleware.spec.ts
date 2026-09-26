@@ -2,7 +2,7 @@ import type { Request, Response } from 'express'
 import type { Mock, MockedObject } from 'vitest'
 import { Test, TestingModule } from '@nestjs/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { MetricsMiddleware } from '#microservice/Metrics/middleware/metrics.middleware'
+import { MetricsMiddleware, UNMATCHED_ROUTE } from '#microservice/Metrics/middleware/metrics.middleware'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import 'reflect-metadata'
 
@@ -82,12 +82,11 @@ describe('metricsMiddleware', () => {
 
 			expect(metricsService.recordHttpRequest).toHaveBeenCalledWith(
 				'GET',
-				'/test',
+				UNMATCHED_ROUTE,
 				200,
 				expect.any(Number),
 				100,
 				0,
-				'public',
 			)
 			expect(metricsService.decrementRequestsInFlight).toHaveBeenCalledTimes(1)
 		})
@@ -107,35 +106,14 @@ describe('metricsMiddleware', () => {
 			expect(metricsService.incrementRequestsInFlight).toHaveBeenCalledTimes(1)
 			expect(nextFunction).toHaveBeenCalledTimes(1)
 		})
-
-		it('should normalize route with numeric ID', () => {
-			mockRequest.url = '/users/123/profile'
-
-			middleware.use(mockRequest as Request, mockResponse as Response, nextFunction)
-
-			expect(metricsService.incrementRequestsInFlight).toHaveBeenCalledTimes(1)
-		})
-
-		it('should normalize route with UUID', () => {
-			mockRequest.url = '/users/550e8400-e29b-41d4-a716-446655440000/profile'
-
-			middleware.use(mockRequest as Request, mockResponse as Response, nextFunction)
-
-			expect(metricsService.incrementRequestsInFlight).toHaveBeenCalledTimes(1)
-		})
-
-		it('should use route path when available', () => {
-			mockRequest.route = { path: '/api/users/:id' }
-
-			middleware.use(mockRequest as Request, mockResponse as Response, nextFunction)
-
-			expect(metricsService.incrementRequestsInFlight).toHaveBeenCalledTimes(1)
-		})
 	})
 
-	describe('tenant_schema label', () => {
-		function runAndFinish(url: string): void {
+	describe('route label', () => {
+		function runAndFinish(url: string, route?: { path: string }): void {
 			mockRequest.url = url
+			if (route) {
+				mockRequest.route = route
+			}
 
 			const finishCallback = vi.fn()
 			mockResponse.on = vi.fn((event: string, callback: (...args: any[]) => any) => {
@@ -149,74 +127,27 @@ describe('metricsMiddleware', () => {
 			finishCallback()
 		}
 
-		it('extracts the tenant schema from a tenant-scoped media path', () => {
-			runAndFinish('/media_stream-image/media/acme/uploads/banner.jpg/800/600/cover/entropy/transparent/5/80.webp')
+		it('is the registered route pattern, never the tenant or image in the path', () => {
+			runAndFinish('/media_stream-image/media/acme/uploads/banner.jpg/800/600/cover/entropy/transparent/5/80.webp', { path: '/media_stream-image/*path' })
 
-			expect(metricsService.recordHttpRequest).toHaveBeenCalledWith(
-				'GET',
-				expect.any(String),
-				200,
-				expect.any(Number),
-				100,
-				0,
-				'acme',
-			)
+			expect(metricsService.recordHttpRequest).toHaveBeenCalledWith('GET', '/media_stream-image/*path', 200, expect.any(Number), 100, 0)
 		})
 
-		it('labels the static-image path (no tenant segment) as public', () => {
-			runAndFinish('/media_stream-image/static/images/banner.jpg/800/600/cover/entropy/transparent/5/80.webp')
+		// A client can send any path; none of it may become a label value.
+		it.each([
+			'/users/123/profile',
+			'/aZ9-random-segment/another/one',
+			'/media_stream-image-typo/media/acme/uploads/x.png',
+		])('collapses the unmatched path %s to one value', (url) => {
+			runAndFinish(url)
 
-			expect(metricsService.recordHttpRequest).toHaveBeenCalledWith(
-				'GET',
-				expect.any(String),
-				200,
-				expect.any(Number),
-				100,
-				0,
-				'public',
-			)
+			expect(metricsService.recordHttpRequest).toHaveBeenCalledWith('GET', UNMATCHED_ROUTE, 200, expect.any(Number), 100, 0)
 		})
 
-		it('labels the static images path as public', () => {
-			runAndFinish('/media_stream-image/static/images/logo.png/800/600/cover/entropy/transparent/5/80.webp')
+		it('carries no tenant argument', () => {
+			runAndFinish('/health', { path: '/health' })
 
-			expect(metricsService.recordHttpRequest).toHaveBeenCalledWith(
-				'GET',
-				expect.any(String),
-				200,
-				expect.any(Number),
-				100,
-				0,
-				'public',
-			)
-		})
-
-		it('labels an invalid tenant schema segment as public', () => {
-			runAndFinish('/media_stream-image/media/ACME/uploads/banner.jpg/800/600/cover/entropy/transparent/5/80.webp')
-
-			expect(metricsService.recordHttpRequest).toHaveBeenCalledWith(
-				'GET',
-				expect.any(String),
-				200,
-				expect.any(Number),
-				100,
-				0,
-				'public',
-			)
-		})
-
-		it('labels unrelated routes (e.g. health checks) as public', () => {
-			runAndFinish('/health')
-
-			expect(metricsService.recordHttpRequest).toHaveBeenCalledWith(
-				'GET',
-				expect.any(String),
-				200,
-				expect.any(Number),
-				100,
-				0,
-				'public',
-			)
+			expect(metricsService.recordHttpRequest.mock.calls[0]).toHaveLength(6)
 		})
 	})
 })

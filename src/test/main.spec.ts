@@ -111,6 +111,25 @@ describe('bootstrap', () => {
 		expect(line).toContain('image served')
 	})
 
+	// The shape VictoriaLogs indexes as log.<field>: flat, next to Nest's own keys.
+	it('should put the fields of a structured event at the top level of the production line', async () => {
+		vi.stubEnv('NODE_ENV', 'production')
+		await bootstrap({ exitProcess: false, enableGracefulShutdown: false })
+		const { logger } = vi.mocked(NestFactory.create).mock.calls[0][1] as unknown as { logger: ConsoleLogger }
+
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+		try {
+			logger.warn('image rejected 200 12ms', { correlation_id: 'c-1', schema: 'webside', input_bytes: 3_000_000, level: 'spoofed' }, 'ImageRequest')
+			const line = JSON.parse(String(write.mock.calls[0][0]))
+
+			expect(line).toMatchObject({ level: 'warn', context: 'ImageRequest', message: 'image rejected 200 12ms', correlation_id: 'c-1', schema: 'webside', input_bytes: 3_000_000 })
+			expect(line.params).toBeUndefined()
+		}
+		finally {
+			write.mockRestore()
+		}
+	})
+
 	it('should use default port if PORT environment variable is not set', async () => {
 		delete process.env.PORT
 

@@ -6,6 +6,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ResizeOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
 import { ImageFormatProcessor } from '#microservice/Cache/operations/image-format-processor.service'
+import { UnsupportedSourceFormatError } from '#microservice/common/errors/media-stream.errors'
 import { storageDirectory } from '#microservice/common/utils/storage-path.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import ManipulationJobResult from '#microservice/Processing/dto/manipulation-job-result.dto'
@@ -63,30 +64,6 @@ describe('imageFormatProcessor', () => {
 		processor = await module.resolve(ImageFormatProcessor)
 	})
 
-	describe('detectSvgByHeader', () => {
-		function mockHeader(content: string): void {
-			mockedFs.open.mockResolvedValue({
-				read: vi.fn(async (buffer: Buffer) => ({ bytesRead: buffer.write(content, 0, 'utf8'), buffer })),
-				close: vi.fn().mockResolvedValue(undefined),
-			} as any)
-		}
-
-		it('detects an SVG root behind an XML declaration from the first bytes only', async () => {
-			mockHeader(`<?xml version="1.0"?>\n${SVG}`)
-
-			await expect(processor.detectSvgByHeader('/tmp/id.rst')).resolves.toBe(true)
-			expect(mockedFs.open).toHaveBeenCalledWith('/tmp/id.rst', 'r')
-		})
-
-		it('treats raster headers and unreadable files as non-SVG', async () => {
-			mockHeader('PNG\r\n')
-			await expect(processor.detectSvgByHeader('/tmp/id.rst')).resolves.toBe(false)
-
-			mockedFs.open.mockRejectedValue(enoent())
-			await expect(processor.detectSvgByHeader('/tmp/missing.rst')).resolves.toBe(false)
-		})
-	})
-
 	describe('processSvg', () => {
 		it('serves the sanitised SVG as-is when no dimension is requested (0 = original size)', async () => {
 			mockedFs.readFile.mockResolvedValue(`${SVG.slice(0, -6)}<script>alert(1)</script></svg>`)
@@ -113,16 +90,13 @@ describe('imageFormatProcessor', () => {
 			expect(result.metadata.tenantSchema).toBe('acme')
 		})
 
-		it('falls back to the default image when the file is not an SVG document', async () => {
-			mockedFs.readFile
-				.mockResolvedValueOnce('not an svg document')
-				.mockRejectedValueOnce(enoent())
+		// Refused, not answered with a default image cached under the source's identity.
+		it('rejects a document without an <svg> element before sanitising it', async () => {
+			mockedFs.readFile.mockResolvedValueOnce('<foo xmlns="http://www.w3.org/2000/svg"/>')
 
-			const result = await processor.processSvg('/tmp/id.rst', resizeOptions())
-
-			expect(result.metadata.format).toBe('webp')
-			expect(result.metadata.tenantSchema).toBe('public')
-			expect(mockWebpImageManipulationJob.handle).toHaveBeenCalledWith(join(cwd(), 'public', 'default.png'), expect.any(Object))
+			await expect(processor.processSvg('/tmp/id.rst', resizeOptions())).rejects.toBeInstanceOf(UnsupportedSourceFormatError)
+			expect(admission.run).not.toHaveBeenCalled()
+			expect(mockWebpImageManipulationJob.handle).not.toHaveBeenCalled()
 		})
 	})
 
@@ -140,24 +114,6 @@ describe('imageFormatProcessor', () => {
 			const result = await processor.processRaster('/tmp/id.rst', resizeOptions())
 
 			expect(result.metadata.tenantSchema).toBe('public')
-		})
-	})
-
-	describe('processDefault', () => {
-		beforeEach(() => {
-			mockedFs.readFile.mockRejectedValue(enoent())
-		})
-
-		it('stamps the requesting tenant', async () => {
-			const result = await processor.processDefault(resizeOptions(), 'acme')
-
-			expect(result.metadata.tenantSchema).toBe('acme')
-			expect(result.metadata.format).toBe('webp')
-		})
-
-		it('stamps the encoded format: SVG requests are rasterised to PNG, others pass through', async () => {
-			expect((await processor.processDefault(resizeOptions({ format: SupportedResizeFormats.svg }))).metadata.format).toBe('png')
-			expect((await processor.processDefault(resizeOptions({ format: SupportedResizeFormats.avif }))).metadata.format).toBe('avif')
 		})
 	})
 

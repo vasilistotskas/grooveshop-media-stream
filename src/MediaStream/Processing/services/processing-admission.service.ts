@@ -2,6 +2,7 @@ import type { OnModuleDestroy } from '@nestjs/common'
 import { Injectable } from '@nestjs/common'
 import { ProcessingOverloadedError } from '#microservice/common/errors/media-stream.errors'
 import { ConfigService } from '#microservice/Config/config.service'
+import { currentImageRequest } from '#microservice/Correlation/utils/image-request-log.util'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 
@@ -62,7 +63,17 @@ export class ProcessingAdmissionService implements OnModuleDestroy {
 
 	/** Run `fn` once a pipeline slot is available; rejects with ProcessingOverloadedError when it never becomes one. */
 	async run<T>(fn: () => Promise<T>): Promise<T> {
-		await this.acquire()
+		// The wait counts toward the request's log line whether or not a slot comes.
+		const log = currentImageRequest()
+		const queuedAt = performance.now()
+		try {
+			await this.acquire()
+		}
+		finally {
+			if (log) {
+				log.admissionWaitMs += performance.now() - queuedAt
+			}
+		}
 		try {
 			return await fn()
 		}

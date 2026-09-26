@@ -3,15 +3,15 @@ import type { NextFunction, Request, Response } from 'express'
 import { Buffer } from 'node:buffer'
 import { Injectable } from '@nestjs/common'
 import { errorMessage } from '#microservice/common/utils/error-message.util'
-import { extractTenantSchemaFromPath } from '#microservice/common/utils/tenant-path.util'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '../services/metrics.service.js'
 
-const UUID_RE = /\/[a-f0-9-]{36}/g
-const OBJECT_ID_RE = /\/[a-f0-9]{24}/g
-const NUMERIC_ID_RE = /\/\d+/g
-/** Unmatched paths are capped at this many segments so 404 noise cannot explode label cardinality. */
-const MAX_ROUTE_SEGMENTS = 5
+/**
+ * The `route` label of a request no registered route matched (a 404 from
+ * the router, a file under `public/`). Its path is whatever the client
+ * sent, so it never becomes a label value.
+ */
+export const UNMATCHED_ROUTE = 'unmatched'
 
 @Injectable()
 export class MetricsMiddleware implements NestMiddleware {
@@ -39,9 +39,8 @@ export class MetricsMiddleware implements NestMiddleware {
 			try {
 				const duration = (Date.now() - startTime) / 1000
 				const route = this.getRoute(req)
-				const tenantSchema = extractTenantSchemaFromPath(this.pathname(req))
 
-				this.metricsService.recordHttpRequest(req.method, route, res.statusCode, duration, requestSize, responseSize, tenantSchema)
+				this.metricsService.recordHttpRequest(req.method, route, res.statusCode, duration, requestSize, responseSize)
 				this.metricsService.decrementRequestsInFlight()
 
 				CorrelatedLogger.debug(`HTTP ${req.method} ${route} ${res.statusCode} - ${duration}s`, MetricsMiddleware.name)
@@ -71,21 +70,15 @@ export class MetricsMiddleware implements NestMiddleware {
 		return req.url.length
 	}
 
-	/** Normalise ids so the `route` label stays low-cardinality. */
+	/**
+	 * The registered route pattern (e.g. `/media_stream-image/*path`), so the
+	 * label set is the service's route table and nothing a client can extend.
+	 * No tenant label either: the schema segment is client-chosen too, and
+	 * per-tenant numbers come from the `schema` field of the image request
+	 * log (docs/observability.md).
+	 */
 	private getRoute(req: Request): string {
-		if (req.route?.path) {
-			return req.route.path
-		}
-
-		const normalized = this.pathname(req)
-			.replace(UUID_RE, '/:uuid')
-			.replace(OBJECT_ID_RE, '/:objectId')
-			.replace(NUMERIC_ID_RE, '/:id')
-
-		return normalized.split('/').slice(0, MAX_ROUTE_SEGMENTS).join('/') || '/'
-	}
-
-	private pathname(req: Request): string {
-		return req.url.split('?')[0]
+		const path: unknown = req.route?.path
+		return typeof path === 'string' && path.length > 0 ? path : UNMATCHED_ROUTE
 	}
 }

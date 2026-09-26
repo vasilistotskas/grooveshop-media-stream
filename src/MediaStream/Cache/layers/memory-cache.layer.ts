@@ -1,10 +1,10 @@
-import type { CacheLayer, CacheLayerStats } from '../interfaces/cache-layer.interface.js'
+import type { CacheLayer, CacheLayerName, CacheLayerStats } from '../interfaces/cache-layer.interface.js'
 import { Injectable } from '@nestjs/common'
 import { MemoryCacheService } from '../services/memory-cache.service.js'
 
 @Injectable()
 export class MemoryCacheLayer implements CacheLayer {
-	private readonly layerName = 'memory'
+	private readonly layerName: CacheLayerName = 'memory'
 	private readonly priority = 1
 
 	constructor(private readonly memoryCacheService: MemoryCacheService) {}
@@ -57,7 +57,7 @@ export class MemoryCacheLayer implements CacheLayer {
 		return Math.max(0, Math.ceil((ttlMs - Date.now()) / 1000))
 	}
 
-	getLayerName(): string {
+	getLayerName(): CacheLayerName {
 		return this.layerName
 	}
 
