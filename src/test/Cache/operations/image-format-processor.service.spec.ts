@@ -98,6 +98,8 @@ describe('imageFormatProcessor', () => {
 			expect(result.data.toString('utf8')).not.toContain('<script')
 			expect(result.metadata.size).toBe(String(result.data.length))
 			expect(mockWebpImageManipulationJob.handle).not.toHaveBeenCalled()
+			// The sanitiser worker holds an admission slot like a Sharp pipeline.
+			expect(admission.run).toHaveBeenCalledTimes(1)
 		})
 
 		it('sanitises in place and rasterises through the job when a dimension is requested', async () => {

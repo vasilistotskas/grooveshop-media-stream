@@ -27,9 +27,9 @@ const DEFAULT_IMAGE_HEIGHT = 600
 /**
  * Turns a fetched temp file into processed image bytes + metadata: SVG
  * detection and sanitisation, raster processing via Sharp, and the
- * default-image fallback pipeline. Every Sharp pipeline goes through
- * ProcessingAdmissionService so a burst of misses is queued and shed
- * instead of oversubscribing the CPU.
+ * default-image fallback pipeline. Every Sharp pipeline and every SVG
+ * sanitisation goes through ProcessingAdmissionService so a burst of misses
+ * is queued and shed instead of oversubscribing the CPU.
  */
 @Injectable()
 export class ImageFormatProcessor {
@@ -38,6 +38,8 @@ export class ImageFormatProcessor {
 	// TTL values in seconds (loaded from config; metadata stores milliseconds)
 	private readonly publicTtl: number
 	private readonly privateTtl: number
+	/** Same budget as a Sharp pipeline (`PROCESSING_TIMEOUT_SECONDS`). */
+	private readonly timeoutSeconds: number
 
 	constructor(
 		private readonly webpImageManipulationJob: WebpImageManipulationJob,
@@ -46,6 +48,7 @@ export class ImageFormatProcessor {
 	) {
 		this.publicTtl = configService.get('cache.image.publicTtl')
 		this.privateTtl = configService.get('cache.image.privateTtl')
+		this.timeoutSeconds = Math.max(0, configService.get<number>('processing.timeoutSeconds'))
 		this.storageDir = storageDirectory(configService)
 	}
 
@@ -78,7 +81,8 @@ export class ImageFormatProcessor {
 
 		// Sanitise before the bytes reach either a browser (served as
 		// image/svg+xml) or Sharp (rasterised): strips script and SSRF vectors.
-		const sanitized = sanitizeSvg(svgContent)
+		// Admitted like a Sharp pipeline: the jsdom parse is CPU- and memory-heavy.
+		const sanitized = await this.admission.run(() => sanitizeSvg(svgContent, { timeoutMs: this.timeoutSeconds * 1000 }))
 		const needsResizing = (resizeOptions.width ?? 0) > 0 || (resizeOptions.height ?? 0) > 0
 
 		if (!needsResizing) {
