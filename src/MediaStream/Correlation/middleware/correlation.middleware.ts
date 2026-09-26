@@ -16,10 +16,10 @@ export class CorrelationMiddleware implements NestMiddleware {
 		const correlationId
 			= (req.headers[CORRELATION_ID_HEADER] as string) || this._correlationService.generateCorrelationId()
 
-		// getClientIp reads req.ip, which Express resolves to the real client IP
-		// from X-Forwarded-For because main.ts sets `trust proxy = 1` (exactly one
-		// hop, i.e. Traefik). Reading the raw XFF header directly would allow an
-		// external client to spoof their apparent address.
+		// getClientIp reads req.ip, which Express resolves from X-Forwarded-For
+		// through main.ts's `trust proxy` hop count (TRUSTED_PROXY_HOPS).
+		// Reading the raw XFF header directly would allow an external client to
+		// spoof their apparent address.
 		const context: RequestContext = {
 			correlationId,
 			timestamp: Date.now(),

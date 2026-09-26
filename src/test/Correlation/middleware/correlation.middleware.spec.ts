@@ -95,7 +95,7 @@ describe('correlationMiddleware', () => {
 		})
 
 		it('should extract client IP from x-forwarded-for header', () => {
-			// Middleware now reads req.ip (set by Express when trust proxy = 1),
+			// Middleware now reads req.ip (set by Express through trust proxy),
 			// not the raw x-forwarded-for header.
 			// Simulate what Express sets on req.ip after trust-proxy processing.
 			mockRequest.headers = {
@@ -115,7 +115,7 @@ describe('correlationMiddleware', () => {
 		})
 
 		it('should extract client IP from x-real-ip header', () => {
-			// Middleware now reads req.ip (set by Express when trust proxy = 1).
+			// Middleware now reads req.ip (set by Express through trust proxy).
 			// When x-real-ip is the source of truth, Express sets req.ip accordingly.
 			mockRequest.headers = {
 				'x-real-ip': '192.168.1.2',

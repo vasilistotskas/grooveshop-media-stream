@@ -3,9 +3,28 @@
  */
 
 /**
+ * Express `trust proxy` hop count (main.ts). Public traffic arrives
+ * Cloudflare → Traefik → here, and Traefik trusts X-Forwarded-For from
+ * Cloudflare's ranges only (grooveshop-infrastructure,
+ * docs/edge-trust-boundary.md), so the header this service sees is:
+ *
+ * - via Cloudflare: `<visitor>, <cloudflare edge>` — Cloudflare appends the
+ *   visitor, Traefik appends its peer. A visitor's own entries sit further
+ *   left and are never reached.
+ * - direct to a node: `<caller>` — Traefik deletes the caller's header and
+ *   appends the caller.
+ *
+ * Two hops (the socket peer = Traefik, then the rightmost entry) make
+ * `req.ip` the visitor in the first case and the caller in the second,
+ * because Express returns the leftmost address when the chain is shorter
+ * than the count. In-cluster callers send no header and stay the socket
+ * address.
+ */
+export const TRUSTED_PROXY_HOPS = 2
+
+/**
  * Extract the client IP from an Express request.
- * `req.ip` reflects the real client IP when `trust proxy = 1` is set
- * (Express reads the rightmost untrusted address from X-Forwarded-For).
+ * `req.ip` is the client as resolved by `trust proxy = TRUSTED_PROXY_HOPS`.
  * Falls back to socket address — never trusts raw XFF headers directly.
  */
 export function getClientIp(request: {

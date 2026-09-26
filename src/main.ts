@@ -10,6 +10,7 @@ import helmet from 'helmet'
 import { buildCorsOrigin } from '#microservice/common/utils/cors-origin.util'
 import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { setupGracefulShutdown, shutdownMiddleware } from '#microservice/common/utils/graceful-shutdown.util'
+import { TRUSTED_PROXY_HOPS } from '#microservice/common/utils/ip.util'
 import { isProduction, isTest } from '#microservice/common/utils/runtime-env.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import MediaStreamModule from '#microservice/media-stream.module'
@@ -79,12 +80,10 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<void> {
 			logger: new ConsoleLogger({ logLevels: resolveLogLevels(), json: isProduction(), flattenParams: true }),
 		})
 
-		// Trust exactly 1 proxy hop (Traefik) so that req.ip reflects the real
-		// client IP from X-Forwarded-For rather than the ingress pod address.
-		// Setting this to 1 (not true) avoids trusting the full XFF chain,
-		// which would allow a remote client to spoof their IP by prepending
-		// arbitrary addresses to X-Forwarded-For.
-		app.set('trust proxy', 1)
+		// A hop count, never `true`: trusting the whole X-Forwarded-For chain
+		// would let a client choose its address by prepending entries. Why
+		// the count is what it is: TRUSTED_PROXY_HOPS.
+		app.set('trust proxy', TRUSTED_PROXY_HOPS)
 
 		const configService = app.get(ConfigService)
 

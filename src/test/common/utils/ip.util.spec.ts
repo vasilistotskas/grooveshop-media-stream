@@ -1,7 +1,32 @@
+import express from 'express'
+import request from 'supertest'
 import { describe, expect, it } from 'vitest'
-import { getClientIp, isInternalIp } from '#microservice/common/utils/ip.util'
+import { getClientIp, isInternalIp, TRUSTED_PROXY_HOPS } from '#microservice/common/utils/ip.util'
 
 describe('ip.util', () => {
+	describe('tRUSTED_PROXY_HOPS', () => {
+		// Real Express resolution: the supertest socket plays Traefik.
+		const app = express()
+		app.set('trust proxy', TRUSTED_PROXY_HOPS)
+		app.get('/', (req, res) => {
+			res.send(getClientIp(req))
+		})
+
+		it.each([
+			['a Cloudflare visitor', '203.0.113.7, 162.158.1.1', '203.0.113.7'],
+			['a visitor that prepends its own entries', '6.6.6.6, 10.0.0.1, 203.0.113.7, 162.158.1.1', '203.0.113.7'],
+			['a direct caller (Traefik replaced its header)', '198.51.100.9', '198.51.100.9'],
+		])('should resolve %s', async (_case, forwardedFor, expected) => {
+			const res = await request(app).get('/').set('X-Forwarded-For', forwardedFor)
+			expect(res.text).toBe(expected)
+		})
+
+		it('should keep an in-cluster caller as the socket address', async () => {
+			const res = await request(app).get('/')
+			expect(isInternalIp(res.text)).toBe(true)
+		})
+	})
+
 	describe('getClientIp', () => {
 		it('should prefer req.ip', () => {
 			expect(getClientIp({ ip: '1.2.3.4', socket: { remoteAddress: '5.6.7.8' } })).toBe('1.2.3.4')
