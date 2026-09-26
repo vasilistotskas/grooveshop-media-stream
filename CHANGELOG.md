@@ -1,3 +1,10 @@
+## [3.6.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.6.0...v3.6.1) (2026-09-26)
+
+
+### Bug Fixes
+
+* **ip:** resolve the visitor two hops back once Traefik trusts Cloudflare ([3d9b9ef](https://github.com/vasilistotskas/grooveshop-media-stream/commit/3d9b9ef79d504bdc55337eeed4e2f25985faadad))
+
 # [3.6.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.5.1...v3.6.0) (2026-09-26)
 
 
