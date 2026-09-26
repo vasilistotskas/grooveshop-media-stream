@@ -218,8 +218,8 @@ importers:
         specifier: 6.0.0
         version: 6.0.0(supports-color@8.1.1)
       isomorphic-dompurify:
-        specifier: ^4.2.0
-        version: 4.2.0(@noble/hashes@1.8.0)
+        specifier: ^4.3.0
+        version: 4.3.0(@noble/hashes@1.8.0)
       node-cache:
         specifier: 5.1.2
         version: 5.1.2
@@ -2011,9 +2011,6 @@ packages:
   '@types/node@26.4.0':
     resolution: {integrity: sha512-faiGnoIrLH/V8cibOMEAZ8pMw6oXqSukl29ra4mN8GdaB2ZewzeaLj+INpV5N+Z1eKWzY+IzaIZH2EIR6YZRNQ==}
 
-  '@types/node@26.5.0':
-    resolution: {integrity: sha512-dVSGpriSoCgz8WnDNTuSSuSv1PC/ALXihO4ulRZt7Md8k9mlbdin3lGOcDE8SnWOgf513ByWlXd7BK4azmyg/A==}
-
   '@types/node@26.6.1':
     resolution: {integrity: sha512-VqGJBMCtdhqkBUCcBLvywI0NJ+KLuVzgNnlBUNFOQjqVxzo2lxLUNg1DSey8+u2u6ktswSAxg+s68QLzWHNOuA==}
 
@@ -3783,8 +3780,8 @@ packages:
     resolution: {integrity: sha512-FFUtZMpoZ8RqHS3XeXEmHWLA4thH+ZxCv2lOiPIn1Xc7CxrqhWzNSDzD+/chS/zbYezmiwWLdQC09JdQKmthOw==}
     engines: {node: '>=20'}
 
-  isomorphic-dompurify@4.2.0:
-    resolution: {integrity: sha512-0rp/dna3nh3lQNZrWRJTZzRS8rSYBFXq7zuDOMn0MiklhFyND8fQqQbAcVFv1MkRJ2xDhgR6G7E0bl1msYQKTQ==}
+  isomorphic-dompurify@4.3.0:
+    resolution: {integrity: sha512-prq6x6sxb/da0HP4S81hiK2Hc444CIvNeZ+gj7A9oDE0r6tqUmQ90ylb9BwhP44ZSCxwUAcTPNoQY0mmjpRHcA==}
     engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
 
   issue-parser@7.0.1:
@@ -7031,11 +7028,6 @@ snapshots:
     dependencies:
       undici-types: 8.3.0
 
-  '@types/node@26.5.0':
-    dependencies:
-      undici-types: 8.9.0
-    optional: true
-
   '@types/node@26.6.1':
     dependencies:
       undici-types: 8.9.0
@@ -7243,7 +7235,7 @@ snapshots:
 
   '@typescript-eslint/utils@8.70.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
-      '@eslint-community/eslint-utils': 4.9.1(eslint@10.10.0(supports-color@8.1.1))
+      '@eslint-community/eslint-utils': 4.10.1(eslint@10.10.0(supports-color@8.1.1))
       '@typescript-eslint/scope-manager': 8.70.0
       '@typescript-eslint/types': 8.70.0
       '@typescript-eslint/typescript-estree': 8.70.0(supports-color@8.1.1)(typescript@6.0.3)
@@ -9111,7 +9103,7 @@ snapshots:
   isexe@4.0.0:
     optional: true
 
-  isomorphic-dompurify@4.2.0(@noble/hashes@1.8.0):
+  isomorphic-dompurify@4.3.0(@noble/hashes@1.8.0):
     dependencies:
       dompurify: 3.4.12
       jsdom: 30.0.1(@noble/hashes@1.8.0)
@@ -9133,7 +9125,7 @@ snapshots:
 
   jest-worker@27.5.1:
     dependencies:
-      '@types/node': 26.5.0
+      '@types/node': 26.6.1
       merge-stream: 2.0.0
       supports-color: 8.1.1
     optional: true
