@@ -1,3 +1,10 @@
+## [3.5.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.5.0...v3.5.1) (2026-09-26)
+
+
+### Bug Fixes
+
+* **svg:** stop a PNG with C2PA credentials from exhausting the heap ([849c781](https://github.com/vasilistotskas/grooveshop-media-stream/commit/849c7817e44dcd8cee1f506fc3669d8e7b82fe90))
+
 # [3.5.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.4.1...v3.5.0) (2026-09-23)
 
 
