@@ -10,6 +10,13 @@ updates:
           - "@nestjs/*"
       dev-tooling:
         dependency-type: development
+    ignore:
+      # TypeScript 7 (the Go-native compiler) ships no JS API, and
+      # typescript-eslint refuses it outright ("typescript-eslint does
+      # not support TS 7.0", PR #22's CI). Remove this once TS 7.1 has
+      # its API and typescript-eslint supports it.
+      - dependency-name: "typescript"
+        versions: [">=7.0.0"]
     open-pull-requests-limit: 10
 
   - package-ecosystem: github-actions
