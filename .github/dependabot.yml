@@ -19,9 +19,11 @@ updates:
         versions: [">=7.0.0"]
     open-pull-requests-limit: 10
 
-  # Minor and patch action bumps arrive together; a major arrives on its
-  # own, to be checked against these workflows. A release ages a week
-  # before it is proposed. "ci" cuts no release.
+  # Version updates only (security updates are neither grouped nor
+  # delayed by these settings): minor and patch action bumps arrive
+  # together, a major arrives on its own to be checked against these
+  # workflows, and a release ages a week before it is proposed. "ci"
+  # cuts no release.
   - package-ecosystem: github-actions
     directory: /
     schedule:
