@@ -66,24 +66,27 @@ value is left out rather than written as `null`.
 | `outcome` | string | See below |
 | `error` | string | Class name of the error that decided the response, e.g. `UpstreamResourceTooLargeError`, `UnableToFetchResourceException`, `ProcessingOverloadedError` |
 
-| `outcome` | Status | Level | When |
+| `outcome` | Status | `level` | When |
 |---|---|---|---|
-| `ok` | 200 | info | The image was served, from a cache tier or freshly processed |
-| `not_modified` | 304 | info | A conditional request matched the cached copy |
-| `fallback` | 200 | info | The default image, because fetching or processing failed (upstream 404, circuit open, Sharp error) |
-| `rejected` | 200 | **warn** | The default image, because the source was refused: over its format's size limit (`UpstreamResourceTooLargeError`), not a supported format (`UnsupportedSourceFormatError`), or an SVG the sanitiser failed closed on (`SvgSanitizationError`) |
-| `overloaded` | 503 | info | Admission control shed the request |
-| `timeout` | 503 | info | A pipeline or the SVG sanitiser exceeded `PROCESSING_TIMEOUT_SECONDS` |
-| `invalid` | 4xx | info | Validation failed or no route matched |
-| `rate_limited` | 429 | info | The rate limit guard refused it |
-| `error` | 5xx | info | Anything else, e.g. `DefaultImageFallbackError` |
-| `aborted` | any | info | The client closed the connection before the response finished; `status` is then what would have been sent |
+| `ok` | 200 | `log` | The image was served, from a cache tier or freshly processed |
+| `not_modified` | 304 | `log` | A conditional request matched the cached copy |
+| `fallback` | 200 | `log` | The default image, because fetching or processing failed (upstream 404, circuit open, Sharp error) |
+| `rejected` | 200 | **`warn`** | The default image, because the source was refused: over its format's size limit (`UpstreamResourceTooLargeError`), not a supported format (`UnsupportedSourceFormatError`), or an SVG the sanitiser failed closed on (`SvgSanitizationError`) |
+| `overloaded` | 503 | `log` | Admission control shed the request |
+| `timeout` | 503 | `log` | A pipeline or the SVG sanitiser exceeded `PROCESSING_TIMEOUT_SECONDS` |
+| `invalid` | 4xx | `log` | Validation failed or no route matched |
+| `rate_limited` | 429 | `log` | The rate limit guard refused it |
+| `error` | 5xx | `log` | Anything else, e.g. `DefaultImageFallbackError` |
+| `aborted` | any | `log` | The client closed the connection before the response finished; `status` is then what would have been sent |
 
 Faults keep their own ERROR or WARN lines with the stack and details, and
-the request line records only the class name. A `rejected` source has no
-separate ERROR line, because it is policy, not a fault. The exception is
-the SVG sanitiser's worker failure, which still logs its cause (for
-example `ERR_WORKER_OUT_OF_MEMORY`) at ERROR.
+the request line records only the class name. `ImageStreamService` adds no
+ERROR line of its own for a `rejected` source, because it is policy, not a
+fault. ERROR lines still appear for one: every failure of a miss,
+rejected sources included, is logged by `CacheImageResourceOperation.execute()`
+(`Failed to execute CacheImageResourceOperation: …`), and the SVG sanitiser
+logs its own fail-closed cause (a worker failure such as
+`ERR_WORKER_OUT_OF_MEMORY`, or a `<script` that survived sanitisation).
 
 ### The pre-decode line
 
@@ -121,7 +124,7 @@ Scraped from `GET /metrics` with the `mediastream_` prefix.
 | `mediastream_image_request_duration_seconds` | histogram | `outcome`, `cache` | Same time as `duration_ms` |
 | `mediastream_image_input_bytes` | histogram | `format` (sniffed) | Once per completed upstream download (the request that led; coalesced waiters add nothing) |
 
-These metrics were already there and still apply: `mediastream_cache_operations_total{cache_type,status}`
+These metrics were already there and still apply: `mediastream_cache_operations_total{operation,cache_type,status}`
 (one sample for each layer probed),
 `mediastream_image_processing_duration_seconds`,
 `mediastream_processing_pipelines{state}`,
