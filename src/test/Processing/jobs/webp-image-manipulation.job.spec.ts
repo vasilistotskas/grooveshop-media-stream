@@ -193,6 +193,48 @@ describe('webpImageManipulationJob', () => {
 				expect(mockManipulation.resize).toHaveBeenLastCalledWith(expect.objectContaining({ withoutEnlargement: true }))
 			})
 
+			describe('keeps the requested aspect for a source smaller than the request', () => {
+				async function resizeBox(source: Record<string, number>, overrides: Partial<ResizeOptions>): Promise<unknown> {
+					mockManipulation.metadata.mockResolvedValue(source)
+					await job.handle('small.jpg', options({ trimThreshold: 0, width: 1040, height: 684, ...overrides }))
+					return mockManipulation.resize.mock.calls.at(-1)![0]
+				}
+
+				it.each([FitOptions.cover, FitOptions.fill])('%s scales the request down uniformly to fit the source', async (fit) => {
+					expect(await resizeBox({ width: 800, height: 800 }, { fit })).toEqual(expect.objectContaining({ width: 800, height: 526, withoutEnlargement: true }))
+					expect(await resizeBox({ width: 300, height: 200 }, { fit, width: 800, height: 800 })).toEqual(expect.objectContaining({ width: 200, height: 200 }))
+				})
+
+				it('contain uses the smallest box of the requested aspect that holds the source', async () => {
+					expect(await resizeBox({ width: 500, height: 400 }, { fit: FitOptions.contain })).toEqual(expect.objectContaining({ width: 609, height: 400 }))
+				})
+
+				it('leaves the request alone for outside, inside and a source larger than it', async () => {
+					for (const fit of [FitOptions.outside, FitOptions.inside]) {
+						expect(await resizeBox({ width: 300, height: 200 }, { fit })).toEqual(expect.objectContaining({ width: 1040, height: 684 }))
+					}
+					for (const fit of [FitOptions.cover, FitOptions.fill, FitOptions.contain]) {
+						expect(await resizeBox({ width: 2000, height: 1500 }, { fit })).toEqual(expect.objectContaining({ width: 1040, height: 684 }))
+					}
+				})
+
+				it('leaves a single requested dimension alone', async () => {
+					expect(await resizeBox({ width: 300, height: 200 }, { fit: FitOptions.cover, width: 1000, height: 0 })).toEqual(expect.objectContaining({ width: 1000, withoutEnlargement: true }))
+					expect(mockManipulation.resize.mock.calls.at(-1)![0]).not.toHaveProperty('height')
+				})
+
+				it('swaps the axes of an orientation 6 source', async () => {
+					// Stored 600x800, displayed 800x600.
+					expect(await resizeBox({ width: 600, height: 800, orientation: 6 }, { fit: FitOptions.cover })).toEqual(expect.objectContaining({ width: 800, height: 526 }))
+				})
+
+				it('never exceeds the source or drops below one pixel', async () => {
+					// A width-limited height would round to 0 for these very wide requests.
+					expect(await resizeBox({ width: 1000, height: 10 }, { fit: FitOptions.cover, width: 5000, height: 1 })).toEqual(expect.objectContaining({ width: 1000, height: 1 }))
+					expect(await resizeBox({ width: 7, height: 7 }, { fit: FitOptions.cover, width: 8192, height: 3 })).toEqual(expect.objectContaining({ width: 7, height: 1 }))
+				})
+			})
+
 			it('sharpens lightly when the source is reduced by more than the threshold', async () => {
 				mockManipulation.metadata.mockResolvedValue({ width: 2400, height: 2400 })
 				primeTrimmedRun()

@@ -46,6 +46,53 @@ function downscaleFactor(source: { width: number, height: number }, target: { wi
 }
 
 /**
+ * The box to hand Sharp so the output never exceeds the source yet keeps the
+ * requested aspect ratio (imgix `fit=min`). Sharp's own `withoutEnlargement`
+ * returns the source at its own size and aspect whenever it would have to
+ * enlarge, which changes the shape of a layout box that was sized from the
+ * request.
+ *
+ * - `cover`/`fill`: scale the request down uniformly until it fits inside the
+ *   source on both axes, then crop (cover) or stretch (fill) to that box. Fill
+ *   cannot keep both aspect and every source pixel without enlarging an axis.
+ * - `contain`: the smallest box of the requested aspect that holds the source
+ *   at 1:1, so the image is padded but never downscaled to make room for
+ *   padding bytes the target box would otherwise carry.
+ * - `outside`/`inside`: the output aspect is the source's by definition, so
+ *   there is no requested aspect to keep; `withoutEnlargement` is enough.
+ * - A single requested axis: the other axis follows the source aspect, so
+ *   `withoutEnlargement` is enough as well.
+ *
+ * The limiting axis is set to the source size exactly and the other derived
+ * from it, so rounding can never push the box past the source.
+ */
+function boxWithinSource(source: { width: number, height: number }, target: { width?: number, height?: number }, fit: FitOptions): { width?: number, height?: number } {
+	const { width, height } = target
+	if (!width || !height) {
+		return target
+	}
+	const widthRatio = source.width / width
+	const heightRatio = source.height / height
+	if (fit === FitOptions.cover || fit === FitOptions.fill) {
+		if (Math.min(widthRatio, heightRatio) >= 1) {
+			return target
+		}
+		return widthRatio <= heightRatio
+			? { width: source.width, height: Math.min(source.height, Math.max(1, Math.round(height * widthRatio))) }
+			: { width: Math.min(source.width, Math.max(1, Math.round(width * heightRatio))), height: source.height }
+	}
+	if (fit === FitOptions.contain) {
+		if (Math.max(widthRatio, heightRatio) >= 1) {
+			return target
+		}
+		return widthRatio >= heightRatio
+			? { width: source.width, height: Math.ceil(height * widthRatio) }
+			: { width: Math.ceil(width * heightRatio), height: source.height }
+	}
+	return target
+}
+
+/**
  * Resizes and re-encodes one source file with Sharp.
  * Stateless service - all request data is passed via method parameters.
  */
@@ -79,13 +126,15 @@ export default class WebpImageManipulationJob {
 		try {
 			// Pipeline order: trim → resize → format conversion
 			if (Object.keys(resizeScales).length > 0) {
-				const factor = await this.sourceDownscaleFactor(manipulation, resizeScales, options.fit)
+				const source = await this.sourceSize(manipulation)
+				const box = source ? boxWithinSource(source, resizeScales, options.fit) : resizeScales
+				const factor = source ? downscaleFactor(source, box, options.fit) : 1
 				if (options.trimThreshold !== null && !Number.isNaN(options.trimThreshold)) {
 					manipulation = await this.trimOnWorkingCopy(manipulation, options, resizeScales)
 				}
 
 				const resizeConfig = {
-					...resizeScales,
+					...box,
 					fit: options.fit,
 					position: options.position,
 					background: options.background,
@@ -166,17 +215,18 @@ export default class WebpImageManipulationJob {
 	}
 
 	/**
-	 * Reads the source header (no pixel decode) for the reduction factor. The
+	 * Reads the source header (no pixel decode) for its displayed size. The
 	 * header reports the stored orientation, so a 90° EXIF rotation swaps the
-	 * axes the same way `autoOrient()` does.
+	 * axes the same way `autoOrient()` does. Undefined when the header has no
+	 * dimensions.
 	 */
-	private async sourceDownscaleFactor(source: Sharp, target: { width?: number, height?: number }, fit: FitOptions): Promise<number> {
+	private async sourceSize(source: Sharp): Promise<{ width: number, height: number } | undefined> {
 		const { width, height, orientation } = await source.metadata()
 		if (!width || !height) {
-			return 1
+			return undefined
 		}
 		const rotated = orientation !== undefined && orientation >= 5
-		return downscaleFactor(rotated ? { width: height, height: width } : { width, height }, target, fit)
+		return rotated ? { width: height, height: width } : { width, height }
 	}
 
 	private withTimeout(pipeline: Sharp): Sharp {
