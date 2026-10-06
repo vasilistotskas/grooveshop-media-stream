@@ -1,3 +1,10 @@
+# [3.8.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.7.0...v3.8.0) (2026-10-06)
+
+
+### Features
+
+* **processing:** sharper photos without upscaling ([#26](https://github.com/vasilistotskas/grooveshop-media-stream/issues/26)) ([a7fd953](https://github.com/vasilistotskas/grooveshop-media-stream/commit/a7fd953b6089a35f31ca758c80a32638d2f1339e))
+
 # [3.7.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.6.1...v3.7.0) (2026-09-29)
 
 
