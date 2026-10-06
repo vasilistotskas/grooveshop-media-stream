@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CacheImageRequest, {
 	BackgroundOptions,
 	FitOptions,
@@ -6,6 +6,7 @@ import CacheImageRequest, {
 	ResizeOptions,
 	SupportedResizeFormats,
 } from '#microservice/API/dto/cache-image-request.dto'
+import { PROCESSING_VERSION } from '#microservice/common/constants/image-encoding.constant'
 import GenerateResourceIdentityFromRequestJob from '#microservice/Processing/jobs/generate-resource-identity-from-request.job'
 
 describe('generateResourceIdentityFromRequestJob', () => {
@@ -63,7 +64,35 @@ describe('generateResourceIdentityFromRequestJob', () => {
 			tenantSchema: 'acme',
 		})
 
-		expect(await job.handle(request)).toBe('73ea4b9c-8730-5d77-b751-5a194b88809a')
+		expect(await job.handle(request)).toBe('d0e9d7a6-21b2-52bc-ba53-8bb3915c5eb7')
+	})
+
+	it('re-keys the identity when the processing version changes', async () => {
+		const request = new CacheImageRequest({
+			resourceTarget: 'http://backend-service/media/acme/uploads/cover.jpg',
+			resizeOptions: new ResizeOptions({
+				width: 800,
+				height: 600,
+				fit: FitOptions.cover,
+				position: PositionOptions.entropy,
+				format: SupportedResizeFormats.avif,
+				background: '#ff00aa80',
+				trimThreshold: 0,
+				quality: 90,
+			}),
+			tenantSchema: 'acme',
+		})
+		const current = await job.handle(request)
+
+		vi.resetModules()
+		vi.doMock('#microservice/common/constants/image-encoding.constant', async importOriginal => ({
+			...await importOriginal<typeof import('#microservice/common/constants/image-encoding.constant')>(),
+			PROCESSING_VERSION: PROCESSING_VERSION + 1,
+		}))
+		const { default: Bumped } = await import('#microservice/Processing/jobs/generate-resource-identity-from-request.job')
+
+		expect(await new Bumped().handle(request)).not.toBe(current)
+		vi.doUnmock('#microservice/common/constants/image-encoding.constant')
 	})
 
 	it('produces different UUIDs for the same URL on different tenants', async () => {

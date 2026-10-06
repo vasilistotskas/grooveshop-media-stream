@@ -3,6 +3,7 @@ import type { ResourceIdentifierKP } from '#microservice/common/constants/key-pr
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import { Injectable } from '@nestjs/common'
+import { PROCESSING_VERSION } from '#microservice/common/constants/image-encoding.constant'
 
 const NAMESPACE_URL = '6ba7b811-9dad-11d1-80b4-00c04fd430c8'
 
@@ -35,12 +36,13 @@ function generateUUIDv5(name: string, namespace: string = NAMESPACE_URL): string
  * `static/images/...` route that has no tenant in the URL) produce
  * different UUIDs and cannot collide in cache or on disk.
  *
- * The JSON text is the cache identity: field order and value shapes are
- * pinned by the golden-UUID spec.
+ * The `PROCESSING_VERSION` prefix plus the JSON text is the cache identity:
+ * field order and value shapes are pinned by the golden-UUID spec, and the
+ * version re-keys every entry when the produced bytes change.
  */
 @Injectable()
 export default class GenerateResourceIdentityFromRequestJob {
 	async handle(cacheImageRequest: CacheImageRequest): Promise<ResourceIdentifierKP> {
-		return generateUUIDv5(JSON.stringify(cacheImageRequest))
+		return generateUUIDv5(`v${PROCESSING_VERSION}:${JSON.stringify(cacheImageRequest)}`)
 	}
 }

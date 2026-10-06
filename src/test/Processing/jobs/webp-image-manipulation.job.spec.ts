@@ -2,6 +2,7 @@ import { Buffer } from 'node:buffer'
 import sharp from 'sharp'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BackgroundOptions, FitOptions, PositionOptions, ResizeOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
+import { AVIF_CHROMA_SUBSAMPLING, AVIF_EFFORT, AVIF_MAX_QUALITY, SHARPEN_SIGMA } from '#microservice/common/constants/image-encoding.constant'
 import { TRIM_WORKING_SIZE } from '#microservice/common/constants/image-limits.constant'
 import { ProcessingTimeoutError } from '#microservice/common/errors/media-stream.errors'
 import ManipulationJobResult from '#microservice/Processing/dto/manipulation-job-result.dto'
@@ -28,6 +29,8 @@ describe('webpImageManipulationJob', () => {
 		tiff: vi.fn().mockReturnThis(),
 		avif: vi.fn().mockReturnThis(),
 		resize: vi.fn().mockReturnThis(),
+		sharpen: vi.fn().mockReturnThis(),
+		metadata: vi.fn(),
 		trim: vi.fn().mockReturnThis(),
 		raw: vi.fn().mockReturnThis(),
 		timeout: vi.fn().mockReturnThis(),
@@ -60,6 +63,7 @@ describe('webpImageManipulationJob', () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
 		mockManipulation.toBuffer.mockResolvedValue({ data: testBuffer, info: { size: 1000, format: 'webp' } })
+		mockManipulation.metadata.mockResolvedValue({ width: 1200, height: 900 })
 		;(sharp as any).mockReturnValue(mockManipulation)
 		job = new WebpImageManipulationJob(createConfigServiceMock({ 'processing.timeoutSeconds': 20 }))
 	})
@@ -77,6 +81,7 @@ describe('webpImageManipulationJob', () => {
 				fit: FitOptions.contain,
 				position: PositionOptions.entropy,
 				background: TRANSPARENT,
+				withoutEnlargement: true,
 			})
 			expect(mockManipulation.webp).toHaveBeenCalledWith({ quality: 80, smartSubsample: true, effort: 4 })
 			expect(mockManipulation.toBuffer).toHaveBeenLastCalledWith({ resolveWithObject: true })
@@ -141,9 +146,9 @@ describe('webpImageManipulationJob', () => {
 			const result = await job.handle('test.avif', options({ format: SupportedResizeFormats.avif }))
 
 			expect(mockManipulation.avif).toHaveBeenCalledWith({
-				quality: 60,
-				effort: 2,
-				chromaSubsampling: '4:2:0',
+				quality: AVIF_MAX_QUALITY,
+				effort: AVIF_EFFORT,
+				chromaSubsampling: AVIF_CHROMA_SUBSAMPLING,
 				lossless: false,
 			})
 			// The job must normalise Sharp's 'heif' back to 'avif' so the
@@ -159,6 +164,136 @@ describe('webpImageManipulationJob', () => {
 			expect(mockManipulation.avif).toHaveBeenCalled()
 			expect(mockManipulation.webp).not.toHaveBeenCalled()
 			expect(result.format).toBe('avif')
+		})
+
+		describe('avif quality', () => {
+			it('caps a higher request at the AVIF ceiling', async () => {
+				primeTrimmedRun({ size: 1000, format: 'heif' })
+
+				await job.handle('test.avif', options({ format: SupportedResizeFormats.avif, quality: 100 }))
+
+				expect(mockManipulation.avif).toHaveBeenCalledWith(expect.objectContaining({ quality: AVIF_MAX_QUALITY }))
+			})
+
+			it('keeps a lower request as asked', async () => {
+				primeTrimmedRun({ size: 1000, format: 'heif' })
+
+				await job.handle('test.avif', options({ format: SupportedResizeFormats.avif, quality: 40 }))
+
+				expect(mockManipulation.avif).toHaveBeenCalledWith(expect.objectContaining({ quality: 40 }))
+			})
+		})
+
+		describe('enlargement and sharpening', () => {
+			it('never enlarges the source', async () => {
+				primeTrimmedRun()
+
+				await job.handle('small.jpg', options())
+
+				expect(mockManipulation.resize).toHaveBeenLastCalledWith(expect.objectContaining({ withoutEnlargement: true }))
+			})
+
+			describe('keeps the requested aspect for a source smaller than the request', () => {
+				async function resizeBox(source: Record<string, number>, overrides: Partial<ResizeOptions>): Promise<unknown> {
+					mockManipulation.metadata.mockResolvedValue(source)
+					await job.handle('small.jpg', options({ trimThreshold: 0, width: 1040, height: 684, ...overrides }))
+					return mockManipulation.resize.mock.calls.at(-1)![0]
+				}
+
+				it.each([FitOptions.cover, FitOptions.fill])('%s scales the request down uniformly to fit the source', async (fit) => {
+					expect(await resizeBox({ width: 800, height: 800 }, { fit })).toEqual(expect.objectContaining({ width: 800, height: 526, withoutEnlargement: true }))
+					expect(await resizeBox({ width: 300, height: 200 }, { fit, width: 800, height: 800 })).toEqual(expect.objectContaining({ width: 200, height: 200 }))
+				})
+
+				it('contain uses the smallest box of the requested aspect that holds the source', async () => {
+					expect(await resizeBox({ width: 500, height: 400 }, { fit: FitOptions.contain })).toEqual(expect.objectContaining({ width: 609, height: 400 }))
+				})
+
+				it('leaves the request alone for outside, inside and a source larger than it', async () => {
+					for (const fit of [FitOptions.outside, FitOptions.inside]) {
+						expect(await resizeBox({ width: 300, height: 200 }, { fit })).toEqual(expect.objectContaining({ width: 1040, height: 684 }))
+					}
+					for (const fit of [FitOptions.cover, FitOptions.fill, FitOptions.contain]) {
+						expect(await resizeBox({ width: 2000, height: 1500 }, { fit })).toEqual(expect.objectContaining({ width: 1040, height: 684 }))
+					}
+				})
+
+				it('leaves a single requested dimension alone', async () => {
+					expect(await resizeBox({ width: 300, height: 200 }, { fit: FitOptions.cover, width: 1000, height: 0 })).toEqual(expect.objectContaining({ width: 1000, withoutEnlargement: true }))
+					expect(mockManipulation.resize.mock.calls.at(-1)![0]).not.toHaveProperty('height')
+				})
+
+				it('swaps the axes of an orientation 6 source', async () => {
+					// Stored 600x800, displayed 800x600.
+					expect(await resizeBox({ width: 600, height: 800, orientation: 6 }, { fit: FitOptions.cover })).toEqual(expect.objectContaining({ width: 800, height: 526 }))
+				})
+
+				it('never exceeds the source or drops below one pixel', async () => {
+					// A width-limited height would round to 0 for these very wide requests.
+					expect(await resizeBox({ width: 1000, height: 10 }, { fit: FitOptions.cover, width: 5000, height: 1 })).toEqual(expect.objectContaining({ width: 1000, height: 1 }))
+					expect(await resizeBox({ width: 7, height: 7 }, { fit: FitOptions.cover, width: 8192, height: 3 })).toEqual(expect.objectContaining({ width: 7, height: 1 }))
+				})
+			})
+
+			it('sharpens lightly when the source is reduced by more than the threshold', async () => {
+				mockManipulation.metadata.mockResolvedValue({ width: 2400, height: 2400 })
+				primeTrimmedRun()
+
+				await job.handle('big.jpg', options({ width: 800, height: 800, fit: FitOptions.cover }))
+
+				expect(mockManipulation.sharpen).toHaveBeenCalledWith({ sigma: SHARPEN_SIGMA })
+				expect(mockManipulation.sharpen.mock.invocationCallOrder[0]).toBeGreaterThan(mockManipulation.resize.mock.invocationCallOrder.at(-1)!)
+			})
+
+			it('does not sharpen at exactly the threshold', async () => {
+				mockManipulation.metadata.mockResolvedValue({ width: 1600, height: 1600 })
+				primeTrimmedRun()
+
+				await job.handle('mid.jpg', options({ width: 800, height: 800, fit: FitOptions.cover }))
+
+				expect(mockManipulation.sharpen).not.toHaveBeenCalled()
+			})
+
+			it('does not sharpen a source smaller than the target', async () => {
+				mockManipulation.metadata.mockResolvedValue({ width: 300, height: 200 })
+				primeTrimmedRun()
+
+				await job.handle('tiny.jpg', options())
+
+				expect(mockManipulation.sharpen).not.toHaveBeenCalled()
+			})
+
+			it('measures the reduction on the axis Sharp scales by for the fit', async () => {
+				// 2400x600 into 800x800: cover scales by the larger scale (800/600),
+				// a 0.75x enlargement attempt; contain by 800/2400, a 3x reduction.
+				mockManipulation.metadata.mockResolvedValue({ width: 2400, height: 600 })
+
+				primeTrimmedRun()
+				await job.handle('wide.jpg', options({ width: 800, height: 800, fit: FitOptions.cover }))
+				expect(mockManipulation.sharpen).not.toHaveBeenCalled()
+
+				primeTrimmedRun()
+				await job.handle('wide.jpg', options({ width: 800, height: 800, fit: FitOptions.contain }))
+				expect(mockManipulation.sharpen).toHaveBeenCalledTimes(1)
+			})
+
+			it('swaps the axes of a 90 degree EXIF-rotated source', async () => {
+				// Stored 2400x600 with orientation 6 displays as 600x2400: a 1000 px
+				// wide target is no reduction (unswapped it would read as 2.4x).
+				mockManipulation.metadata.mockResolvedValue({ width: 2400, height: 600, orientation: 6 })
+				primeTrimmedRun()
+
+				await job.handle('rotated.jpg', options({ width: 1000, height: 0, trimThreshold: 0, fit: FitOptions.inside }))
+
+				expect(mockManipulation.sharpen).not.toHaveBeenCalled()
+			})
+
+			it('does not read the header when no resize is requested', async () => {
+				await job.handle('original.jpg', options({ width: 0, height: 0 }))
+
+				expect(mockManipulation.metadata).not.toHaveBeenCalled()
+				expect(mockManipulation.sharpen).not.toHaveBeenCalled()
+			})
 		})
 
 		describe('trim', () => {
