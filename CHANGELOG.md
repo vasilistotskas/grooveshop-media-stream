@@ -1,3 +1,10 @@
+## [3.9.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.9.0...v3.9.1) (2026-10-12)
+
+
+### Bug Fixes
+
+* **auth:** resolve Django permissions for platform identities only ([c728d89](https://github.com/vasilistotskas/grooveshop-media-stream/commit/c728d89835eb8f1eba3cda8a5c5a169d58c7fb13))
+
 # [3.9.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.8.0...v3.9.0) (2026-10-08)
 
 
