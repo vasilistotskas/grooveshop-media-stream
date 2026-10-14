@@ -60,8 +60,11 @@ function downscaleFactor(source: { width: number, height: number }, target: { wi
  *   padding bytes the target box would otherwise carry.
  * - `outside`/`inside`: the output aspect is the source's by definition, so
  *   there is no requested aspect to keep; `withoutEnlargement` is enough.
- * - A single requested axis: the other axis follows the source aspect, so
- *   `withoutEnlargement` is enough as well.
+ * - A single requested axis: a bound, with the other axis following the
+ *   source aspect. It is clamped to the source. `withoutEnlargement` alone
+ *   is not enough here: with `contain`, Sharp (0.35.5) pads the requested
+ *   axis out to the request instead (a 517x388 source asked for width 1440
+ *   came back 1440x388, the photo a third of it).
  *
  * The limiting axis is set to the source size exactly and the other derived
  * from it, so rounding can never push the box past the source.
@@ -69,7 +72,10 @@ function downscaleFactor(source: { width: number, height: number }, target: { wi
 function boxWithinSource(source: { width: number, height: number }, target: { width?: number, height?: number }, fit: FitOptions): { width?: number, height?: number } {
 	const { width, height } = target
 	if (!width || !height) {
-		return target
+		return {
+			...(width ? { width: Math.min(width, source.width) } : {}),
+			...(height ? { height: Math.min(height, source.height) } : {}),
+		}
 	}
 	const widthRatio = source.width / width
 	const heightRatio = source.height / height

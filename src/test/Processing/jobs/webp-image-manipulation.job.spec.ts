@@ -218,9 +218,15 @@ describe('webpImageManipulationJob', () => {
 					}
 				})
 
-				it('leaves a single requested dimension alone', async () => {
-					expect(await resizeBox({ width: 300, height: 200 }, { fit: FitOptions.cover, width: 1000, height: 0 })).toEqual(expect.objectContaining({ width: 1000, withoutEnlargement: true }))
+				it.each([FitOptions.contain, FitOptions.cover])('%s clamps a single requested dimension to the source', async (fit) => {
+					expect(await resizeBox({ width: 300, height: 200 }, { fit, width: 1000, height: 0 })).toEqual(expect.objectContaining({ width: 300, withoutEnlargement: true }))
 					expect(mockManipulation.resize.mock.calls.at(-1)![0]).not.toHaveProperty('height')
+					expect(await resizeBox({ width: 300, height: 200 }, { fit, width: 0, height: 1000 })).toEqual(expect.objectContaining({ height: 200 }))
+					expect(mockManipulation.resize.mock.calls.at(-1)![0]).not.toHaveProperty('width')
+				})
+
+				it('passes a single requested dimension smaller than the source through', async () => {
+					expect(await resizeBox({ width: 2000, height: 1500 }, { fit: FitOptions.contain, width: 1000, height: 0 })).toEqual(expect.objectContaining({ width: 1000 }))
 				})
 
 				it('swaps the axes of an orientation 6 source', async () => {
