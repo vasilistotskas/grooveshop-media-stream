@@ -64,7 +64,7 @@ describe('generateResourceIdentityFromRequestJob', () => {
 			tenantSchema: 'acme',
 		})
 
-		expect(await job.handle(request)).toBe('d0e9d7a6-21b2-52bc-ba53-8bb3915c5eb7')
+		expect(await job.handle(request)).toBe('91bd2110-1cc7-5879-90ec-5ced04b446af')
 	})
 
 	it('re-keys the identity when the processing version changes', async () => {

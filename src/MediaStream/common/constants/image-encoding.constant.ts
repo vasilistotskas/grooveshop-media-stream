@@ -12,7 +12,7 @@
  * every change that alters the produced bytes (quality caps, encoder options,
  * resampling, sharpening).
  */
-export const PROCESSING_VERSION = 2
+export const PROCESSING_VERSION = 3
 
 /**
  * AVIF quality ceiling. The storefront asks for 80-100; AVIF at 72 is already

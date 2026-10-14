@@ -129,9 +129,16 @@ describe('webpImageManipulationJob output geometry (real Sharp)', () => {
 	})
 
 	describe('single dimension requested', () => {
-		it('never upscales and follows the source aspect', async () => {
-			expect(await dimensions(small300x200, { fit: FitOptions.cover, width: 1000, height: 0 })).toEqual({ width: 300, height: 200 })
-			expect(await dimensions(small300x200, { fit: FitOptions.cover, width: 0, height: 1000 })).toEqual({ width: 300, height: 200 })
+		// contain is the case Sharp gets wrong on its own: with only
+		// withoutEnlargement it pads the requested axis out to the request
+		// (300x200 asked for width 1000 came back 1000x200).
+		it.each([FitOptions.cover, FitOptions.contain, FitOptions.inside])('%s never upscales or pads and follows the source aspect', async (fit) => {
+			expect(await dimensions(small300x200, { fit, width: 1000, height: 0 })).toEqual({ width: 300, height: 200 })
+			expect(await dimensions(small300x200, { fit, width: 0, height: 1000 })).toEqual({ width: 300, height: 200 })
+		})
+
+		it('scales a larger source down to the requested width', async () => {
+			expect(await dimensions(large2000x1500, { fit: FitOptions.contain, width: 1000, height: 0 })).toEqual({ width: 1000, height: 750 })
 		})
 	})
 
