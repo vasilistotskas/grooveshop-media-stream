@@ -1,3 +1,10 @@
+## [3.9.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.9.1...v3.9.2) (2026-10-14)
+
+
+### Bug Fixes
+
+* **processing:** never pad a single requested dimension ([#29](https://github.com/vasilistotskas/grooveshop-media-stream/issues/29)) ([021fc8d](https://github.com/vasilistotskas/grooveshop-media-stream/commit/021fc8d49ee703ec13edb605833d09dd71a11ec8))
+
 ## [3.9.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.9.0...v3.9.1) (2026-10-12)
 
 
