@@ -156,6 +156,42 @@ describe('multiLayerCacheManager Unit', () => {
 			expect(mockMemoryLayer.set).toHaveBeenCalledWith('image:key1', testValue, undefined)
 		})
 
+		it('does not backfill when the caller is already stale', async () => {
+			mockMemoryLayer.get.mockResolvedValue(null)
+			mockRedisLayer.get.mockResolvedValue({ data: 'from-redis' })
+
+			await manager.lookup('image', 'key1', () => true)
+			await new Promise(resolve => setTimeout(resolve, 50))
+
+			expect(mockMemoryLayer.set).not.toHaveBeenCalled()
+		})
+
+		it('removes a backfill that became stale while it was being written', async () => {
+			let stale = false
+			mockMemoryLayer.get.mockResolvedValue(null)
+			mockRedisLayer.get.mockResolvedValue({ data: 'from-redis' })
+			mockMemoryLayer.set.mockImplementation(async () => {
+				stale = true
+			})
+
+			await manager.lookup('image', 'key1', () => stale)
+			await new Promise(resolve => setTimeout(resolve, 50))
+
+			expect(mockMemoryLayer.set).toHaveBeenCalledWith('image:key1', { data: 'from-redis' }, undefined)
+			expect(mockMemoryLayer.delete).toHaveBeenCalledWith('image:key1')
+		})
+
+		it('keeps a backfill when the caller is not stale', async () => {
+			mockMemoryLayer.get.mockResolvedValue(null)
+			mockRedisLayer.get.mockResolvedValue({ data: 'from-redis' })
+
+			await manager.lookup('image', 'key1', () => false)
+			await new Promise(resolve => setTimeout(resolve, 50))
+
+			expect(mockMemoryLayer.set).toHaveBeenCalledTimes(1)
+			expect(mockMemoryLayer.delete).not.toHaveBeenCalled()
+		})
+
 		it('should NOT backfill when hit in highest-priority layer', async () => {
 			const testValue = { data: 'from-memory' }
 			mockMemoryLayer.get.mockResolvedValue(testValue)
@@ -270,25 +306,22 @@ describe('multiLayerCacheManager Unit', () => {
 	})
 
 	describe('invalidateNamespace', () => {
-		it('should call deleteByPrefix on all layers', async () => {
-			mockMemoryLayer.deleteByPrefix.mockResolvedValue(5)
+		it('clears the prefix in the named layer only and returns the count', async () => {
 			mockRedisLayer.deleteByPrefix.mockResolvedValue(3)
 
-			await manager.invalidateNamespace('image')
+			await expect(manager.invalidateNamespace('image:acme', 'redis')).resolves.toBe(3)
 
-			expect(mockMemoryLayer.deleteByPrefix).toHaveBeenCalledWith('image:')
-			expect(mockRedisLayer.deleteByPrefix).toHaveBeenCalledWith('image:')
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('clear', 'multi-layer', 'success')
+			expect(mockRedisLayer.deleteByPrefix).toHaveBeenCalledWith('image:acme:')
+			expect(mockMemoryLayer.deleteByPrefix).not.toHaveBeenCalled()
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('clear', 'redis', 'success')
 		})
 
-		it('should handle layer failures during invalidation', async () => {
-			mockMemoryLayer.deleteByPrefix.mockRejectedValue(new Error('Delete error'))
-			mockRedisLayer.deleteByPrefix.mockResolvedValue(3)
+		it('propagates a layer that could not be cleared, so a flush never looks complete when it is not', async () => {
+			mockRedisLayer.deleteByPrefix.mockRejectedValue(new Error('Redis not connected'))
 
-			// Should not throw
-			await manager.invalidateNamespace('image')
+			await expect(manager.invalidateNamespace('image:acme', 'redis')).rejects.toThrow('Redis not connected')
 
-			expect(mockRedisLayer.deleteByPrefix).toHaveBeenCalled()
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('clear', 'redis', 'error')
 		})
 	})
 

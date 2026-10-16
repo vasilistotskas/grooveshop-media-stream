@@ -5,6 +5,7 @@ import type { StorageCleanupService } from '#microservice/Storage/services/stora
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TenantCacheEpochs } from '#microservice/Cache/services/tenant-cache-epochs.service'
 import { TenantFlushService } from '#microservice/Cache/services/tenant-flush.service'
+import { TenantFlushIncompleteError } from '#microservice/common/errors/media-stream.errors'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 import 'reflect-metadata'
@@ -18,6 +19,8 @@ describe('tenantFlushService', () => {
 	let epochs: TenantCacheEpochs
 	let storage: MockedObject<StorageCleanupService>
 	let onBroadcast: Handler
+	/** Every tier clear, in order, with the tenant's epoch at that moment. */
+	let clears: string[]
 
 	/** Delivers a message the way Redis would, then lets the async handler settle. */
 	async function deliver(message: unknown): Promise<void> {
@@ -30,15 +33,26 @@ describe('tenantFlushService', () => {
 	}
 
 	beforeEach(() => {
+		clears = []
+		epochs = new TenantCacheEpochs()
 		redis = {
 			subscribe: vi.fn((_channel: string, handler: Handler) => {
 				onBroadcast = handler
 			}),
 			publish: vi.fn().mockResolvedValue(2),
 		} as unknown as MockedObject<RedisCacheService>
-		cacheManager = { invalidateNamespace: vi.fn().mockResolvedValue(undefined) } as unknown as MockedObject<MultiLayerCacheManager>
-		epochs = new TenantCacheEpochs()
-		storage = { removeTenantFiles: vi.fn().mockResolvedValue({ filesRemoved: 1, errors: [] }) } as unknown as MockedObject<StorageCleanupService>
+		cacheManager = {
+			invalidateNamespace: vi.fn(async (namespace: string, layer: string) => {
+				clears.push(`${layer}@${epochs.current(namespace.split(':')[1])}`)
+				return 1
+			}),
+		} as unknown as MockedObject<MultiLayerCacheManager>
+		storage = {
+			removeTenantFiles: vi.fn(async (schema: string) => {
+				clears.push(`disk@${epochs.current(schema)}`)
+				return { filesRemoved: 1, errors: [], complete: true }
+			}),
+		} as unknown as MockedObject<StorageCleanupService>
 
 		service = new TenantFlushService(
 			createConfigServiceMock({ 'cache.redis.db': 2 }),
@@ -57,37 +71,34 @@ describe('tenantFlushService', () => {
 	})
 
 	describe('flushTenant', () => {
-		it('advances the epoch, clears memory and Redis, then the disk tier, then broadcasts', async () => {
-			const order: string[] = []
-			cacheManager.invalidateNamespace.mockImplementation(async () => {
-				order.push(`invalidateNamespace@epoch${epochs.current('acme')}`)
-			})
-			storage.removeTenantFiles.mockImplementation(async () => {
-				order.push('removeTenantFiles')
-				return { filesRemoved: 1, errors: [] }
-			})
+		it('clears disk, then Redis, then memory, advancing the epoch before each tier', async () => {
+			await service.flushTenant('acme')
+
+			expect(clears).toEqual(['disk@1', 'redis@2', 'memory@3'])
+			expect(cacheManager.invalidateNamespace).toHaveBeenCalledWith('image:acme', 'redis')
+			expect(cacheManager.invalidateNamespace).toHaveBeenCalledWith('image:acme', 'memory')
+		})
+
+		it('broadcasts only after the local clear', async () => {
 			redis.publish.mockImplementation(async () => {
-				order.push('publish')
+				clears.push('publish')
 				return 2
 			})
 
 			await service.flushTenant('acme')
 
-			// The epoch is already advanced when the first tier is cleared.
-			expect(order).toEqual(['invalidateNamespace@epoch1', 'removeTenantFiles', 'publish'])
-			expect(cacheManager.invalidateNamespace).toHaveBeenCalledWith('image:acme')
-			expect(storage.removeTenantFiles).toHaveBeenCalledWith('acme')
+			expect(clears.at(-1)).toBe('publish')
 		})
 
 		it('advances only the flushed tenant\'s epoch', async () => {
 			await service.flushTenant('tenant_a')
 
-			expect(epochs.current('tenant_a')).toBe(1)
+			expect(epochs.current('tenant_a')).toBe(3)
 			expect(epochs.current('tenant_b')).toBe(0)
 		})
 
 		it('reports the namespace, the removed files and the broadcast receivers', async () => {
-			storage.removeTenantFiles.mockResolvedValue({ filesRemoved: 4, errors: ['boom'] })
+			storage.removeTenantFiles.mockResolvedValue({ filesRemoved: 4, errors: ['boom'], complete: true })
 
 			const result = await service.flushTenant('acme')
 
@@ -101,45 +112,61 @@ describe('tenantFlushService', () => {
 			expect(publishedMessage()).toEqual({ tenantSchema: 'acme', origin: expect.any(String) })
 		})
 
-		it('leaves other tenants alone', async () => {
-			await service.flushTenant('tenant_a')
-
-			expect(cacheManager.invalidateNamespace).not.toHaveBeenCalledWith('image:tenant_b')
-			expect(cacheManager.invalidateNamespace).not.toHaveBeenCalledWith('image')
-		})
-
-		it('still succeeds locally, with zero receivers, when the broadcast fails', async () => {
+		it('still succeeds locally, with zero receivers, when only the broadcast fails', async () => {
 			redis.publish.mockRejectedValue(new Error('READONLY'))
 
 			const result = await service.flushTenant('acme')
 
 			expect(result.broadcastReceivers).toBe(0)
-			expect(cacheManager.invalidateNamespace).toHaveBeenCalledWith('image:acme')
 		})
 
-		it('reports zero receivers when Redis is disconnected', async () => {
-			redis.publish.mockResolvedValue(0)
+		it('fails with 503 when a tier could not be cleared, after clearing the rest and broadcasting', async () => {
+			cacheManager.invalidateNamespace.mockImplementation(async (_namespace: string, layer: string) => {
+				if (layer === 'redis') {
+					throw new Error('Redis not connected')
+				}
+				clears.push(layer)
+				return 0
+			})
 
-			const result = await service.flushTenant('acme')
+			const error = await service.flushTenant('acme').catch((caught: unknown) => caught)
 
-			expect(result.broadcastReceivers).toBe(0)
+			expect(error).toBeInstanceOf(TenantFlushIncompleteError)
+			expect((error as TenantFlushIncompleteError).status).toBe(503)
+			expect((error as TenantFlushIncompleteError).context).toMatchObject({ failures: ['redis: Redis not connected'] })
+			expect(clears).toContain('memory')
+			expect(redis.publish).toHaveBeenCalledOnce()
+		})
+
+		it('fails with 503 when a pair of the tenant could not be removed from disk', async () => {
+			storage.removeTenantFiles.mockResolvedValue({ filesRemoved: 0, errors: ['Failed to remove x.rsm and its .rsc: EACCES'], complete: false })
+
+			const error = await service.flushTenant('acme').catch((caught: unknown) => caught)
+
+			expect(error).toBeInstanceOf(TenantFlushIncompleteError)
+			expect((error as TenantFlushIncompleteError).context).toMatchObject({ failures: ['disk: Failed to remove x.rsm and its .rsc: EACCES'] })
+		})
+
+		it('still succeeds when the sweep only met sidecars it could not read', async () => {
+			storage.removeTenantFiles.mockResolvedValue({ filesRemoved: 2, errors: ['Failed to parse metadata corrupt.rsm'], complete: true })
+
+			await expect(service.flushTenant('acme')).resolves.toMatchObject({ filesRemoved: 2, diskErrors: ['Failed to parse metadata corrupt.rsm'] })
+		})
+
+		it('fails with 503 when the disk sweep throws', async () => {
+			storage.removeTenantFiles.mockRejectedValue(new Error('EIO'))
+
+			await expect(service.flushTenant('acme')).rejects.toBeInstanceOf(TenantFlushIncompleteError)
 		})
 	})
 
 	describe('peer broadcasts', () => {
 		const PEER = 'another-replica'
 
-		it('advances the epoch, then clears memory and Redis and sweeps the disk', async () => {
-			const seen: number[] = []
-			cacheManager.invalidateNamespace.mockImplementation(async () => {
-				seen.push(epochs.current('acme'))
-			})
-
+		it('clears disk, then Redis, then memory, advancing the epoch before each tier', async () => {
 			await deliver({ tenantSchema: 'acme', origin: PEER })
 
-			expect(seen).toEqual([1])
-			expect(cacheManager.invalidateNamespace).toHaveBeenCalledExactlyOnceWith('image:acme')
-			expect(storage.removeTenantFiles).toHaveBeenCalledExactlyOnceWith('acme')
+			expect(clears).toEqual(['disk@1', 'redis@2', 'memory@3'])
 		})
 
 		it('does not broadcast again', async () => {
@@ -151,13 +178,12 @@ describe('tenantFlushService', () => {
 		it('ignores its own broadcast', async () => {
 			await service.flushTenant('acme')
 			const own = publishedMessage()
-			vi.clearAllMocks()
+			clears = []
 
 			await deliver(own)
 
-			expect(cacheManager.invalidateNamespace).not.toHaveBeenCalled()
-			expect(storage.removeTenantFiles).not.toHaveBeenCalled()
-			expect(epochs.current('acme')).toBe(1)
+			expect(clears).toEqual([])
+			expect(epochs.current('acme')).toBe(3)
 		})
 
 		it.each([
@@ -172,34 +198,19 @@ describe('tenantFlushService', () => {
 		])('ignores %s', async (_name, message) => {
 			await deliver(message)
 
-			expect(cacheManager.invalidateNamespace).not.toHaveBeenCalled()
-			expect(storage.removeTenantFiles).not.toHaveBeenCalled()
+			expect(clears).toEqual([])
 			expect(epochs.current('acme')).toBe(0)
 		})
 
-		it('still sweeps the disk when the layered tiers fail', async () => {
-			cacheManager.invalidateNamespace.mockRejectedValue(new Error('redis gone'))
-
-			await deliver({ tenantSchema: 'acme', origin: PEER })
-
-			expect(storage.removeTenantFiles).toHaveBeenCalledExactlyOnceWith('acme')
-		})
-
-		it('still clears the layered tiers when the disk sweep fails', async () => {
-			storage.removeTenantFiles.mockRejectedValue(new Error('disk gone'))
-
-			await deliver({ tenantSchema: 'acme', origin: PEER })
-
-			expect(cacheManager.invalidateNamespace).toHaveBeenCalledExactlyOnceWith('image:acme')
-		})
-
-		it('names the tier that failed', async () => {
+		it('keeps clearing the remaining tiers when one fails, and names it', async () => {
 			const error = vi.spyOn(CorrelatedLogger, 'error').mockImplementation(() => {})
 			storage.removeTenantFiles.mockRejectedValue(new Error('disk gone'))
 
 			await deliver({ tenantSchema: 'acme', origin: PEER })
 
-			expect(error).toHaveBeenCalledWith(expect.stringContaining('disk tier: disk gone'), undefined, 'TenantFlushService')
+			expect(cacheManager.invalidateNamespace).toHaveBeenCalledWith('image:acme', 'redis')
+			expect(cacheManager.invalidateNamespace).toHaveBeenCalledWith('image:acme', 'memory')
+			expect(error).toHaveBeenCalledWith(expect.stringContaining('disk: disk gone'), undefined, 'TenantFlushService')
 			error.mockRestore()
 		})
 	})

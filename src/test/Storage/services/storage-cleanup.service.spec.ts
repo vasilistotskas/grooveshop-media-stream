@@ -473,6 +473,7 @@ describe('storageCleanupService', () => {
 
 			expect(result.filesRemoved).toBe(1)
 			expect(result.errors).toEqual([])
+			expect(result.complete).toBe(true)
 			expect(mockFs.unlink).toHaveBeenCalledWith(expect.stringContaining('uuid-tenant-a.rsm'))
 			expect(mockFs.unlink).toHaveBeenCalledWith(expect.stringContaining('uuid-tenant-a.rsc'))
 			expect(mockFs.unlink).not.toHaveBeenCalledWith(expect.stringContaining('uuid-tenant-b.rsm'))
@@ -514,6 +515,8 @@ describe('storageCleanupService', () => {
 			expect(result.filesRemoved).toBe(1)
 			expect(result.errors).toHaveLength(1)
 			expect(result.errors[0]).toContain('corrupt.rsm')
+			// A sidecar of unknown tenant is not a pair of this tenant left behind.
+			expect(result.complete).toBe(true)
 			expect(mockFs.unlink).toHaveBeenCalledWith(expect.stringContaining('uuid-tenant-a.rsm'))
 		})
 
@@ -535,6 +538,19 @@ describe('storageCleanupService', () => {
 
 			expect(result.filesRemoved).toBe(0)
 			expect(result.errors[0]).toContain('Permission denied')
+			expect(result.complete).toBe(false)
+		})
+
+		it('is incomplete when a pair of the tenant could not be removed', async () => {
+			mockFs.readdir.mockResolvedValue(['uuid-tenant-a.rsm', 'uuid-tenant-a.rsc'] as any)
+			mockFs.readFile.mockResolvedValue(mockMetaContent('tenant_a'))
+			mockFs.unlink.mockRejectedValue(Object.assign(new Error('operation not permitted'), { code: 'EPERM' }))
+
+			const result = await service.removeTenantFiles('tenant_a')
+
+			expect(result.filesRemoved).toBe(0)
+			expect(result.complete).toBe(false)
+			expect(result.errors[0]).toContain('uuid-tenant-a.rsm')
 		})
 
 		it('tolerates a missing .rsc file (ENOENT) for a matched tenant .rsm', async () => {

@@ -73,6 +73,16 @@ export class CircuitBreakerOpenError extends MediaStreamError {
 }
 
 /**
+ * A tenant flush could not clear every tier (Redis unreachable, a sweep that
+ * threw). Answered 503 so the caller, Django's flush task, retries.
+ */
+export class TenantFlushIncompleteError extends MediaStreamError {
+	constructor(context: Metadata = {}) {
+		super('Tenant cache flush did not complete', HttpStatus.SERVICE_UNAVAILABLE, 'TENANT_FLUSH_INCOMPLETE', context)
+	}
+}
+
+/**
  * Every Sharp pipeline slot is busy and the wait queue is full (or the wait
  * timed out). Answered 503 with Retry-After so clients and CDNs back off
  * instead of receiving the default image for a perfectly good source.

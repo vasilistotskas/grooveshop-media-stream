@@ -25,10 +25,11 @@ export class RedisCacheLayer implements CacheLayer {
 		return this.redisCacheService.delete(key)
 	}
 
+	/** Throws while disconnected: a namespace that could not be cleared must not look cleared. */
 	async deleteByPrefix(prefix: string): Promise<number> {
 		const client = this.redisCacheService.getClient()
 		if (!client) {
-			return 0
+			throw new Error('Redis not connected')
 		}
 
 		let count = 0

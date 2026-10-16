@@ -71,10 +71,10 @@ describe('redisCacheLayer', () => {
 	})
 
 	describe('deleteByPrefix', () => {
-		it('should return 0 without a client', async () => {
+		it('throws without a client: a namespace that could not be cleared must not look cleared', async () => {
 			redisCacheService.getClient.mockReturnValue(null)
 
-			await expect(layer.deleteByPrefix('image:acme:')).resolves.toBe(0)
+			await expect(layer.deleteByPrefix('image:acme:')).rejects.toThrow('Redis not connected')
 		})
 
 		it('should SCAN the prefix and DEL every batch', async () => {

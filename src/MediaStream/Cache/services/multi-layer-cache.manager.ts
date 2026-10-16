@@ -52,8 +52,12 @@ export class MultiLayerCacheManager implements OnModuleInit {
 		return (await this.lookup<T>(namespace, identifier))?.value ?? null
 	}
 
-	/** Like get(), and names the layer that answered. */
-	async lookup<T>(namespace: string, identifier: string): Promise<CacheLookup<T> | null> {
+	/**
+	 * Like get(), and names the layer that answered. `isStale` fences the
+	 * backfill of a lower-layer hit into the faster layers: it is checked
+	 * before and after each write, and a write that turns out stale is removed.
+	 */
+	async lookup<T>(namespace: string, identifier: string, isStale?: () => boolean): Promise<CacheLookup<T> | null> {
 		const key = cacheKey(namespace, identifier)
 
 		for (const layer of this.layers) {
@@ -63,7 +67,7 @@ export class MultiLayerCacheManager implements OnModuleInit {
 					CorrelatedLogger.debug(`Cache HIT in ${layer.getLayerName()} layer for key: ${key}`, MultiLayerCacheManager.name)
 					this.metricsService.recordCacheOperation('get', layer.getLayerName(), 'hit')
 
-					this.backfillLayers(key, value, layer).catch((error: unknown) => {
+					this.backfillLayers(key, value, layer, isStale).catch((error: unknown) => {
 						CorrelatedLogger.warn(`Backfill failed for key ${key}: ${errorMessage(error)}`, MultiLayerCacheManager.name)
 					})
 
@@ -147,23 +151,27 @@ export class MultiLayerCacheManager implements OnModuleInit {
 		this.metricsService.recordCacheOperation('flush', 'multi-layer', 'success')
 	}
 
-	/** Delete every key under a namespace (`image:acme` → `image:acme:*`) in every layer. */
-	async invalidateNamespace(namespace: string): Promise<void> {
-		const prefix = cacheKey(namespace, '')
-		CorrelatedLogger.debug(`Invalidating cache namespace: ${namespace} (prefix: ${prefix})`, MultiLayerCacheManager.name)
-
-		let totalDeleted = 0
-		for (const layer of this.layers) {
-			try {
-				totalDeleted += await layer.deleteByPrefix(prefix)
-			}
-			catch (error: unknown) {
-				CorrelatedLogger.warn(`Failed to invalidate namespace in ${layer.getLayerName()}: ${errorMessage(error)}`, MultiLayerCacheManager.name)
-			}
+	/**
+	 * Delete every key under a namespace (`image:acme` → `image:acme:*`) in one
+	 * layer; the caller picks the order. Throws when the layer could not be
+	 * cleared, so a flush never reports a namespace as gone when it is not.
+	 */
+	async invalidateNamespace(namespace: string, layerName: CacheLayerName): Promise<number> {
+		const layer = this.layers.find(candidate => candidate.getLayerName() === layerName)
+		if (!layer) {
+			throw new Error(`Unknown cache layer: ${layerName}`)
 		}
-
-		CorrelatedLogger.debug(`Namespace ${namespace} invalidated: ${totalDeleted} keys deleted`, MultiLayerCacheManager.name)
-		this.metricsService.recordCacheOperation('clear', 'multi-layer', 'success')
+		const prefix = cacheKey(namespace, '')
+		try {
+			const deleted = await layer.deleteByPrefix(prefix)
+			CorrelatedLogger.debug(`Namespace ${namespace} invalidated in ${layerName}: ${deleted} keys deleted`, MultiLayerCacheManager.name)
+			this.metricsService.recordCacheOperation('clear', layerName, 'success')
+			return deleted
+		}
+		catch (error: unknown) {
+			this.metricsService.recordCacheOperation('clear', layerName, 'error')
+			throw error
+		}
 	}
 
 	async getStats(): Promise<MultiLayerCacheStats> {
@@ -201,9 +209,9 @@ export class MultiLayerCacheManager implements OnModuleInit {
 	 * Copy a lower-layer hit into every faster layer, capped at the source's
 	 * remaining TTL so a backfilled entry never outlives its origin.
 	 */
-	private async backfillLayers<T>(key: string, value: T, sourceLayer: CacheLayer): Promise<void> {
+	private async backfillLayers<T>(key: string, value: T, sourceLayer: CacheLayer, isStale?: () => boolean): Promise<void> {
 		const sourceIndex = this.layers.indexOf(sourceLayer)
-		if (sourceIndex <= 0) {
+		if (sourceIndex <= 0 || isStale?.()) {
 			return
 		}
 
@@ -221,6 +229,11 @@ export class MultiLayerCacheManager implements OnModuleInit {
 		await Promise.all(this.layers.slice(0, sourceIndex).map(async (layer) => {
 			try {
 				await layer.set(key, value, remainingTtl)
+				if (isStale?.()) {
+					// A flush cleared this layer while the copy was on its way in.
+					await layer.delete(key)
+					return
+				}
 				CorrelatedLogger.debug(`Backfilled ${layer.getLayerName()} layer with key: ${key} (TTL: ${remainingTtl ?? 'default'}s)`, MultiLayerCacheManager.name)
 			}
 			catch (error: unknown) {
