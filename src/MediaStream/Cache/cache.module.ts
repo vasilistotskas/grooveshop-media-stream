@@ -12,6 +12,7 @@ import { CacheWarmingService } from './services/cache-warming.service.js'
 import { MemoryCacheService } from './services/memory-cache.service.js'
 import { MultiLayerCacheManager } from './services/multi-layer-cache.manager.js'
 import { RedisCacheService } from './services/redis-cache.service.js'
+import { TenantCacheEpochs } from './services/tenant-cache-epochs.service.js'
 import { TenantFlushService } from './services/tenant-flush.service.js'
 
 @Module({
@@ -28,6 +29,7 @@ import { TenantFlushService } from './services/tenant-flush.service.js'
 		RedisCacheService,
 		CacheWarmingService,
 		MultiLayerCacheManager,
+		TenantCacheEpochs,
 		TenantFlushService,
 		CacheHealthIndicator,
 		RedisHealthIndicator,
@@ -40,6 +42,7 @@ import { TenantFlushService } from './services/tenant-flush.service.js'
 		RedisCacheService,
 		CacheWarmingService,
 		MultiLayerCacheManager,
+		TenantCacheEpochs,
 		CacheHealthIndicator,
 		RedisHealthIndicator,
 	],

@@ -17,6 +17,7 @@ import CacheImageResourceOperation from '#microservice/Cache/operations/cache-im
 import { ImageFormatProcessor } from '#microservice/Cache/operations/image-format-processor.service'
 import { ResourceFetcher } from '#microservice/Cache/operations/resource-fetcher.service'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
+import { TenantCacheEpochs } from '#microservice/Cache/services/tenant-cache-epochs.service'
 import { ProcessingOverloadedError, UpstreamResourceTooLargeError } from '#microservice/common/errors/media-stream.errors'
 import { storageDirectory } from '#microservice/common/utils/storage-path.util'
 import { ConfigService } from '#microservice/Config/config.service'
@@ -78,6 +79,7 @@ describe('cacheImageResourceOperation', () => {
 	let validation: MockedObject<ResourceValidationService>
 	let tracker: MockedObject<AccessCountTracker>
 	let metricsService: MockedObject<MetricsService>
+	let epochs: TenantCacheEpochs
 	let storageDir: string
 	let request: CacheImageRequest
 	let ctx: OperationContext
@@ -116,6 +118,7 @@ describe('cacheImageResourceOperation', () => {
 			recordError: vi.fn(),
 		} as any
 
+		epochs = new TenantCacheEpochs()
 		const configService = createConfigServiceMock()
 		storageDir = storageDirectory(configService)
 
@@ -134,6 +137,7 @@ describe('cacheImageResourceOperation', () => {
 				{ provide: ResourceValidationService, useValue: validation },
 				{ provide: AccessCountTracker, useValue: tracker },
 				{ provide: MetricsService, useValue: metricsService },
+				{ provide: TenantCacheEpochs, useValue: epochs },
 				{ provide: ConfigService, useValue: configService },
 			],
 		}).compile()
@@ -157,7 +161,7 @@ describe('cacheImageResourceOperation', () => {
 	describe('setup', () => {
 		it('returns a context with the generated identity and nothing loaded yet', () => {
 			expect(identityJob.handle).toHaveBeenCalledWith(request)
-			expect(ctx).toEqual({ request, id: RESOURCE_ID, metaData: null, cached: null, cacheTier: null })
+			expect(ctx).toEqual({ request, id: RESOURCE_ID, metaData: null, cached: null, cacheTier: null, flushEpoch: 0 })
 		})
 
 		it('records a validation error and rethrows when identity generation fails', async () => {
@@ -414,6 +418,112 @@ describe('cacheImageResourceOperation', () => {
 
 			await expect(operation.execute(ctx)).rejects.toBeInstanceOf(UpstreamResourceTooLargeError)
 			expect(metricsService.recordImageProcessing).toHaveBeenCalledWith('execute', 'unknown', 'error', expect.any(Number))
+		})
+	})
+
+	describe('flush fencing', () => {
+		const RSC = () => operation.getResourcePath(ctx)
+		const RSM = () => operation.getResourceMetaPath(ctx)
+
+		it('records the tenant\'s flush epoch when the request starts', async () => {
+			epochs.advance('public')
+			epochs.advance('public')
+
+			const started = await operation.setup(request)
+
+			expect(started.flushEpoch).toBe(2)
+		})
+
+		it('reads the epoch of the request\'s own tenant', async () => {
+			epochs.advance('acme')
+			const acme = new CacheImageRequest({ resourceTarget: 'https://example.com/image.jpg', resizeOptions: request.resizeOptions, tenantSchema: 'acme' })
+
+			expect((await operation.setup(acme)).flushEpoch).toBe(1)
+			expect((await operation.setup(request)).flushEpoch).toBe(0)
+		})
+
+		it('still serves a result built across a flush, but does not cache it', async () => {
+			epochs.advance('public')
+
+			const result = await operation.execute(ctx)
+
+			expect(result.data).toBe(processedBuffer)
+			expect(cacheManager.set).not.toHaveBeenCalled()
+			expect(mockedFs.writeFile).not.toHaveBeenCalled()
+			expect(mockedFs.rename).not.toHaveBeenCalled()
+			expect(tracker.record).not.toHaveBeenCalled()
+			expect(mockedFs.unlink).toHaveBeenCalledWith(operation.getResourceTempPath(ctx))
+		})
+
+		it('caches normally when no flush landed', async () => {
+			await operation.execute(ctx)
+
+			expect(cacheManager.set).toHaveBeenCalledTimes(1)
+			expect(mockedFs.rename).toHaveBeenCalledTimes(2)
+			expect(cacheManager.delete).not.toHaveBeenCalled()
+		})
+
+		it('removes what it cached when a flush lands during the write', async () => {
+			cacheManager.set.mockImplementation(async () => {
+				epochs.advance('public')
+			})
+
+			const result = await operation.execute(ctx)
+
+			expect(result.data).toBe(processedBuffer)
+			expect(cacheManager.delete).toHaveBeenCalledWith('image:public', RESOURCE_ID)
+			expect(mockedFs.unlink).toHaveBeenCalledWith(RSC())
+			expect(mockedFs.unlink).toHaveBeenCalledWith(RSM())
+			expect(tracker.record).not.toHaveBeenCalled()
+		})
+
+		it('does not fail the request when the files it removes are already gone', async () => {
+			cacheManager.set.mockImplementation(async () => {
+				epochs.advance('public')
+			})
+			mockedFs.unlink.mockImplementation(async (path) => {
+				if (path === RSC() || path === RSM()) {
+					throw new Error('ENOENT')
+				}
+			})
+
+			await expect(operation.execute(ctx)).resolves.toMatchObject({ data: processedBuffer })
+		})
+
+		it('does not backfill the layered cache from a disk read that a flush overtook', async () => {
+			ctx.metaData = metadata()
+			mockedFs.readFile.mockResolvedValue(Buffer.from('file-data'))
+			epochs.advance('public')
+
+			await expect(operation.loadResource(ctx)).resolves.toMatchObject({ data: Buffer.from('file-data') })
+
+			expect(cacheManager.set).not.toHaveBeenCalled()
+		})
+
+		it('removes a backfill that a flush overtook while it was being written', async () => {
+			ctx.metaData = metadata()
+			mockedFs.readFile.mockResolvedValue(Buffer.from('file-data'))
+			cacheManager.set.mockImplementation(async () => {
+				epochs.advance('public')
+			})
+
+			await operation.loadResource(ctx)
+			await new Promise(resolve => setImmediate(resolve))
+
+			expect(cacheManager.delete).toHaveBeenCalledWith('image:public', RESOURCE_ID)
+			expect(mockedFs.unlink).toHaveBeenCalledWith(RSC())
+			expect(mockedFs.unlink).toHaveBeenCalledWith(RSM())
+		})
+
+		it('leaves a backfill alone when no flush landed', async () => {
+			ctx.metaData = metadata()
+			mockedFs.readFile.mockResolvedValue(Buffer.from('file-data'))
+
+			await operation.loadResource(ctx)
+			await new Promise(resolve => setImmediate(resolve))
+
+			expect(cacheManager.set).toHaveBeenCalledTimes(1)
+			expect(cacheManager.delete).not.toHaveBeenCalled()
 		})
 	})
 

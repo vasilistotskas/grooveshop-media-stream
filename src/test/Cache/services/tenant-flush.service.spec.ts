@@ -1,9 +1,9 @@
 import type { MockedObject } from 'vitest'
-import type { MemoryCacheLayer } from '#microservice/Cache/layers/memory-cache.layer'
 import type { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
 import type { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import type { StorageCleanupService } from '#microservice/Storage/services/storage-cleanup.service'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { TenantCacheEpochs } from '#microservice/Cache/services/tenant-cache-epochs.service'
 import { TenantFlushService } from '#microservice/Cache/services/tenant-flush.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
@@ -15,7 +15,7 @@ describe('tenantFlushService', () => {
 	let service: TenantFlushService
 	let redis: MockedObject<RedisCacheService>
 	let cacheManager: MockedObject<MultiLayerCacheManager>
-	let memoryLayer: MockedObject<MemoryCacheLayer>
+	let epochs: TenantCacheEpochs
 	let storage: MockedObject<StorageCleanupService>
 	let onBroadcast: Handler
 
@@ -37,14 +37,14 @@ describe('tenantFlushService', () => {
 			publish: vi.fn().mockResolvedValue(2),
 		} as unknown as MockedObject<RedisCacheService>
 		cacheManager = { invalidateNamespace: vi.fn().mockResolvedValue(undefined) } as unknown as MockedObject<MultiLayerCacheManager>
-		memoryLayer = { deleteByPrefix: vi.fn().mockResolvedValue(3) } as unknown as MockedObject<MemoryCacheLayer>
+		epochs = new TenantCacheEpochs()
 		storage = { removeTenantFiles: vi.fn().mockResolvedValue({ filesRemoved: 1, errors: [] }) } as unknown as MockedObject<StorageCleanupService>
 
 		service = new TenantFlushService(
 			createConfigServiceMock({ 'cache.redis.db': 2 }),
 			redis,
 			cacheManager,
-			memoryLayer,
+			epochs,
 			storage,
 		)
 		service.onModuleInit()
@@ -57,10 +57,10 @@ describe('tenantFlushService', () => {
 	})
 
 	describe('flushTenant', () => {
-		it('clears memory and Redis, then the disk tier, then broadcasts', async () => {
+		it('advances the epoch, clears memory and Redis, then the disk tier, then broadcasts', async () => {
 			const order: string[] = []
 			cacheManager.invalidateNamespace.mockImplementation(async () => {
-				order.push('invalidateNamespace')
+				order.push(`invalidateNamespace@epoch${epochs.current('acme')}`)
 			})
 			storage.removeTenantFiles.mockImplementation(async () => {
 				order.push('removeTenantFiles')
@@ -73,9 +73,17 @@ describe('tenantFlushService', () => {
 
 			await service.flushTenant('acme')
 
-			expect(order).toEqual(['invalidateNamespace', 'removeTenantFiles', 'publish'])
+			// The epoch is already advanced when the first tier is cleared.
+			expect(order).toEqual(['invalidateNamespace@epoch1', 'removeTenantFiles', 'publish'])
 			expect(cacheManager.invalidateNamespace).toHaveBeenCalledWith('image:acme')
 			expect(storage.removeTenantFiles).toHaveBeenCalledWith('acme')
+		})
+
+		it('advances only the flushed tenant\'s epoch', async () => {
+			await service.flushTenant('tenant_a')
+
+			expect(epochs.current('tenant_a')).toBe(1)
+			expect(epochs.current('tenant_b')).toBe(0)
 		})
 
 		it('reports the namespace, the removed files and the broadcast receivers', async () => {
@@ -121,17 +129,22 @@ describe('tenantFlushService', () => {
 	describe('peer broadcasts', () => {
 		const PEER = 'another-replica'
 
-		it('drops the tenant\'s memory entries and disk files', async () => {
+		it('advances the epoch, then clears memory and Redis and sweeps the disk', async () => {
+			const seen: number[] = []
+			cacheManager.invalidateNamespace.mockImplementation(async () => {
+				seen.push(epochs.current('acme'))
+			})
+
 			await deliver({ tenantSchema: 'acme', origin: PEER })
 
-			expect(memoryLayer.deleteByPrefix).toHaveBeenCalledExactlyOnceWith('image:acme:')
+			expect(seen).toEqual([1])
+			expect(cacheManager.invalidateNamespace).toHaveBeenCalledExactlyOnceWith('image:acme')
 			expect(storage.removeTenantFiles).toHaveBeenCalledExactlyOnceWith('acme')
 		})
 
-		it('does not touch Redis: the origin already cleared the shared tier', async () => {
+		it('does not broadcast again', async () => {
 			await deliver({ tenantSchema: 'acme', origin: PEER })
 
-			expect(cacheManager.invalidateNamespace).not.toHaveBeenCalled()
 			expect(redis.publish).not.toHaveBeenCalled()
 		})
 
@@ -142,8 +155,9 @@ describe('tenantFlushService', () => {
 
 			await deliver(own)
 
-			expect(memoryLayer.deleteByPrefix).not.toHaveBeenCalled()
+			expect(cacheManager.invalidateNamespace).not.toHaveBeenCalled()
 			expect(storage.removeTenantFiles).not.toHaveBeenCalled()
+			expect(epochs.current('acme')).toBe(1)
 		})
 
 		it.each([
@@ -158,24 +172,25 @@ describe('tenantFlushService', () => {
 		])('ignores %s', async (_name, message) => {
 			await deliver(message)
 
-			expect(memoryLayer.deleteByPrefix).not.toHaveBeenCalled()
+			expect(cacheManager.invalidateNamespace).not.toHaveBeenCalled()
 			expect(storage.removeTenantFiles).not.toHaveBeenCalled()
+			expect(epochs.current('acme')).toBe(0)
 		})
 
-		it('still sweeps the disk when the memory tier fails', async () => {
-			memoryLayer.deleteByPrefix.mockRejectedValue(new Error('memory gone'))
+		it('still sweeps the disk when the layered tiers fail', async () => {
+			cacheManager.invalidateNamespace.mockRejectedValue(new Error('redis gone'))
 
 			await deliver({ tenantSchema: 'acme', origin: PEER })
 
 			expect(storage.removeTenantFiles).toHaveBeenCalledExactlyOnceWith('acme')
 		})
 
-		it('still clears the memory tier when the disk sweep fails', async () => {
+		it('still clears the layered tiers when the disk sweep fails', async () => {
 			storage.removeTenantFiles.mockRejectedValue(new Error('disk gone'))
 
 			await deliver({ tenantSchema: 'acme', origin: PEER })
 
-			expect(memoryLayer.deleteByPrefix).toHaveBeenCalledExactlyOnceWith('image:acme:')
+			expect(cacheManager.invalidateNamespace).toHaveBeenCalledExactlyOnceWith('image:acme')
 		})
 
 		it('names the tier that failed', async () => {

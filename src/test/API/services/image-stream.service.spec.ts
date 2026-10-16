@@ -114,6 +114,7 @@ describe('imageStreamService', () => {
 			metaData: null,
 			cached: null,
 			cacheTier: null,
+			flushEpoch: 3,
 		}
 
 		cacheOp = {
@@ -198,7 +199,7 @@ describe('imageStreamService', () => {
 
 			await service.processAndStream(createContext(), createRequest(), res)
 
-			expect(deduplicator.execute).toHaveBeenCalledWith(opCtx.id, expect.any(Function))
+			expect(deduplicator.execute).toHaveBeenCalledWith(`${opCtx.flushEpoch}:${opCtx.id}`, expect.any(Function))
 			expect(res.end).toHaveBeenCalledWith(processed.data)
 			expect(cacheOp.optimizeAndServeDefaultImage).not.toHaveBeenCalled()
 		})
@@ -254,7 +255,7 @@ describe('imageStreamService', () => {
 
 			await service.processAndStream(createContext(), createRequest(), res)
 
-			expect(deduplicator.execute).toHaveBeenCalledWith(opCtx.id, expect.any(Function))
+			expect(deduplicator.execute).toHaveBeenCalledWith(`${opCtx.flushEpoch}:${opCtx.id}`, expect.any(Function))
 			expect(cacheOp.execute).toHaveBeenCalledWith(opCtx)
 			expect(cacheOp.loadResource).not.toHaveBeenCalled()
 			expect(res.end).toHaveBeenCalledWith(processed.data)
