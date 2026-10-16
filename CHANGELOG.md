@@ -1,3 +1,10 @@
+## [3.10.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.10.0...v3.10.1) (2026-10-16)
+
+
+### Bug Fixes
+
+* **cache:** flush a tenant on every replica ([#33](https://github.com/vasilistotskas/grooveshop-media-stream/issues/33)) ([be22c2f](https://github.com/vasilistotskas/grooveshop-media-stream/commit/be22c2f1757487f33bc4b700e75d1ba57d738c15))
+
 # [3.10.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.9.2...v3.10.0) (2026-10-15)
 
 
