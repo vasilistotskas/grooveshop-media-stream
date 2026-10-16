@@ -6,8 +6,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 
+interface MockSubscriber {
+	status: string
+	connect: ReturnType<typeof vi.fn>
+	subscribe: ReturnType<typeof vi.fn>
+	quit: ReturnType<typeof vi.fn>
+	on: ReturnType<typeof vi.fn>
+}
+
 interface MockRedis {
 	status: string
+	subscriber: MockSubscriber
+	duplicate: ReturnType<typeof vi.fn>
+	publish: ReturnType<typeof vi.fn>
 	connect: ReturnType<typeof vi.fn>
 	quit: ReturnType<typeof vi.fn>
 	getBuffer: ReturnType<typeof vi.fn>
@@ -23,7 +34,20 @@ interface MockRedis {
 
 vi.mock('ioredis', () => {
 	const mockConstructor = vi.fn(function (this: Record<string, unknown>) {
+		const subscriber: MockSubscriber = {
+			status: 'wait',
+			connect: vi.fn().mockImplementation(function (this: MockSubscriber) {
+				this.status = 'ready'
+				return Promise.resolve()
+			}),
+			subscribe: vi.fn().mockResolvedValue(1),
+			quit: vi.fn().mockResolvedValue('OK'),
+			on: vi.fn(),
+		}
 		const instance: MockRedis = {
+			subscriber,
+			duplicate: vi.fn(() => subscriber),
+			publish: vi.fn().mockResolvedValue(2),
 			status: 'wait',
 			connect: vi.fn().mockImplementation(function (this: MockRedis) {
 				this.status = 'ready'
@@ -131,6 +155,7 @@ describe('redisCacheService', () => {
 					status: 'reconnecting',
 					connect: vi.fn().mockRejectedValue(new Error('ECONNREFUSED')),
 					on: vi.fn(),
+					duplicate: vi.fn(() => ({ on: vi.fn(), connect: vi.fn().mockRejectedValue(new Error('ECONNREFUSED')) })),
 				}
 				Object.assign(this, instance)
 				return instance
@@ -156,6 +181,81 @@ describe('redisCacheService', () => {
 			await service.onModuleDestroy()
 
 			expect(redis.quit).toHaveBeenCalledOnce()
+			expect(redis.subscriber.quit).toHaveBeenCalledOnce()
+		})
+	})
+
+	describe('pub/sub', () => {
+		function listener(event: string): (...args: string[]) => void {
+			return redis.subscriber.on.mock.calls.find(([name]) => name === event)![1]
+		}
+
+		it('should open the subscriber as a duplicate of the main connection and connect it once', () => {
+			expect(redis.duplicate).toHaveBeenCalledOnce()
+			expect(redis.subscriber.connect).toHaveBeenCalledOnce()
+			expect(redis.subscriber.on.mock.calls.map(([event]) => event)).toEqual(['message', 'ready', 'error'])
+		})
+
+		it('should subscribe a channel registered after the subscriber is ready', () => {
+			service.subscribe('flush', vi.fn())
+
+			expect(redis.subscriber.subscribe).toHaveBeenCalledExactlyOnceWith('flush')
+		})
+
+		it('should defer a channel registered before the subscriber is ready until it is', () => {
+			redis.subscriber.status = 'connecting'
+			service.subscribe('flush', vi.fn())
+			expect(redis.subscriber.subscribe).not.toHaveBeenCalled()
+
+			listener('ready')()
+
+			expect(redis.subscriber.subscribe).toHaveBeenCalledExactlyOnceWith('flush')
+		})
+
+		it('should resubscribe every channel on each ready, so a late or lost connection recovers', () => {
+			service.subscribe('a', vi.fn())
+			service.subscribe('b', vi.fn())
+			redis.subscriber.subscribe.mockClear()
+
+			listener('ready')()
+
+			expect(redis.subscriber.subscribe).toHaveBeenCalledExactlyOnceWith('a', 'b')
+		})
+
+		it('should route a message to the handler of its channel only', () => {
+			const flush = vi.fn()
+			const other = vi.fn()
+			service.subscribe('flush', flush)
+			service.subscribe('other', other)
+
+			listener('message')('flush', 'payload')
+
+			expect(flush).toHaveBeenCalledExactlyOnceWith('payload')
+			expect(other).not.toHaveBeenCalled()
+		})
+
+		it('should ignore a message for a channel nobody registered', () => {
+			expect(() => listener('message')('unknown', 'payload')).not.toThrow()
+		})
+
+		it('should publish on the main connection and return the receiver count', async () => {
+			await expect(service.publish('flush', 'payload')).resolves.toBe(2)
+
+			expect(redis.publish).toHaveBeenCalledExactlyOnceWith('flush', 'payload')
+		})
+
+		it('should return zero receivers without publishing while disconnected', async () => {
+			redis.status = 'reconnecting'
+
+			await expect(service.publish('flush', 'payload')).resolves.toBe(0)
+
+			expect(redis.publish).not.toHaveBeenCalled()
+		})
+
+		it('should surface a publish error to the caller', async () => {
+			redis.publish.mockRejectedValue(new Error('READONLY'))
+
+			await expect(service.publish('flush', 'payload')).rejects.toThrow('READONLY')
 		})
 	})
 

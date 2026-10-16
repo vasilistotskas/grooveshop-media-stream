@@ -29,6 +29,9 @@ const BINARY_HEADER_BYTES = 5
 @Injectable()
 export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleDestroy {
 	private redis!: Redis
+	/** Dedicated pub/sub connection: a subscribed connection cannot run other commands. */
+	private subscriber!: Redis
+	private readonly subscriptions = new Map<string, (message: string) => void>()
 	private readonly config: RedisConfig
 	private readonly keyspaceKeysRe: RegExp
 	private readonly stats = {
@@ -90,6 +93,8 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 		catch (error: unknown) {
 			CorrelatedLogger.warn(`Redis unavailable at startup, ioredis will keep retrying: ${errorMessage(error)}`, RedisCacheService.name)
 		}
+
+		this.openSubscriber()
 	}
 
 	async onModuleDestroy(): Promise<void> {
@@ -97,6 +102,57 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			await this.redis.quit()
 			CorrelatedLogger.log('Redis connection closed', RedisCacheService.name)
 		}
+		if (this.subscriber) {
+			await this.subscriber.quit()
+		}
+	}
+
+	/**
+	 * Run `handler` for every message published to `channel`, from any replica.
+	 * Registrations may precede the connection: every `ready` of the subscriber
+	 * subscribes them all, so a Redis that is down at startup is not a lost
+	 * subscription. Handlers must not throw.
+	 */
+	subscribe(channel: string, handler: (message: string) => void): void {
+		this.subscriptions.set(channel, handler)
+		if (this.subscriber?.status === 'ready') {
+			this.subscribeAll()
+		}
+	}
+
+	/** Receivers of the message (every subscribed replica, this one included); 0 while disconnected. */
+	async publish(channel: string, message: string): Promise<number> {
+		if (!this.isConnected) {
+			CorrelatedLogger.warn('Redis not connected, skipping PUBLISH operation', RedisCacheService.name)
+			return 0
+		}
+		return this.redis.publish(channel, message)
+	}
+
+	private openSubscriber(): void {
+		this.subscriber = this.redis.duplicate()
+
+		this.subscriber.on('message', (channel: string, message: string) => {
+			this.subscriptions.get(channel)?.(message)
+		})
+		this.subscriber.on('ready', () => this.subscribeAll())
+		this.subscriber.on('error', (error: unknown) => {
+			CorrelatedLogger.error(`Redis subscriber error: ${errorMessage(error)}`, undefined, RedisCacheService.name)
+		})
+
+		this.subscriber.connect().catch((error: unknown) => {
+			CorrelatedLogger.warn(`Redis subscriber unavailable at startup, ioredis will keep retrying: ${errorMessage(error)}`, RedisCacheService.name)
+		})
+	}
+
+	private subscribeAll(): void {
+		const channels = [...this.subscriptions.keys()]
+		if (channels.length === 0) {
+			return
+		}
+		this.subscriber.subscribe(...channels).catch((error: unknown) => {
+			CorrelatedLogger.error(`Redis SUBSCRIBE failed for ${channels.join(', ')}: ${errorMessage(error)}`, undefined, RedisCacheService.name)
+		})
 	}
 
 	get isConnected(): boolean {

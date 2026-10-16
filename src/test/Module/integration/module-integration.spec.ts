@@ -33,6 +33,8 @@ describe('module Integration', () => {
 				keys: vi.fn().mockResolvedValue([]),
 				getStats: vi.fn().mockReturnValue({ hits: 0, misses: 0, size: 0 }),
 				disconnect: vi.fn().mockResolvedValue(undefined),
+				subscribe: vi.fn(),
+				publish: vi.fn().mockResolvedValue(0),
 			})
 			.overrideProvider(CacheWarmingService)
 			.useValue({
