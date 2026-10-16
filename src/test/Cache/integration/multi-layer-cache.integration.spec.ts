@@ -251,9 +251,9 @@ describe('multiLayerCacheManager Integration', () => {
 		it('should invalidate namespace by deleting keys with prefix', async () => {
 			// deleteByPrefix is called on the cache layers (MemoryCacheLayer, RedisCacheLayer)
 			// The layers use the underlying service methods internally
-			await cacheManager.invalidateNamespace('image')
+			await cacheManager.invalidateNamespace('image', 'memory')
 
-			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('clear', 'multi-layer', 'success')
+			expect(mockMetricsService.recordCacheOperation).toHaveBeenCalledWith('clear', 'memory', 'success')
 		})
 	})
 

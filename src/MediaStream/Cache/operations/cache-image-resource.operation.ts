@@ -122,7 +122,7 @@ export default class CacheImageResourceOperation {
 		const namespace = imageNamespace(ctx.request.tenantSchema)
 
 		try {
-			const lookup = await this.cacheManager.lookup<ProcessedImage>(namespace, ctx.id)
+			const lookup = await this.cacheManager.lookup<ProcessedImage>(namespace, ctx.id, () => this.flushedSince(ctx))
 			if (lookup) {
 				const cached = lookup.value
 				if (typeof cached.metadata?.dateCreated !== 'number') {

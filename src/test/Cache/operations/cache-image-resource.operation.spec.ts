@@ -180,7 +180,7 @@ describe('cacheImageResourceOperation', () => {
 
 			await expect(operation.checkResourceExists(ctx)).resolves.toBe(true)
 
-			expect(cacheManager.lookup).toHaveBeenCalledWith('image:public', RESOURCE_ID)
+			expect(cacheManager.lookup).toHaveBeenCalledWith('image:public', RESOURCE_ID, expect.any(Function))
 			expect(ctx.cached).toBe(cached)
 			expect(ctx.metaData).toBe(cached.metadata)
 			expect(ctx.cacheTier).toBe('redis')
@@ -196,7 +196,7 @@ describe('cacheImageResourceOperation', () => {
 
 			await operation.checkResourceExists(ctx)
 
-			expect(cacheManager.lookup).toHaveBeenCalledWith('image:acme', RESOURCE_ID)
+			expect(cacheManager.lookup).toHaveBeenCalledWith('image:acme', RESOURCE_ID, expect.any(Function))
 			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'miss', expect.any(Number))
 		})
 
@@ -483,6 +483,15 @@ describe('cacheImageResourceOperation', () => {
 			const messages = warn.mock.calls.map(([message]) => String(message))
 			expect(messages.filter(m => m.includes('Could not remove a copy'))).toHaveLength(1)
 			warn.mockRestore()
+		})
+
+		it('fences the layered lookup\'s backfill with the request\'s own epoch', async () => {
+			await operation.checkResourceExists(ctx)
+			const fence = cacheManager.lookup.mock.calls[0][2] as () => boolean
+
+			expect(fence()).toBe(false)
+			epochs.advance('public')
+			expect(fence()).toBe(true)
 		})
 
 		it('caches normally when no flush landed', async () => {

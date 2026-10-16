@@ -12,6 +12,7 @@ import ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { imageNamespace } from '../utils/cache-namespace.util.js'
 import { MultiLayerCacheManager } from './multi-layer-cache.manager.js'
+import { TenantCacheEpochs } from './tenant-cache-epochs.service.js'
 
 const RESOURCE_EXTENSION = '.rsc'
 const METADATA_EXTENSION = '.rsm'
@@ -46,6 +47,7 @@ export class CacheWarmingService implements OnModuleInit {
 
 	constructor(
 		private readonly cacheManager: MultiLayerCacheManager,
+		private readonly tenantCacheEpochs: TenantCacheEpochs,
 		configService: ConfigService,
 		private readonly metricsService: MetricsService,
 		private readonly schedulerRegistry: SchedulerRegistry,
@@ -185,7 +187,10 @@ export class CacheWarmingService implements OnModuleInit {
 
 	private async warmupFile(fileInfo: FileAccessInfo): Promise<void> {
 		const resourceId = basename(fileInfo.path, RESOURCE_EXTENSION)
-		const namespace = imageNamespace(fileInfo.metadata.tenantSchema)
+		const tenantSchema = fileInfo.metadata.tenantSchema
+		const namespace = imageNamespace(tenantSchema)
+		// A flush of the tenant during the warm-up must not be undone by it.
+		const epoch = this.tenantCacheEpochs.current(tenantSchema)
 
 		if (await this.cacheManager.exists(namespace, resourceId)) {
 			CorrelatedLogger.debug(`File already in cache: ${fileInfo.path}`, CacheWarmingService.name)
@@ -198,7 +203,14 @@ export class CacheWarmingService implements OnModuleInit {
 		const accessMultiplier = Math.min(fileInfo.metadata.accessCount / 10, 5)
 		const ttl = Math.floor(this.baseCacheTtl * (1 + accessMultiplier))
 
+		if (this.tenantCacheEpochs.flushedSince(tenantSchema, epoch)) {
+			return
+		}
 		await this.cacheManager.set(namespace, resourceId, { data: content, metadata: fileInfo.metadata }, ttl)
+		if (this.tenantCacheEpochs.flushedSince(tenantSchema, epoch)) {
+			await this.cacheManager.delete(namespace, resourceId)
+			return
+		}
 
 		CorrelatedLogger.debug(`Warmed up file: ${fileInfo.path} (ns=${namespace}, TTL: ${ttl}s)`, CacheWarmingService.name)
 	}

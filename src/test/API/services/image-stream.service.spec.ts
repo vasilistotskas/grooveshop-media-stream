@@ -5,7 +5,7 @@ import type { ProcessedImage } from '#microservice/Cache/operations/image-format
 import type { ImageRequestLog } from '#microservice/Correlation/utils/image-request-log.util'
 import { Buffer } from 'node:buffer'
 import { Test, TestingModule } from '@nestjs/testing'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CacheImageRequest, { ResizeOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
 import UnableToFetchResourceException from '#microservice/API/exceptions/unable-to-fetch-resource.exception'
 import { ImageStreamService } from '#microservice/API/services/image-stream.service'
@@ -278,6 +278,69 @@ describe('imageStreamService', () => {
 
 			expect(first.end).toHaveBeenCalledWith(processed.data)
 			expect(second.end).toHaveBeenCalledWith(processed.data)
+		})
+
+		describe('with the real deduplicator', () => {
+			let real: RequestDeduplicator<ProcessedImage>
+			let isolated: ImageStreamService
+			let release: () => void
+
+			beforeEach(async () => {
+				real = new RequestDeduplicator<ProcessedImage>()
+				const module = await Test.createTestingModule({
+					providers: [
+						ImageStreamService,
+						{ provide: CacheImageResourceOperation, useValue: cacheOp },
+						{ provide: MetricsService, useValue: metricsService },
+						{ provide: RequestDeduplicator, useValue: real },
+					],
+				}).compile()
+				isolated = module.get(ImageStreamService)
+				// The first execute hangs until released; any later one answers at once.
+				cacheOp.execute
+					.mockImplementationOnce(() => new Promise((resolve) => {
+						release = () => resolve(createProcessedImage('before'))
+					}))
+					.mockResolvedValue(createProcessedImage('after'))
+			})
+
+			afterEach(() => {
+				real.onModuleDestroy()
+			})
+
+			it('never lets a request from after a flush join work that began before it', async () => {
+				cacheOp.setup
+					.mockResolvedValueOnce({ ...opCtx, flushEpoch: 0 })
+					.mockResolvedValueOnce({ ...opCtx, flushEpoch: 1 })
+				const before = createMockResponse()
+				const after = createMockResponse()
+
+				const first = isolated.processAndStream(createContext(), createRequest(), before)
+				await vi.waitFor(() => expect(cacheOp.execute).toHaveBeenCalledTimes(1))
+				const second = isolated.processAndStream(createContext(), createRequest(), after)
+				await vi.waitFor(() => expect(cacheOp.execute).toHaveBeenCalledTimes(2))
+				release()
+				await Promise.all([first, second])
+
+				expect(before.end).toHaveBeenCalledWith(Buffer.from('before'))
+				expect(after.end).toHaveBeenCalledWith(Buffer.from('after'))
+			})
+
+			it('still shares in-flight work between requests of the same epoch', async () => {
+				const one = createMockResponse()
+				const two = createMockResponse()
+
+				const first = isolated.processAndStream(createContext(), createRequest(), one)
+				await vi.waitFor(() => expect(cacheOp.execute).toHaveBeenCalledTimes(1))
+				const second = isolated.processAndStream(createContext(), createRequest(), two)
+				await new Promise(resolve => setImmediate(resolve))
+				release()
+				await Promise.all([first, second])
+
+				expect(cacheOp.execute).toHaveBeenCalledTimes(1)
+				expect(one.end).toHaveBeenCalledWith(Buffer.from('before'))
+				expect(two.end).toHaveBeenCalledWith(Buffer.from('before'))
+			})
 		})
 	})
 

@@ -9,6 +9,7 @@ import { Test } from '@nestjs/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CacheWarmingService } from '#microservice/Cache/services/cache-warming.service'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
+import { TenantCacheEpochs } from '#microservice/Cache/services/tenant-cache-epochs.service'
 import { storageDirectory } from '#microservice/common/utils/storage-path.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
@@ -49,12 +50,13 @@ interface Harness {
 	storageDir: string
 }
 
-async function createHarness(overrides: ConfigOverrides = {}): Promise<Harness> {
+async function createHarness(overrides: ConfigOverrides = {}, epochs = new TenantCacheEpochs()): Promise<Harness> {
 	const configService = createConfigServiceMock(overrides)
 	const module = await Test.createTestingModule({
 		providers: [
 			CacheWarmingService,
-			{ provide: MultiLayerCacheManager, useValue: { exists: vi.fn(), set: vi.fn() } },
+			{ provide: MultiLayerCacheManager, useValue: { exists: vi.fn(), set: vi.fn(), delete: vi.fn() } },
+			{ provide: TenantCacheEpochs, useValue: epochs },
 			{ provide: ConfigService, useValue: configService },
 			{ provide: MetricsService, useValue: { recordCacheOperation: vi.fn() } },
 			{ provide: SchedulerRegistry, useValue: { addCronJob: vi.fn() } },
@@ -192,6 +194,38 @@ describe('cacheWarmingService', () => {
 	})
 
 	describe('cache entry', () => {
+		it('does not warm a file whose tenant was flushed while the file was being read', async () => {
+			const epochs = new TenantCacheEpochs()
+			harness = await createHarness({}, epochs)
+			mockReaddir.mockResolvedValue([mockDirent('abc-123.rsc')] as any)
+			mockReadFile
+				.mockResolvedValueOnce(sidecar(20, 'acme'))
+				.mockImplementationOnce(async () => {
+					epochs.advance('acme')
+					return Buffer.from('file content')
+				})
+
+			await harness.service.warmupCache()
+
+			expect(harness.cacheManager.set).not.toHaveBeenCalled()
+		})
+
+		it('removes a warmed entry whose tenant was flushed while it was being written', async () => {
+			const epochs = new TenantCacheEpochs()
+			harness = await createHarness({}, epochs)
+			mockReaddir.mockResolvedValue([mockDirent('abc-123.rsc')] as any)
+			mockReadFile
+				.mockResolvedValueOnce(sidecar(20, 'acme'))
+				.mockResolvedValueOnce(Buffer.from('file content'))
+			harness.cacheManager.set.mockImplementation(async () => {
+				epochs.advance('acme')
+			})
+
+			await harness.service.warmupCache()
+
+			expect(harness.cacheManager.delete).toHaveBeenCalledWith('image:acme', 'abc-123')
+		})
+
 		it('keys the entry by the sidecar\'s tenant namespace and the file basename, carrying the parsed metadata', async () => {
 			mockReaddir.mockResolvedValue([mockDirent('abc-123.rsc')] as any)
 			mockReadFile
