@@ -1,3 +1,10 @@
+## [3.10.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.10.2...v3.10.3) (2026-10-16)
+
+
+### Bug Fixes
+
+* **cache:** a tenant flush holds under live traffic ([#35](https://github.com/vasilistotskas/grooveshop-media-stream/issues/35)) ([7495405](https://github.com/vasilistotskas/grooveshop-media-stream/commit/74954050b98c7a2800ed07f55766a9175a2eb344))
+
 ## [3.10.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.10.1...v3.10.2) (2026-10-16)
 
 
