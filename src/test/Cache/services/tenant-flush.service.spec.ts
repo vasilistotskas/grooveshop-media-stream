@@ -5,6 +5,7 @@ import type { RedisCacheService } from '#microservice/Cache/services/redis-cache
 import type { StorageCleanupService } from '#microservice/Storage/services/storage-cleanup.service'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TenantFlushService } from '#microservice/Cache/services/tenant-flush.service'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 import 'reflect-metadata'
 
@@ -161,10 +162,30 @@ describe('tenantFlushService', () => {
 			expect(storage.removeTenantFiles).not.toHaveBeenCalled()
 		})
 
-		it('survives a failing sweep without an unhandled rejection', async () => {
-			memoryLayer.deleteByPrefix.mockRejectedValue(new Error('disk gone'))
+		it('still sweeps the disk when the memory tier fails', async () => {
+			memoryLayer.deleteByPrefix.mockRejectedValue(new Error('memory gone'))
 
-			await expect(deliver({ tenantSchema: 'acme', origin: PEER })).resolves.toBeUndefined()
+			await deliver({ tenantSchema: 'acme', origin: PEER })
+
+			expect(storage.removeTenantFiles).toHaveBeenCalledExactlyOnceWith('acme')
+		})
+
+		it('still clears the memory tier when the disk sweep fails', async () => {
+			storage.removeTenantFiles.mockRejectedValue(new Error('disk gone'))
+
+			await deliver({ tenantSchema: 'acme', origin: PEER })
+
+			expect(memoryLayer.deleteByPrefix).toHaveBeenCalledExactlyOnceWith('image:acme:')
+		})
+
+		it('names the tier that failed', async () => {
+			const error = vi.spyOn(CorrelatedLogger, 'error').mockImplementation(() => {})
+			storage.removeTenantFiles.mockRejectedValue(new Error('disk gone'))
+
+			await deliver({ tenantSchema: 'acme', origin: PEER })
+
+			expect(error).toHaveBeenCalledWith(expect.stringContaining('disk tier: disk gone'), undefined, 'TenantFlushService')
+			error.mockRestore()
 		})
 	})
 })

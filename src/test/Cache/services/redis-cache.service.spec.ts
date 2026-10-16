@@ -183,6 +183,22 @@ describe('redisCacheService', () => {
 			expect(redis.quit).toHaveBeenCalledOnce()
 			expect(redis.subscriber.quit).toHaveBeenCalledOnce()
 		})
+
+		it('should still quit the subscriber when the main connection QUIT rejects', async () => {
+			redis.quit.mockRejectedValue(new Error('Connection is closed'))
+
+			await expect(service.onModuleDestroy()).resolves.toBeUndefined()
+
+			expect(redis.subscriber.quit).toHaveBeenCalledOnce()
+		})
+
+		it('should still quit the main connection when the subscriber QUIT rejects', async () => {
+			redis.subscriber.quit.mockRejectedValue(new Error('Connection is closed'))
+
+			await expect(service.onModuleDestroy()).resolves.toBeUndefined()
+
+			expect(redis.quit).toHaveBeenCalledOnce()
+		})
 	})
 
 	describe('pub/sub', () => {

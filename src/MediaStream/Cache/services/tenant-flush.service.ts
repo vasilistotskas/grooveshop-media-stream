@@ -118,12 +118,23 @@ export class TenantFlushService implements OnModuleInit {
 			return
 		}
 
+		// Independent tiers: one failing must not leave the other stale.
 		const namespace = imageNamespace(message.tenantSchema)
-		const memoryRemoved = await this.memoryCacheLayer.deleteByPrefix(cacheKey(namespace, ''))
-		const disk = await this.storageCleanupService.removeTenantFiles(message.tenantSchema)
-		CorrelatedLogger.log(
-			`Peer flush for ${namespace}: ${memoryRemoved} memory key(s) and ${disk.filesRemoved} file pair(s) removed${disk.errors.length ? `, ${disk.errors.length} error(s)` : ''}`,
-			TenantFlushService.name,
-		)
+		const [memory, disk] = await Promise.allSettled([
+			this.memoryCacheLayer.deleteByPrefix(cacheKey(namespace, '')),
+			this.storageCleanupService.removeTenantFiles(message.tenantSchema),
+		])
+		if (memory.status === 'rejected') {
+			CorrelatedLogger.error(`Peer flush of ${namespace} failed in the memory tier: ${errorMessage(memory.reason)}`, undefined, TenantFlushService.name)
+		}
+		if (disk.status === 'rejected') {
+			CorrelatedLogger.error(`Peer flush of ${namespace} failed in the disk tier: ${errorMessage(disk.reason)}`, undefined, TenantFlushService.name)
+		}
+		if (memory.status === 'fulfilled' && disk.status === 'fulfilled') {
+			CorrelatedLogger.log(
+				`Peer flush for ${namespace}: ${memory.value} memory key(s) and ${disk.value.filesRemoved} file pair(s) removed${disk.value.errors.length ? `, ${disk.value.errors.length} error(s)` : ''}`,
+				TenantFlushService.name,
+			)
+		}
 	}
 }

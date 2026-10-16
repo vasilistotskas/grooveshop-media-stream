@@ -98,12 +98,23 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 	}
 
 	async onModuleDestroy(): Promise<void> {
-		if (this.redis) {
-			await this.redis.quit()
-			CorrelatedLogger.log('Redis connection closed', RedisCacheService.name)
+		await Promise.all([
+			this.quit(this.redis, 'Redis'),
+			this.quit(this.subscriber, 'Redis subscriber'),
+		])
+	}
+
+	/** A connection that already dropped rejects its QUIT; shutdown goes on to the other one. */
+	private async quit(client: Redis | undefined, name: string): Promise<void> {
+		if (!client) {
+			return
 		}
-		if (this.subscriber) {
-			await this.subscriber.quit()
+		try {
+			await client.quit()
+			CorrelatedLogger.log(`${name} connection closed`, RedisCacheService.name)
+		}
+		catch (error: unknown) {
+			CorrelatedLogger.warn(`${name} QUIT failed: ${errorMessage(error)}`, RedisCacheService.name)
 		}
 	}
 
