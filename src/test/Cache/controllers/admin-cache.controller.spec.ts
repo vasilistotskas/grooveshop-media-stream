@@ -3,36 +3,28 @@ import { BadRequestException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AdminCacheController } from '#microservice/Cache/controllers/admin-cache.controller'
-import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
+import { TenantFlushService } from '#microservice/Cache/services/tenant-flush.service'
 import { InternalSecretGuard } from '#microservice/common/guards/internal-secret.guard'
-import { StorageCleanupService } from '#microservice/Storage/services/storage-cleanup.service'
 import 'reflect-metadata'
 
 describe('adminCacheController', () => {
 	let controller: AdminCacheController
-	let cacheManager: MockedObject<MultiLayerCacheManager>
-	let storageCleanupService: MockedObject<StorageCleanupService>
+	let tenantFlushService: MockedObject<TenantFlushService>
 
 	beforeEach(async () => {
-		const mockCacheManager = {
-			invalidateNamespace: vi.fn().mockResolvedValue(undefined),
-		}
-
-		const mockStorageCleanupService = {
-			removeTenantFiles: vi.fn().mockResolvedValue({ filesRemoved: 0, errors: [] }),
+		const mockTenantFlushService = {
+			flushTenant: vi.fn().mockImplementation(async (tenantSchema: string) => ({
+				namespace: `image:${tenantSchema}`,
+				filesRemoved: 0,
+				diskErrors: [],
+				broadcastReceivers: 2,
+			})),
 		}
 
 		const module: TestingModule = await Test.createTestingModule({
 			controllers: [AdminCacheController],
 			providers: [
-				{
-					provide: MultiLayerCacheManager,
-					useValue: mockCacheManager,
-				},
-				{
-					provide: StorageCleanupService,
-					useValue: mockStorageCleanupService,
-				},
+				{ provide: TenantFlushService, useValue: mockTenantFlushService },
 			],
 		})
 			.overrideGuard(InternalSecretGuard)
@@ -40,129 +32,53 @@ describe('adminCacheController', () => {
 			.compile()
 
 		controller = module.get<AdminCacheController>(AdminCacheController)
-		cacheManager = module.get(MultiLayerCacheManager)
-		storageCleanupService = module.get(StorageCleanupService)
+		tenantFlushService = module.get(TenantFlushService)
 	})
 
 	describe('flushTenant', () => {
-		it('should flush the cache for a valid tenant schema', async () => {
+		it('flushes a valid tenant schema and reports the documented response shape', async () => {
 			const result = await controller.flushTenant({ tenantSchema: 'acme' })
 
 			expect(result).toEqual({
 				flushed: true,
 				tenantSchema: 'acme',
 				namespace: 'image:acme',
+				broadcastReceivers: 2,
 				timestamp: expect.any(Number),
 			})
-			expect(cacheManager.invalidateNamespace).toHaveBeenCalledWith('image:acme')
+			expect(tenantFlushService.flushTenant).toHaveBeenCalledExactlyOnceWith('acme')
 		})
 
-		it('should flush the cache for "public" schema', async () => {
-			const result = await controller.flushTenant({ tenantSchema: 'public' })
+		it.each(['public', '_tenant_123', 'tenant_a'])('accepts the schema %s', async (tenantSchema) => {
+			const result = await controller.flushTenant({ tenantSchema })
 
-			expect(result.tenantSchema).toBe('public')
-			expect(result.namespace).toBe('image:public')
-			expect(cacheManager.invalidateNamespace).toHaveBeenCalledWith('image:public')
+			expect(result.tenantSchema).toBe(tenantSchema)
+			expect(result.namespace).toBe(`image:${tenantSchema}`)
+			expect(tenantFlushService.flushTenant).toHaveBeenCalledWith(tenantSchema)
 		})
 
-		it('should flush the cache for underscore-prefixed tenant schema', async () => {
-			const result = await controller.flushTenant({ tenantSchema: '_tenant_123' })
-
-			expect(result.namespace).toBe('image:_tenant_123')
-			expect(cacheManager.invalidateNamespace).toHaveBeenCalledWith('image:_tenant_123')
+		it.each(['UPPERCASE', 'bad-schema', 'sch@ma!', ''])('rejects the schema %j', async (tenantSchema) => {
+			await expect(controller.flushTenant({ tenantSchema })).rejects.toThrow(BadRequestException)
+			expect(tenantFlushService.flushTenant).not.toHaveBeenCalled()
 		})
 
-		it('should throw BadRequestException for uppercase tenant schema', async () => {
-			await expect(controller.flushTenant({ tenantSchema: 'UPPERCASE' }))
-				.rejects
-				.toThrow(BadRequestException)
+		it('rejects a body without tenantSchema', async () => {
+			await expect(controller.flushTenant({} as never)).rejects.toThrow(BadRequestException)
+			expect(tenantFlushService.flushTenant).not.toHaveBeenCalled()
 		})
 
-		it('should throw BadRequestException for tenant schema with hyphens', async () => {
-			await expect(controller.flushTenant({ tenantSchema: 'bad-schema' }))
-				.rejects
-				.toThrow(BadRequestException)
-		})
-
-		it('should throw BadRequestException for tenant schema with special characters', async () => {
-			await expect(controller.flushTenant({ tenantSchema: 'sch@ma!' }))
-				.rejects
-				.toThrow(BadRequestException)
-		})
-
-		it('should throw BadRequestException for empty tenant schema', async () => {
-			await expect(controller.flushTenant({ tenantSchema: '' }))
-				.rejects
-				.toThrow(BadRequestException)
-		})
-
-		it('should throw BadRequestException when tenantSchema is missing', async () => {
-			await expect(controller.flushTenant({} as any))
-				.rejects
-				.toThrow(BadRequestException)
-		})
-
-		it('should not affect other tenant namespaces when flushing tenant A', async () => {
-			// Call invalidateNamespace for tenant A
-			await controller.flushTenant({ tenantSchema: 'tenant_a' })
-
-			// The invalidation call uses a precise namespace prefix, leaving tenant_b intact
-			expect(cacheManager.invalidateNamespace).toHaveBeenCalledWith('image:tenant_a')
-			expect(cacheManager.invalidateNamespace).not.toHaveBeenCalledWith('image:tenant_b')
-			expect(cacheManager.invalidateNamespace).not.toHaveBeenCalledWith('image')
-		})
-
-		// FIX 1: memory+Redis invalidation alone leaves the on-disk tier
-		// untouched, so flushed resources resurrect from disk on the next
-		// request. The endpoint must also sweep storage/*.rsm files for the
-		// flushed tenant schema.
-		it('should also sweep the on-disk storage tier for the flushed tenant schema', async () => {
-			await controller.flushTenant({ tenantSchema: 'acme' })
-
-			expect(storageCleanupService.removeTenantFiles).toHaveBeenCalledWith('acme')
-			expect(storageCleanupService.removeTenantFiles).toHaveBeenCalledTimes(1)
-		})
-
-		it('sweeps disk files after memory/Redis invalidation, not before', async () => {
-			const callOrder: string[] = []
-			cacheManager.invalidateNamespace.mockImplementation(async () => {
-				callOrder.push('invalidateNamespace')
-			})
-			storageCleanupService.removeTenantFiles.mockImplementation(async () => {
-				callOrder.push('removeTenantFiles')
-				return { filesRemoved: 0, errors: [] }
-			})
-
-			await controller.flushTenant({ tenantSchema: 'acme' })
-
-			expect(callOrder).toEqual(['invalidateNamespace', 'removeTenantFiles'])
-		})
-
-		it('still returns the documented response shape when disk files were removed', async () => {
-			storageCleanupService.removeTenantFiles.mockResolvedValue({ filesRemoved: 3, errors: [] })
-
-			const result = await controller.flushTenant({ tenantSchema: 'acme' })
-
-			// The disk-removal count is logged, not part of the public response
-			// contract (documented in CLAUDE.md) — response shape stays stable.
-			expect(result).toEqual({
-				flushed: true,
-				tenantSchema: 'acme',
+		it('reports zero broadcast receivers when the other replicas could not be reached', async () => {
+			tenantFlushService.flushTenant.mockResolvedValue({
 				namespace: 'image:acme',
-				timestamp: expect.any(Number),
-			})
-		})
-
-		it('does not fail the request for other tenant schemas when disk sweep reports errors', async () => {
-			storageCleanupService.removeTenantFiles.mockResolvedValue({
 				filesRemoved: 1,
-				errors: ['Failed to read metadata corrupt.rsm: Unexpected token'],
+				diskErrors: [],
+				broadcastReceivers: 0,
 			})
 
-			const result = await controller.flushTenant({ tenantSchema: 'tenant_a' })
+			const result = await controller.flushTenant({ tenantSchema: 'acme' })
 
 			expect(result.flushed).toBe(true)
-			expect(storageCleanupService.removeTenantFiles).toHaveBeenCalledWith('tenant_a')
+			expect(result.broadcastReceivers).toBe(0)
 		})
 	})
 })

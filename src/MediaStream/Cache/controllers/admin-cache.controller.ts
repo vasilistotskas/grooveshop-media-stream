@@ -1,10 +1,7 @@
 import { BadRequestException, Body, Controller, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common'
 import { TENANT_SCHEMA_PATTERN } from '#microservice/common/constants/tenant.constant'
 import { InternalSecretGuard } from '#microservice/common/guards/internal-secret.guard'
-import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
-import { StorageCleanupService } from '#microservice/Storage/services/storage-cleanup.service'
-import { MultiLayerCacheManager } from '../services/multi-layer-cache.manager.js'
-import { imageNamespace } from '../utils/cache-namespace.util.js'
+import { TenantFlushService } from '../services/tenant-flush.service.js'
 
 export interface FlushTenantBody {
 	tenantSchema: string
@@ -17,28 +14,26 @@ export interface FlushTenantBody {
 @Controller('admin/cache')
 @UseGuards(InternalSecretGuard)
 export class AdminCacheController {
-	constructor(
-		private readonly cacheManager: MultiLayerCacheManager,
-		private readonly storageCleanupService: StorageCleanupService,
-	) {}
+	constructor(private readonly tenantFlushService: TenantFlushService) {}
 
 	/**
-	 * Flush all cache entries that belong to a specific tenant.
+	 * Flush all cache entries that belong to a specific tenant, on every replica.
 	 *
-	 * Cache keys are stored under the namespace ``image:{tenantSchema}``, so this
-	 * performs a targeted SCAN-based invalidation of the ``image:{tenantSchema}:*``
-	 * key range across every active cache layer (memory + Redis), and additionally
-	 * sweeps the on-disk storage tier for matching ``.rsm``/``.rsc`` pairs (the file
-	 * system layer is read directly by CacheImageResourceOperation and is not covered
-	 * by MultiLayerCacheManager — without this sweep, flushed resources would
-	 * resurrect from disk on the next request). Keys/files from other tenants are
-	 * not touched.
+	 * Cache keys are stored under the namespace ``image:{tenantSchema}``. The
+	 * replica that takes this request clears its memory tier, the shared Redis
+	 * tier and its on-disk tier (the file system layer is read directly by
+	 * CacheImageResourceOperation, so without the sweep a flushed resource
+	 * resurrects from disk), then broadcasts the tenant over Redis pub/sub so
+	 * every other replica drops its own memory and disk entries. Keys/files from
+	 * other tenants are not touched.
 	 *
 	 * Body: ``{ "tenantSchema": "acme" }``
 	 *
 	 * Guards: requires ``x-internal-secret`` header matching INTERNAL_ADMIN_SECRET.
 	 *
-	 * Returns: ``{ flushed: true, tenantSchema, namespace, timestamp }``
+	 * Returns: ``{ flushed: true, tenantSchema, namespace, broadcastReceivers, timestamp }``.
+	 * ``broadcastReceivers`` counts the subscribers that got the broadcast, this
+	 * replica included: with N replicas a healthy flush reports N.
 	 */
 	@Post('flush-tenant')
 	@HttpCode(HttpStatus.OK)
@@ -46,6 +41,7 @@ export class AdminCacheController {
 		flushed: boolean
 		tenantSchema: string
 		namespace: string
+		broadcastReceivers: number
 		timestamp: number
 	}> {
 		const { tenantSchema } = body ?? {}
@@ -60,24 +56,13 @@ export class AdminCacheController {
 			)
 		}
 
-		const namespace = imageNamespace(tenantSchema)
-		CorrelatedLogger.log(`Flushing cache for tenant namespace: ${namespace}`, AdminCacheController.name)
-
-		await this.cacheManager.invalidateNamespace(namespace)
-
-		const diskResult = await this.storageCleanupService.removeTenantFiles(tenantSchema)
-		CorrelatedLogger.log(
-			`Disk sweep for tenant namespace ${namespace}: ${diskResult.filesRemoved} file pair(s) removed${
-				diskResult.errors.length ? `, ${diskResult.errors.length} error(s)` : ''}`,
-			AdminCacheController.name,
-		)
-
-		CorrelatedLogger.log(`Cache flush complete for tenant namespace: ${namespace}`, AdminCacheController.name)
+		const { namespace, broadcastReceivers } = await this.tenantFlushService.flushTenant(tenantSchema)
 
 		return {
 			flushed: true,
 			tenantSchema,
 			namespace,
+			broadcastReceivers,
 			timestamp: Date.now(),
 		}
 	}

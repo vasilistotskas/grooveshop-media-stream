@@ -90,7 +90,7 @@ Content-Type: application/json
 { "tenantSchema": "acme" }
 ```
 
-Invalidates all `image:acme:*` entries in memory and Redis and sweeps the on-disk tier (`StorageCleanupService.removeTenantFiles`) for `.rsm`/`.rsc` pairs whose `tenantSchema` matches. Returns `{ flushed: true, tenantSchema, namespace, timestamp }`. `tenantSchema` must match `/^[a-z_][a-z0-9_]{0,62}$/`; the endpoint is fail-closed without `INTERNAL_ADMIN_SECRET`.
+Flushes the tenant on **every replica**. The replica that takes the request (`TenantFlushService`) invalidates all `image:acme:*` entries in its memory tier and in the shared Redis tier, sweeps its on-disk tier (`StorageCleanupService.removeTenantFiles`) for `.rsm`/`.rsc` pairs whose `tenantSchema` matches, then publishes the tenant on the Redis channel `mediastream:tenant-flush:{REDIS_DB}`; every other replica drops its own memory entries and disk pairs for that tenant (Redis is cleared once, by the origin). The memory and disk tiers are private to a pod, so without the broadcast a flush sent to one pod left the others serving the old image for up to the memory TTL (30 days in production). Returns `{ flushed: true, tenantSchema, namespace, broadcastReceivers, timestamp }`; `broadcastReceivers` is the number of subscribers that got the message, the origin included, so a healthy flush reports the replica count and `0` means Redis was unreachable and the other replicas were not flushed (pub/sub is fire-and-forget: a replica that is down or mid-reconnect at that moment misses it). `tenantSchema` must match `/^[a-z_][a-z0-9_]{0,62}$/`; the endpoint is fail-closed without `INTERNAL_ADMIN_SECRET`.
 
 ### Image Sources
 

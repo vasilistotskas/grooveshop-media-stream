@@ -106,7 +106,7 @@ CORS is always enabled; the allowed origins are decided per request:
 - `GET /metrics` — Prometheus-format metrics. Requires `Authorization: Bearer <METRICS_BEARER_TOKEN>` (`MetricsTokenGuard`), a read-only credential separate from `INTERNAL_ADMIN_SECRET`
 
 ### Admin
-- `POST /admin/cache/flush-tenant` — Flush all cache entries (memory, Redis, file system) for a tenant. Protected by `InternalSecretGuard` (`x-internal-secret` header matching `INTERNAL_ADMIN_SECRET`)
+- `POST /admin/cache/flush-tenant` — Flush all cache entries (memory, Redis, file system) for a tenant on every replica (the receiving replica broadcasts over Redis pub/sub). Protected by `InternalSecretGuard` (`x-internal-secret` header matching `INTERNAL_ADMIN_SECRET`)
 
 ## Testing
 
