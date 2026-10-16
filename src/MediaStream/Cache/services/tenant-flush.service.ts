@@ -7,10 +7,10 @@ import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { StorageCleanupService } from '#microservice/Storage/services/storage-cleanup.service'
-import { MemoryCacheLayer } from '../layers/memory-cache.layer.js'
-import { cacheKey, imageNamespace } from '../utils/cache-namespace.util.js'
+import { imageNamespace } from '../utils/cache-namespace.util.js'
 import { MultiLayerCacheManager } from './multi-layer-cache.manager.js'
 import { RedisCacheService } from './redis-cache.service.js'
+import { TenantCacheEpochs } from './tenant-cache-epochs.service.js'
 
 const TENANT_FLUSH_CHANNEL = 'mediastream:tenant-flush'
 
@@ -42,9 +42,12 @@ function isTenantFlushMessage(value: unknown): value is TenantFlushMessage {
  * Redis is shared, but each replica also holds a private memory tier and an
  * on-disk tier that a request to one replica cannot reach. The replica that
  * takes the request therefore flushes itself completely (memory, Redis, disk)
- * and then broadcasts the tenant over Redis pub/sub; every other replica drops
- * its own memory and disk entries for that tenant. Redis is cleared once, by
- * the origin.
+ * and then broadcasts the tenant over Redis pub/sub; every other replica
+ * flushes itself the same way. Each replica advances the tenant's epoch before
+ * it clears anything, so a request that was already running when the flush
+ * arrived neither caches its stale result nor leaves it behind; every replica
+ * clears Redis too because that request may be on another replica than the one
+ * that took the flush.
  */
 @Injectable()
 export class TenantFlushService implements OnModuleInit {
@@ -55,7 +58,7 @@ export class TenantFlushService implements OnModuleInit {
 		configService: ConfigService,
 		private readonly redisCacheService: RedisCacheService,
 		private readonly cacheManager: MultiLayerCacheManager,
-		private readonly memoryCacheLayer: MemoryCacheLayer,
+		private readonly tenantCacheEpochs: TenantCacheEpochs,
 		private readonly storageCleanupService: StorageCleanupService,
 	) {
 		// Pub/sub channels are server-wide, not per database: scope the channel to
@@ -75,6 +78,7 @@ export class TenantFlushService implements OnModuleInit {
 		const namespace = imageNamespace(tenantSchema)
 		CorrelatedLogger.log(`Flushing cache for tenant namespace: ${namespace}`, TenantFlushService.name)
 
+		this.tenantCacheEpochs.advance(tenantSchema)
 		await this.cacheManager.invalidateNamespace(namespace)
 		const disk = await this.storageCleanupService.removeTenantFiles(tenantSchema)
 		const broadcastReceivers = await this.broadcast(tenantSchema)
@@ -118,21 +122,22 @@ export class TenantFlushService implements OnModuleInit {
 			return
 		}
 
-		// Independent tiers: one failing must not leave the other stale.
 		const namespace = imageNamespace(message.tenantSchema)
-		const [memory, disk] = await Promise.allSettled([
-			this.memoryCacheLayer.deleteByPrefix(cacheKey(namespace, '')),
+		this.tenantCacheEpochs.advance(message.tenantSchema)
+		// Independent tiers: one failing must not leave the other stale.
+		const [layered, disk] = await Promise.allSettled([
+			this.cacheManager.invalidateNamespace(namespace),
 			this.storageCleanupService.removeTenantFiles(message.tenantSchema),
 		])
-		if (memory.status === 'rejected') {
-			CorrelatedLogger.error(`Peer flush of ${namespace} failed in the memory tier: ${errorMessage(memory.reason)}`, undefined, TenantFlushService.name)
+		if (layered.status === 'rejected') {
+			CorrelatedLogger.error(`Peer flush of ${namespace} failed in the memory and Redis tiers: ${errorMessage(layered.reason)}`, undefined, TenantFlushService.name)
 		}
 		if (disk.status === 'rejected') {
 			CorrelatedLogger.error(`Peer flush of ${namespace} failed in the disk tier: ${errorMessage(disk.reason)}`, undefined, TenantFlushService.name)
 		}
-		if (memory.status === 'fulfilled' && disk.status === 'fulfilled') {
+		if (layered.status === 'fulfilled' && disk.status === 'fulfilled') {
 			CorrelatedLogger.log(
-				`Peer flush for ${namespace}: ${memory.value} memory key(s) and ${disk.value.filesRemoved} file pair(s) removed${disk.value.errors.length ? `, ${disk.value.errors.length} error(s)` : ''}`,
+				`Peer flush for ${namespace}: ${disk.value.filesRemoved} file pair(s) removed${disk.value.errors.length ? `, ${disk.value.errors.length} error(s)` : ''}`,
 				TenantFlushService.name,
 			)
 		}

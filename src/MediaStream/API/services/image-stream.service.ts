@@ -109,8 +109,11 @@ export class ImageStreamService {
 			// Concurrent misses for the same identity share one fetch + process;
 			// every waiter streams the shared result. The deduplicator calls
 			// `fn` synchronously for the request that leads, never for a waiter.
+			// The flush epoch is part of the key: a request that starts after a
+			// tenant flush must not join work that began before it, or it would
+			// stream the stale result the flush was meant to drop.
 			let leads = false
-			const shared = this.requestDeduplicator.execute(opCtx.id, () => {
+			const shared = this.requestDeduplicator.execute(`${opCtx.flushEpoch}:${opCtx.id}`, () => {
 				leads = true
 				return this.cacheImageResourceOperation.execute(opCtx)
 			})

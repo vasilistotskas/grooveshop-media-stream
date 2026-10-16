@@ -3,6 +3,7 @@ import type { ResizeOptions } from '#microservice/API/dto/cache-image-request.dt
 import type { ResourceIdentifierKP } from '#microservice/common/constants/key-properties.constant'
 import type { CacheLayerName } from '../interfaces/cache-layer.interface.js'
 import type { ProcessedImage } from './image-format-processor.service.js'
+import { randomUUID } from 'node:crypto'
 import { access, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
@@ -19,6 +20,7 @@ import ResourceMetaData, { resourceMetaVersion } from '#microservice/HTTP/dto/re
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import GenerateResourceIdentityFromRequestJob from '#microservice/Processing/jobs/generate-resource-identity-from-request.job'
 import { MultiLayerCacheManager } from '../services/multi-layer-cache.manager.js'
+import { TenantCacheEpochs } from '../services/tenant-cache-epochs.service.js'
 import { imageNamespace } from '../utils/cache-namespace.util.js'
 import { AccessCountTracker } from './access-count-tracker.service.js'
 import { ImageFormatProcessor } from './image-format-processor.service.js'
@@ -37,6 +39,14 @@ export interface OperationContext {
 	cached: ProcessedImage | null
 	/** Which tier checkResourceExists() found the valid copy in. */
 	cacheTier: CacheLayerName | 'disk' | null
+	/** The tenant's flush epoch when the request started; a cache write is dropped if a flush landed since. */
+	flushEpoch: number
+	/**
+	 * Names this request's temp files. Requests for one id from different flush
+	 * epochs no longer share a deduplicator slot, so two can run at once and
+	 * must not write the same temp path.
+	 */
+	tempToken: string
 }
 
 /**
@@ -59,6 +69,7 @@ export default class CacheImageResourceOperation {
 		private readonly cacheManager: MultiLayerCacheManager,
 		private readonly accessCountTracker: AccessCountTracker,
 		private readonly metricsService: MetricsService,
+		private readonly tenantCacheEpochs: TenantCacheEpochs,
 		configService: ConfigService,
 	) {
 		this.privateTtl = configService.get('cache.image.privateTtl')
@@ -70,7 +81,7 @@ export default class CacheImageResourceOperation {
 	}
 
 	getResourceTempPath(ctx: OperationContext): string {
-		return join(this.storageDir, `${ctx.id}.rst`)
+		return join(this.storageDir, `${ctx.id}.${ctx.tempToken}.rst`)
 	}
 
 	getResourceMetaPath(ctx: OperationContext): string {
@@ -85,9 +96,11 @@ export default class CacheImageResourceOperation {
 	async setup(cacheImageRequest: CacheImageRequest): Promise<OperationContext> {
 		PerformanceTracker.startPhase('setup')
 		try {
+			// Before anything is read or fetched: a flush after this point makes the result stale.
+			const flushEpoch = this.tenantCacheEpochs.current(cacheImageRequest.tenantSchema)
 			const id = await this.generateResourceIdentityFromRequestJob.handle(cacheImageRequest)
 			CorrelatedLogger.debug(`Resource ID generated: ${id}`, CacheImageResourceOperation.name)
-			return { request: cacheImageRequest, id, metaData: null, cached: null, cacheTier: null }
+			return { request: cacheImageRequest, id, metaData: null, cached: null, cacheTier: null, flushEpoch, tempToken: randomUUID() }
 		}
 		catch (error: unknown) {
 			CorrelatedLogger.error(`Setup failed: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, CacheImageResourceOperation.name)
@@ -203,9 +216,13 @@ export default class CacheImageResourceOperation {
 			}
 			resource = { data, metadata: ctx.metaData }
 			// Awaiting here would block the response on a Redis/memory write on every filesystem hit
-			this.cacheManager.set(imageNamespace(ctx.request.tenantSchema), ctx.id, resource, this.privateTtl).catch((error: unknown) => {
-				CorrelatedLogger.warn(`Failed to backfill multi-layer cache for ${ctx.id}: ${errorMessage(error)}`, CacheImageResourceOperation.name)
-			})
+			if (!this.flushedSince(ctx)) {
+				this.cacheManager.set(imageNamespace(ctx.request.tenantSchema), ctx.id, resource, this.privateTtl)
+					.then(() => this.discardIfFlushed(ctx))
+					.catch((error: unknown) => {
+						CorrelatedLogger.warn(`Failed to backfill multi-layer cache for ${ctx.id}: ${errorMessage(error)}`, CacheImageResourceOperation.name)
+					})
+			}
 			CorrelatedLogger.debug(`Resource retrieved from filesystem and cached: ${ctx.id}`, CacheImageResourceOperation.name)
 		}
 
@@ -253,6 +270,34 @@ export default class CacheImageResourceOperation {
 		return this.imageFormatProcessor.optimizeAndServeDefaultImage(resizeOptions)
 	}
 
+	/** Whether a flush of this request's tenant landed after the request started. */
+	private flushedSince(ctx: OperationContext): boolean {
+		return this.tenantCacheEpochs.flushedSince(ctx.request.tenantSchema, ctx.flushEpoch)
+	}
+
+	/**
+	 * Remove what this request cached if a flush landed while it was writing.
+	 * The flush advances the epoch before it clears anything, so a write that
+	 * finishes after the clear is caught here and one that finished before it
+	 * is removed by the clear itself. Missing files are expected, not errors.
+	 */
+	private async discardIfFlushed(ctx: OperationContext): Promise<void> {
+		if (!this.flushedSince(ctx)) {
+			return
+		}
+		CorrelatedLogger.debug(`Tenant flushed while ${ctx.id} was being cached, discarding the copy`, CacheImageResourceOperation.name)
+		const results = await Promise.allSettled([
+			this.cacheManager.delete(imageNamespace(ctx.request.tenantSchema), ctx.id),
+			unlink(this.getResourcePath(ctx)),
+			unlink(this.getResourceMetaPath(ctx)),
+		])
+		for (const result of results) {
+			if (result.status === 'rejected' && (result.reason as NodeJS.ErrnoException)?.code !== 'ENOENT') {
+				CorrelatedLogger.warn(`Could not remove a copy cached across a tenant flush for ${ctx.id}: ${errorMessage(result.reason)}`, CacheImageResourceOperation.name)
+			}
+		}
+	}
+
 	private isFresh(metadata: ResourceMetaData): boolean {
 		return metadata.dateCreated + metadata.privateTTL > Date.now()
 	}
@@ -287,6 +332,43 @@ export default class CacheImageResourceOperation {
 		}, IMAGE_DECODE_LOG_CONTEXT)
 	}
 
+	/**
+	 * Cache a processed result in the layered cache and on disk. Skipped when a
+	 * flush of the tenant landed since the request started (the result was built
+	 * from data the flush meant to drop; this request still serves it), and undone
+	 * when one lands during the write.
+	 */
+	private async persist(ctx: OperationContext, processed: ProcessedImage): Promise<void> {
+		if (this.flushedSince(ctx)) {
+			CorrelatedLogger.debug(`Tenant flushed while ${ctx.id} was processing, not caching the result`, CacheImageResourceOperation.name)
+			return
+		}
+
+		const resourcePath = this.getResourcePath(ctx)
+		const resourceMetaPath = this.getResourceMetaPath(ctx)
+		// Write to sibling .tmp paths first, then rename() — rename is
+		// atomic within one filesystem, so concurrent readers either
+		// see the old file or the complete new file, never a partial one.
+		const resourceTmpPath = `${resourcePath}.${ctx.tempToken}.tmp`
+		const resourceMetaTmpPath = `${resourceMetaPath}.${ctx.tempToken}.tmp`
+
+		await Promise.all([
+			this.cacheManager.set(imageNamespace(ctx.request.tenantSchema), ctx.id, processed, this.privateTtl),
+			writeFile(resourceTmpPath, processed.data),
+			writeFile(resourceMetaTmpPath, JSON.stringify(processed.metadata), 'utf8'),
+		])
+		await Promise.all([
+			rename(resourceTmpPath, resourcePath),
+			rename(resourceMetaTmpPath, resourceMetaPath),
+		])
+
+		if (this.flushedSince(ctx)) {
+			await this.discardIfFlushed(ctx)
+			return
+		}
+		this.accessCountTracker.record(resourceMetaPath)
+	}
+
 	private async processImage(ctx: OperationContext): Promise<ProcessedImage> {
 		PerformanceTracker.startPhase('processing')
 		const tenantSchema = ctx.request.tenantSchema || PUBLIC_TENANT_SCHEMA
@@ -307,24 +389,7 @@ export default class CacheImageResourceOperation {
 					? await this.imageFormatProcessor.processSvg(resourceTempPath, ctx.request.resizeOptions, tenantSchema)
 					: await this.imageFormatProcessor.processRaster(resourceTempPath, ctx.request.resizeOptions, tenantSchema)
 
-				const resourcePath = this.getResourcePath(ctx)
-				const resourceMetaPath = this.getResourceMetaPath(ctx)
-				// Write to sibling .tmp paths first, then rename() — rename is
-				// atomic within one filesystem, so concurrent readers either
-				// see the old file or the complete new file, never a partial one.
-				const resourceTmpPath = `${resourcePath}.tmp`
-				const resourceMetaTmpPath = `${resourceMetaPath}.tmp`
-
-				await Promise.all([
-					this.cacheManager.set(imageNamespace(ctx.request.tenantSchema), ctx.id, processed, this.privateTtl),
-					writeFile(resourceTmpPath, processed.data),
-					writeFile(resourceMetaTmpPath, JSON.stringify(processed.metadata), 'utf8'),
-				])
-				await Promise.all([
-					rename(resourceTmpPath, resourcePath),
-					rename(resourceMetaTmpPath, resourceMetaPath),
-				])
-				this.accessCountTracker.record(resourceMetaPath)
+				await this.persist(ctx, processed)
 			}
 			finally {
 				await unlink(resourceTempPath).catch((error: unknown) => {
