@@ -21,6 +21,7 @@ import { TenantCacheEpochs } from '#microservice/Cache/services/tenant-cache-epo
 import { ProcessingOverloadedError, UpstreamResourceTooLargeError } from '#microservice/common/errors/media-stream.errors'
 import { storageDirectory } from '#microservice/common/utils/storage-path.util'
 import { ConfigService } from '#microservice/Config/config.service'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
 import ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
@@ -153,7 +154,7 @@ describe('cacheImageResourceOperation', () => {
 	describe('resource paths', () => {
 		it('resolve under the configured storage directory', () => {
 			expect(operation.getResourcePath(ctx)).toBe(join(storageDir, `${RESOURCE_ID}.rsc`))
-			expect(operation.getResourceTempPath(ctx)).toBe(join(storageDir, `${RESOURCE_ID}.rst`))
+			expect(operation.getResourceTempPath(ctx)).toBe(join(storageDir, `${RESOURCE_ID}.${ctx.tempToken}.rst`))
 			expect(operation.getResourceMetaPath(ctx)).toBe(join(storageDir, `${RESOURCE_ID}.rsm`))
 		})
 	})
@@ -161,7 +162,7 @@ describe('cacheImageResourceOperation', () => {
 	describe('setup', () => {
 		it('returns a context with the generated identity and nothing loaded yet', () => {
 			expect(identityJob.handle).toHaveBeenCalledWith(request)
-			expect(ctx).toEqual({ request, id: RESOURCE_ID, metaData: null, cached: null, cacheTier: null, flushEpoch: 0 })
+			expect(ctx).toEqual({ request, id: RESOURCE_ID, metaData: null, cached: null, cacheTier: null, flushEpoch: 0, tempToken: expect.any(String) })
 		})
 
 		it('records a validation error and rethrows when identity generation fails', async () => {
@@ -365,10 +366,10 @@ describe('cacheImageResourceOperation', () => {
 			const result = await operation.execute(ctx)
 
 			expect(mockedFs.writeFile).toHaveBeenCalledTimes(2)
-			expect(mockedFs.writeFile).toHaveBeenCalledWith(`${resourcePath}.tmp`, processedBuffer)
-			expect(mockedFs.writeFile).toHaveBeenCalledWith(`${metaPath}.tmp`, JSON.stringify(result.metadata), 'utf8')
-			expect(mockedFs.rename).toHaveBeenCalledWith(`${resourcePath}.tmp`, resourcePath)
-			expect(mockedFs.rename).toHaveBeenCalledWith(`${metaPath}.tmp`, metaPath)
+			expect(mockedFs.writeFile).toHaveBeenCalledWith(`${resourcePath}.${ctx.tempToken}.tmp`, processedBuffer)
+			expect(mockedFs.writeFile).toHaveBeenCalledWith(`${metaPath}.${ctx.tempToken}.tmp`, JSON.stringify(result.metadata), 'utf8')
+			expect(mockedFs.rename).toHaveBeenCalledWith(`${resourcePath}.${ctx.tempToken}.tmp`, resourcePath)
+			expect(mockedFs.rename).toHaveBeenCalledWith(`${metaPath}.${ctx.tempToken}.tmp`, metaPath)
 			expect(Math.max(...mockedFs.writeFile.mock.invocationCallOrder)).toBeLessThan(Math.min(...mockedFs.rename.mock.invocationCallOrder))
 			expect(tracker.record).toHaveBeenCalledWith(metaPath)
 			expect(tracker.record.mock.invocationCallOrder[0]).toBeGreaterThan(Math.max(...mockedFs.rename.mock.invocationCallOrder))
@@ -453,6 +454,35 @@ describe('cacheImageResourceOperation', () => {
 			expect(mockedFs.rename).not.toHaveBeenCalled()
 			expect(tracker.record).not.toHaveBeenCalled()
 			expect(mockedFs.unlink).toHaveBeenCalledWith(operation.getResourceTempPath(ctx))
+		})
+
+		it('gives each request its own temp files, so requests from different epochs never write the same path', async () => {
+			const other = await operation.setup(request)
+
+			expect(other.tempToken).not.toBe(ctx.tempToken)
+			expect(operation.getResourceTempPath(other)).not.toBe(operation.getResourceTempPath(ctx))
+			expect(operation.getResourceTempPath(ctx)).toMatch(/\.rst$/)
+		})
+
+		it('logs a copy it could not remove, but not a file that was already gone', async () => {
+			const warn = vi.spyOn(CorrelatedLogger, 'warn').mockImplementation(() => {})
+			cacheManager.set.mockImplementation(async () => {
+				epochs.advance('public')
+			})
+			mockedFs.unlink.mockImplementation(async (path) => {
+				if (path === RSC()) {
+					throw Object.assign(new Error('EACCES'), { code: 'EACCES' })
+				}
+				if (path === RSM()) {
+					throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+				}
+			})
+
+			await operation.execute(ctx)
+
+			const messages = warn.mock.calls.map(([message]) => String(message))
+			expect(messages.filter(m => m.includes('Could not remove a copy'))).toHaveLength(1)
+			warn.mockRestore()
 		})
 
 		it('caches normally when no flush landed', async () => {

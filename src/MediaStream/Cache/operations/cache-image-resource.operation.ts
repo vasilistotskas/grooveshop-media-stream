@@ -3,6 +3,7 @@ import type { ResizeOptions } from '#microservice/API/dto/cache-image-request.dt
 import type { ResourceIdentifierKP } from '#microservice/common/constants/key-properties.constant'
 import type { CacheLayerName } from '../interfaces/cache-layer.interface.js'
 import type { ProcessedImage } from './image-format-processor.service.js'
+import { randomUUID } from 'node:crypto'
 import { access, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
@@ -40,6 +41,12 @@ export interface OperationContext {
 	cacheTier: CacheLayerName | 'disk' | null
 	/** The tenant's flush epoch when the request started; a cache write is dropped if a flush landed since. */
 	flushEpoch: number
+	/**
+	 * Names this request's temp files. Requests for one id from different flush
+	 * epochs no longer share a deduplicator slot, so two can run at once and
+	 * must not write the same temp path.
+	 */
+	tempToken: string
 }
 
 /**
@@ -74,7 +81,7 @@ export default class CacheImageResourceOperation {
 	}
 
 	getResourceTempPath(ctx: OperationContext): string {
-		return join(this.storageDir, `${ctx.id}.rst`)
+		return join(this.storageDir, `${ctx.id}.${ctx.tempToken}.rst`)
 	}
 
 	getResourceMetaPath(ctx: OperationContext): string {
@@ -93,7 +100,7 @@ export default class CacheImageResourceOperation {
 			const flushEpoch = this.tenantCacheEpochs.current(cacheImageRequest.tenantSchema)
 			const id = await this.generateResourceIdentityFromRequestJob.handle(cacheImageRequest)
 			CorrelatedLogger.debug(`Resource ID generated: ${id}`, CacheImageResourceOperation.name)
-			return { request: cacheImageRequest, id, metaData: null, cached: null, cacheTier: null, flushEpoch }
+			return { request: cacheImageRequest, id, metaData: null, cached: null, cacheTier: null, flushEpoch, tempToken: randomUUID() }
 		}
 		catch (error: unknown) {
 			CorrelatedLogger.error(`Setup failed: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, CacheImageResourceOperation.name)
@@ -279,11 +286,16 @@ export default class CacheImageResourceOperation {
 			return
 		}
 		CorrelatedLogger.debug(`Tenant flushed while ${ctx.id} was being cached, discarding the copy`, CacheImageResourceOperation.name)
-		await Promise.allSettled([
+		const results = await Promise.allSettled([
 			this.cacheManager.delete(imageNamespace(ctx.request.tenantSchema), ctx.id),
 			unlink(this.getResourcePath(ctx)),
 			unlink(this.getResourceMetaPath(ctx)),
 		])
+		for (const result of results) {
+			if (result.status === 'rejected' && (result.reason as NodeJS.ErrnoException)?.code !== 'ENOENT') {
+				CorrelatedLogger.warn(`Could not remove a copy cached across a tenant flush for ${ctx.id}: ${errorMessage(result.reason)}`, CacheImageResourceOperation.name)
+			}
+		}
 	}
 
 	private isFresh(metadata: ResourceMetaData): boolean {
@@ -337,8 +349,8 @@ export default class CacheImageResourceOperation {
 		// Write to sibling .tmp paths first, then rename() — rename is
 		// atomic within one filesystem, so concurrent readers either
 		// see the old file or the complete new file, never a partial one.
-		const resourceTmpPath = `${resourcePath}.tmp`
-		const resourceMetaTmpPath = `${resourceMetaPath}.tmp`
+		const resourceTmpPath = `${resourcePath}.${ctx.tempToken}.tmp`
+		const resourceMetaTmpPath = `${resourceMetaPath}.${ctx.tempToken}.tmp`
 
 		await Promise.all([
 			this.cacheManager.set(imageNamespace(ctx.request.tenantSchema), ctx.id, processed, this.privateTtl),
