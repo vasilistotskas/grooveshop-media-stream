@@ -50,7 +50,7 @@ describe('tenantFlushService', () => {
 		storage = {
 			removeTenantFiles: vi.fn(async (schema: string) => {
 				clears.push(`disk@${epochs.current(schema)}`)
-				return { filesRemoved: 1, errors: [] }
+				return { filesRemoved: 1, errors: [], complete: true }
 			}),
 		} as unknown as MockedObject<StorageCleanupService>
 
@@ -98,7 +98,7 @@ describe('tenantFlushService', () => {
 		})
 
 		it('reports the namespace, the removed files and the broadcast receivers', async () => {
-			storage.removeTenantFiles.mockResolvedValue({ filesRemoved: 4, errors: ['boom'] })
+			storage.removeTenantFiles.mockResolvedValue({ filesRemoved: 4, errors: ['boom'], complete: true })
 
 			const result = await service.flushTenant('acme')
 
@@ -136,6 +136,21 @@ describe('tenantFlushService', () => {
 			expect((error as TenantFlushIncompleteError).context).toMatchObject({ failures: ['redis: Redis not connected'] })
 			expect(clears).toContain('memory')
 			expect(redis.publish).toHaveBeenCalledOnce()
+		})
+
+		it('fails with 503 when a pair of the tenant could not be removed from disk', async () => {
+			storage.removeTenantFiles.mockResolvedValue({ filesRemoved: 0, errors: ['Failed to remove x.rsm and its .rsc: EACCES'], complete: false })
+
+			const error = await service.flushTenant('acme').catch((caught: unknown) => caught)
+
+			expect(error).toBeInstanceOf(TenantFlushIncompleteError)
+			expect((error as TenantFlushIncompleteError).context).toMatchObject({ failures: ['disk: Failed to remove x.rsm and its .rsc: EACCES'] })
+		})
+
+		it('still succeeds when the sweep only met sidecars it could not read', async () => {
+			storage.removeTenantFiles.mockResolvedValue({ filesRemoved: 2, errors: ['Failed to parse metadata corrupt.rsm'], complete: true })
+
+			await expect(service.flushTenant('acme')).resolves.toMatchObject({ filesRemoved: 2, diskErrors: ['Failed to parse metadata corrupt.rsm'] })
 		})
 
 		it('fails with 503 when the disk sweep throws', async () => {

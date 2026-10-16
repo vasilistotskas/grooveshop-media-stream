@@ -68,6 +68,9 @@ export function evictionScore(entry: StorageEntry, now: number): number {
  * orphans, then score-based eviction down to the warning thresholds. Runs on
  * the configured cron and on demand.
  */
+/** A pair of the swept tenant that could not be removed, as opposed to a sidecar that could not be read. */
+class MatchedPairRemovalError extends Error {}
+
 @Injectable()
 export class StorageCleanupService implements OnModuleInit {
 	private readonly directory: string
@@ -166,9 +169,14 @@ export class StorageCleanupService implements OnModuleInit {
 	 * errors are logged and skipped rather than aborting the sweep — file
 	 * counts here are small so no bounded-concurrency limiter is needed.
 	 */
-	async removeTenantFiles(tenantSchema: string): Promise<{ filesRemoved: number, errors: string[] }> {
+	async removeTenantFiles(tenantSchema: string): Promise<{ filesRemoved: number, errors: string[], complete: boolean }> {
 		const errors: string[] = []
 		let filesRemoved = 0
+		// False when a pair of this tenant may still be on disk: the directory
+		// could not be listed, or a matched pair could not be removed. An
+		// unreadable or unparsable sidecar does not count: its tenant is
+		// unknown, and a pair without a valid sidecar is never served.
+		let complete = true
 
 		let allFiles: string[]
 		try {
@@ -177,7 +185,7 @@ export class StorageCleanupService implements OnModuleInit {
 		catch (error: unknown) {
 			const msg = `Failed to read storage directory for tenant sweep: ${errorMessage(error)}`
 			CorrelatedLogger.warn(msg, StorageCleanupService.name)
-			return { filesRemoved: 0, errors: [msg] }
+			return { filesRemoved: 0, errors: [msg], complete: false }
 		}
 
 		const metaFiles = allFiles.filter(f => f.endsWith('.rsm'))
@@ -203,7 +211,12 @@ export class StorageCleanupService implements OnModuleInit {
 				return false
 			}
 
-			await this.unlinkPair(metaFile.replace(/\.rsm$/, ''))
+			try {
+				await this.unlinkPair(metaFile.replace(/\.rsm$/, ''))
+			}
+			catch (error: unknown) {
+				throw new MatchedPairRemovalError(`Failed to remove ${metaFile} and its .rsc: ${errorMessage(error)}`)
+			}
 			return true
 		}))
 
@@ -217,6 +230,9 @@ export class StorageCleanupService implements OnModuleInit {
 			else {
 				const msg = `Tenant file sweep failed for ${metaFiles[i]}: ${errorMessage(result.reason)}`
 				errors.push(msg)
+				if (result.reason instanceof MatchedPairRemovalError) {
+					complete = false
+				}
 				CorrelatedLogger.warn(msg, StorageCleanupService.name)
 			}
 		}
@@ -226,7 +242,7 @@ export class StorageCleanupService implements OnModuleInit {
 			StorageCleanupService.name,
 		)
 
-		return { filesRemoved, errors }
+		return { filesRemoved, errors, complete }
 	}
 
 	getCleanupStatus(): CleanupStatus {

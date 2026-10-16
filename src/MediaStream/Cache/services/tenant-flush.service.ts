@@ -128,6 +128,9 @@ export class TenantFlushService implements OnModuleInit {
 			const disk = await this.storageCleanupService.removeTenantFiles(tenantSchema)
 			filesRemoved = disk.filesRemoved
 			diskErrors = disk.errors
+			if (!disk.complete) {
+				failures.push(`disk: ${disk.errors.join('; ')}`)
+			}
 		}
 		catch (error: unknown) {
 			failures.push(`disk: ${errorMessage(error)}`)
