@@ -1,3 +1,10 @@
+## [3.10.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.10.1...v3.10.2) (2026-10-16)
+
+
+### Bug Fixes
+
+* **cache:** a tenant flush cannot be undone by a request already in flight ([#34](https://github.com/vasilistotskas/grooveshop-media-stream/issues/34)) ([e37d22f](https://github.com/vasilistotskas/grooveshop-media-stream/commit/e37d22f864995caacb1f22a5af2c7601197a95a8))
+
 ## [3.10.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.10.0...v3.10.1) (2026-10-16)
 
 
