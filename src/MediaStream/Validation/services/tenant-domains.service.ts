@@ -12,6 +12,8 @@ interface TenantDomainsFeedResponse {
 }
 
 const FETCH_TIMEOUT_MS = 10000
+/** First retry after a failed refresh; doubles per failure, capped at the poll interval. */
+const RETRY_INITIAL_DELAY_MS = 1000
 
 /**
  * Polls Django's internal tenant feed and keeps two in-memory sets:
@@ -27,6 +29,13 @@ const FETCH_TIMEOUT_MS = 10000
  * which Django sends when a store is suspended or reactivated, so a state
  * change applies at once rather than at the next poll.
  *
+ * Refreshes run one at a time, in call order, so a poll that read the feed
+ * before a suspension can never land after the flush's refresh and restore
+ * the older state. A failed refresh is retried with backoff (1 s doubling up
+ * to the poll interval) rather than at the next poll, so a replica that
+ * could not read the feed when a flush reached it catches up as soon as
+ * Django answers again.
+ *
  * Fail-safe by design: disabled entirely when INTERNAL_DOMAINS_SECRET is
  * unset (`isAllowed` then always returns false — callers must OR this with
  * the static allowlist), and a failed refresh keeps the last known-good set
@@ -38,6 +47,11 @@ export class TenantDomainsService implements OnModuleInit, OnModuleDestroy {
 	private domains: ReadonlySet<string> = new Set()
 	private suspendedSchemas: ReadonlySet<string> = new Set()
 	private refreshTimer?: NodeJS.Timeout
+	private retryTimer?: NodeJS.Timeout
+	private retryDelayMs = 0
+	private destroyed = false
+	/** The tail of the refresh queue: each refresh starts after the previous one settled. */
+	private refreshQueue: Promise<unknown> = Promise.resolve()
 	private readonly enabled: boolean
 	private readonly secret: string
 	private readonly refreshUrl: string
@@ -83,9 +97,14 @@ export class TenantDomainsService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	onModuleDestroy(): void {
+		this.destroyed = true
 		if (this.refreshTimer) {
 			clearInterval(this.refreshTimer)
 			this.refreshTimer = undefined
+		}
+		if (this.retryTimer) {
+			clearTimeout(this.retryTimer)
+			this.retryTimer = undefined
 		}
 	}
 
@@ -116,15 +135,49 @@ export class TenantDomainsService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	/**
-	 * Re-read the feed. True when the sets are current: the feed answered, or
-	 * it is disabled and there is nothing to read. False when it could not be
-	 * read; the last known-good sets are kept.
+	 * Re-read the feed, after any refresh already running. True when the sets
+	 * are current: the feed answered, or it is disabled and there is nothing
+	 * to read. False when it could not be read; the last known-good sets are
+	 * kept and a retry is scheduled.
 	 */
-	async refresh(): Promise<boolean> {
+	refresh(): Promise<boolean> {
 		if (!this.enabled) {
-			return true
+			return Promise.resolve(true)
 		}
 
+		const run = this.refreshQueue.then(async () => {
+			const current = await this.readFeed()
+			this.scheduleRetry(current)
+			return current
+		})
+		this.refreshQueue = run
+		return run
+	}
+
+	/** Retry a failed refresh with backoff; a successful one cancels any pending retry. */
+	private scheduleRetry(current: boolean): void {
+		if (current) {
+			this.retryDelayMs = 0
+			if (this.retryTimer) {
+				clearTimeout(this.retryTimer)
+				this.retryTimer = undefined
+			}
+			return
+		}
+		if (this.retryTimer || this.destroyed) {
+			return
+		}
+		this.retryDelayMs = this.retryDelayMs === 0
+			? RETRY_INITIAL_DELAY_MS
+			: Math.min(this.retryDelayMs * 2, this.refreshIntervalMs)
+		// unref: a pending retry must never keep the process (or a spec worker) alive.
+		this.retryTimer = setTimeout(() => {
+			this.retryTimer = undefined
+			void this.refresh()
+		}, this.retryDelayMs).unref()
+	}
+
+	private async readFeed(): Promise<boolean> {
 		const controller = new AbortController()
 		const timeoutHandle = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
 

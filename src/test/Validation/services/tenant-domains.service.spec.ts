@@ -313,4 +313,108 @@ describe('tenantDomainsService', () => {
 			}
 		})
 	})
+
+	describe('refresh ordering', () => {
+		beforeEach(() => {
+			configValues['tenantDomains.secret'] = 's3cr3t'
+		})
+
+		// A poll that read the feed before a suspension must not land after
+		// the flush's refresh and restore the older state.
+		it('runs refreshes one at a time, so the later call\'s result is the one kept', async () => {
+			let answerFirst!: (response: Response) => void
+			fetchMock
+				.mockReturnValueOnce(new Promise<Response>((resolve) => {
+					answerFirst = resolve
+				}))
+				.mockResolvedValueOnce(jsonResponse({ domains: [], suspendedSchemas: ['closed_shop'] }))
+			const service = createService()
+
+			const poll = service.refresh()
+			const flush = service.refresh()
+			await Promise.resolve()
+			expect(fetchMock).toHaveBeenCalledTimes(1)
+
+			answerFirst(jsonResponse({ domains: [], suspendedSchemas: [] }))
+			await Promise.all([poll, flush])
+
+			expect(fetchMock).toHaveBeenCalledTimes(2)
+			expect(service.isSuspended('closed_shop')).toBe(true)
+		})
+
+		it('keeps refreshing after one failed', async () => {
+			fetchMock
+				.mockRejectedValueOnce(new Error('ECONNRESET'))
+				.mockResolvedValueOnce(jsonResponse({ domains: [], suspendedSchemas: ['closed_shop'] }))
+			const service = createService()
+
+			await expect(service.refresh()).resolves.toBe(false)
+			await expect(service.refresh()).resolves.toBe(true)
+
+			expect(service.isSuspended('closed_shop')).toBe(true)
+			service.onModuleDestroy()
+		})
+	})
+
+	describe('retry after a failed refresh', () => {
+		beforeEach(() => {
+			configValues['tenantDomains.secret'] = 's3cr3t'
+			configValues['tenantDomains.refreshIntervalMs'] = 300000
+			vi.useFakeTimers()
+		})
+
+		afterEach(() => {
+			vi.useRealTimers()
+		})
+
+		// A replica that could not read the feed when a flush reached it
+		// catches up as soon as Django answers, not at the next poll.
+		it('retries with a doubling delay until the feed answers, then stops', async () => {
+			fetchMock
+				.mockRejectedValueOnce(new Error('down'))
+				.mockRejectedValueOnce(new Error('down'))
+				.mockResolvedValue(jsonResponse({ domains: [], suspendedSchemas: ['closed_shop'] }))
+			const service = createService()
+
+			await service.refresh()
+			expect(fetchMock).toHaveBeenCalledTimes(1)
+
+			await vi.advanceTimersByTimeAsync(1000)
+			expect(fetchMock).toHaveBeenCalledTimes(2)
+
+			await vi.advanceTimersByTimeAsync(1999)
+			expect(fetchMock).toHaveBeenCalledTimes(2)
+			await vi.advanceTimersByTimeAsync(1)
+			expect(fetchMock).toHaveBeenCalledTimes(3)
+			expect(service.isSuspended('closed_shop')).toBe(true)
+
+			await vi.advanceTimersByTimeAsync(60000)
+			expect(fetchMock).toHaveBeenCalledTimes(3)
+		})
+
+		it('never waits longer than the poll interval between retries', async () => {
+			configValues['tenantDomains.refreshIntervalMs'] = 3000
+			fetchMock.mockRejectedValue(new Error('down'))
+			const service = createService()
+
+			await service.refresh()
+			await vi.advanceTimersByTimeAsync(1000 + 2000)
+			expect(fetchMock).toHaveBeenCalledTimes(3)
+			await vi.advanceTimersByTimeAsync(3000)
+			expect(fetchMock).toHaveBeenCalledTimes(4)
+
+			service.onModuleDestroy()
+		})
+
+		it('cancels a pending retry on shutdown', async () => {
+			fetchMock.mockRejectedValue(new Error('down'))
+			const service = createService()
+
+			await service.refresh()
+			service.onModuleDestroy()
+			await vi.advanceTimersByTimeAsync(10000)
+
+			expect(fetchMock).toHaveBeenCalledTimes(1)
+		})
+	})
 })
