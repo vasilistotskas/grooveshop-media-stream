@@ -5,7 +5,7 @@ import { HttpAdapterHost } from '@nestjs/core'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { currentImageRequest } from '#microservice/Correlation/utils/image-request-log.util'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
-import { MediaStreamError, ProcessingOverloadedError, ProcessingTimeoutError } from '../errors/media-stream.errors.js'
+import { MediaStreamError, ProcessingOverloadedError, ProcessingTimeoutError, TenantSuspendedError } from '../errors/media-stream.errors.js'
 
 /** The JSON body every error response carries. */
 export interface ErrorResponseBody {
@@ -75,10 +75,18 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 		if (exception instanceof ProcessingOverloadedError) {
 			response.setHeader('Retry-After', String(exception.retryAfterSeconds))
 		}
+		// No browser or edge may keep the refusal: the store can be
+		// reactivated at any moment.
+		if (exception instanceof TenantSuspendedError) {
+			response.setHeader('Cache-Control', 'no-store')
+		}
 
-		// Load shedding (503 + Retry-After) is the service working as designed
-		// under pressure, not a fault: keep it out of the ERROR stream.
-		const isCapacityShed = exception instanceof ProcessingOverloadedError || exception instanceof ProcessingTimeoutError
+		// Load shedding (503 + Retry-After) and a suspended store are the
+		// service working as designed, not faults: keep them out of the ERROR
+		// stream.
+		const isExpected503 = exception instanceof ProcessingOverloadedError
+			|| exception instanceof ProcessingTimeoutError
+			|| exception instanceof TenantSuspendedError
 
 		// The per-request image line (ImageRequestLogMiddleware) derives any
 		// other outcome from the status it sees when the response closes.
@@ -91,9 +99,12 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 			else if (exception instanceof ProcessingTimeoutError) {
 				imageRequest.outcome = 'timeout'
 			}
+			else if (exception instanceof TenantSuspendedError) {
+				imageRequest.outcome = 'suspended'
+			}
 		}
 
-		if (shape.status >= HttpStatus.INTERNAL_SERVER_ERROR && !isCapacityShed) {
+		if (shape.status >= HttpStatus.INTERNAL_SERVER_ERROR && !isExpected503) {
 			CorrelatedLogger.error(`${shape.name}: ${exception.message}`, logDetail, MediaStreamExceptionFilter.name)
 		}
 		else {

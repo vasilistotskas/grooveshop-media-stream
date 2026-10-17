@@ -4,7 +4,7 @@ import type { ImageRequestLog } from '#microservice/Correlation/utils/image-requ
 import { HttpException, HttpStatus } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { InvalidRequestError, MediaStreamError, ProcessingOverloadedError, ProcessingTimeoutError } from '#microservice/common/errors/media-stream.errors'
+import { InvalidRequestError, MediaStreamError, ProcessingOverloadedError, ProcessingTimeoutError, TenantSuspendedError } from '#microservice/common/errors/media-stream.errors'
 import { MediaStreamExceptionFilter } from '#microservice/common/filters/media-stream-exception.filter'
 import { requestContextStorage } from '#microservice/Correlation/async-local-storage'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
@@ -126,6 +126,20 @@ describe('mediaStreamExceptionFilter', () => {
 			expect((errorResponseArg as Record<string, any>).code).toBe('PROCESSING_OVERLOADED')
 		})
 
+		// The store can be reactivated at any moment: neither a browser nor
+		// the edge may keep the refusal.
+		it('answers TenantSuspendedError with 503 that nothing may store', () => {
+			mockResponse.setHeader = vi.fn()
+
+			filter.catch(new TenantSuspendedError({ tenantSchema: 'acme' }), mockArgumentsHost)
+
+			expect(mockResponse.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store')
+			const [, errorResponseArg, statusArg] = mockHttpAdapterReply.mock.calls[0]
+			expect(statusArg).toBe(HttpStatus.SERVICE_UNAVAILABLE)
+			expect((errorResponseArg as Record<string, any>).code).toBe('TENANT_SUSPENDED')
+			expect(JSON.stringify(errorResponseArg)).not.toContain('acme')
+		})
+
 		it('should handle HttpException', () => {
 			const error = new HttpException('Forbidden', HttpStatus.FORBIDDEN)
 
@@ -228,6 +242,14 @@ describe('mediaStreamExceptionFilter', () => {
 			expect(errorSpy).not.toHaveBeenCalled()
 		})
 
+		it('logs a suspended store\'s refusal at WARN, not ERROR', () => {
+			mockResponse.setHeader = vi.fn()
+			filter.catch(new TenantSuspendedError({ tenantSchema: 'acme' }), mockArgumentsHost)
+
+			expect(warnSpy).toHaveBeenCalledTimes(1)
+			expect(errorSpy).not.toHaveBeenCalled()
+		})
+
 		it('logs an unknown (500) error at ERROR, not WARN', () => {
 			filter.catch(new Error('boom'), mockArgumentsHost)
 
@@ -258,6 +280,7 @@ describe('mediaStreamExceptionFilter', () => {
 		it('records the error class, and classifies the capacity errors itself', () => {
 			expect(catchFor(new ProcessingOverloadedError(2))).toMatchObject({ error: 'ProcessingOverloadedError', outcome: 'overloaded' })
 			expect(catchFor(new ProcessingTimeoutError())).toMatchObject({ error: 'ProcessingTimeoutError', outcome: 'timeout' })
+			expect(catchFor(new TenantSuspendedError())).toMatchObject({ error: 'TenantSuspendedError', outcome: 'suspended' })
 		})
 
 		it('leaves every other outcome to the status the middleware sees', () => {

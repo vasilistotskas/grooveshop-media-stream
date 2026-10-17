@@ -13,6 +13,7 @@ import { requestContextStorage } from '../async-local-storage.js'
  *   over its format's size limit, not a supported format, or an SVG the
  *   sanitiser failed closed on (logged at WARN)
  * - `overloaded` / `timeout`: 503 from admission control / a pipeline deadline
+ * - `suspended`: 503, the store is suspended (TenantSuspendedError)
  * - `invalid`: any other 4xx (validation, unknown route)
  * - `rate_limited`: 429
  * - `error`: any other 5xx
@@ -25,6 +26,7 @@ export type ImageRequestOutcome
 		| 'rejected'
 		| 'overloaded'
 		| 'timeout'
+		| 'suspended'
 		| 'invalid'
 		| 'rate_limited'
 		| 'error'

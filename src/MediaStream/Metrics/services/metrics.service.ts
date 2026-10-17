@@ -51,6 +51,7 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	private readonly eventLoopLag: promClient.Histogram
 
 	private readonly tenantDomainsCount: promClient.Gauge
+	private readonly tenantSuspendedSchemasCount: promClient.Gauge
 	private readonly tenantDomainsLastRefreshTimestamp: promClient.Gauge
 
 	private readonly processingPipelines: promClient.Gauge
@@ -279,6 +280,12 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			registers: [this.register],
 		})
 
+		this.tenantSuspendedSchemasCount = new promClient.Gauge({
+			name: 'mediastream_tenant_suspended_schemas_count',
+			help: 'Number of suspended stores whose images are refused, as last read from the tenant feed (TenantDomainsService)',
+			registers: [this.register],
+		})
+
 		this.tenantDomainsLastRefreshTimestamp = new promClient.Gauge({
 			name: 'mediastream_tenant_domains_last_refresh_timestamp_seconds',
 			help: 'Unix timestamp (seconds) of the last successful TenantDomainsService feed refresh, 0 if it has never succeeded',
@@ -458,8 +465,9 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	 * (never successfully refreshed) is reported as `0`, the Prometheus
 	 * convention for "no value yet" on a timestamp gauge.
 	 */
-	updateTenantDomainsMetrics(domainCount: number, lastSuccessfulRefreshAt: number | undefined): void {
+	updateTenantDomainsMetrics(domainCount: number, suspendedSchemaCount: number, lastSuccessfulRefreshAt: number | undefined): void {
 		this.tenantDomainsCount.set(domainCount)
+		this.tenantSuspendedSchemasCount.set(suspendedSchemaCount)
 		this.tenantDomainsLastRefreshTimestamp.set(lastSuccessfulRefreshAt ? lastSuccessfulRefreshAt / 1000 : 0)
 	}
 

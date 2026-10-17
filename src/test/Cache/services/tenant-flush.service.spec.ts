@@ -2,6 +2,7 @@ import type { MockedObject } from 'vitest'
 import type { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
 import type { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import type { StorageCleanupService } from '#microservice/Storage/services/storage-cleanup.service'
+import type { TenantDomainsService } from '#microservice/Validation/services/tenant-domains.service'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TenantCacheEpochs } from '#microservice/Cache/services/tenant-cache-epochs.service'
 import { TenantFlushService } from '#microservice/Cache/services/tenant-flush.service'
@@ -18,6 +19,7 @@ describe('tenantFlushService', () => {
 	let cacheManager: MockedObject<MultiLayerCacheManager>
 	let epochs: TenantCacheEpochs
 	let storage: MockedObject<StorageCleanupService>
+	let tenantFeed: MockedObject<TenantDomainsService>
 	let onBroadcast: Handler
 	/** Every tier clear, in order, with the tenant's epoch at that moment. */
 	let clears: string[]
@@ -53,6 +55,12 @@ describe('tenantFlushService', () => {
 				return { filesRemoved: 1, errors: [], complete: true }
 			}),
 		} as unknown as MockedObject<StorageCleanupService>
+		tenantFeed = {
+			refresh: vi.fn(async () => {
+				clears.push('feed')
+				return true
+			}),
+		} as unknown as MockedObject<TenantDomainsService>
 
 		service = new TenantFlushService(
 			createConfigServiceMock({ 'cache.redis.db': 2 }),
@@ -60,6 +68,7 @@ describe('tenantFlushService', () => {
 			cacheManager,
 			epochs,
 			storage,
+			tenantFeed,
 		)
 		service.onModuleInit()
 	})
@@ -71,10 +80,10 @@ describe('tenantFlushService', () => {
 	})
 
 	describe('flushTenant', () => {
-		it('clears disk, then Redis, then memory, advancing the epoch before each tier', async () => {
+		it('re-reads the tenant feed, then clears disk, then Redis, then memory, advancing the epoch before each tier', async () => {
 			await service.flushTenant('acme')
 
-			expect(clears).toEqual(['disk@1', 'redis@2', 'memory@3'])
+			expect(clears).toEqual(['feed', 'disk@1', 'redis@2', 'memory@3'])
 			expect(cacheManager.invalidateNamespace).toHaveBeenCalledWith('image:acme', 'redis')
 			expect(cacheManager.invalidateNamespace).toHaveBeenCalledWith('image:acme', 'memory')
 		})
@@ -158,15 +167,41 @@ describe('tenantFlushService', () => {
 
 			await expect(service.flushTenant('acme')).rejects.toBeInstanceOf(TenantFlushIncompleteError)
 		})
+
+		// Django retries on 503, so a suspension whose state this replica could
+		// not read is sent again rather than left to the next poll.
+		it('fails with 503 when the tenant feed could not be read, after clearing every tier and broadcasting', async () => {
+			tenantFeed.refresh.mockResolvedValue(false)
+
+			const error = await service.flushTenant('acme').catch((caught: unknown) => caught)
+
+			expect(error).toBeInstanceOf(TenantFlushIncompleteError)
+			expect((error as TenantFlushIncompleteError).context).toMatchObject({
+				failures: [expect.stringContaining('tenant feed')],
+			})
+			expect(clears).toEqual(['disk@1', 'redis@2', 'memory@3'])
+			expect(redis.publish).toHaveBeenCalledOnce()
+		})
 	})
 
 	describe('peer broadcasts', () => {
 		const PEER = 'another-replica'
 
-		it('clears disk, then Redis, then memory, advancing the epoch before each tier', async () => {
+		it('re-reads the tenant feed, then clears disk, then Redis, then memory, advancing the epoch before each tier', async () => {
 			await deliver({ tenantSchema: 'acme', origin: PEER })
 
+			expect(clears).toEqual(['feed', 'disk@1', 'redis@2', 'memory@3'])
+		})
+
+		it('names a tenant feed it could not read', async () => {
+			const error = vi.spyOn(CorrelatedLogger, 'error').mockImplementation(() => {})
+			tenantFeed.refresh.mockResolvedValue(false)
+
+			await deliver({ tenantSchema: 'acme', origin: PEER })
+
+			expect(error).toHaveBeenCalledWith(expect.stringContaining('tenant feed'), undefined, 'TenantFlushService')
 			expect(clears).toEqual(['disk@1', 'redis@2', 'memory@3'])
+			error.mockRestore()
 		})
 
 		it('does not broadcast again', async () => {

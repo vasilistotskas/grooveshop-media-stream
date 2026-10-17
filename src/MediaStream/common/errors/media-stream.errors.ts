@@ -83,6 +83,18 @@ export class TenantFlushIncompleteError extends MediaStreamError {
 }
 
 /**
+ * The store is suspended (Django's tenant feed lists it), so its images are
+ * refused before any cache tier is read. 503, like Django's answer to the
+ * store's own requests: the store exists and the condition is temporary, so
+ * crawlers keep its images indexed rather than dropping them as gone.
+ */
+export class TenantSuspendedError extends MediaStreamError {
+	constructor(context: Metadata = {}) {
+		super('This store is temporarily unavailable', HttpStatus.SERVICE_UNAVAILABLE, 'TENANT_SUSPENDED', context)
+	}
+}
+
+/**
  * Every Sharp pipeline slot is busy and the wait queue is full (or the wait
  * timed out). Answered 503 with Retry-After so clients and CDNs back off
  * instead of receiving the default image for a perfectly good source.

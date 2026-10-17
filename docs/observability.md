@@ -74,6 +74,7 @@ value is left out rather than written as `null`.
 | `rejected` | 200 | **`warn`** | The default image, because the source was refused: over its format's size limit (`UpstreamResourceTooLargeError`), not a supported format (`UnsupportedSourceFormatError`), or an SVG the sanitiser failed closed on (`SvgSanitizationError`) |
 | `overloaded` | 503 | `log` | Admission control shed the request |
 | `timeout` | 503 | `log` | A pipeline or the SVG sanitiser exceeded `PROCESSING_TIMEOUT_SECONDS` |
+| `suspended` | 503 | `log` | The store is suspended (Django's tenant feed lists it): `TenantSuspendedError`, sent with `Cache-Control: no-store` |
 | `invalid` | 4xx | `log` | Validation failed or no route matched |
 | `rate_limited` | 429 | `log` | The rate limit guard refused it |
 | `error` | 5xx | `log` | Anything else, e.g. `DefaultImageFallbackError` |

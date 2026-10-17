@@ -8,10 +8,12 @@ import MediaStreamImageController from '#microservice/API/controllers/media-stre
 import { ImageStreamService } from '#microservice/API/services/image-stream.service'
 import { RequestValidatorService } from '#microservice/API/services/request-validator.service'
 import { UrlBuilderService } from '#microservice/API/services/url-builder.service'
+import { TenantSuspendedError } from '#microservice/common/errors/media-stream.errors'
 import { requestContextStorage } from '#microservice/Correlation/async-local-storage'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
+import { TenantDomainsService } from '#microservice/Validation/services/tenant-domains.service'
 
 vi.mock('#microservice/API/services/image-stream.service')
 vi.mock('#microservice/API/services/request-validator.service')
@@ -33,6 +35,7 @@ describe('mediaStreamImageController', () => {
 	let mockUrlBuilderService: MockedObject<UrlBuilderService>
 	let mockCorrelationService: MockedObject<CorrelationService>
 	let mockMetricsService: MockedObject<MetricsService>
+	let mockTenantDomainsService: MockedObject<TenantDomainsService>
 	let mockResponse: MockedObject<Response>
 
 	beforeEach(async () => {
@@ -55,6 +58,10 @@ describe('mediaStreamImageController', () => {
 
 		mockMetricsService = {
 			recordError: vi.fn(),
+		} as any
+
+		mockTenantDomainsService = {
+			isSuspended: vi.fn().mockReturnValue(false),
 		} as any
 
 		mockResponse = {
@@ -94,6 +101,10 @@ describe('mediaStreamImageController', () => {
 					provide: MetricsService,
 					useValue: mockMetricsService,
 				},
+				{
+					provide: TenantDomainsService,
+					useValue: mockTenantDomainsService,
+				},
 			],
 		}).compile()
 
@@ -102,6 +113,46 @@ describe('mediaStreamImageController', () => {
 
 	afterEach(() => {
 		vi.clearAllMocks()
+	})
+
+	describe('suspended stores', () => {
+		const TENANT_PATH = '/media_stream-image/media/acme/uploads/test/image.webp/100/100/contain/entropy/transparent/0/80.webp'
+
+		it('refuses a suspended store\'s image before building the source URL or reading any cache', async () => {
+			mockTenantDomainsService.isSuspended.mockReturnValue(true)
+
+			await expect(controller.handleImageRequest({ path: TENANT_PATH } as any, mockResponse))
+				.rejects
+				.toBeInstanceOf(TenantSuspendedError)
+
+			expect(mockTenantDomainsService.isSuspended).toHaveBeenCalledWith('acme')
+			expect(mockUrlBuilderService.buildResourceUrl).not.toHaveBeenCalled()
+			expect(mockImageStreamService.processAndStream).not.toHaveBeenCalled()
+		})
+
+		it('answers the refusal 503', async () => {
+			mockTenantDomainsService.isSuspended.mockReturnValue(true)
+
+			const error = await controller.handleImageRequest({ path: TENANT_PATH } as any, mockResponse).catch((caught: unknown) => caught)
+
+			expect((error as TenantSuspendedError).status).toBe(503)
+			expect((error as TenantSuspendedError).code).toBe('TENANT_SUSPENDED')
+		})
+
+		it('serves an active store', async () => {
+			await controller.handleImageRequest({ path: TENANT_PATH } as any, mockResponse)
+
+			expect(mockImageStreamService.processAndStream).toHaveBeenCalled()
+		})
+
+		it('never gates the shared static images', async () => {
+			mockTenantDomainsService.isSuspended.mockReturnValue(true)
+
+			await controller.handleImageRequest({ path: '/media_stream-image/static/images/default.png/100/100/contain/entropy/transparent/0/80.webp' } as any, mockResponse)
+
+			expect(mockTenantDomainsService.isSuspended).not.toHaveBeenCalled()
+			expect(mockImageStreamService.processAndStream).toHaveBeenCalled()
+		})
 	})
 
 	describe('handleImageRequest', () => {

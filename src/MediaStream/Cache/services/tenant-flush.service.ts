@@ -9,6 +9,7 @@ import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { StorageCleanupService } from '#microservice/Storage/services/storage-cleanup.service'
+import { TenantDomainsService } from '#microservice/Validation/services/tenant-domains.service'
 import { imageNamespace } from '../utils/cache-namespace.util.js'
 import { MultiLayerCacheManager } from './multi-layer-cache.manager.js'
 import { RedisCacheService } from './redis-cache.service.js'
@@ -61,7 +62,12 @@ function isTenantFlushMessage(value: unknown): value is TenantFlushMessage {
  * takes the request clears itself and then broadcasts the tenant over Redis
  * pub/sub; every other replica clears itself the same way.
  *
- * Clearing a replica: disk, then Redis, then memory (bottom-up, see
+ * Clearing a replica starts by re-reading Django's tenant feed: Django sends
+ * the flush when a store is suspended or reactivated, so the replica refuses
+ * or serves the store's images from then on, not from its next poll, and a
+ * request arriving after the clear cannot refill a suspended store's tiers.
+ *
+ * Then disk, then Redis, then memory (bottom-up, see
  * LAYERS_BOTTOM_UP), advancing the tenant's epoch before each tier. Every
  * cache write checks the epoch the request started with after it lands and
  * removes itself when it moved, so a write that lands after a tier was cleared
@@ -79,6 +85,7 @@ export class TenantFlushService implements OnModuleInit {
 		private readonly cacheManager: MultiLayerCacheManager,
 		private readonly tenantCacheEpochs: TenantCacheEpochs,
 		private readonly storageCleanupService: StorageCleanupService,
+		private readonly tenantDomainsService: TenantDomainsService,
 	) {
 		// Pub/sub channels are server-wide, not per database: scope the channel to
 		// the configured database so environments sharing a server stay apart.
@@ -117,11 +124,15 @@ export class TenantFlushService implements OnModuleInit {
 		return { namespace, filesRemoved: local.filesRemoved, diskErrors: local.diskErrors, broadcastReceivers }
 	}
 
-	/** Disk, then each layered tier bottom-up, advancing the epoch before each; never stops at a failing tier. */
+	/** The tenant feed, then disk, then each layered tier bottom-up, advancing the epoch before each; never stops at a failing step. */
 	private async clearLocal(tenantSchema: string, namespace: string): Promise<LocalClear> {
 		const failures: string[] = []
 		let filesRemoved = 0
 		let diskErrors: string[] = []
+
+		if (!(await this.tenantDomainsService.refresh())) {
+			failures.push('tenant feed: could not be read, the store\'s suspension state is not current')
+		}
 
 		this.tenantCacheEpochs.advance(tenantSchema)
 		try {
