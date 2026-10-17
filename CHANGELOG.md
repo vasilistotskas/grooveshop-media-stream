@@ -1,3 +1,10 @@
+# [3.11.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.10.3...v3.11.0) (2026-10-17)
+
+
+### Features
+
+* **validation:** refuse a suspended store's images ([#36](https://github.com/vasilistotskas/grooveshop-media-stream/issues/36)) ([18d52e4](https://github.com/vasilistotskas/grooveshop-media-stream/commit/18d52e463e84f90520ace3e00dd00e8ada3c0385))
+
 ## [3.10.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.10.2...v3.10.3) (2026-10-16)
 
 
