@@ -1,5 +1,6 @@
 import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import { Injectable } from '@nestjs/common'
+import { TENANT_SCHEMA_PATTERN } from '#microservice/common/constants/tenant.constant'
 import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
@@ -7,15 +8,24 @@ import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 
 interface TenantDomainsFeedResponse {
 	domains?: unknown
+	suspendedSchemas?: unknown
 }
 
 const FETCH_TIMEOUT_MS = 10000
 
 /**
- * Polls Django's internal tenant-domain feed and keeps an in-memory set of
- * hostnames that belong to active tenants. New tenant domains become
- * allowed for upstream image fetches without a VALIDATION_ALLOWED_DOMAINS
- * env change + restart.
+ * Polls Django's internal tenant feed and keeps two in-memory sets:
+ *
+ * - the hostnames that belong to active tenants. New tenant domains become
+ *   allowed for upstream image fetches without a VALIDATION_ALLOWED_DOMAINS
+ *   env change + restart;
+ * - the schemas of suspended stores, whose images are refused
+ *   (`isSuspended`). A deny list: a store created between two polls is
+ *   served at once, and a feed that never loaded refuses nothing.
+ *
+ * Besides the poll, `TenantFlushService` refreshes on every tenant flush,
+ * which Django sends when a store is suspended or reactivated, so a state
+ * change applies at once rather than at the next poll.
  *
  * Fail-safe by design: disabled entirely when INTERNAL_DOMAINS_SECRET is
  * unset (`isAllowed` then always returns false — callers must OR this with
@@ -26,6 +36,7 @@ const FETCH_TIMEOUT_MS = 10000
 @Injectable()
 export class TenantDomainsService implements OnModuleInit, OnModuleDestroy {
 	private domains: ReadonlySet<string> = new Set()
+	private suspendedSchemas: ReadonlySet<string> = new Set()
 	private refreshTimer?: NodeJS.Timeout
 	private readonly enabled: boolean
 	private readonly secret: string
@@ -86,6 +97,11 @@ export class TenantDomainsService implements OnModuleInit, OnModuleDestroy {
 		return this.domains
 	}
 
+	/** Whether the store's images must be refused: Django lists it as suspended. */
+	isSuspended(tenantSchema: string): boolean {
+		return this.suspendedSchemas.has(tenantSchema)
+	}
+
 	/** Whether dynamic refresh is configured (INTERNAL_DOMAINS_SECRET set). */
 	isEnabled(): boolean {
 		return this.enabled
@@ -99,9 +115,14 @@ export class TenantDomainsService implements OnModuleInit, OnModuleDestroy {
 		return this.lastSuccessfulRefreshAt
 	}
 
-	async refresh(): Promise<void> {
+	/**
+	 * Re-read the feed. True when the sets are current: the feed answered, or
+	 * it is disabled and there is nothing to read. False when it could not be
+	 * read; the last known-good sets are kept.
+	 */
+	async refresh(): Promise<boolean> {
 		if (!this.enabled) {
-			return
+			return true
 		}
 
 		const controller = new AbortController()
@@ -121,29 +142,38 @@ export class TenantDomainsService implements OnModuleInit, OnModuleDestroy {
 			if (!Array.isArray(body.domains)) {
 				throw new TypeError('Tenant domains feed returned a malformed payload (domains is not an array)')
 			}
+			if (!Array.isArray(body.suspendedSchemas)) {
+				throw new TypeError('Tenant domains feed returned a malformed payload (suspendedSchemas is not an array)')
+			}
 
 			this.domains = new Set(
 				body.domains
 					.filter((domain): domain is string => typeof domain === 'string' && domain.length > 0)
 					.map(domain => domain.toLowerCase()),
 			)
+			this.suspendedSchemas = new Set(
+				body.suspendedSchemas
+					.filter((schema): schema is string => typeof schema === 'string' && TENANT_SCHEMA_PATTERN.test(schema)),
+			)
 			this.lastSuccessfulRefreshAt = Date.now()
 
 			CorrelatedLogger.debug(
-				`Refreshed dynamic tenant domain allowlist: ${this.domains.size} domains`,
+				`Refreshed the tenant feed: ${this.domains.size} domains, ${this.suspendedSchemas.size} suspended stores`,
 				TenantDomainsService.name,
 			)
+			return true
 		}
 		catch (error: unknown) {
-			// Keep the last known-good set — a transient Django outage must not
-			// widen or shrink the effective allowlist.
+			// Keep the last known-good sets — a transient Django outage must not
+			// widen or shrink the effective allowlist, nor lift a suspension.
 			CorrelatedLogger.warn(
-				`Failed to refresh tenant domains, keeping last known-good set (${this.domains.size} domains): ${errorMessage(error)}`,
+				`Failed to refresh the tenant feed, keeping last known-good sets (${this.domains.size} domains, ${this.suspendedSchemas.size} suspended stores): ${errorMessage(error)}`,
 				TenantDomainsService.name,
 			)
+			return false
 		}
 		finally {
-			this._metricsService.updateTenantDomainsMetrics(this.domains.size, this.lastSuccessfulRefreshAt)
+			this._metricsService.updateTenantDomainsMetrics(this.domains.size, this.suspendedSchemas.size, this.lastSuccessfulRefreshAt)
 			clearTimeout(timeoutHandle)
 		}
 	}

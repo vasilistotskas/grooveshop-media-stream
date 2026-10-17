@@ -3,6 +3,7 @@ import { InternalSecretGuard } from '#microservice/common/guards/internal-secret
 import { ConfigModule } from '#microservice/Config/config.module'
 import { MetricsModule } from '#microservice/Metrics/metrics.module'
 import { StorageModule } from '#microservice/Storage/storage.module'
+import { ValidationModule } from '#microservice/Validation/validation.module'
 import { AdminCacheController } from './controllers/admin-cache.controller.js'
 import { CacheHealthIndicator } from './indicators/cache-health.indicator.js'
 import { RedisHealthIndicator } from './indicators/redis-health.indicator.js'
@@ -20,6 +21,7 @@ import { TenantFlushService } from './services/tenant-flush.service.js'
 		ConfigModule,
 		MetricsModule,
 		StorageModule,
+		ValidationModule,
 	],
 	controllers: [
 		AdminCacheController,

@@ -5,12 +5,14 @@ import type { ImageProcessingContext, ImageProcessingParams } from '../types/ima
 import { BadRequestException, Controller, Get, NotFoundException, Req, Res } from '@nestjs/common'
 import { IMAGE } from '#microservice/common/constants/route-prefixes.constant'
 import { PUBLIC_TENANT_SCHEMA } from '#microservice/common/constants/tenant.constant'
+import { TenantSuspendedError } from '#microservice/common/errors/media-stream.errors'
 import { decodePathFully } from '#microservice/common/utils/percent-decode.util'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { currentImageRequest } from '#microservice/Correlation/utils/image-request-log.util'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
+import { TenantDomainsService } from '#microservice/Validation/services/tenant-domains.service'
 import { IMAGE_SOURCES } from '../config/image-sources.config.js'
 import CacheImageRequest, {
 	FitOptions,
@@ -47,6 +49,7 @@ export default class MediaStreamImageController {
 		private readonly urlBuilderService: UrlBuilderService,
 		private readonly correlationService: CorrelationService,
 		private readonly metricsService: MetricsService,
+		private readonly tenantDomainsService: TenantDomainsService,
 	) {
 		CorrelatedLogger.log('Image controller initialized with sources:', MediaStreamImageController.name)
 		Object.entries(IMAGE_SOURCES).forEach(([key, config]) => {
@@ -194,6 +197,12 @@ export default class MediaStreamImageController {
 			}
 
 			this.requestValidatorService.validateRequest(context)
+
+			// Before any cache tier is read, so a suspended store's copies
+			// already cached in memory, Redis or on disk are not served either.
+			if (params.tenantSchema && this.tenantDomainsService.isSuspended(params.tenantSchema)) {
+				throw new TenantSuspendedError({ tenantSchema: params.tenantSchema })
+			}
 
 			const resourceUrl = this.urlBuilderService.buildResourceUrl(context)
 			this.requestValidatorService.validateUrl(resourceUrl, correlationId)
