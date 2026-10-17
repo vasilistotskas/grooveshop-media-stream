@@ -142,20 +142,28 @@ export class TenantDomainsService implements OnModuleInit, OnModuleDestroy {
 			if (!Array.isArray(body.domains)) {
 				throw new TypeError('Tenant domains feed returned a malformed payload (domains is not an array)')
 			}
-			if (!Array.isArray(body.suspendedSchemas)) {
-				throw new TypeError('Tenant domains feed returned a malformed payload (suspendedSchemas is not an array)')
-			}
 
 			this.domains = new Set(
 				body.domains
 					.filter((domain): domain is string => typeof domain === 'string' && domain.length > 0)
 					.map(domain => domain.toLowerCase()),
 			)
+			this.lastSuccessfulRefreshAt = Date.now()
+
+			// Read on its own: a feed without it (a Django older than the field)
+			// must not cost the domain allowlist, which CORS and the rate limit
+			// rely on. The last known suspensions stay, none after a restart.
+			if (!Array.isArray(body.suspendedSchemas)) {
+				CorrelatedLogger.warn(
+					`Tenant feed has no suspendedSchemas list, keeping the last known ${this.suspendedSchemas.size} suspended stores`,
+					TenantDomainsService.name,
+				)
+				return false
+			}
 			this.suspendedSchemas = new Set(
 				body.suspendedSchemas
 					.filter((schema): schema is string => typeof schema === 'string' && TENANT_SCHEMA_PATTERN.test(schema)),
 			)
-			this.lastSuccessfulRefreshAt = Date.now()
 
 			CorrelatedLogger.debug(
 				`Refreshed the tenant feed: ${this.domains.size} domains, ${this.suspendedSchemas.size} suspended stores`,

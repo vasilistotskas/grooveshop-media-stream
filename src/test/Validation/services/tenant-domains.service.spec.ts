@@ -211,7 +211,6 @@ describe('tenantDomainsService', () => {
 			it.each([
 				['an unreachable feed', () => fetchMock.mockRejectedValueOnce(new Error('ECONNREFUSED'))],
 				['a non-2xx answer', () => fetchMock.mockResolvedValueOnce(jsonResponse({}, false, 503))],
-				['a payload without suspendedSchemas', () => fetchMock.mockResolvedValueOnce(jsonResponse({ domains: [] }))],
 			])('keeps the last known suspensions and reports failure on %s', async (_case, failNext) => {
 				fetchMock.mockResolvedValueOnce(jsonResponse({ domains: ['acme.example'], suspendedSchemas: ['closed_shop'] }))
 				const service = createService()
@@ -222,6 +221,30 @@ describe('tenantDomainsService', () => {
 
 				expect(service.isSuspended('closed_shop')).toBe(true)
 				expect(service.isAllowed('acme.example')).toBe(true)
+			})
+
+			// A Django older than the field (a rollback) must not cost the
+			// domain allowlist that CORS and the rate limit rely on.
+			it('still takes the domains from a feed without suspendedSchemas, keeping the last suspensions and reporting them stale', async () => {
+				fetchMock.mockResolvedValueOnce(jsonResponse({ domains: ['acme.example'], suspendedSchemas: ['closed_shop'] }))
+				const service = createService()
+				await service.onModuleInit()
+
+				fetchMock.mockResolvedValueOnce(jsonResponse({ domains: ['acme.example', 'new.example'] }))
+				await expect(service.refresh()).resolves.toBe(false)
+
+				expect(service.isAllowed('new.example')).toBe(true)
+				expect(service.isSuspended('closed_shop')).toBe(true)
+			})
+
+			it('starts with the domains and nothing suspended when a restarted pod reads a feed without suspendedSchemas', async () => {
+				fetchMock.mockResolvedValue(jsonResponse({ domains: ['acme.example'] }))
+				const service = createService()
+				await service.onModuleInit()
+
+				expect(service.isAllowed('acme.example')).toBe(true)
+				expect(service.isSuspended('closed_shop')).toBe(false)
+				expect(service.getLastSuccessfulRefresh()).toBeDefined()
 			})
 
 			it('refuses nothing before the feed has ever been read', () => {
