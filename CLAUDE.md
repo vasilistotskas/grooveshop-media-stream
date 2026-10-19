@@ -169,4 +169,4 @@ Copy `.env.example` to `.env`. Critical ones: `PORT` (default 3003), `BACKEND_UR
 - ESM modules (`"type": "module"`), SWC builds (`nest-cli.json`), Vitest with `unplugin-swc`
 - Unit tests in `src/test/` as `*.spec.ts`, E2E in `src/test/e2e/` as `*.e2e-spec.ts`, performance specs in `src/test/performance/` (own config). `src/test/helpers/config-service.mock.ts` provides `createConfigServiceMock(overrides)` — a `ConfigService` double with every schema default; config is read in constructors, so build a new instance per configuration under test
 - Prefer fake timers (`vi.useFakeTimers`) over real sleeps and `vi.stubEnv` over `process.env` writes
-- Node.js >= 24.12.0, pnpm package manager
+- Node.js per `engines` in `package.json`, pnpm package manager (`packageManager` field)
