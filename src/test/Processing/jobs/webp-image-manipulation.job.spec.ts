@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer'
 import sharp from 'sharp'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BackgroundOptions, FitOptions, PositionOptions, ResizeOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
-import { AVIF_CHROMA_SUBSAMPLING, AVIF_EFFORT, AVIF_MAX_QUALITY, SHARPEN_SIGMA } from '#microservice/common/constants/image-encoding.constant'
+import { AVIF_CHROMA_SUBSAMPLING, AVIF_EFFORT, SHARPEN_SIGMA } from '#microservice/common/constants/image-encoding.constant'
 import { TRIM_WORKING_SIZE } from '#microservice/common/constants/image-limits.constant'
 import { ProcessingTimeoutError } from '#microservice/common/errors/media-stream.errors'
 import ManipulationJobResult from '#microservice/Processing/dto/manipulation-job-result.dto'
@@ -146,7 +146,7 @@ describe('webpImageManipulationJob', () => {
 			const result = await job.handle('test.avif', options({ format: SupportedResizeFormats.avif }))
 
 			expect(mockManipulation.avif).toHaveBeenCalledWith({
-				quality: AVIF_MAX_QUALITY,
+				quality: 80,
 				effort: AVIF_EFFORT,
 				chromaSubsampling: AVIF_CHROMA_SUBSAMPLING,
 				lossless: false,
@@ -166,22 +166,12 @@ describe('webpImageManipulationJob', () => {
 			expect(result.format).toBe('avif')
 		})
 
-		describe('avif quality', () => {
-			it('caps a higher request at the AVIF ceiling', async () => {
-				primeTrimmedRun({ size: 1000, format: 'heif' })
+		it('encodes AVIF at the quality the request carries (the controller applies the ceiling)', async () => {
+			primeTrimmedRun({ size: 1000, format: 'heif' })
 
-				await job.handle('test.avif', options({ format: SupportedResizeFormats.avif, quality: 100 }))
+			await job.handle('test.avif', options({ format: SupportedResizeFormats.avif, quality: 40 }))
 
-				expect(mockManipulation.avif).toHaveBeenCalledWith(expect.objectContaining({ quality: AVIF_MAX_QUALITY }))
-			})
-
-			it('keeps a lower request as asked', async () => {
-				primeTrimmedRun({ size: 1000, format: 'heif' })
-
-				await job.handle('test.avif', options({ format: SupportedResizeFormats.avif, quality: 40 }))
-
-				expect(mockManipulation.avif).toHaveBeenCalledWith(expect.objectContaining({ quality: 40 }))
-			})
+			expect(mockManipulation.avif).toHaveBeenCalledWith(expect.objectContaining({ quality: 40 }))
 		})
 
 		describe('enlargement and sharpening', () => {

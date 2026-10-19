@@ -75,6 +75,8 @@ export interface ProcessingConfig {
 	queueTimeoutMs: number
 	/** Sharp per-pipeline timeout (seconds); 0 disables. */
 	timeoutSeconds: number
+	/** AVIF quality ceiling; a request above it is encoded (and cached) at it. */
+	avifMaxQuality: number
 }
 
 export interface MonitoringConfig {

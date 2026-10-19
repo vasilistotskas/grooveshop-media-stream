@@ -160,6 +160,8 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	'processing.queueTimeoutMs': { env: 'PROCESSING_QUEUE_TIMEOUT_MS', default: 10000, type: 'number' },
 	// Sharp per-pipeline processing timeout (seconds); 0 disables
 	'processing.timeoutSeconds': { env: 'PROCESSING_TIMEOUT_SECONDS', default: 20, type: 'number' },
+	// AVIF quality ceiling (1-100); a lower requested quality still wins
+	'processing.avifMaxQuality': { env: 'PROCESSING_AVIF_MAX_QUALITY', default: 60, type: 'number' },
 
 	// Monitoring configuration
 	'monitoring.enabled': { env: 'MONITORING_ENABLED', default: true, type: 'boolean' },

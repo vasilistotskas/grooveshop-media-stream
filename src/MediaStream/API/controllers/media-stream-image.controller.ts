@@ -7,6 +7,7 @@ import { IMAGE } from '#microservice/common/constants/route-prefixes.constant'
 import { PUBLIC_TENANT_SCHEMA } from '#microservice/common/constants/tenant.constant'
 import { TenantSuspendedError } from '#microservice/common/errors/media-stream.errors'
 import { decodePathFully } from '#microservice/common/utils/percent-decode.util'
+import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { currentImageRequest } from '#microservice/Correlation/utils/image-request-log.util'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
@@ -42,6 +43,7 @@ const MAX_LOGGED_PARAM_LENGTH = 64
 @Controller(IMAGE)
 export default class MediaStreamImageController {
 	private readonly compiledPatterns = new Map<string, RegExp>()
+	private readonly avifMaxQuality: number
 
 	constructor(
 		private readonly imageStreamService: ImageStreamService,
@@ -50,7 +52,9 @@ export default class MediaStreamImageController {
 		private readonly correlationService: CorrelationService,
 		private readonly metricsService: MetricsService,
 		private readonly tenantDomainsService: TenantDomainsService,
+		configService: ConfigService,
 	) {
+		this.avifMaxQuality = configService.get<number>('processing.avifMaxQuality')
 		CorrelatedLogger.log('Image controller initialized with sources:', MediaStreamImageController.name)
 		Object.entries(IMAGE_SOURCES).forEach(([key, config]) => {
 			CorrelatedLogger.log(`  - ${key}: /${IMAGE}/${config.routePattern}`, MediaStreamImageController.name)
@@ -240,8 +244,14 @@ export default class MediaStreamImageController {
 	 * Every route segment is mandatory and already validated, so values are
 	 * converted verbatim; ResizeOptions supplies defaults only for programmatic
 	 * callers that omit a field.
+	 *
+	 * AVIF quality is clamped to `processing.avifMaxQuality` here, before the
+	 * request is hashed into its cache identity: requests that encode to the
+	 * same bytes share one entry, and changing the ceiling re-keys AVIF only.
 	 */
 	private buildResizeOptions(params: ImageProcessingParams): ResizeOptions {
+		const format = params.format as SupportedResizeFormats | undefined
+		const quality = Number(params.quality)
 		return new ResizeOptions({
 			width: Number(params.width),
 			height: Number(params.height),
@@ -249,8 +259,8 @@ export default class MediaStreamImageController {
 			background: params.background,
 			fit: params.fit as FitOptions | undefined,
 			trimThreshold: Number(params.trimThreshold),
-			format: params.format as SupportedResizeFormats | undefined,
-			quality: Number(params.quality),
+			format,
+			quality: format === SupportedResizeFormats.avif ? Math.min(quality, this.avifMaxQuality) : quality,
 		})
 	}
 

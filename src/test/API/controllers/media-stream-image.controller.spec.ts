@@ -9,11 +9,13 @@ import { ImageStreamService } from '#microservice/API/services/image-stream.serv
 import { RequestValidatorService } from '#microservice/API/services/request-validator.service'
 import { UrlBuilderService } from '#microservice/API/services/url-builder.service'
 import { TenantSuspendedError } from '#microservice/common/errors/media-stream.errors'
+import { ConfigService } from '#microservice/Config/config.service'
 import { requestContextStorage } from '#microservice/Correlation/async-local-storage'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { TenantDomainsService } from '#microservice/Validation/services/tenant-domains.service'
+import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 
 vi.mock('#microservice/API/services/image-stream.service')
 vi.mock('#microservice/API/services/request-validator.service')
@@ -27,6 +29,8 @@ vi.mock('#microservice/Correlation/utils/performance-tracker.util', () => ({
 		endPhase: vi.fn().mockReturnValue(100),
 	},
 }))
+
+const AVIF_MAX_QUALITY = 60
 
 describe('mediaStreamImageController', () => {
 	let controller: MediaStreamImageController
@@ -104,6 +108,10 @@ describe('mediaStreamImageController', () => {
 				{
 					provide: TenantDomainsService,
 					useValue: mockTenantDomainsService,
+				},
+				{
+					provide: ConfigService,
+					useValue: createConfigServiceMock({ 'processing.avifMaxQuality': AVIF_MAX_QUALITY }),
 				},
 			],
 		}).compile()
@@ -369,6 +377,25 @@ describe('mediaStreamImageController', () => {
 					}),
 				}),
 			)
+		})
+	})
+
+	describe('avif quality ceiling', () => {
+		async function requestedQuality(path: string): Promise<number> {
+			await controller.handleImageRequest({ path } as any, mockResponse)
+			return mockImageStreamService.processAndStream.mock.calls[0][1].resizeOptions.quality
+		}
+
+		it('clamps an AVIF request above the ceiling before the request is hashed', async () => {
+			expect(await requestedQuality('/media_stream-image/media/acme/uploads/a.jpg/768/576/cover/attention/transparent/0/80.avif')).toBe(AVIF_MAX_QUALITY)
+		})
+
+		it('keeps an AVIF request below the ceiling as asked', async () => {
+			expect(await requestedQuality('/media_stream-image/media/acme/uploads/a.jpg/768/576/cover/attention/transparent/0/40.avif')).toBe(40)
+		})
+
+		it('leaves other formats at the requested quality', async () => {
+			expect(await requestedQuality('/media_stream-image/media/acme/uploads/a.jpg/768/576/cover/attention/transparent/0/80.webp')).toBe(80)
 		})
 	})
 
