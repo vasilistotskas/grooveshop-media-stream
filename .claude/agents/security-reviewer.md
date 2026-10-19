@@ -16,18 +16,18 @@ Review code changes for security vulnerabilities specific to this image processi
 
 ### 1. Input Validation Bypass
 - Check `src/MediaStream/Validation/services/security-checker.service.ts` patterns
-- Verify `InputSanitizationService` domain whitelist isn't weakened
-- Ensure numeric param bounds (width 1-8192, height 1-8192, quality 1-100, trimThreshold 0-100) are enforced
+- Verify `ResourceValidationService` domain whitelist isn't weakened
+- Ensure numeric param bounds (width/height 0–8192 with 0 = original, quality 1–100, trimThreshold 0–100, total pixels ≤ 7680×4320) are enforced
 - Watch for path traversal in image path parameters (`../`, `%2e%2e`)
 
 ### 2. Image Processing Vulnerabilities
 - SVG bomb detection (recursive references, excessive elements)
 - Pixel flood attacks (decompression bombs: max 7680x4320 total pixels, max 8192 per dimension)
 - Sharp memory limits (100MB cache, concurrency based on CPU cores)
-- Format-specific file size limits: JPEG 5MB, PNG 8MB, WebP 3MB, GIF 2MB, SVG 1MB
+- Format-specific limits in `MAX_FILE_SIZES` (`common/constants/image-limits.constant.ts`), keyed on the sniffed format
 
 ### 3. Cache Poisoning & Redis Injection
-- Cache key generation in `DefaultCacheKeyStrategy` (SHA256 hash, namespace:identifier:paramsHash)
+- Cache keys from `Cache/utils/cache-namespace.util.ts` (`image:{tenantSchema}:{uuid}`, the uuid derived from the request by `GenerateResourceIdentityFromRequestJob`)
 - Redis command injection through unsanitized cache keys
 - Binary serialization format integrity (0x00 marker + 4-byte metadata length)
 - Negative cache bypass attempts
@@ -35,11 +35,11 @@ Review code changes for security vulnerabilities specific to this image processi
 ### 4. HTTP Security
 - Circuit breaker state manipulation via Redis
 - SSRF through upstream URL building (`UrlBuilderService`)
-- Domain whitelist bypass in `InputSanitizationService` (configurable via `validation.allowedDomains`)
+- Domain whitelist bypass in `ResourceValidationService` (configurable via `validation.allowedDomains`)
 - ETag/conditional request header injection
 
 ### 5. Rate Limiting Bypass
-- `AdaptiveRateLimitGuard` skip conditions (dev mode, health, metrics, static, bots)
+- `AdaptiveRateLimitGuard` bypasses (health probes except the circuit-breaker reset, static `public/` assets, bot UAs and whitelisted referers from internal IPs only) — flag any new bypass
 - IP spoofing via X-Forwarded-For/X-Real-IP headers
 - User-agent manipulation for bot detection bypass
 

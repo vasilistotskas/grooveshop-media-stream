@@ -11,28 +11,28 @@ Use when debugging cache hit/miss behavior, stale entries, warming, or eviction 
 `MultiLayerCacheManager` (`src/MediaStream/Cache/services/multi-layer-cache.manager.ts`) registers two layers, sorted by `getPriority()`:
 
 1. **Memory** (`memory-cache.service.ts`) — NodeCache. Defaults: TTL 3600s (`CACHE_MEMORY_DEFAULT_TTL`), maxKeys 1000 (`CACHE_MEMORY_MAX_KEYS`), maxSize 100MB (`CACHE_MEMORY_MAX_SIZE`), checkPeriod 600s.
-2. **Redis** (`redis-cache.service.ts`) — ioredis. Default TTL 7200s (`REDIS_TTL`). Key pattern `image:*` (see line 269). `flushAll()` issues `FLUSHDB` (current DB only — Redis is shared with Django/Nuxt/Celery).
+2. **Redis** (`redis-cache.service.ts`) — ioredis. Default TTL 7200s (`REDIS_TTL`). Key pattern `image:*` (`IMAGE_KEY_PATTERN` in `cache-namespace.util.ts`). `clear()` deletes `image:*` via SCAN + DEL, never `FLUSHDB` — the DB also holds rate-limit counters and circuit-breaker state.
 
 > The "file system cache" mentioned in CLAUDE.md is **NOT** a registered cache layer in `MultiLayerCacheManager`. It's the persistence layer used by `CacheImageResourceOperation` (`.rsc` data, `.rsm` metadata JSON, `.rst` temp during write). Treat it as orthogonal to the multi-layer flow.
 
 ## Lookup Order (read path)
 
-`multi-layer-cache.manager.ts` lines 69–96:
+`MultiLayerCacheManager.lookup()`:
 
 1. Iterate `this.layers` by priority ascending (Memory first, Redis second).
 2. Return on the first hit.
-3. On hit from a lower-priority layer, fire-and-forget `backfillLayers()` (lines 323–358) to populate higher-priority layers, **preserving the source TTL** (lines 330–336).
+3. On hit from a lower-priority layer, fire-and-forget `backfillLayers()` to populate higher-priority layers, **preserving the source layer's remaining TTL** (`sourceLayer.getTtl(key)`).
 4. **Backfill MUST stay non-awaited** — awaiting it serializes every cache hit on the slowest layer. See performance-analyzer guidance.
 
 ## Negative Caching
 
-- Where: `src/MediaStream/Cache/operations/cache-image-resource.operation.ts:78`.
-- TTL: 300s (5 min) for failed upstream fetches.
+- Where: `ResourceFetcher` (`Cache/operations/resource-fetcher.service.ts`), stored under `negative:{resourceId}` in the tenant's `image:` namespace.
+- TTL: `cache.image.negativeCacheTtl` (`CACHE_IMAGE_NEGATIVE_TTL`, default 300 s) for failed upstream fetches.
 - Purpose: prevents repeated failed HTTP requests from hammering the backend.
 
 ## Access-Weighted TTL
 
-`cache-warming.service.ts` lines 248–249:
+`CacheWarmingService` (`cache-warming.service.ts`), when it warms a file:
 
 ```
 ttl = floor(baseCacheTtl * (1 + min(accessCount / 10, 5)))
@@ -42,21 +42,16 @@ Examples: accessCount=5 → multiplier 1.5 → TTL = base × 1.5. accessCount≥
 
 ## Cache Warming
 
-- Threshold: ≥5 accesses (`CACHE_WARMING_THRESHOLD`, default 5). Filter at `cache-warming.service.ts:206`.
+- Threshold: ≥5 accesses (`CACHE_WARMING_THRESHOLD`, default 5), filtered against `popularImageThreshold` in `cache-warming.service.ts`.
 - Schedule: cron from `CACHE_WARMING_CRON` env, default every 6 hours.
-- Trigger style: `setImmediate(() => this.warmupCache())` at line 65 — must stay non-awaited.
+- Trigger style: `setImmediate(() => this.warmupCache())` for the boot-time warm-up — must stay non-awaited.
 - Stored shape in warmup paths: `{ data: Buffer, metadata: ResourceMetaData }`.
-
-## Eviction
-
-`multi-layer-cache.manager.ts:385–387` — eviction is deferred via `setImmediate` so it never blocks the request path.
 
 ## Common Debug Questions
 
 - **Cache miss for an image that was just fetched**: check Memory TTL/maxKeys (LRU eviction), then check Redis with `redis-cli -n 0 KEYS "image:*"`.
 - **Stale entry served**: TTL preserved during backfill — verify the source layer's TTL is correct, not the destination's.
-- **Warmer not warming a known-popular image**: confirm `accessCount >= 5` in its `ResourceMetaData` (`.rsm` JSON file). Access count is incremented on every multi-layer hit.
-- **`flushAll` didn't clear other services**: expected. `FLUSHDB` is DB-scoped.
+- **Warmer not warming a known-popular image**: confirm `accessCount >= 5` in its `ResourceMetaData` (`.rsm` JSON file). Access count is bumped on every served image (`loadResource` and a fresh `persist` in `CacheImageResourceOperation`) by `AccessCountTracker` (batched; flushed every 30 s / 1000 pending / shutdown).
 - **Backfill blocking requests**: search for any `await this.backfillLayers(` — there should be none in the request path.
 
 ## Don't Mix Up
