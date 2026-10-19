@@ -25,7 +25,8 @@ Run targeted tests for modified modules in the grooveshop-media-stream microserv
 | `src/MediaStream/RateLimit/` | `src/test/RateLimit/` | `pnpm exec vitest run src/test/RateLimit/` |
 | `src/MediaStream/Storage/` | `src/test/Storage/` | `pnpm exec vitest run src/test/Storage/` |
 | `src/MediaStream/Validation/` | `src/test/Validation/` | `pnpm exec vitest run src/test/Validation/` |
-| `src/MediaStream/common/` | `src/test/common/` + `src/test/utils/` + `src/test/errors/` + `src/test/filters/` | `pnpm exec vitest run src/test/common/ src/test/utils/ src/test/errors/ src/test/filters/` |
+| `src/MediaStream/common/` | `src/test/common/` | `pnpm exec vitest run src/test/common/` |
+| `src/MediaStream/media-stream.module.ts` (module wiring, middleware order) | `src/test/Module/` + `src/test/media-stream.module.spec.ts` | `pnpm exec vitest run src/test/Module/ src/test/media-stream.module.spec.ts` |
 | Cross-module changes | All tests | `pnpm run test` |
 
 ## Process
@@ -48,7 +49,6 @@ Run targeted tests for modified modules in the grooveshop-media-stream microserv
 
 ## Notes
 
-- Tests run with `fileParallelism: false` (sequential file execution)
-- Each test file is isolated (`isolate: true`)
+- Test files run in parallel (`fileParallelism: true`), each isolated (`isolate: true`)
 - Coverage is disabled by default for speed; use `pnpm run test:coverage` for full coverage
 - E2E tests are separate: `pnpm run test:e2e`
