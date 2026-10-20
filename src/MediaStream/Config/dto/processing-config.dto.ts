@@ -25,4 +25,9 @@ export class ProcessingConfigDto {
 	@Min(0)
 	@Max(600)
 	timeoutSeconds!: number
+
+	@IsInt()
+	@Min(1)
+	@Max(100)
+	avifMaxQuality!: number
 }

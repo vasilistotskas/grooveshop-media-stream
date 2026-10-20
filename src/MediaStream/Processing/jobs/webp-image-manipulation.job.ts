@@ -4,7 +4,7 @@ import { Buffer } from 'node:buffer'
 import { Injectable } from '@nestjs/common'
 import sharp from 'sharp'
 import { FitOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
-import { AVIF_CHROMA_SUBSAMPLING, AVIF_EFFORT, AVIF_MAX_QUALITY, SHARPEN_MIN_DOWNSCALE_FACTOR, SHARPEN_SIGMA } from '#microservice/common/constants/image-encoding.constant'
+import { AVIF_CHROMA_SUBSAMPLING, AVIF_EFFORT, SHARPEN_MIN_DOWNSCALE_FACTOR, SHARPEN_SIGMA } from '#microservice/common/constants/image-encoding.constant'
 import { SHARP_INPUT_PIXEL_LIMIT, TRIM_WORKING_SIZE } from '#microservice/common/constants/image-limits.constant'
 import { ProcessingTimeoutError } from '#microservice/common/errors/media-stream.errors'
 import { errorMessage } from '#microservice/common/utils/error-message.util'
@@ -165,7 +165,7 @@ export default class WebpImageManipulationJob {
 					manipulation = manipulation.png({ ...ENCODER_OPTIONS.png, quality, palette: quality < PNG_PALETTE_BELOW_QUALITY })
 					break
 				case SupportedResizeFormats.avif:
-					manipulation = manipulation.avif({ ...ENCODER_OPTIONS.avif, quality: Math.min(quality, AVIF_MAX_QUALITY) })
+					manipulation = manipulation.avif({ ...ENCODER_OPTIONS.avif, quality })
 					break
 				case SupportedResizeFormats.gif:
 					manipulation = manipulation.gif()

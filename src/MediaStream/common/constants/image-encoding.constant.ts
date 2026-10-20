@@ -9,17 +9,11 @@
 
 /**
  * Cache-identity version of the processing pipeline's output. Increment on
- * every change that alters the produced bytes (quality caps, encoder options,
- * resampling, sharpening).
+ * every change that alters the produced bytes (encoder options, resampling,
+ * sharpening). The AVIF quality ceiling (`processing.avifMaxQuality`) needs no
+ * bump: the controller clamps the request before it is hashed.
  */
 export const PROCESSING_VERSION = 3
-
-/**
- * AVIF quality ceiling. The storefront asks for 80-100; AVIF at 72 is already
- * visually transparent for photos and above it size grows far faster than
- * quality. Lower than the request still wins.
- */
-export const AVIF_MAX_QUALITY = 72
 
 /**
  * AVIF CPU effort (0 fastest, 9 slowest). Measured on 2400 px product photos:
