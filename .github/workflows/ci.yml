@@ -124,19 +124,20 @@ jobs:
           # production-mode guard in RedisCacheService (ioredis warns and continues).
           REDIS_PASSWORD: ci_smoke_test_password
         run: |
+          exit_code=1
           timeout 10s pnpm run prod || exit_code=$?
-          if [ $exit_code -eq 124 ]; then
+          if [ "$exit_code" -eq 124 ]; then
             echo "Production build starts successfully"
           else
             echo "Production build failed with exit code $exit_code"
-            exit $exit_code
+            exit "$exit_code"
           fi
 
       - name: Coverage summary
         if: always()
         run: |
           if [ -f coverage/coverage-summary.json ]; then
-            echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
+            echo "## Coverage Report" >> "$GITHUB_STEP_SUMMARY"
             node -e "
               const fs = require('fs');
               const s = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8')).total;
@@ -146,7 +147,7 @@ jobs:
               console.log(\`| Branches   | \${s.branches.pct}% | \${s.branches.covered} / \${s.branches.total} |\`);
               console.log(\`| Functions  | \${s.functions.pct}% | \${s.functions.covered} / \${s.functions.total} |\`);
               console.log(\`| Lines      | \${s.lines.pct}% | \${s.lines.covered} / \${s.lines.total} |\`);
-            " >> $GITHUB_STEP_SUMMARY
+            " >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload coverage artifacts
