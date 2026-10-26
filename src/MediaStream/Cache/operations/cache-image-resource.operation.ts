@@ -8,8 +8,9 @@ import { access, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
 import CacheImageRequest from '#microservice/API/dto/cache-image-request.dto'
+import UnableToFetchResourceException from '#microservice/API/exceptions/unable-to-fetch-resource.exception'
 import { PUBLIC_TENANT_SCHEMA } from '#microservice/common/constants/tenant.constant'
-import { MediaStreamError, ProcessingOverloadedError } from '#microservice/common/errors/media-stream.errors'
+import { isRejectedSource, MediaStreamError, ProcessingOverloadedError } from '#microservice/common/errors/media-stream.errors'
 import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { storageDirectory } from '#microservice/common/utils/storage-path.util'
 import { ConfigService } from '#microservice/Config/config.service'
@@ -249,7 +250,17 @@ export default class CacheImageResourceOperation {
 				CorrelatedLogger.warn(`Shed by processing admission: ${errorMessage(error)}`, CacheImageResourceOperation.name)
 				throw error
 			}
-			CorrelatedLogger.error(`Failed to execute CacheImageResourceOperation: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, CacheImageResourceOperation.name)
+			// A missing or unreachable source was logged where it was raised,
+			// at the level it deserves (a 404 is WARN in the fetch job). A
+			// source refused by policy is logged only here, so here it keeps
+			// its detail, at WARN like its request line. Neither is a fault:
+			// an ERROR line would page on a broken link or an oversized upload.
+			if (isRejectedSource(error)) {
+				CorrelatedLogger.warn(`Source refused: ${errorMessage(error)}`, CacheImageResourceOperation.name)
+			}
+			else if (!(error instanceof UnableToFetchResourceException)) {
+				CorrelatedLogger.error(`Failed to execute CacheImageResourceOperation: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, CacheImageResourceOperation.name)
+			}
 			this.metricsService.recordError('image_processing', 'execute')
 			this.metricsService.recordImageProcessing('execute', 'unknown', 'error', duration || 0)
 			if (error instanceof MediaStreamError) {

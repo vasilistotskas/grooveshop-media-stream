@@ -152,3 +152,14 @@ export class SvgSanitizationError extends MediaStreamError {
 		super(message, HttpStatus.BAD_GATEWAY, 'SVG_SANITIZATION_FAILED', context)
 	}
 }
+
+/**
+ * The source was refused by policy, not lost to a fault: over its format's
+ * size limit, not a supported format, or an SVG the sanitiser would not
+ * vouch for. The request line carries it at WARN; no separate ERROR line.
+ */
+export function isRejectedSource(error: unknown): error is UpstreamResourceTooLargeError | UnsupportedSourceFormatError | SvgSanitizationError {
+	return error instanceof UpstreamResourceTooLargeError
+		|| error instanceof UnsupportedSourceFormatError
+		|| error instanceof SvgSanitizationError
+}

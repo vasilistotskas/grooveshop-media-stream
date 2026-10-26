@@ -420,6 +420,44 @@ describe('cacheImageResourceOperation', () => {
 			await expect(operation.execute(ctx)).rejects.toBeInstanceOf(UpstreamResourceTooLargeError)
 			expect(metricsService.recordImageProcessing).toHaveBeenCalledWith('execute', 'unknown', 'error', expect.any(Number))
 		})
+
+		describe('error lines', () => {
+			afterEach(() => {
+				vi.restoreAllMocks()
+			})
+
+			it('logs no ERROR for a missing source: the fetcher logged its 404 at WARN', async () => {
+				const error = vi.spyOn(CorrelatedLogger, 'error').mockImplementation(() => {})
+				const warn = vi.spyOn(CorrelatedLogger, 'warn').mockImplementation(() => {})
+				fetchJob.handle.mockResolvedValue({ ...streamResponse(), status: 404, statusText: 'Not Found', data: null })
+
+				await expect(operation.execute(ctx)).rejects.toBeInstanceOf(UnableToFetchResourceException)
+
+				expect(error).not.toHaveBeenCalled()
+				expect(warn).toHaveBeenCalledWith(expect.stringContaining('status: 404'), 'ResourceFetcher')
+			})
+
+			it('logs a source refused by policy at WARN with its detail, never at ERROR', async () => {
+				const error = vi.spyOn(CorrelatedLogger, 'error').mockImplementation(() => {})
+				const warn = vi.spyOn(CorrelatedLogger, 'warn').mockImplementation(() => {})
+				validation.validateFileSize.mockReturnValue(false)
+				fetchJob.handle.mockResolvedValue({ ...streamResponse(), headers: { 'content-length': '50000000' } })
+
+				await expect(operation.execute(ctx)).rejects.toBeInstanceOf(UpstreamResourceTooLargeError)
+
+				expect(error).not.toHaveBeenCalled()
+				expect(warn).toHaveBeenCalledWith(expect.stringContaining('Source refused:'), 'CacheImageResourceOperation')
+			})
+
+			it('logs an ERROR for a failure nothing else explained', async () => {
+				const error = vi.spyOn(CorrelatedLogger, 'error').mockImplementation(() => {})
+				webpJob.handle.mockRejectedValue(new Error('Input buffer contains unsupported image format'))
+
+				await expect(operation.execute(ctx)).rejects.toBeInstanceOf(InternalServerErrorException)
+
+				expect(error).toHaveBeenCalledWith(expect.stringContaining('Failed to execute CacheImageResourceOperation'), expect.anything(), 'CacheImageResourceOperation')
+			})
+		})
 	})
 
 	describe('flush fencing', () => {

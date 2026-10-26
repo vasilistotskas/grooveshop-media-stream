@@ -5,7 +5,7 @@ import type { ImageProcessingContext } from '../types/image-source.types.js'
 import { Injectable } from '@nestjs/common'
 import UnableToFetchResourceException from '#microservice/API/exceptions/unable-to-fetch-resource.exception'
 import CacheImageResourceOperation from '#microservice/Cache/operations/cache-image-resource.operation'
-import { CircuitBreakerOpenError, DefaultImageFallbackError, ProcessingOverloadedError, ProcessingTimeoutError, SvgSanitizationError, UnsupportedSourceFormatError, UpstreamResourceTooLargeError } from '#microservice/common/errors/media-stream.errors'
+import { CircuitBreakerOpenError, DefaultImageFallbackError, isRejectedSource, ProcessingOverloadedError, ProcessingTimeoutError } from '#microservice/common/errors/media-stream.errors'
 import { getMimeType } from '#microservice/common/utils/content-negotiation.util'
 import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { checkETagMatch, checkIfModifiedSince, formatLastModified, generateWeakETag } from '#microservice/common/utils/etag.util'
@@ -38,17 +38,6 @@ import CacheImageRequest from '../dto/cache-image-request.dto.js'
 function buildCacheControl(publicTTLms: number): string {
 	const maxAge = Math.floor((publicTTLms || 0) / 1000)
 	return `max-age=${maxAge}, s-maxage=${maxAge}, public, immutable, stale-while-revalidate=604800, stale-if-error=2592000`
-}
-
-/**
- * The source was refused by policy, not lost to a fault: over its format's
- * size limit, not a supported format, or an SVG the sanitiser would not
- * vouch for. The request line carries it at WARN; no separate ERROR line.
- */
-function isRejectedSource(error: unknown): error is UpstreamResourceTooLargeError | UnsupportedSourceFormatError | SvgSanitizationError {
-	return error instanceof UpstreamResourceTooLargeError
-		|| error instanceof UnsupportedSourceFormatError
-		|| error instanceof SvgSanitizationError
 }
 
 function etagFor(metadata: ResourceMetaData): string {

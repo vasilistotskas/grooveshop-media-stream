@@ -192,10 +192,19 @@ export class HttpClientService implements OnModuleInit, OnModuleDestroy {
 							// rolled pod restored it. A 404 is a normal negative
 							// result with its own 5-minute negative cache, not a
 							// sign the upstream is unwell.
-							if (this.circuitBreakerEnabled && this.isUpstreamFailure(error)) {
+							const upstreamFailure = this.isUpstreamFailure(error)
+							if (this.circuitBreakerEnabled && upstreamFailure) {
 								this.circuitBreaker.recordFailure()
 							}
-							CorrelatedLogger.error(`HTTP request failed: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, HttpClientService.name)
+							// Same rule for the log: a 4xx is an answer, which the
+							// caller logs at the level it deserves (a missing image
+							// is a WARN in FetchResourceResponseJob).
+							if (upstreamFailure) {
+								CorrelatedLogger.error(`HTTP request failed: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, HttpClientService.name)
+							}
+							else {
+								CorrelatedLogger.debug(`HTTP request answered ${errorMessage(error)}`, HttpClientService.name)
+							}
 						},
 						next: (response: AxiosResponse<T>) => {
 							this.stats.successfulRequests++
