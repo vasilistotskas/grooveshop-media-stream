@@ -124,7 +124,7 @@ jobs:
           # production-mode guard in RedisCacheService (ioredis warns and continues).
           REDIS_PASSWORD: ci_smoke_test_password
         run: |
-          exit_code=0
+          exit_code=1
           timeout 10s pnpm run prod || exit_code=$?
           if [ "$exit_code" -eq 124 ]; then
             echo "Production build starts successfully"
