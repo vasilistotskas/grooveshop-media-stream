@@ -1,3 +1,10 @@
+## [3.11.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.11.1...v3.11.2) (2026-10-26)
+
+
+### Bug Fixes
+
+* **logging:** an upstream 404 is no ERROR line; a refused source logs at WARN ([#44](https://github.com/vasilistotskas/grooveshop-media-stream/issues/44)) ([8a9c1fa](https://github.com/vasilistotskas/grooveshop-media-stream/commit/8a9c1fa74e72c594a97402abd1a7f85c3f9821be))
+
 ## [3.11.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.11.0...v3.11.1) (2026-10-20)
 
 
