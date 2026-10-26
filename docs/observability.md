@@ -81,13 +81,20 @@ value is left out rather than written as `null`.
 | `aborted` | any | `log` | The client closed the connection before the response finished; `status` is then what would have been sent |
 
 Faults keep their own ERROR or WARN lines with the stack and details, and
-the request line records only the class name. `ImageStreamService` adds no
-ERROR line of its own for a `rejected` source, because it is policy, not a
-fault. ERROR lines still appear for one: every failure of a miss,
-rejected sources included, is logged by `CacheImageResourceOperation.execute()`
-(`Failed to execute CacheImageResourceOperation: …`), and the SVG sanitiser
-logs its own fail-closed cause (a worker failure such as
-`ERR_WORKER_OUT_OF_MEMORY`, or a `<script` that survived sanitisation).
+the request line records only the class name. A failure on a miss is
+logged once, at the level of what happened:
+
+- a missing or unreachable source where it was raised: an upstream 4xx at
+  WARN by `FetchResourceResponseJob` and `ResourceFetcher`, a 5xx or a
+  network fault at ERROR. `HttpClientService` logs ERROR only for those
+  (the same rule as its circuit breaker), and a 4xx at debug;
+- a `rejected` source (policy, not a fault) by
+  `CacheImageResourceOperation.execute()` at WARN, with its detail
+  (`Source refused: …`). The SVG sanitiser still logs its own fail-closed
+  cause at ERROR (a worker failure such as `ERR_WORKER_OUT_OF_MEMORY`, or a
+  `<script` that survived sanitisation);
+- anything else by `CacheImageResourceOperation.execute()` at ERROR
+  (`Failed to execute CacheImageResourceOperation: …`).
 
 ### The pre-decode line
 

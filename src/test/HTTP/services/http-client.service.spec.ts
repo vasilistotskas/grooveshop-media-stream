@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { CircuitBreakerOpenError } from '#microservice/common/errors/media-stream.errors'
 import { ConfigService } from '#microservice/Config/config.service'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { HttpClientService } from '#microservice/HTTP/services/http-client.service'
 import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 
@@ -106,6 +107,61 @@ describe('httpClientService', () => {
 			vi.runAllTimers()
 
 			await expect(promise).rejects.toThrow()
+		})
+	})
+
+	describe('logging a failed request', () => {
+		// No retries, so each case is one request and no timers.
+		async function clientAnswering(failure: AxiosError): Promise<HttpClientService> {
+			const module: TestingModule = await Test.createTestingModule({
+				imports: [NestHttpModule],
+				providers: [
+					HttpClientService,
+					{ provide: ConfigService, useValue: createConfigServiceMock({ 'http.maxRetries': 0 }) },
+					{ provide: RedisCacheService, useValue: mockRedisCacheService },
+				],
+			}).compile()
+			vi.spyOn(module.get<HttpService>(HttpService), 'get').mockReturnValue(throwError(() => failure))
+			return module.get<HttpClientService>(HttpClientService)
+		}
+
+		function failure(status: number): AxiosError {
+			const error = new AxiosError(`Request failed with status code ${status}`)
+			error.response = { status, data: '' } as any
+			return error
+		}
+
+		afterEach(() => {
+			vi.restoreAllMocks()
+		})
+
+		it('logs a 4xx at debug: the caller logs it at the level it deserves', async () => {
+			const error = vi.spyOn(CorrelatedLogger, 'error')
+			const debug = vi.spyOn(CorrelatedLogger, 'debug')
+			const client = await clientAnswering(failure(404))
+
+			await expect(client.get('https://example.com/missing.png')).rejects.toThrow()
+
+			expect(error).not.toHaveBeenCalled()
+			expect(debug).toHaveBeenCalledWith(expect.stringContaining('404'), 'HttpClientService')
+		})
+
+		it('logs an upstream failure (5xx) at error', async () => {
+			const error = vi.spyOn(CorrelatedLogger, 'error')
+			const client = await clientAnswering(failure(503))
+
+			await expect(client.get('https://example.com/image.png')).rejects.toThrow()
+
+			expect(error).toHaveBeenCalledWith(expect.stringContaining('HTTP request failed'), expect.anything(), 'HttpClientService')
+		})
+
+		it('logs a network fault (no response) at error', async () => {
+			const error = vi.spyOn(CorrelatedLogger, 'error')
+			const client = await clientAnswering(new AxiosError('connect ECONNREFUSED', 'ECONNREFUSED'))
+
+			await expect(client.get('https://example.com/image.png')).rejects.toThrow()
+
+			expect(error).toHaveBeenCalledWith(expect.stringContaining('HTTP request failed'), expect.anything(), 'HttpClientService')
 		})
 	})
 
