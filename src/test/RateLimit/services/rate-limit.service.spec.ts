@@ -29,8 +29,12 @@ describe('rateLimitService', () => {
 	let redisCacheService: { getClient: ReturnType<typeof vi.fn> }
 
 	beforeEach(() => {
-		metricsService = { recordError: vi.fn() }
-		redisCacheService = { getClient: vi.fn().mockReturnValue(null) }
+		metricsService = {
+			recordError: vi.fn(),
+		}
+		redisCacheService = {
+			getClient: vi.fn().mockReturnValue(null),
+		}
 		service = new RateLimitService(
 			createConfigServiceMock(CONFIG_OVERRIDES),
 			metricsService as unknown as MetricsService,
@@ -245,7 +249,12 @@ describe('rateLimitService', () => {
 
 	describe('recordRateLimitMetrics', () => {
 		it('should record metrics for allowed requests', () => {
-			const info = { limit: 100, current: 1, remaining: 99, resetTime: new Date() }
+			const info = {
+				limit: 100,
+				current: 1,
+				remaining: 99,
+				resetTime: new Date(),
+			}
 
 			service.recordRateLimitMetrics('image-processing', true, info)
 
@@ -253,7 +262,12 @@ describe('rateLimitService', () => {
 		})
 
 		it('should record metrics for blocked requests', () => {
-			const info = { limit: 100, current: 101, remaining: 0, resetTime: new Date() }
+			const info = {
+				limit: 100,
+				current: 101,
+				remaining: 0,
+				resetTime: new Date(),
+			}
 
 			service.recordRateLimitMetrics('image-processing', false, info)
 

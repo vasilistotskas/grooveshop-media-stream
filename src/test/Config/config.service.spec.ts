@@ -132,7 +132,11 @@ describe('configService', () => {
 
 		function productionService(env: Record<string, string | undefined>): ConfigService {
 			vi.stubEnv('NODE_ENV', 'production')
-			const nest = { get: vi.fn((key: string) => key in env ? env[key] : mockEnvVars[key as keyof typeof mockEnvVars]) }
+			const nest = {
+				get: vi.fn((key: string) => key in env
+					? env[key]
+					: mockEnvVars[key as keyof typeof mockEnvVars]),
+			}
 			return new ConfigService(nest as unknown as NestConfigService)
 		}
 

@@ -4,7 +4,13 @@ import { ResourceValidationService } from '#microservice/Validation/services/res
 import { TenantDomainsService } from '#microservice/Validation/services/tenant-domains.service'
 import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 
-const ALLOWED_DOMAINS = ['localhost', '127.0.0.1', 'example.com', 'test.com', 'grooveshop.com']
+const ALLOWED_DOMAINS = [
+	'localhost',
+	'127.0.0.1',
+	'example.com',
+	'test.com',
+	'grooveshop.com',
+]
 
 describe('resourceValidationService', () => {
 	let service: ResourceValidationService

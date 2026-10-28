@@ -18,7 +18,12 @@ import DOMPurify from 'isomorphic-dompurify'
 const sanitized = DOMPurify.sanitize(workerData as string, {
 	USE_PROFILES: { svg: true, svgFilters: true },
 	FORBID_TAGS: ['script', 'use', 'image', 'feimage'],
-	FORBID_ATTR: ['xlink:href', 'href', 'action', 'formaction'],
+	FORBID_ATTR: [
+		'xlink:href',
+		'href',
+		'action',
+		'formaction',
+	],
 	// Keep SVG structure intact; don't wrap in <div>
 	WHOLE_DOCUMENT: false,
 	RETURN_DOM: false,

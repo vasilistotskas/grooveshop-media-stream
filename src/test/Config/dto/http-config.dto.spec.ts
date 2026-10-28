@@ -52,7 +52,10 @@ describe('hTTP Config DTOs', () => {
 
 	describe('httpHealthCheckConfigDto', () => {
 		it('should reject non-string URL entries', async () => {
-			const config = plainToInstance(HttpHealthCheckConfigDto, { ...httpDefaults().healthCheck, urls: [42] })
+			const config = plainToInstance(HttpHealthCheckConfigDto, {
+				...httpDefaults().healthCheck,
+				urls: [42],
+			})
 
 			const errors = await validate(config)
 
@@ -64,7 +67,10 @@ describe('hTTP Config DTOs', () => {
 		it('should validate a complete valid config', async () => {
 			const config = plainToInstance(HttpConfigDto, {
 				...httpDefaults(),
-				healthCheck: { urls: ['http://localhost:8000/health'], timeout: 5000 },
+				healthCheck: {
+					urls: ['http://localhost:8000/health'],
+					timeout: 5000,
+				},
 			})
 
 			const errors = await validate(config)
@@ -105,7 +111,9 @@ describe('hTTP Config DTOs', () => {
 			const errors = await validate(plainToInstance(HttpConfigDto, plain))
 			const timeoutError = errors.find(error => error.property === 'timeout')
 
-			expect(timeoutError?.constraints).toMatchObject({ isNumber: expect.stringContaining('must be a number') })
+			expect(timeoutError?.constraints).toMatchObject({
+				isNumber: expect.stringContaining('must be a number'),
+			})
 		})
 	})
 })

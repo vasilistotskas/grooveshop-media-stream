@@ -23,7 +23,12 @@ function enoent(): NodeJS.ErrnoException {
 }
 
 function resizeOptions(overrides: Partial<ResizeOptions> = {}): ResizeOptions {
-	return new ResizeOptions({ width: 100, height: 100, trimThreshold: 5, ...overrides })
+	return new ResizeOptions({
+		width: 100,
+		height: 100,
+		trimThreshold: 5,
+		...overrides,
+	})
 }
 
 const SVG = '<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'
@@ -39,7 +44,9 @@ describe('imageFormatProcessor', () => {
 		vi.resetAllMocks()
 		mockedFs.writeFile.mockResolvedValue()
 
-		mockWebpImageManipulationJob = { handle: vi.fn() } as unknown as WebpImageManipulationJob
+		mockWebpImageManipulationJob = {
+			handle: vi.fn(),
+		} as unknown as WebpImageManipulationJob
 		vi.spyOn(mockWebpImageManipulationJob, 'handle').mockResolvedValue({
 			format: 'webp',
 			size: '1000',
@@ -50,7 +57,9 @@ describe('imageFormatProcessor', () => {
 		storageDir = storageDirectory(configService)
 
 		// Admission is a pass-through here; its queueing is covered by its own spec.
-		admission = { run: vi.fn((fn: () => Promise<unknown>) => fn()) }
+		admission = {
+			run: vi.fn((fn: () => Promise<unknown>) => fn()),
+		}
 
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [
@@ -105,7 +114,12 @@ describe('imageFormatProcessor', () => {
 			const result = await processor.processRaster('/tmp/id.rst', resizeOptions(), 'acme')
 
 			expect(result.data).toBe(optimized)
-			expect(result.metadata).toMatchObject({ version: 1, size: '1000', format: 'webp', tenantSchema: 'acme' })
+			expect(result.metadata).toMatchObject({
+				version: 1,
+				size: '1000',
+				format: 'webp',
+				tenantSchema: 'acme',
+			})
 			expect(result.metadata.publicTTL).toBeGreaterThan(0)
 			expect(result.metadata.privateTTL).toBeGreaterThan(0)
 		})
@@ -138,7 +152,13 @@ describe('imageFormatProcessor', () => {
 			expect(result).toBe(optimized)
 			expect(mockWebpImageManipulationJob.handle).toHaveBeenCalledWith(
 				join(cwd(), 'public', 'default.png'),
-				expect.objectContaining({ width: 100, height: 100, format: 'webp', trimThreshold: 5, quality: 100 }),
+				expect.objectContaining({
+					width: 100,
+					height: 100,
+					format: 'webp',
+					trimThreshold: 5,
+					quality: 100,
+				}),
 			)
 			const [writtenPath, writtenData] = mockedFs.writeFile.mock.calls[0]
 			expect(writtenPath).toMatch(/default_optimized_[0-9a-f]{32}\.webp$/)
@@ -149,11 +169,21 @@ describe('imageFormatProcessor', () => {
 		it('falls back to 800x600 only for missing dimensions and keeps the request\'s other options', async () => {
 			mockedFs.readFile.mockRejectedValue(enoent())
 
-			await processor.optimizeAndServeDefaultImage(resizeOptions({ width: 0, height: null, format: SupportedResizeFormats.png, quality: 55 }))
+			await processor.optimizeAndServeDefaultImage(resizeOptions({
+				width: 0,
+				height: null,
+				format: SupportedResizeFormats.png,
+				quality: 55,
+			}))
 
 			expect(mockWebpImageManipulationJob.handle).toHaveBeenCalledWith(
 				expect.any(String),
-				expect.objectContaining({ width: 800, height: 600, format: 'png', quality: 55 }),
+				expect.objectContaining({
+					width: 800,
+					height: 600,
+					format: 'png',
+					quality: 55,
+				}),
 			)
 		})
 

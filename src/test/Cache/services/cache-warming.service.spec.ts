@@ -22,7 +22,18 @@ const mockStat = vi.mocked(stat)
 const mockReadFile = vi.mocked(readFile)
 
 function mockDirent(name: string, isFile = true): Dirent {
-	return { name, isFile: () => isFile, isDirectory: () => !isFile, isBlockDevice: () => false, isCharacterDevice: () => false, isFIFO: () => false, isSocket: () => false, isSymbolicLink: () => false, path: '', parentPath: '' } as Dirent
+	return {
+		name,
+		isFile: () => isFile,
+		isDirectory: () => !isFile,
+		isBlockDevice: () => false,
+		isCharacterDevice: () => false,
+		isFIFO: () => false,
+		isSocket: () => false,
+		isSymbolicLink: () => false,
+		path: '',
+		parentPath: '',
+	} as Dirent
 }
 
 function sidecar(accessCount: number, tenantSchema?: string): string {
@@ -34,7 +45,9 @@ function sidecar(accessCount: number, tenantSchema?: string): string {
 		privateTTL: 1000,
 		publicTTL: 2000,
 		accessCount,
-		...(tenantSchema ? { tenantSchema } : {}),
+		...(tenantSchema
+			? { tenantSchema }
+			: {}),
 	})
 }
 
@@ -55,11 +68,28 @@ async function createHarness(overrides: ConfigOverrides = {}, epochs = new Tenan
 	const module = await Test.createTestingModule({
 		providers: [
 			CacheWarmingService,
-			{ provide: MultiLayerCacheManager, useValue: { exists: vi.fn(), set: vi.fn(), delete: vi.fn() } },
+			{
+				provide: MultiLayerCacheManager,
+				useValue: {
+					exists: vi.fn(),
+					set: vi.fn(),
+					delete: vi.fn(),
+				},
+			},
 			{ provide: TenantCacheEpochs, useValue: epochs },
 			{ provide: ConfigService, useValue: configService },
-			{ provide: MetricsService, useValue: { recordCacheOperation: vi.fn() } },
-			{ provide: SchedulerRegistry, useValue: { addCronJob: vi.fn() } },
+			{
+				provide: MetricsService,
+				useValue: {
+					recordCacheOperation: vi.fn(),
+				},
+			},
+			{
+				provide: SchedulerRegistry,
+				useValue: {
+					addCronJob: vi.fn(),
+				},
+			},
 		],
 	}).compile()
 
@@ -77,7 +107,10 @@ describe('cacheWarmingService', () => {
 
 	beforeEach(async () => {
 		vi.resetAllMocks()
-		mockStat.mockResolvedValue({ atime: new Date(), size: 1024 } as any)
+		mockStat.mockResolvedValue({
+			atime: new Date(),
+			size: 1024,
+		} as any)
 		harness = await createHarness()
 		harness.cacheManager.exists.mockResolvedValue(false)
 		harness.cacheManager.set.mockResolvedValue()
@@ -95,7 +128,11 @@ describe('cacheWarmingService', () => {
 
 	describe('cache Warmup', () => {
 		it('warms popular files, reading each sidecar once and each payload once', async () => {
-			mockReaddir.mockResolvedValue([mockDirent('file1.rsc'), mockDirent('file2.rsc'), mockDirent('file3.rsc')] as any)
+			mockReaddir.mockResolvedValue([
+				mockDirent('file1.rsc'),
+				mockDirent('file2.rsc'),
+				mockDirent('file3.rsc'),
+			] as any)
 			mockReadFile
 				.mockResolvedValueOnce(sidecar(10))
 				.mockResolvedValueOnce(sidecar(8))
@@ -113,7 +150,9 @@ describe('cacheWarmingService', () => {
 		})
 
 		it('should skip files already in cache', async () => {
-			mockReaddir.mockResolvedValue([mockDirent('file1.rsc')] as any)
+			mockReaddir.mockResolvedValue([
+				mockDirent('file1.rsc'),
+			] as any)
 			mockReadFile.mockResolvedValue(sidecar(10))
 			harness.cacheManager.exists.mockResolvedValue(true)
 
@@ -129,7 +168,11 @@ describe('cacheWarmingService', () => {
 			limited.cacheManager.exists.mockResolvedValue(false)
 			limited.cacheManager.set.mockResolvedValue()
 
-			mockReaddir.mockResolvedValue([mockDirent('file1.rsc'), mockDirent('file2.rsc'), mockDirent('file3.rsc')] as any)
+			mockReaddir.mockResolvedValue([
+				mockDirent('file1.rsc'),
+				mockDirent('file2.rsc'),
+				mockDirent('file3.rsc'),
+			] as any)
 			mockReadFile
 				.mockResolvedValueOnce(sidecar(10))
 				.mockResolvedValueOnce(sidecar(8))
@@ -142,7 +185,10 @@ describe('cacheWarmingService', () => {
 		})
 
 		it('should filter files by popularity threshold', async () => {
-			mockReaddir.mockResolvedValue([mockDirent('file1.rsc'), mockDirent('file2.rsc')] as any)
+			mockReaddir.mockResolvedValue([
+				mockDirent('file1.rsc'),
+				mockDirent('file2.rsc'),
+			] as any)
 			mockReadFile
 				.mockResolvedValueOnce(sidecar(10)) // above threshold
 				.mockResolvedValueOnce(sidecar(2)) // below threshold
@@ -155,7 +201,12 @@ describe('cacheWarmingService', () => {
 		})
 
 		it('skips entries whose sidecar is missing or unreadable', async () => {
-			mockReaddir.mockResolvedValue([mockDirent('file1.rsc'), mockDirent('file2.rsc'), mockDirent('file3.rsc'), mockDirent('other.rsm')] as any)
+			mockReaddir.mockResolvedValue([
+				mockDirent('file1.rsc'),
+				mockDirent('file2.rsc'),
+				mockDirent('file3.rsc'),
+				mockDirent('other.rsm'),
+			] as any)
 			mockReadFile
 				.mockResolvedValueOnce(sidecar(10))
 				.mockRejectedValueOnce(enoent())
@@ -178,7 +229,10 @@ describe('cacheWarmingService', () => {
 		})
 
 		it('should handle individual file errors gracefully', async () => {
-			mockReaddir.mockResolvedValue([mockDirent('file1.rsc'), mockDirent('file2.rsc')] as any)
+			mockReaddir.mockResolvedValue([
+				mockDirent('file1.rsc'),
+				mockDirent('file2.rsc'),
+			] as any)
 			// Call order: file1.rsm, file2.rsm (scan), then file1.rsc, file2.rsc (warmup)
 			mockReadFile
 				.mockResolvedValueOnce(sidecar(10))
@@ -197,7 +251,9 @@ describe('cacheWarmingService', () => {
 		it('does not warm a file whose tenant was flushed while the file was being read', async () => {
 			const epochs = new TenantCacheEpochs()
 			harness = await createHarness({}, epochs)
-			mockReaddir.mockResolvedValue([mockDirent('abc-123.rsc')] as any)
+			mockReaddir.mockResolvedValue([
+				mockDirent('abc-123.rsc'),
+			] as any)
 			mockReadFile
 				.mockResolvedValueOnce(sidecar(20, 'acme'))
 				.mockImplementationOnce(async () => {
@@ -213,7 +269,9 @@ describe('cacheWarmingService', () => {
 		it('removes a warmed entry whose tenant was flushed while it was being written', async () => {
 			const epochs = new TenantCacheEpochs()
 			harness = await createHarness({}, epochs)
-			mockReaddir.mockResolvedValue([mockDirent('abc-123.rsc')] as any)
+			mockReaddir.mockResolvedValue([
+				mockDirent('abc-123.rsc'),
+			] as any)
 			mockReadFile
 				.mockResolvedValueOnce(sidecar(20, 'acme'))
 				.mockResolvedValueOnce(Buffer.from('file content'))
@@ -227,7 +285,9 @@ describe('cacheWarmingService', () => {
 		})
 
 		it('keys the entry by the sidecar\'s tenant namespace and the file basename, carrying the parsed metadata', async () => {
-			mockReaddir.mockResolvedValue([mockDirent('abc-123.rsc')] as any)
+			mockReaddir.mockResolvedValue([
+				mockDirent('abc-123.rsc'),
+			] as any)
 			mockReadFile
 				.mockResolvedValueOnce(sidecar(20, 'acme'))
 				.mockResolvedValueOnce(Buffer.from('file content'))
@@ -238,13 +298,18 @@ describe('cacheWarmingService', () => {
 			expect(harness.cacheManager.set).toHaveBeenCalledWith(
 				'image:acme',
 				'abc-123',
-				{ data: Buffer.from('file content'), metadata: expect.objectContaining({ tenantSchema: 'acme', accessCount: 20, format: 'webp' }) },
+				{
+					data: Buffer.from('file content'),
+					metadata: expect.objectContaining({ tenantSchema: 'acme', accessCount: 20, format: 'webp' }),
+				},
 				expect.any(Number),
 			)
 		})
 
 		it('defaults a sidecar without tenantSchema to the public namespace and weights the TTL by access count', async () => {
-			mockReaddir.mockResolvedValue([mockDirent('file1.rsc')] as any)
+			mockReaddir.mockResolvedValue([
+				mockDirent('file1.rsc'),
+			] as any)
 			mockReadFile
 				.mockResolvedValueOnce(sidecar(20))
 				.mockResolvedValueOnce(Buffer.from('file content'))

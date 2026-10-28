@@ -38,7 +38,16 @@ function fileName(filePath: unknown): string {
 }
 
 function metaJson(dateCreated: number, privateTTL: number, accessCount = 0): string {
-	return JSON.stringify({ version: 1, size: '1', format: 'webp', dateCreated, privateTTL, publicTTL: privateTTL * 2, accessCount, tenantSchema: 'acme' })
+	return JSON.stringify({
+		version: 1,
+		size: '1',
+		format: 'webp',
+		dateCreated,
+		privateTTL,
+		publicTTL: privateTTL * 2,
+		accessCount,
+		tenantSchema: 'acme',
+	})
 }
 
 let disk: Record<string, DiskFile> = {}
@@ -49,12 +58,18 @@ function useDisk(files: Record<string, DiskFile>): void {
 	mockFs.stat.mockImplementation((filePath: any) => {
 		const file = disk[fileName(filePath)]
 		return file
-			? Promise.resolve({ size: file.size, mtimeMs: file.mtime ?? NOW, isFile: () => true } as any)
+			? Promise.resolve({
+					size: file.size,
+					mtimeMs: file.mtime ?? NOW,
+					isFile: () => true,
+				} as any)
 			: Promise.reject(new Error('ENOENT'))
 	})
 	mockFs.readFile.mockImplementation((filePath: any) => {
 		const content = disk[fileName(filePath)]?.content
-		return content !== undefined ? Promise.resolve(content) : Promise.reject(new Error('ENOENT'))
+		return content !== undefined
+			? Promise.resolve(content)
+			: Promise.reject(new Error('ENOENT'))
 	})
 	mockFs.unlink.mockImplementation(async (filePath: any) => {
 		delete disk[fileName(filePath)]
@@ -74,7 +89,10 @@ describe('storage management integration', () => {
 		mockFs.mkdir.mockResolvedValue(undefined)
 
 		module = await Test.createTestingModule({
-			imports: [StorageModule, ScheduleModule.forRoot()],
+			imports: [
+				StorageModule,
+				ScheduleModule.forRoot(),
+			],
 		})
 			.overrideProvider(ConfigService)
 			.useValue(createConfigServiceMock({
@@ -114,9 +132,15 @@ describe('storage management integration', () => {
 			'.gitkeep': { size: 0 },
 			'default_optimized_abc.webp': { size: MB },
 			'live.rsc': { size: 2 * MB },
-			'live.rsm': { size: 100, content: metaJson(NOW - DAY, 30 * DAY, 8) },
+			'live.rsm': {
+				size: 100,
+				content: metaJson(NOW - DAY, 30 * DAY, 8),
+			},
 			'expired.rsc': { size: 3 * MB },
-			'expired.rsm': { size: 100, content: metaJson(NOW - 10 * DAY, 5 * DAY) },
+			'expired.rsm': {
+				size: 100,
+				content: metaJson(NOW - 10 * DAY, 5 * DAY),
+			},
 			'stale.rst': { size: 512, mtime: NOW - 2 * HOUR },
 			'fresh.tmp': { size: 64, mtime: NOW - 5 * 60 * 1000 },
 		})
@@ -136,7 +160,13 @@ describe('storage management integration', () => {
 		expect(cleanup.filesRemoved).toBe(3)
 		expect(cleanup.sizeFreed).toBe(3 * MB + 100 + 512)
 		expect(cleanup.errors).toEqual([])
-		expect(Object.keys(disk).sort()).toEqual(['.gitkeep', 'default_optimized_abc.webp', 'fresh.tmp', 'live.rsc', 'live.rsm'])
+		expect(Object.keys(disk).sort()).toEqual([
+			'.gitkeep',
+			'default_optimized_abc.webp',
+			'fresh.tmp',
+			'live.rsc',
+			'live.rsm',
+		])
 
 		await storageMonitoring.getInventory(0)
 		const health = await storageHealth.isHealthy()
@@ -150,19 +180,38 @@ describe('storage management integration', () => {
 			expired: 0,
 			oldestEntry: new Date(NOW - DAY).toISOString(),
 			newestEntry: new Date(NOW - DAY).toISOString(),
-			cleanupStatus: { enabled: true, dryRun: false, lastCleanup: new Date(NOW).toISOString(), nextCleanup: null },
-			thresholds: { warningSize: '10.0 MB', criticalSize: '20.0 MB', warningFileCount: 100, criticalFileCount: 200 },
+			cleanupStatus: {
+				enabled: true,
+				dryRun: false,
+				lastCleanup: new Date(NOW).toISOString(),
+				nextCleanup: null,
+			},
+			thresholds: {
+				warningSize: '10.0 MB',
+				criticalSize: '20.0 MB',
+				warningFileCount: 100,
+				criticalFileCount: 200,
+			},
 		})
 	})
 
 	it('evicts down to the warning thresholds and reports the tier healthy again', async () => {
 		useDisk({
 			'popular.rsc': { size: 4 * MB },
-			'popular.rsm': { size: 10, content: metaJson(NOW - 200 * DAY, 365 * DAY, 50) },
+			'popular.rsm': {
+				size: 10,
+				content: metaJson(NOW - 200 * DAY, 365 * DAY, 50),
+			},
 			'old.rsc': { size: 4 * MB },
-			'old.rsm': { size: 10, content: metaJson(NOW - 50 * DAY, 365 * DAY) },
+			'old.rsm': {
+				size: 10,
+				content: metaJson(NOW - 50 * DAY, 365 * DAY),
+			},
 			'new.rsc': { size: 4 * MB },
-			'new.rsm': { size: 10, content: metaJson(NOW - DAY, 365 * DAY) },
+			'new.rsm': {
+				size: 10,
+				content: metaJson(NOW - DAY, 365 * DAY),
+			},
 		})
 
 		const before = await storageMonitoring.checkThresholds()
@@ -173,7 +222,12 @@ describe('storage management integration', () => {
 
 		const cleanup = await storageCleanup.performCleanup()
 		expect(cleanup.removed).toEqual({ expired: 0, stale: 0, evicted: 1 })
-		expect(Object.keys(disk).sort()).toEqual(['new.rsc', 'new.rsm', 'popular.rsc', 'popular.rsm'])
+		expect(Object.keys(disk).sort()).toEqual([
+			'new.rsc',
+			'new.rsm',
+			'popular.rsc',
+			'popular.rsm',
+		])
 
 		await storageMonitoring.getInventory(0)
 		const after = await storageHealth.isHealthy()

@@ -38,7 +38,9 @@ describe('image streaming (e2e)', () => {
 		for (let i = 0; i < noise.length; i++) {
 			noise[i] = (i * 2654435761) % 256
 		}
-		pngFixture = await sharp(noise, { raw: { width: 100, height: 100, channels: 3 } })
+		pngFixture = await sharp(noise, {
+			raw: { width: 100, height: 100, channels: 3 },
+		})
 			.png()
 			.toBuffer()
 

@@ -71,7 +71,9 @@ export class SecurityCheckerService {
 			return true
 		}
 
-		const sample = input.length > PATTERN_TEST_MAX_LENGTH ? input.substring(0, PATTERN_TEST_MAX_LENGTH) : input
+		const sample = input.length > PATTERN_TEST_MAX_LENGTH
+			? input.substring(0, PATTERN_TEST_MAX_LENGTH)
+			: input
 		const matched = SUSPICIOUS_PATTERNS.find(pattern => pattern.test(sample))
 		if (matched) {
 			CorrelatedLogger.warn(`Suspicious pattern detected: ${matched.source}`, SecurityCheckerService.name)
@@ -118,7 +120,9 @@ export class SecurityCheckerService {
 			return false
 		}
 
-		const sample = value.length > ENTROPY_SAMPLE_LENGTH ? value.substring(0, ENTROPY_SAMPLE_LENGTH) : value
+		const sample = value.length > ENTROPY_SAMPLE_LENGTH
+			? value.substring(0, ENTROPY_SAMPLE_LENGTH)
+			: value
 
 		const charCount = new Map<string, number>()
 		for (const char of sample) {

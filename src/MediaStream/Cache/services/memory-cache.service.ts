@@ -56,7 +56,9 @@ export class MemoryCacheService implements ICacheManager {
 
 	async get<T>(key: string): Promise<T | null> {
 		const value = this.cache.get<T>(key)
-		return value !== undefined ? value : null
+		return value !== undefined
+			? value
+			: null
 	}
 
 	async set<T>(key: string, value: T, ttl?: number): Promise<void> {
@@ -83,7 +85,9 @@ export class MemoryCacheService implements ICacheManager {
 			// Evict entries until we have space
 			this.evictIfNeeded(valueSize, key)
 
-			const success = ttl !== undefined ? this.cache.set(key, value, ttl) : this.cache.set(key, value)
+			const success = ttl !== undefined
+				? this.cache.set(key, value, ttl)
+				: this.cache.set(key, value)
 			if (success) {
 				this.currentByteSize += valueSize
 				this.sizeMap.set(key, valueSize)
@@ -93,7 +97,9 @@ export class MemoryCacheService implements ICacheManager {
 			}
 		}
 		catch (error: unknown) {
-			CorrelatedLogger.error(`Memory cache SET error for key ${key}: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, MemoryCacheService.name)
+			CorrelatedLogger.error(`Memory cache SET error for key ${key}: ${errorMessage(error)}`, error instanceof Error
+				? error.stack
+				: undefined, MemoryCacheService.name)
 			throw error
 		}
 	}
@@ -108,7 +114,9 @@ export class MemoryCacheService implements ICacheManager {
 
 	async getStats(): Promise<CacheStats> {
 		const stats = this.cache.getStats()
-		const hitRate = stats.hits + stats.misses > 0 ? stats.hits / (stats.hits + stats.misses) : 0
+		const hitRate = stats.hits + stats.misses > 0
+			? stats.hits / (stats.hits + stats.misses)
+			: 0
 
 		this.metricsService.updateCacheHitRatio('memory', hitRate)
 
@@ -219,7 +227,9 @@ export class MemoryCacheService implements ICacheManager {
 			.map(key => ({ key, ttl: this.cache.getTtl(key) ?? Infinity }))
 			.sort((a, b) => a.ttl - b.ttl)
 
-		const ownPrefix = forKey ? keyNamespacePrefix(forKey) : null
+		const ownPrefix = forKey
+			? keyNamespacePrefix(forKey)
+			: null
 		const ordered = ownPrefix
 			? [
 					...keysByTtl.filter(e => e.key.startsWith(ownPrefix)),

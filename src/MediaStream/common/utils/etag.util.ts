@@ -10,7 +10,10 @@ export function generateWeakETag(
 	dateCreated: number,
 	format?: string,
 ): string {
-	const components = [size.toString(), dateCreated.toString()]
+	const components = [
+		size.toString(),
+		dateCreated.toString(),
+	]
 	if (format) {
 		components.push(format)
 	}
@@ -86,6 +89,8 @@ export function checkIfModifiedSince(
  * Generate Last-Modified header value
  */
 export function formatLastModified(date: Date | number): string {
-	const d = typeof date === 'number' ? new Date(date) : date
+	const d = typeof date === 'number'
+		? new Date(date)
+		: date
 	return d.toUTCString()
 }

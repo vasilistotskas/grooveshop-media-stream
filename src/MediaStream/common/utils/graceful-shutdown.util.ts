@@ -87,7 +87,9 @@ export function setupGracefulShutdown(app: INestApplication, options: ShutdownOp
 			process.exit(0)
 		}
 		catch (error: unknown) {
-			logger.error(`Error during shutdown: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined)
+			logger.error(`Error during shutdown: ${errorMessage(error)}`, error instanceof Error
+				? error.stack
+				: undefined)
 			clearTimeout(forceTimer)
 			process.exit(1)
 		}
@@ -105,7 +107,9 @@ export function setupGracefulShutdown(app: INestApplication, options: ShutdownOp
 	})
 
 	process.on('unhandledRejection', (reason) => {
-		logger.error(`Unhandled rejection (continuing): ${errorMessage(reason)}`, reason instanceof Error ? reason.stack : undefined)
+		logger.error(`Unhandled rejection (continuing): ${errorMessage(reason)}`, reason instanceof Error
+			? reason.stack
+			: undefined)
 	})
 
 	logger.log('Graceful shutdown handlers registered')

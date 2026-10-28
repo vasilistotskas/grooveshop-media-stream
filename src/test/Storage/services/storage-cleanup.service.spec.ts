@@ -95,7 +95,13 @@ describe('storageCleanupService', () => {
 			providers: [
 				StorageCleanupService,
 				{ provide: StorageMonitoringService, useValue: storageMonitoring },
-				{ provide: ConfigService, useValue: createConfigServiceMock({ ...mockConfig, ...overrides }) },
+				{
+					provide: ConfigService,
+					useValue: createConfigServiceMock({
+						...mockConfig,
+						...overrides,
+					}),
+				},
 				{ provide: SchedulerRegistry, useValue: schedulerRegistry },
 			],
 		}).compile()
@@ -107,7 +113,10 @@ describe('storageCleanupService', () => {
 		vi.useFakeTimers()
 		vi.setSystemTime(NOW)
 
-		storageMonitoring = { getInventory: vi.fn(), thresholds } as unknown as MockedObject<StorageMonitoringService>
+		storageMonitoring = {
+			getInventory: vi.fn(),
+			thresholds,
+		} as unknown as MockedObject<StorageMonitoringService>
 		schedulerRegistry = schedulerRegistryMock()
 		service = await buildService()
 
@@ -196,7 +205,10 @@ describe('storageCleanupService', () => {
 		})
 
 		it('does not evict while under both warning thresholds', async () => {
-			storageMonitoring.getInventory.mockResolvedValue(inventory([entry('a'), entry('b')]))
+			storageMonitoring.getInventory.mockResolvedValue(inventory([
+				entry('a'),
+				entry('b'),
+			]))
 
 			const result = await service.performCleanup()
 
@@ -214,7 +226,12 @@ describe('storageCleanupService', () => {
 			const result = await service.performCleanup()
 
 			// 102 files >= 100: two pairs must go, the newest survives.
-			expect(unlinkedNames()).toEqual(['oldest.rsm', 'oldest.rsc', 'middle.rsm', 'middle.rsc'])
+			expect(unlinkedNames()).toEqual([
+				'oldest.rsm',
+				'oldest.rsc',
+				'middle.rsm',
+				'middle.rsc',
+			])
 			expect(result.removed).toEqual({ expired: 0, stale: 0, evicted: 2 })
 			expect(result.filesRemoved).toBe(4)
 		})
@@ -266,7 +283,12 @@ describe('storageCleanupService', () => {
 
 			const result = await service.performCleanup()
 
-			expect(unlinkedNames()).toEqual(['unpopular.rsm', 'unpopular.rsc', 'popular.rsm', 'popular.rsc'])
+			expect(unlinkedNames()).toEqual([
+				'unpopular.rsm',
+				'unpopular.rsc',
+				'popular.rsm',
+				'popular.rsc',
+			])
 			expect(result.removed.evicted).toBe(2)
 		})
 
@@ -275,7 +297,9 @@ describe('storageCleanupService', () => {
 			storageMonitoring.getInventory.mockResolvedValue(inventory([
 				entry('expired', { dateCreated: NOW - 2 * DAY, privateTTL: DAY, size: 3 * MB }),
 				entry('bulk', { size: 10 * MB }),
-			], [orphan('old.rst', 2 * STALE_FILE_MIN_AGE_MS, 100)]))
+			], [
+				orphan('old.rst', 2 * STALE_FILE_MIN_AGE_MS, 100),
+			]))
 
 			const result = await dryRunService.performCleanup()
 
@@ -292,7 +316,9 @@ describe('storageCleanupService', () => {
 			storageMonitoring.getInventory.mockResolvedValue(inventory([
 				entry('first', { dateCreated: NOW - 2 * DAY, privateTTL: DAY }),
 				entry('second', { dateCreated: NOW - 2 * DAY, privateTTL: DAY }),
-			], [orphan('old.rst', 2 * STALE_FILE_MIN_AGE_MS)]))
+			], [
+				orphan('old.rst', 2 * STALE_FILE_MIN_AGE_MS),
+			]))
 			mockFs.unlink.mockImplementation(async () => {
 				vi.setSystemTime(Date.now() + 600)
 			})
@@ -308,7 +334,9 @@ describe('storageCleanupService', () => {
 			storageMonitoring.getInventory.mockResolvedValue(inventory([
 				entry('locked', { dateCreated: NOW - 2 * DAY, privateTTL: DAY }),
 				entry('fine', { dateCreated: NOW - 2 * DAY, privateTTL: DAY }),
-			], [orphan('stuck.rst', 2 * STALE_FILE_MIN_AGE_MS)]))
+			], [
+				orphan('stuck.rst', 2 * STALE_FILE_MIN_AGE_MS),
+			]))
 			mockFs.unlink.mockImplementation((filePath: any) => {
 				const name = String(filePath).split(/[/\\]/).pop()
 				return name === 'locked.rsm' || name === 'stuck.rst'
@@ -447,7 +475,9 @@ describe('storageCleanupService', () => {
 				privateTTL: 1000,
 				publicTTL: 1000,
 				accessCount: 0,
-				...(tenantSchema !== undefined ? { tenantSchema } : {}),
+				...(tenantSchema !== undefined
+					? { tenantSchema }
+					: {}),
 			})
 		}
 

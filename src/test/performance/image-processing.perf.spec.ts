@@ -37,19 +37,39 @@ beforeAll(async () => {
 
 	// Generate test images of various sizes from noise
 	smallImage = await sharp({
-		create: { width: 200, height: 200, channels: 3, background: { r: 128, g: 64, b: 32 } },
+		create: {
+			width: 200,
+			height: 200,
+			channels: 3,
+			background: { r: 128, g: 64, b: 32 },
+		},
 	}).png().toBuffer()
 
 	mediumImage = await sharp({
-		create: { width: 1024, height: 768, channels: 3, background: { r: 64, g: 128, b: 200 } },
+		create: {
+			width: 1024,
+			height: 768,
+			channels: 3,
+			background: { r: 64, g: 128, b: 200 },
+		},
 	}).png().toBuffer()
 
 	largeImage = await sharp({
-		create: { width: 4096, height: 3072, channels: 3, background: { r: 200, g: 100, b: 50 } },
+		create: {
+			width: 4096,
+			height: 3072,
+			channels: 3,
+			background: { r: 200, g: 100, b: 50 },
+		},
 	}).png().toBuffer()
 
 	xlImage = await sharp({
-		create: { width: 8192, height: 4320, channels: 3, background: { r: 100, g: 200, b: 150 } },
+		create: {
+			width: 8192,
+			height: 4320,
+			channels: 3,
+			background: { r: 100, g: 200, b: 150 },
+		},
 	}).png().toBuffer()
 
 	tempDir = await mkdtemp(join(tmpdir(), 'perf-images-'))
@@ -301,7 +321,9 @@ describe('image Processing Performance', () => {
 			for (let i = 0; i < noiseBuffer.length; i++) {
 				noiseBuffer[i] = Math.floor(Math.random() * 256)
 			}
-			const source = await sharp(noiseBuffer, { raw: { width: 800, height: 600, channels: 3 } })
+			const source = await sharp(noiseBuffer, {
+				raw: { width: 800, height: 600, channels: 3 },
+			})
 				.png()
 				.toBuffer()
 

@@ -32,7 +32,13 @@ export class TimingMiddleware implements NestMiddleware {
 				res.setHeader('x-request-end', endTimestamp.toString())
 			}
 
-			this.correlationService.updateContext({ startTime, endTime, duration, startTimestamp, endTimestamp })
+			this.correlationService.updateContext({
+				startTime,
+				endTime,
+				duration,
+				startTimestamp,
+				endTimestamp,
+			})
 
 			const context = this.correlationService.getContext()
 			if (context) {

@@ -47,7 +47,9 @@ describe('internalSecretGuard', () => {
 	})
 
 	it('should reject a non-string header value (e.g. a repeated header parsed as an array)', () => {
-		expect(() => createGuard('top-secret').canActivate(createContext({ 'x-internal-secret': ['top-secret', 'top-secret'] })))
+		expect(() => createGuard('top-secret').canActivate(createContext({
+			'x-internal-secret': ['top-secret', 'top-secret'],
+		})))
 			.toThrow(UnauthorizedException)
 	})
 })

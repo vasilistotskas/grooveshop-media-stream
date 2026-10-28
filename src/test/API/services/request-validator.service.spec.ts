@@ -31,11 +31,15 @@ describe('requestValidatorService', () => {
 				RequestValidatorService,
 				{
 					provide: ResourceValidationService,
-					useValue: { validateUrl: vi.fn().mockReturnValue(true) },
+					useValue: {
+						validateUrl: vi.fn().mockReturnValue(true),
+					},
 				},
 				{
 					provide: SecurityCheckerService,
-					useValue: { checkForMaliciousContent: vi.fn().mockReturnValue(false) },
+					useValue: {
+						checkForMaliciousContent: vi.fn().mockReturnValue(false),
+					},
 				},
 			],
 		}).compile()
@@ -144,7 +148,9 @@ describe('requestValidatorService', () => {
 			['Acme'],
 			['tenant-1'],
 			['1tenant'],
-			['a'.repeat(64)],
+			[
+				'a'.repeat(64),
+			],
 		])('rejects an invalid tenantSchema %s', (tenantSchema) => {
 			expect(() => service.validateRequest(createContext({ tenantSchema })))
 				.toThrow(InvalidRequestError)

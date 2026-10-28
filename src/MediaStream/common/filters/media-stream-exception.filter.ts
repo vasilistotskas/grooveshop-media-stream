@@ -54,7 +54,9 @@ export class MediaStreamExceptionFilter implements ExceptionFilter {
 			const payload = exception.getResponse()
 			shape = {
 				name: exception.name,
-				message: typeof payload === 'object' && payload !== null && 'message' in payload ? String(payload.message) : exception.message,
+				message: typeof payload === 'object' && payload !== null && 'message' in payload
+					? String(payload.message)
+					: exception.message,
 				status,
 				code: `HTTP_${status}`,
 			}

@@ -21,14 +21,23 @@ describe('processingAdmissionService', () => {
 
 	function build(overrides: Record<string, unknown> = {}): ProcessingAdmissionService {
 		return new ProcessingAdmissionService(
-			createConfigServiceMock({ 'processing.cpuCores': 1, 'processing.maxConcurrent': 0, 'processing.maxQueue': 2, 'processing.queueTimeoutMs': 1000, ...overrides }),
+			createConfigServiceMock({
+				'processing.cpuCores': 1,
+				'processing.maxConcurrent': 0,
+				'processing.maxQueue': 2,
+				'processing.queueTimeoutMs': 1000,
+				...overrides,
+			}),
 			metrics as unknown as MetricsService,
 		)
 	}
 
 	beforeEach(() => {
 		vi.useFakeTimers()
-		metrics = { setProcessingAdmission: vi.fn(), recordProcessingRejected: vi.fn() }
+		metrics = {
+			setProcessingAdmission: vi.fn(),
+			recordProcessingRejected: vi.fn(),
+		}
 	})
 
 	afterEach(() => {
@@ -86,7 +95,10 @@ describe('processingAdmissionService', () => {
 		const service = build()
 		const gate = deferred<void>()
 		const running = service.run(() => gate.promise)
-		const queued = [service.run(() => gate.promise), service.run(() => gate.promise)]
+		const queued = [
+			service.run(() => gate.promise),
+			service.run(() => gate.promise),
+		]
 
 		await expect(service.run(async () => 'never')).rejects.toBeInstanceOf(ProcessingOverloadedError)
 		expect(metrics.recordProcessingRejected).toHaveBeenCalledWith('queue_full')
@@ -136,11 +148,24 @@ describe('processingAdmissionService', () => {
 		const gate = deferred<void>()
 		const running = service.run(() => gate.promise)
 		const inRequest = <T>(log: ImageRequestLog, fn: () => Promise<T>): Promise<T> => requestContextStorage.run(
-			{ correlationId: 'c', timestamp: 0, clientIp: '127.0.0.1', method: 'GET', url: '/', startTime: 0n, imageRequest: log },
+			{
+				correlationId: 'c',
+				timestamp: 0,
+				clientIp: '127.0.0.1',
+				method: 'GET',
+				url: '/',
+				startTime: 0n,
+				imageRequest: log,
+			},
 			fn,
 		)
 
-		const granted: ImageRequestLog = { correlationId: 'c', startedAt: 0n, path: 'p', admissionWaitMs: 0 }
+		const granted: ImageRequestLog = {
+			correlationId: 'c',
+			startedAt: 0n,
+			path: 'p',
+			admissionWaitMs: 0,
+		}
 		const grantedRun = inRequest(granted, () => service.run(async () => 'ok'))
 		await vi.advanceTimersByTimeAsync(400)
 		gate.resolve()
@@ -149,7 +174,12 @@ describe('processingAdmissionService', () => {
 
 		const blocker = deferred<void>()
 		const blocking = service.run(() => blocker.promise)
-		const timedOut: ImageRequestLog = { correlationId: 'c', startedAt: 0n, path: 'p', admissionWaitMs: 0 }
+		const timedOut: ImageRequestLog = {
+			correlationId: 'c',
+			startedAt: 0n,
+			path: 'p',
+			admissionWaitMs: 0,
+		}
 		const shed = inRequest(timedOut, () => service.run(async () => 'late'))
 		shed.catch(() => undefined)
 		await vi.advanceTimersByTimeAsync(1000)

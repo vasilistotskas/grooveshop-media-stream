@@ -81,7 +81,10 @@ describe('correlationService', () => {
 			service.updateContext(updates)
 
 			const updatedContext = service.getContext()
-			expect(updatedContext).toEqual({ ...mockContext, ...updates })
+			expect(updatedContext).toEqual({
+				...mockContext,
+				...updates,
+			})
 		})
 
 		it('should not update context when no context exists', () => {

@@ -30,7 +30,9 @@ export class MetricsMiddleware implements NestMiddleware {
 		let responseSize = 0
 		res.end = ((chunk?: unknown, encoding?: BufferEncoding, cb?: () => void): Response => {
 			if (chunk) {
-				responseSize += Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(chunk as string, encoding)
+				responseSize += Buffer.isBuffer(chunk)
+					? chunk.length
+					: Buffer.byteLength(chunk as string, encoding)
 			}
 			return originalEnd(chunk as never, encoding as never, cb)
 		}) as Response['end']
@@ -46,13 +48,17 @@ export class MetricsMiddleware implements NestMiddleware {
 				CorrelatedLogger.debug(`HTTP ${req.method} ${route} ${res.statusCode} - ${duration}s`, MetricsMiddleware.name)
 			}
 			catch (error: unknown) {
-				CorrelatedLogger.error(`Failed to record HTTP metrics: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, MetricsMiddleware.name)
+				CorrelatedLogger.error(`Failed to record HTTP metrics: ${errorMessage(error)}`, error instanceof Error
+					? error.stack
+					: undefined, MetricsMiddleware.name)
 				this.metricsService.recordError('metrics_middleware', 'http_tracking')
 			}
 		})
 
 		res.on('error', (error: unknown) => {
-			CorrelatedLogger.error(`HTTP request error: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, MetricsMiddleware.name)
+			CorrelatedLogger.error(`HTTP request error: ${errorMessage(error)}`, error instanceof Error
+				? error.stack
+				: undefined, MetricsMiddleware.name)
 			this.metricsService.recordError('http_request', 'response_error')
 			this.metricsService.decrementRequestsInFlight()
 		})
@@ -79,6 +85,8 @@ export class MetricsMiddleware implements NestMiddleware {
 	 */
 	private getRoute(req: Request): string {
 		const path: unknown = req.route?.path
-		return typeof path === 'string' && path.length > 0 ? path : UNMATCHED_ROUTE
+		return typeof path === 'string' && path.length > 0
+			? path
+			: UNMATCHED_ROUTE
 	}
 }

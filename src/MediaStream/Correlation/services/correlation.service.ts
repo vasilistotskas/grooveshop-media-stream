@@ -30,7 +30,10 @@ export class CorrelationService {
 	updateContext(updates: Partial<RequestContext>): void {
 		const currentContext = this.getContext()
 		if (currentContext) {
-			this.setContext({ ...currentContext, ...updates })
+			this.setContext({
+				...currentContext,
+				...updates,
+			})
 		}
 	}
 }

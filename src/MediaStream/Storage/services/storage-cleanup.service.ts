@@ -115,7 +115,13 @@ export class StorageCleanupService implements OnModuleInit {
 
 		const startedAt = Date.now()
 		const run: CleanupRun = {
-			result: { removed: { expired: 0, stale: 0, evicted: 0 }, filesRemoved: 0, sizeFreed: 0, errors: [], duration: 0 },
+			result: {
+				removed: { expired: 0, stale: 0, evicted: 0 },
+				filesRemoved: 0,
+				sizeFreed: 0,
+				errors: [],
+				duration: 0,
+			},
 			dryRun: this.config.dryRun,
 			deadline: startedAt + this.config.maxDuration,
 			timedOut: false,
@@ -185,7 +191,11 @@ export class StorageCleanupService implements OnModuleInit {
 		catch (error: unknown) {
 			const msg = `Failed to read storage directory for tenant sweep: ${errorMessage(error)}`
 			CorrelatedLogger.warn(msg, StorageCleanupService.name)
-			return { filesRemoved: 0, errors: [msg], complete: false }
+			return {
+				filesRemoved: 0,
+				errors: [msg],
+				complete: false,
+			}
 		}
 
 		const metaFiles = allFiles.filter(f => f.endsWith('.rsm'))
@@ -265,7 +275,9 @@ export class StorageCleanupService implements OnModuleInit {
 		catch (error: unknown) {
 			CorrelatedLogger.error(
 				`Scheduled storage cleanup failed: ${errorMessage(error)}`,
-				error instanceof Error ? error.stack : undefined,
+				error instanceof Error
+					? error.stack
+					: undefined,
 				StorageCleanupService.name,
 			)
 		}
@@ -320,7 +332,11 @@ export class StorageCleanupService implements OnModuleInit {
 		}
 
 		const ranked = entries
-			.map(entry => ({ entry, popular: entry.accessCount >= this.minAccessCount, score: evictionScore(entry, now) }))
+			.map(entry => ({
+				entry,
+				popular: entry.accessCount >= this.minAccessCount,
+				score: evictionScore(entry, now),
+			}))
 			.sort((a, b) => Number(a.popular) - Number(b.popular) || b.score - a.score)
 
 		for (const { entry } of ranked) {

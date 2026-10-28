@@ -42,7 +42,9 @@ const options = {
 
 function getArgValue(argName) {
 	const index = args.indexOf(argName)
-	return index !== -1 && args[index + 1] ? args[index + 1] : null
+	return index !== -1 && args[index + 1]
+		? args[index + 1]
+		: null
 }
 
 function showHelp() {
@@ -204,7 +206,12 @@ async function clearFileCache() {
 			console.log(`⚠️  ${errors.length} error(s) occurred during deletion`)
 		}
 
-		return { success: true, deletedCount, skippedCount, errors }
+		return {
+			success: true,
+			deletedCount,
+			skippedCount,
+			errors,
+		}
 	}
 	catch (error) {
 		console.error('❌ File cache clearing failed:', error.message)

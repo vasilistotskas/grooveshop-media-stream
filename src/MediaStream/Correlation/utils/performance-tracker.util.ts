@@ -38,7 +38,10 @@ export class PerformanceTracker {
 			this.timestamps.set(correlationId, Date.now())
 		}
 
-		this.phases.get(correlationId)!.push({ name: phaseName, startTime: process.hrtime.bigint() })
+		this.phases.get(correlationId)!.push({
+			name: phaseName,
+			startTime: process.hrtime.bigint(),
+		})
 
 		CorrelatedLogger.debug(`Performance phase started: ${phaseName}`, PerformanceTracker.name)
 	}
@@ -82,7 +85,9 @@ export class PerformanceTracker {
 
 	static getPhases(): PerformancePhase[] {
 		const correlationId = this.getCorrelationId()
-		return correlationId ? this.phases.get(correlationId) || [] : []
+		return correlationId
+			? this.phases.get(correlationId) || []
+			: []
 	}
 
 	static getSummary(): {
@@ -96,7 +101,9 @@ export class PerformanceTracker {
 		const completedPhases = phases.filter(phase => phase.duration !== undefined)
 		const totalDuration = completedPhases.reduce((sum, phase) => sum + (phase.duration ?? 0), 0)
 		const slowestPhase = completedPhases.reduce<PerformancePhase | undefined>(
-			(slowest, current) => !slowest || (current.duration ?? 0) > (slowest.duration ?? 0) ? current : slowest,
+			(slowest, current) => !slowest || (current.duration ?? 0) > (slowest.duration ?? 0)
+				? current
+				: slowest,
 			undefined,
 		)
 
@@ -131,8 +138,12 @@ export class PerformanceTracker {
 
 		CorrelatedLogger.debug(
 			`Performance Summary: ${summary.completedPhases}/${summary.totalPhases} phases completed, `
-			+ `total phase time: ${summary.totalDuration.toFixed(2)}ms${requestDuration ? `, request time: ${requestDuration.toFixed(2)}ms` : ''}`
-			+ `${summary.slowestPhase ? `, slowest: ${summary.slowestPhase.name} (${summary.slowestPhase.duration?.toFixed(2)}ms)` : ''}`,
+			+ `total phase time: ${summary.totalDuration.toFixed(2)}ms${requestDuration
+				? `, request time: ${requestDuration.toFixed(2)}ms`
+				: ''}`
+				+ `${summary.slowestPhase
+					? `, slowest: ${summary.slowestPhase.name} (${summary.slowestPhase.duration?.toFixed(2)}ms)`
+					: ''}`,
 			PerformanceTracker.name,
 		)
 

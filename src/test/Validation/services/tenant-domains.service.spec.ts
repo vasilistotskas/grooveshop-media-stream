@@ -81,7 +81,10 @@ describe('tenantDomainsService', () => {
 		})
 
 		it('fetches the feed derived from backend.url with the internal token header and populates domains', async () => {
-			fetchMock.mockResolvedValue(jsonResponse({ domains: ['acme.example', 'api.acme.example'], suspendedSchemas: [] }))
+			fetchMock.mockResolvedValue(jsonResponse({
+				domains: ['acme.example', 'api.acme.example'],
+				suspendedSchemas: [],
+			}))
 
 			const service = createService()
 			await service.onModuleInit()
@@ -99,7 +102,10 @@ describe('tenantDomainsService', () => {
 		})
 
 		it('matches domains case-insensitively', async () => {
-			fetchMock.mockResolvedValue(jsonResponse({ domains: ['Acme.Example'], suspendedSchemas: [] }))
+			fetchMock.mockResolvedValue(jsonResponse({
+				domains: ['Acme.Example'],
+				suspendedSchemas: [],
+			}))
 
 			const service = createService()
 			await service.onModuleInit()
@@ -119,7 +125,10 @@ describe('tenantDomainsService', () => {
 		})
 
 		it('records isEnabled() = true, sets getLastSuccessfulRefresh(), and reports the gauges via MetricsService on success', async () => {
-			fetchMock.mockResolvedValue(jsonResponse({ domains: ['acme.example', 'api.acme.example'], suspendedSchemas: [] }))
+			fetchMock.mockResolvedValue(jsonResponse({
+				domains: ['acme.example', 'api.acme.example'],
+				suspendedSchemas: [],
+			}))
 			const before = Date.now()
 
 			const service = createService()
@@ -139,7 +148,10 @@ describe('tenantDomainsService', () => {
 		})
 
 		it('keeps the previous set when a later refresh throws (network error)', async () => {
-			fetchMock.mockResolvedValueOnce(jsonResponse({ domains: ['acme.example'], suspendedSchemas: [] }))
+			fetchMock.mockResolvedValueOnce(jsonResponse({
+				domains: ['acme.example'],
+				suspendedSchemas: [],
+			}))
 			const service = createService()
 			await service.onModuleInit()
 			expect(service.isAllowed('acme.example')).toBe(true)
@@ -152,7 +164,10 @@ describe('tenantDomainsService', () => {
 		})
 
 		it('keeps the previous set when the feed responds non-2xx', async () => {
-			fetchMock.mockResolvedValueOnce(jsonResponse({ domains: ['acme.example'], suspendedSchemas: [] }))
+			fetchMock.mockResolvedValueOnce(jsonResponse({
+				domains: ['acme.example'],
+				suspendedSchemas: [],
+			}))
 			const service = createService()
 			await service.onModuleInit()
 
@@ -164,7 +179,10 @@ describe('tenantDomainsService', () => {
 		})
 
 		it('keeps the previous set when the feed returns a malformed payload', async () => {
-			fetchMock.mockResolvedValueOnce(jsonResponse({ domains: ['acme.example'], suspendedSchemas: [] }))
+			fetchMock.mockResolvedValueOnce(jsonResponse({
+				domains: ['acme.example'],
+				suspendedSchemas: [],
+			}))
 			const service = createService()
 			await service.onModuleInit()
 
@@ -177,7 +195,10 @@ describe('tenantDomainsService', () => {
 
 		describe('suspended stores', () => {
 			it('refuses the schemas the feed lists as suspended, and only those', async () => {
-				fetchMock.mockResolvedValue(jsonResponse({ domains: [], suspendedSchemas: ['closed_shop'] }))
+				fetchMock.mockResolvedValue(jsonResponse({
+					domains: [],
+					suspendedSchemas: ['closed_shop'],
+				}))
 				const service = createService()
 				await service.onModuleInit()
 
@@ -187,7 +208,10 @@ describe('tenantDomainsService', () => {
 			})
 
 			it('lifts a suspension the next refresh no longer lists', async () => {
-				fetchMock.mockResolvedValueOnce(jsonResponse({ domains: [], suspendedSchemas: ['closed_shop'] }))
+				fetchMock.mockResolvedValueOnce(jsonResponse({
+					domains: [],
+					suspendedSchemas: ['closed_shop'],
+				}))
 				const service = createService()
 				await service.onModuleInit()
 
@@ -198,7 +222,10 @@ describe('tenantDomainsService', () => {
 			})
 
 			it('ignores entries that are not valid schema names', async () => {
-				fetchMock.mockResolvedValue(jsonResponse({ domains: [], suspendedSchemas: ['ok_shop', 'Bad-Name', 7, '', '../x'] }))
+				fetchMock.mockResolvedValue(jsonResponse({
+					domains: [],
+					suspendedSchemas: ['ok_shop', 'Bad-Name', 7, '', '../x'],
+				}))
 				const service = createService()
 				await service.onModuleInit()
 
@@ -209,10 +236,19 @@ describe('tenantDomainsService', () => {
 
 			// A suspension must not lapse because Django could not be read.
 			it.each([
-				['an unreachable feed', () => fetchMock.mockRejectedValueOnce(new Error('ECONNREFUSED'))],
-				['a non-2xx answer', () => fetchMock.mockResolvedValueOnce(jsonResponse({}, false, 503))],
+				[
+					'an unreachable feed',
+					() => fetchMock.mockRejectedValueOnce(new Error('ECONNREFUSED')),
+				],
+				[
+					'a non-2xx answer',
+					() => fetchMock.mockResolvedValueOnce(jsonResponse({}, false, 503)),
+				],
 			])('keeps the last known suspensions and reports failure on %s', async (_case, failNext) => {
-				fetchMock.mockResolvedValueOnce(jsonResponse({ domains: ['acme.example'], suspendedSchemas: ['closed_shop'] }))
+				fetchMock.mockResolvedValueOnce(jsonResponse({
+					domains: ['acme.example'],
+					suspendedSchemas: ['closed_shop'],
+				}))
 				const service = createService()
 				await service.onModuleInit()
 
@@ -226,11 +262,16 @@ describe('tenantDomainsService', () => {
 			// A Django older than the field (a rollback) must not cost the
 			// domain allowlist that CORS and the rate limit rely on.
 			it('still takes the domains from a feed without suspendedSchemas, keeping the last suspensions and reporting them stale', async () => {
-				fetchMock.mockResolvedValueOnce(jsonResponse({ domains: ['acme.example'], suspendedSchemas: ['closed_shop'] }))
+				fetchMock.mockResolvedValueOnce(jsonResponse({
+					domains: ['acme.example'],
+					suspendedSchemas: ['closed_shop'],
+				}))
 				const service = createService()
 				await service.onModuleInit()
 
-				fetchMock.mockResolvedValueOnce(jsonResponse({ domains: ['acme.example', 'new.example'] }))
+				fetchMock.mockResolvedValueOnce(jsonResponse({
+					domains: ['acme.example', 'new.example'],
+				}))
 				await expect(service.refresh()).resolves.toBe(false)
 
 				expect(service.isAllowed('new.example')).toBe(true)
@@ -238,7 +279,9 @@ describe('tenantDomainsService', () => {
 			})
 
 			it('starts with the domains and nothing suspended when a restarted pod reads a feed without suspendedSchemas', async () => {
-				fetchMock.mockResolvedValue(jsonResponse({ domains: ['acme.example'] }))
+				fetchMock.mockResolvedValue(jsonResponse({
+					domains: ['acme.example'],
+				}))
 				const service = createService()
 				await service.onModuleInit()
 
@@ -272,7 +315,10 @@ describe('tenantDomainsService', () => {
 		})
 
 		it('does NOT advance getLastSuccessfulRefresh() when a later refresh fails, but keeps reporting the last known-good timestamp to metrics', async () => {
-			fetchMock.mockResolvedValueOnce(jsonResponse({ domains: ['acme.example'], suspendedSchemas: [] }))
+			fetchMock.mockResolvedValueOnce(jsonResponse({
+				domains: ['acme.example'],
+				suspendedSchemas: [],
+			}))
 			const service = createService()
 			await service.onModuleInit()
 			const firstRefresh = service.getLastSuccessfulRefresh()
@@ -296,7 +342,10 @@ describe('tenantDomainsService', () => {
 			vi.useFakeTimers()
 
 			try {
-				fetchMock.mockResolvedValue(jsonResponse({ domains: ['acme.example'], suspendedSchemas: [] }))
+				fetchMock.mockResolvedValue(jsonResponse({
+					domains: ['acme.example'],
+					suspendedSchemas: [],
+				}))
 				const service = createService()
 				await service.onModuleInit()
 				expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -327,7 +376,10 @@ describe('tenantDomainsService', () => {
 				.mockReturnValueOnce(new Promise<Response>((resolve) => {
 					answerFirst = resolve
 				}))
-				.mockResolvedValueOnce(jsonResponse({ domains: [], suspendedSchemas: ['closed_shop'] }))
+				.mockResolvedValueOnce(jsonResponse({
+					domains: [],
+					suspendedSchemas: ['closed_shop'],
+				}))
 			const service = createService()
 
 			const poll = service.refresh()
@@ -345,7 +397,10 @@ describe('tenantDomainsService', () => {
 		it('keeps refreshing after one failed', async () => {
 			fetchMock
 				.mockRejectedValueOnce(new Error('ECONNRESET'))
-				.mockResolvedValueOnce(jsonResponse({ domains: [], suspendedSchemas: ['closed_shop'] }))
+				.mockResolvedValueOnce(jsonResponse({
+					domains: [],
+					suspendedSchemas: ['closed_shop'],
+				}))
 			const service = createService()
 
 			await expect(service.refresh()).resolves.toBe(false)
@@ -373,7 +428,10 @@ describe('tenantDomainsService', () => {
 			fetchMock
 				.mockRejectedValueOnce(new Error('down'))
 				.mockRejectedValueOnce(new Error('down'))
-				.mockResolvedValue(jsonResponse({ domains: [], suspendedSchemas: ['closed_shop'] }))
+				.mockResolvedValue(jsonResponse({
+					domains: [],
+					suspendedSchemas: ['closed_shop'],
+				}))
 			const service = createService()
 
 			await service.refresh()

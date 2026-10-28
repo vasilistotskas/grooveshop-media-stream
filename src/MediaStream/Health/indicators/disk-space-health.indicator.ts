@@ -45,7 +45,9 @@ export class DiskSpaceHealthIndicator extends BaseHealthIndicator {
 
 			return this.createHealthyResult({
 				...diskInfo,
-				detailStatus: diskInfo.usedPercentage >= DISK_WARNING_RATIO ? 'warning' : 'healthy',
+				detailStatus: diskInfo.usedPercentage >= DISK_WARNING_RATIO
+					? 'warning'
+					: 'healthy',
 				warningThreshold: DISK_WARNING_RATIO,
 				criticalThreshold: DISK_CRITICAL_RATIO,
 			})

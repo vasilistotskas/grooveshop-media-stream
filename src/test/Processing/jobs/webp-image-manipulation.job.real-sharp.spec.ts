@@ -43,8 +43,17 @@ describe('webpImageManipulationJob output geometry (real Sharp)', () => {
 
 	async function jpeg(name: string, width: number, height: number, orientation?: number): Promise<string> {
 		const path = join(directory, name)
-		const pipeline = sharp({ create: { width, height, channels: 3, background: { r: 200, g: 40, b: 40 } } })
-		await writeFile(path, await (orientation ? pipeline.jpeg().withMetadata({ orientation }) : pipeline.jpeg()).toBuffer())
+		const pipeline = sharp({
+			create: {
+				width,
+				height,
+				channels: 3,
+				background: { r: 200, g: 40, b: 40 },
+			},
+		})
+		await writeFile(path, await (orientation
+			? pipeline.jpeg().withMetadata({ orientation })
+			: pipeline.jpeg()).toBuffer())
 		return path
 	}
 
@@ -108,8 +117,28 @@ describe('webpImageManipulationJob output geometry (real Sharp)', () => {
 		it('crops by position as usual', async () => {
 			// Top half red, bottom half blue: a top crop keeps the red, a bottom crop the blue.
 			const halves = join(directory, 'halves.png')
-			await sharp({ create: { width: 800, height: 800, channels: 3, background: { r: 255, g: 0, b: 0 } } })
-				.composite([{ input: { create: { width: 800, height: 400, channels: 3, background: { r: 0, g: 0, b: 255 } } }, top: 400, left: 0 }])
+			await sharp({
+				create: {
+					width: 800,
+					height: 800,
+					channels: 3,
+					background: { r: 255, g: 0, b: 0 },
+				},
+			})
+				.composite([
+					{
+						input: {
+							create: {
+								width: 800,
+								height: 400,
+								channels: 3,
+								background: { r: 0, g: 0, b: 255 },
+							},
+						},
+						top: 400,
+						left: 0,
+					},
+				])
 				.png()
 				.toFile(halves)
 
@@ -118,7 +147,9 @@ describe('webpImageManipulationJob output geometry (real Sharp)', () => {
 				const { data, info } = await sharp(buffer).removeAlpha().raw().toBuffer({ resolveWithObject: true })
 				expect(info).toMatchObject({ width: 800, height: 526 })
 				const offset = (Math.floor(info.height / 2) * info.width + Math.floor(info.width / 2)) * info.channels
-				return [...data.subarray(offset, offset + 3)]
+				return [
+					...data.subarray(offset, offset + 3),
+				]
 			}
 
 			// The 526 px crop of an 800 px tall source spans rows 0-525 (top) or 274-799 (bottom);

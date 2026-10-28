@@ -16,7 +16,14 @@ export default defineConfig({
 			enabled: false,
 			provider: 'v8',
 			reportsDirectory: fileURLToPath(new URL('./coverage', import.meta.url)),
-			reporter: ['text', 'html', 'clover', 'lcov', 'json', 'json-summary'],
+			reporter: [
+				'text',
+				'html',
+				'clover',
+				'lcov',
+				'json',
+				'json-summary',
+			],
 			// Application sources only — test files and config must not dilute
 			// (or pad) the coverage denominators.
 			include: ['src/MediaStream/**/*.ts', 'src/main.ts'],

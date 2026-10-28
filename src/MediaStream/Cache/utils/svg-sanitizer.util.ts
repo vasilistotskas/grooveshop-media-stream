@@ -86,10 +86,14 @@ export async function sanitizeSvg(svg: string, { timeoutMs, heapLimitMb = SVG_SA
 		}
 		CorrelatedLogger.error(
 			`DOMPurify SVG sanitization failed — rejecting SVG (fail closed): ${errorMessage(err)}`,
-			err instanceof Error ? err.stack : undefined,
+			err instanceof Error
+				? err.stack
+				: undefined,
 			'SvgSanitizer',
 		)
-		throw new SvgSanitizationError('SVG sanitization unavailable', { cause: errorMessage(err) })
+		throw new SvgSanitizationError('SVG sanitization unavailable', {
+			cause: errorMessage(err),
+		})
 	}
 
 	// Defence-in-depth tripwire: detection-and-reject, NOT stripping. DOMPurify's
@@ -130,7 +134,9 @@ function runWorker(svg: string, timeoutMs: number, heapLimitMb: number): Promise
 		}
 
 		worker.once('message', (result: unknown) => {
-			settle(() => typeof result === 'string' ? resolve(result) : reject(new Error('SVG sanitizer replied without markup')))
+			settle(() => typeof result === 'string'
+				? resolve(result)
+				: reject(new Error('SVG sanitizer replied without markup')))
 		})
 		// Covers ERR_WORKER_OUT_OF_MEMORY and anything DOMPurify/jsdom throws.
 		worker.once('error', (error: Error) => {

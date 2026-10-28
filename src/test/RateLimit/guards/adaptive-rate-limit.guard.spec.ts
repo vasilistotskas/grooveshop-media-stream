@@ -52,7 +52,10 @@ describe('adaptiveRateLimitGuard', () => {
 	function createContext(request: Record<string, unknown> = {}): ExecutionContext {
 		return {
 			switchToHttp: () => ({
-				getRequest: () => ({ ...baseRequest, ...request }),
+				getRequest: () => ({
+					...baseRequest,
+					...request,
+				}),
 				getResponse: () => response,
 			}),
 		} as unknown as ExecutionContext
@@ -62,7 +65,12 @@ describe('adaptiveRateLimitGuard', () => {
 	function primeRateLimit(options: { max?: number, current?: number, allowed?: boolean, resetTime?: Date } = {}) {
 		const { max = 100, current = 1, allowed = true, resetTime = new Date(Date.now() + 60_000) } = options
 		const config = { windowMs: 60_000, max }
-		const info: RateLimitInfo = { limit: max, current, remaining: Math.max(0, max - current), resetTime }
+		const info: RateLimitInfo = {
+			limit: max,
+			current,
+			remaining: Math.max(0, max - current),
+			resetTime,
+		}
 
 		rateLimitService.generateAdvancedKey.mockReturnValue('rate-limit-key')
 		rateLimitService.getRateLimitConfig.mockReturnValue(config)
@@ -85,9 +93,15 @@ describe('adaptiveRateLimitGuard', () => {
 
 	beforeEach(() => {
 		rateLimitService = createRateLimitServiceMock()
-		metricsService = { recordRateLimitAttempt: vi.fn() }
-		tenantDomainsService = { isAllowed: vi.fn<TenantDomainsService['isAllowed']>().mockReturnValue(false) }
-		response = { setHeader: vi.fn() }
+		metricsService = {
+			recordRateLimitAttempt: vi.fn(),
+		}
+		tenantDomainsService = {
+			isAllowed: vi.fn<TenantDomainsService['isAllowed']>().mockReturnValue(false),
+		}
+		response = {
+			setHeader: vi.fn(),
+		}
 		guard = createGuard()
 	})
 
@@ -126,10 +140,17 @@ describe('adaptiveRateLimitGuard', () => {
 		})
 
 		it('should throw 429 with a Retry-After header when the limit is exceeded', async () => {
-			vi.useFakeTimers({ toFake: ['Date'] })
+			vi.useFakeTimers({
+				toFake: ['Date'],
+			})
 			vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'))
 			const resetTime = new Date('2026-01-01T00:00:30.000Z')
-			const { info } = primeRateLimit({ max: 100, current: 101, allowed: false, resetTime })
+			const { info } = primeRateLimit({
+				max: 100,
+				current: 101,
+				allowed: false,
+				resetTime,
+			})
 
 			await expectTooManyRequests(guard.canActivate(createContext()))
 
@@ -180,7 +201,12 @@ describe('adaptiveRateLimitGuard', () => {
 	})
 
 	describe('health-check bypass', () => {
-		it.each(['/health', '/health/live', '/health/ready', '/health/circuit-breaker/reset'])('should skip %s probes', async (url) => {
+		it.each([
+			'/health',
+			'/health/live',
+			'/health/ready',
+			'/health/circuit-breaker/reset',
+		])('should skip %s probes', async (url) => {
 			const result = await guard.canActivate(createContext({ url }))
 
 			expect(result).toBe(true)
@@ -243,7 +269,10 @@ describe('adaptiveRateLimitGuard', () => {
 		it('should skip bots calling from an internal IP', async () => {
 			rateLimitService.isBot.mockReturnValue(true)
 
-			const result = await guard.canActivate(createContext({ ip: INTERNAL_IP, headers: { 'user-agent': BOT_UA } }))
+			const result = await guard.canActivate(createContext({
+				ip: INTERNAL_IP,
+				headers: { 'user-agent': BOT_UA },
+			}))
 
 			expect(result).toBe(true)
 			expect(rateLimitService.isBot).toHaveBeenCalledWith(BOT_UA)
@@ -254,7 +283,10 @@ describe('adaptiveRateLimitGuard', () => {
 			rateLimitService.isBot.mockReturnValue(true)
 			primeRateLimit()
 
-			const result = await guard.canActivate(createContext({ ip: EXTERNAL_IP, headers: { 'user-agent': BOT_UA } }))
+			const result = await guard.canActivate(createContext({
+				ip: EXTERNAL_IP,
+				headers: { 'user-agent': BOT_UA },
+			}))
 
 			expect(result).toBe(true)
 			expect(rateLimitService.checkRateLimit).toHaveBeenCalled()
@@ -265,7 +297,10 @@ describe('adaptiveRateLimitGuard', () => {
 			rateLimitService.isBot.mockReturnValue(true)
 			primeRateLimit()
 
-			const result = await guard.canActivate(createContext({ ip: INTERNAL_IP, headers: { 'user-agent': BOT_UA } }))
+			const result = await guard.canActivate(createContext({
+				ip: INTERNAL_IP,
+				headers: { 'user-agent': BOT_UA },
+			}))
 
 			expect(result).toBe(true)
 			expect(rateLimitService.checkRateLimit).toHaveBeenCalled()
@@ -274,10 +309,15 @@ describe('adaptiveRateLimitGuard', () => {
 
 	describe('domain whitelist bypass (static list unioned with dynamic tenant domains)', () => {
 		const internalRequestWith = (headers: Record<string, string>) =>
-			createContext({ ip: '192.168.1.50', headers: { 'user-agent': BROWSER_UA, ...headers } })
+			createContext({
+				ip: '192.168.1.50',
+				headers: { 'user-agent': BROWSER_UA, ...headers },
+			})
 
 		it('should skip internal requests whose referer matches the static whitelist exactly', async () => {
-			guard = createGuard({ 'rateLimit.bypass.whitelistedDomains': ['webside.gr'] })
+			guard = createGuard({
+				'rateLimit.bypass.whitelistedDomains': ['webside.gr'],
+			})
 
 			const result = await guard.canActivate(internalRequestWith({ referer: 'https://webside.gr/page' }))
 
@@ -286,7 +326,9 @@ describe('adaptiveRateLimitGuard', () => {
 		})
 
 		it.each(['https://assets.webside.gr/img.png', 'https://webside.gr/'])('should match a `*.` wildcard entry against %s', async (referer) => {
-			guard = createGuard({ 'rateLimit.bypass.whitelistedDomains': ['*.webside.gr'] })
+			guard = createGuard({
+				'rateLimit.bypass.whitelistedDomains': ['*.webside.gr'],
+			})
 
 			const result = await guard.canActivate(internalRequestWith({ referer }))
 
@@ -295,7 +337,9 @@ describe('adaptiveRateLimitGuard', () => {
 		})
 
 		it('should also honour the Origin header', async () => {
-			guard = createGuard({ 'rateLimit.bypass.whitelistedDomains': ['webside.gr'] })
+			guard = createGuard({
+				'rateLimit.bypass.whitelistedDomains': ['webside.gr'],
+			})
 
 			const result = await guard.canActivate(internalRequestWith({ origin: 'https://webside.gr' }))
 
@@ -304,7 +348,9 @@ describe('adaptiveRateLimitGuard', () => {
 		})
 
 		it('should NOT skip when the referer domain is neither statically whitelisted nor dynamically known', async () => {
-			guard = createGuard({ 'rateLimit.bypass.whitelistedDomains': ['webside.gr'] })
+			guard = createGuard({
+				'rateLimit.bypass.whitelistedDomains': ['webside.gr'],
+			})
 			primeRateLimit({ max: 50 })
 
 			const result = await guard.canActivate(internalRequestWith({ referer: 'https://new-tenant.example.com/page' }))
@@ -315,7 +361,9 @@ describe('adaptiveRateLimitGuard', () => {
 		})
 
 		it('should ignore a malformed referer and count the request', async () => {
-			guard = createGuard({ 'rateLimit.bypass.whitelistedDomains': ['webside.gr'] })
+			guard = createGuard({
+				'rateLimit.bypass.whitelistedDomains': ['webside.gr'],
+			})
 			primeRateLimit()
 
 			const result = await guard.canActivate(internalRequestWith({ referer: 'not a url' }))
@@ -344,7 +392,9 @@ describe('adaptiveRateLimitGuard', () => {
 		})
 
 		it('should not consult the whitelist at all for external IPs, even when the domain is allowed', async () => {
-			guard = createGuard({ 'rateLimit.bypass.whitelistedDomains': ['webside.gr'] })
+			guard = createGuard({
+				'rateLimit.bypass.whitelistedDomains': ['webside.gr'],
+			})
 			tenantDomainsService.isAllowed.mockReturnValue(true)
 			primeRateLimit({ max: 50 })
 
@@ -362,13 +412,31 @@ describe('adaptiveRateLimitGuard', () => {
 	describe('request identity', () => {
 		it.each([
 			// request.ip takes priority
-			{ ip: '192.168.1.5', socket: { remoteAddress: '10.0.0.1' }, expectedIp: '192.168.1.5' },
+			{
+				ip: '192.168.1.5',
+				socket: { remoteAddress: '10.0.0.1' },
+				expectedIp: '192.168.1.5',
+			},
 			// Falls back to socket.remoteAddress when ip is not set
-			{ ip: undefined, socket: { remoteAddress: '192.168.1.4' }, expectedIp: '192.168.1.4' },
+			{
+				ip: undefined,
+				socket: { remoteAddress: '192.168.1.4' },
+				expectedIp: '192.168.1.4',
+			},
 			// Falls back to connection.remoteAddress
-			{ ip: undefined, socket: undefined, connection: { remoteAddress: '192.168.1.6' }, expectedIp: '192.168.1.6' },
+			{
+				ip: undefined,
+				socket: undefined,
+				connection: { remoteAddress: '192.168.1.6' },
+				expectedIp: '192.168.1.6',
+			},
 			// Falls back to 'unknown' when nothing is available
-			{ ip: undefined, socket: undefined, connection: undefined, expectedIp: 'unknown' },
+			{
+				ip: undefined,
+				socket: undefined,
+				connection: undefined,
+				expectedIp: 'unknown',
+			},
 		])('should resolve the client IP to $expectedIp and normalise a missing user agent to an empty string', async ({ expectedIp, ...request }) => {
 			primeRateLimit()
 
@@ -382,7 +450,9 @@ describe('adaptiveRateLimitGuard', () => {
 		it('should key the image-processing bucket by the tenant schema of the tenant-scoped media route', async () => {
 			primeRateLimit({ max: 50 })
 
-			await guard.canActivate(createContext({ url: TENANT_IMAGE_URL('acme') }))
+			await guard.canActivate(createContext({
+				url: TENANT_IMAGE_URL('acme'),
+			}))
 
 			expect(rateLimitService.generateAdvancedKey).toHaveBeenCalledWith(INTERNAL_IP, BROWSER_UA, 'image-processing', 'acme')
 		})
@@ -391,18 +461,42 @@ describe('adaptiveRateLimitGuard', () => {
 			primeRateLimit({ max: 50 })
 			rateLimitService.generateAdvancedKey.mockImplementation((ip, _ua, type, tenantSchema) => `${tenantSchema}:${ip}:${type}`)
 
-			await guard.canActivate(createContext({ url: TENANT_IMAGE_URL('tenant_a') }))
-			await guard.canActivate(createContext({ url: TENANT_IMAGE_URL('tenant_b') }))
+			await guard.canActivate(createContext({
+				url: TENANT_IMAGE_URL('tenant_a'),
+			}))
+			await guard.canActivate(createContext({
+				url: TENANT_IMAGE_URL('tenant_b'),
+			}))
 
 			expect(rateLimitService.checkRateLimit).toHaveBeenNthCalledWith(1, `tenant_a:${INTERNAL_IP}:image-processing`, expect.anything())
 			expect(rateLimitService.checkRateLimit).toHaveBeenNthCalledWith(2, `tenant_b:${INTERNAL_IP}:image-processing`, expect.anything())
 		})
 
 		it.each([
-			{ url: TENANT_IMAGE_URL('acme'), method: 'GET', expectedType: 'image-processing', expectedTenant: 'acme' },
-			{ url: STATIC_IMAGE_URL, method: 'GET', expectedType: 'image-processing', expectedTenant: 'public' },
-			{ url: '/api/v1/other', method: 'GET', expectedType: 'get-default', expectedTenant: 'public' },
-			{ url: '/api/v1/other', method: 'POST', expectedType: 'post-default', expectedTenant: 'public' },
+			{
+				url: TENANT_IMAGE_URL('acme'),
+				method: 'GET',
+				expectedType: 'image-processing',
+				expectedTenant: 'acme',
+			},
+			{
+				url: STATIC_IMAGE_URL,
+				method: 'GET',
+				expectedType: 'image-processing',
+				expectedTenant: 'public',
+			},
+			{
+				url: '/api/v1/other',
+				method: 'GET',
+				expectedType: 'get-default',
+				expectedTenant: 'public',
+			},
+			{
+				url: '/api/v1/other',
+				method: 'POST',
+				expectedType: 'post-default',
+				expectedTenant: 'public',
+			},
 		])('should classify $method $url as $expectedType', async ({ url, method, expectedType, expectedTenant }) => {
 			primeRateLimit()
 

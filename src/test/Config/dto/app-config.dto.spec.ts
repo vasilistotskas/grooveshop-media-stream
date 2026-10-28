@@ -73,7 +73,9 @@ describe('appConfigDto', () => {
 			const shutdownError = errors.find(error => error.property === 'shutdown')
 			const timeoutError = shutdownError?.children?.find(child => child.property === 'timeout')
 
-			expect(timeoutError?.constraints).toMatchObject({ isNumber: expect.stringContaining('must be a number') })
+			expect(timeoutError?.constraints).toMatchObject({
+				isNumber: expect.stringContaining('must be a number'),
+			})
 		})
 
 		it('should fail validation when a group is missing', async () => {

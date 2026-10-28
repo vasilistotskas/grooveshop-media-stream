@@ -179,8 +179,12 @@ export class ImageStreamService {
 			const format = outputFormat(request.resizeOptions.format)
 			const log = currentImageRequest()
 			if (log) {
-				log.outcome = isRejectedSource(cause) ? 'rejected' : 'fallback'
-				log.error = cause instanceof Error ? cause.constructor.name : 'UnknownError'
+				log.outcome = isRejectedSource(cause)
+					? 'rejected'
+					: 'fallback'
+				log.error = cause instanceof Error
+					? cause.constructor.name
+					: 'UnknownError'
 				log.outputFormat = format
 				log.outputBytes = imageBuffer.length
 			}
@@ -193,9 +197,14 @@ export class ImageStreamService {
 			if (error instanceof ProcessingOverloadedError || error instanceof ProcessingTimeoutError) {
 				throw error
 			}
-			CorrelatedLogger.error(`Failed to serve fallback image: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, ImageStreamService.name)
+			CorrelatedLogger.error(`Failed to serve fallback image: ${errorMessage(error)}`, error instanceof Error
+				? error.stack
+				: undefined, ImageStreamService.name)
 			this.metricsService.recordError('default_image_fallback', 'fallback_error')
-			throw new DefaultImageFallbackError('Failed to process image request', { error: errorMessage(error), correlationId })
+			throw new DefaultImageFallbackError('Failed to process image request', {
+				error: errorMessage(error),
+				correlationId,
+			})
 		}
 	}
 
@@ -221,8 +230,12 @@ export class ImageStreamService {
 			this.metricsService.recordError('image_request', error.constructor.name)
 		}
 		else {
-			CorrelatedLogger.error(`Error processing image request: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, ImageStreamService.name)
-			this.metricsService.recordError('image_request', error instanceof Error ? error.constructor.name : 'UnknownError')
+			CorrelatedLogger.error(`Error processing image request: ${errorMessage(error)}`, error instanceof Error
+				? error.stack
+				: undefined, ImageStreamService.name)
+			this.metricsService.recordError('image_request', error instanceof Error
+				? error.constructor.name
+				: 'UnknownError')
 		}
 
 		await this.serveFallbackImage(request, res, correlationId, error)

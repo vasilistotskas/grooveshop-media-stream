@@ -7,7 +7,9 @@ import { SvgSanitizationError } from '#microservice/common/errors/media-stream.e
 // real-worker behavioural spec. Each test scripts what the fake worker does.
 const { workers, reply } = vi.hoisted(() => ({
 	workers: [] as Array<{ options: any, terminate: ReturnType<typeof vi.fn> }>,
-	reply: { current: (_worker: EventEmitter): void => {} },
+	reply: {
+		current: (_worker: EventEmitter): void => {},
+	},
 }))
 
 vi.mock('node:worker_threads', async () => {

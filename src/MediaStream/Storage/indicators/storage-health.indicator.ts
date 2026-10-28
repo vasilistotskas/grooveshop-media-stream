@@ -65,8 +65,12 @@ export class StorageHealthIndicator extends BaseHealthIndicator {
 				entries: inventory.entries.length,
 				orphans: inventory.orphans.length,
 				expired,
-				oldestEntry: inventory.entries.length ? new Date(oldest).toISOString() : null,
-				newestEntry: inventory.entries.length ? new Date(newest).toISOString() : null,
+				oldestEntry: inventory.entries.length
+					? new Date(oldest).toISOString()
+					: null,
+				newestEntry: inventory.entries.length
+					? new Date(newest).toISOString()
+					: null,
 				cleanupStatus: {
 					enabled: cleanup.enabled,
 					dryRun: cleanup.dryRun,

@@ -50,7 +50,10 @@ describe('memoryCacheService', () => {
 
 		it('should set and get a value', async () => {
 			const key = 'test-key'
-			const value = { data: 'test-value', timestamp: Date.now() }
+			const value = {
+				data: 'test-value',
+				timestamp: Date.now(),
+			}
 
 			await service.set(key, value)
 			const result = await service.get(key)
@@ -265,7 +268,10 @@ describe('memoryCacheService', () => {
 					},
 					{
 						provide: MetricsService,
-						useValue: { recordCacheOperation: vi.fn(), updateCacheHitRatio: vi.fn() },
+						useValue: {
+							recordCacheOperation: vi.fn(),
+							updateCacheHitRatio: vi.fn(),
+						},
 					},
 				],
 			}).compile()

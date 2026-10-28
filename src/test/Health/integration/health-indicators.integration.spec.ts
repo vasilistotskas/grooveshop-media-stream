@@ -25,7 +25,10 @@ function mockRes(): { res: Response, statusCode: () => number | undefined } {
 			return this
 		},
 	} as unknown as Response
-	return { res, statusCode: () => code }
+	return {
+		res,
+		statusCode: () => code,
+	}
 }
 
 describe('health Indicators Integration', () => {
@@ -34,7 +37,10 @@ describe('health Indicators Integration', () => {
 
 	beforeAll(async () => {
 		module = await Test.createTestingModule({
-			imports: [HealthModule, ScheduleModule.forRoot()],
+			imports: [
+				HealthModule,
+				ScheduleModule.forRoot(),
+			],
 		}).compile()
 
 		healthController = module.get<HealthController>(HealthController)
@@ -93,7 +99,9 @@ describe('health Indicators Integration', () => {
 			const indicator = module.get<DiskSpaceHealthIndicator>(DiskSpaceHealthIndicator)
 
 			// Health checks might fail in test environment
-			const result = await Promise.allSettled([indicator.isHealthy()])
+			const result = await Promise.allSettled([
+				indicator.isHealthy(),
+			])
 			expect(result).toBeDefined()
 			expect(result.length).toBe(1)
 		})
@@ -102,7 +110,9 @@ describe('health Indicators Integration', () => {
 			const indicator = module.get<MemoryHealthIndicator>(MemoryHealthIndicator)
 
 			// Health checks might fail in test environment
-			const result = await Promise.allSettled([indicator.isHealthy()])
+			const result = await Promise.allSettled([
+				indicator.isHealthy(),
+			])
 			expect(result).toBeDefined()
 			expect(result.length).toBe(1)
 		})
@@ -111,7 +121,9 @@ describe('health Indicators Integration', () => {
 			const indicator = module.get<CacheHealthIndicator>(CacheHealthIndicator)
 
 			// Health checks might fail in test environment
-			const result = await Promise.allSettled([indicator.isHealthy()])
+			const result = await Promise.allSettled([
+				indicator.isHealthy(),
+			])
 			expect(result).toBeDefined()
 			expect(result.length).toBe(1)
 		})
@@ -137,14 +149,18 @@ describe('health Indicators Integration', () => {
 		it('should execute comprehensive health check', async () => {
 			// This tests that all health indicators are properly integrated
 			// Health checks might fail in test environment, but should not throw module errors
-			const result = await Promise.allSettled([healthController.check(mockRes().res)])
+			const result = await Promise.allSettled([
+				healthController.check(mockRes().res),
+			])
 			expect(result).toBeDefined()
 			expect(result.length).toBe(1)
 		})
 
 		it('should provide detailed health information', async () => {
 			// Detailed health might fail in test environment
-			const result = await Promise.allSettled([healthController.getDetailedHealth(mockRes().res)])
+			const result = await Promise.allSettled([
+				healthController.getDetailedHealth(mockRes().res),
+			])
 			expect(result).toBeDefined()
 			expect(result.length).toBe(1)
 		})

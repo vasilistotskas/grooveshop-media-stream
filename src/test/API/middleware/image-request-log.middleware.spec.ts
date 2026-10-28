@@ -55,7 +55,14 @@ describe('imageRequestLogMiddleware', () => {
 	function handle(url: string, pipeline: (log: ImageRequestLog, res: ReturnType<typeof fakeResponse>) => void): { level: string, message: string, fields: Record<string, unknown> } {
 		const res = fakeResponse()
 		requestContextStorage.run(
-			{ correlationId: 'corr-1', timestamp: 0, clientIp: '127.0.0.1', method: 'GET', url, startTime: 0n },
+			{
+				correlationId: 'corr-1',
+				timestamp: 0,
+				clientIp: '127.0.0.1',
+				method: 'GET',
+				url,
+				startTime: 0n,
+			},
 			() => {
 				middleware.use(fakeRequest(url), res as any, () => {
 					pipeline(currentImageRequest() as ImageRequestLog, res)
@@ -70,7 +77,9 @@ describe('imageRequestLogMiddleware', () => {
 	}
 
 	beforeEach(() => {
-		metrics = { recordImageRequest: vi.fn() }
+		metrics = {
+			recordImageRequest: vi.fn(),
+		}
 		middleware = new ImageRequestLogMiddleware(metrics as any)
 		event = vi.spyOn(CorrelatedLogger, 'event').mockImplementation(() => {})
 	})
@@ -137,21 +146,43 @@ describe('imageRequestLogMiddleware', () => {
 
 	it('logs a rejected source at WARN with the same fields', () => {
 		const { level, fields } = handle('/media_stream-image/media/webside/uploads/x.png/1/1/contain/centre/transparent/0/80.webp', (log) => {
-			Object.assign(log, { cache: 'miss', inputFormat: 'svg', inputBytes: 3_000_000, outcome: 'rejected', error: 'UpstreamResourceTooLargeError' })
+			Object.assign(log, {
+				cache: 'miss',
+				inputFormat: 'svg',
+				inputBytes: 3_000_000,
+				outcome: 'rejected',
+				error: 'UpstreamResourceTooLargeError',
+			})
 		})
 
 		expect(level).toBe('warn')
-		expect(fields).toMatchObject({ outcome: 'rejected', error: 'UpstreamResourceTooLargeError', input_format: 'svg', input_bytes: 3_000_000, status: 200 })
+		expect(fields).toMatchObject({
+			outcome: 'rejected',
+			error: 'UpstreamResourceTooLargeError',
+			input_format: 'svg',
+			input_bytes: 3_000_000,
+			status: 200,
+		})
 	})
 
 	it('keeps the outcome the exception filter set for a capacity error', () => {
 		const { level, fields } = handle('/media_stream-image/media/webside/uploads/x.png/1/1/contain/centre/transparent/0/80.webp', (log, res) => {
-			Object.assign(log, { cache: 'miss', admissionWaitMs: 5000, outcome: 'overloaded', error: 'ProcessingOverloadedError' })
+			Object.assign(log, {
+				cache: 'miss',
+				admissionWaitMs: 5000,
+				outcome: 'overloaded',
+				error: 'ProcessingOverloadedError',
+			})
 			res.statusCode = 503
 		})
 
 		expect(level).toBe('log')
-		expect(fields).toMatchObject({ status: 503, outcome: 'overloaded', error: 'ProcessingOverloadedError', admission_wait_ms: 5000 })
+		expect(fields).toMatchObject({
+			status: 503,
+			outcome: 'overloaded',
+			error: 'ProcessingOverloadedError',
+			admission_wait_ms: 5000,
+		})
 		expect(metrics.recordImageRequest).toHaveBeenCalledWith('overloaded', 'none', 'miss', expect.any(Number))
 	})
 

@@ -30,7 +30,10 @@ describe('memory Cache Performance', () => {
 		const start = performance.now()
 
 		for (let i = 0; i < 1000; i++) {
-			cache.set(`key:${i}`, { data: `value-${i}`, timestamp: Date.now() })
+			cache.set(`key:${i}`, {
+				data: `value-${i}`,
+				timestamp: Date.now(),
+			})
 		}
 		for (let i = 0; i < 1000; i++) {
 			cache.get(`key:${i}`)
@@ -45,7 +48,10 @@ describe('memory Cache Performance', () => {
 		const start = performance.now()
 
 		for (let i = 0; i < 1000; i++) {
-			cache.set(`buf:${i}`, { data: buffer, metadata: { size: 1024, format: 'webp' } })
+			cache.set(`buf:${i}`, {
+				data: buffer,
+				metadata: { size: 1024, format: 'webp' },
+			})
 		}
 		for (let i = 0; i < 1000; i++) {
 			cache.get(`buf:${i}`)
@@ -60,7 +66,10 @@ describe('memory Cache Performance', () => {
 		const start = performance.now()
 
 		for (let i = 0; i < 100; i++) {
-			cache.set(`large:${i}`, { data: buffer, metadata: { size: buffer.length } })
+			cache.set(`large:${i}`, {
+				data: buffer,
+				metadata: { size: buffer.length },
+			})
 		}
 		for (let i = 0; i < 100; i++) {
 			cache.get(`large:${i}`)

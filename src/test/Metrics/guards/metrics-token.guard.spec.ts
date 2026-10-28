@@ -53,7 +53,9 @@ describe('metricsTokenGuard', () => {
 	})
 
 	it('should reject a non-string header value', () => {
-		expect(() => createGuard('scrape-token').canActivate(createContext({ authorization: ['Bearer scrape-token'] })))
+		expect(() => createGuard('scrape-token').canActivate(createContext({
+			authorization: ['Bearer scrape-token'],
+		})))
 			.toThrow(UnauthorizedException)
 	})
 

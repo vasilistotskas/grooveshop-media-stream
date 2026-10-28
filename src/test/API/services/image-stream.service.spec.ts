@@ -69,17 +69,33 @@ function createMetadata(overrides: Partial<ResourceMetaData> = {}): ResourceMeta
 }
 
 function createProcessedImage(content: string, overrides: Partial<ResourceMetaData> = {}): ProcessedImage {
-	return { data: Buffer.from(content), metadata: createMetadata(overrides) }
+	return {
+		data: Buffer.from(content),
+		metadata: createMetadata(overrides),
+	}
 }
 
 function createLog(): ImageRequestLog {
-	return { correlationId: 'test-correlation-id', startedAt: 0n, path: 'media/acme/uploads/x.png/200/200/contain/entropy/transparent/0/80.webp', admissionWaitMs: 0 }
+	return {
+		correlationId: 'test-correlation-id',
+		startedAt: 0n,
+		path: 'media/acme/uploads/x.png/200/200/contain/entropy/transparent/0/80.webp',
+		admissionWaitMs: 0,
+	}
 }
 
 /** Run `fn` inside a request context carrying `log`, the way ImageRequestLogMiddleware sets it up. */
 function withLog<T>(log: ImageRequestLog, fn: () => Promise<T>): Promise<T> {
 	return requestContextStorage.run(
-		{ correlationId: log.correlationId, timestamp: 0, clientIp: '127.0.0.1', method: 'GET', url: '/', startTime: 0n, imageRequest: log },
+		{
+			correlationId: log.correlationId,
+			timestamp: 0,
+			clientIp: '127.0.0.1',
+			method: 'GET',
+			url: '/',
+			startTime: 0n,
+			imageRequest: log,
+		},
 		fn,
 	)
 }
@@ -408,7 +424,10 @@ describe('imageStreamService', () => {
 		})
 
 		it('propagates capacity errors (overloaded, timed out) instead of serving the default image', async () => {
-			for (const error of [new ProcessingOverloadedError(2), new ProcessingTimeoutError()]) {
+			for (const error of [
+				new ProcessingOverloadedError(2),
+				new ProcessingTimeoutError(),
+			]) {
 				const res = createMockResponse()
 				cacheOp.execute.mockRejectedValue(error)
 
@@ -421,7 +440,10 @@ describe('imageStreamService', () => {
 		})
 
 		it('propagates a capacity error (overload or timeout) raised while producing the fallback itself', async () => {
-			for (const error of [new ProcessingOverloadedError(2), new ProcessingTimeoutError()]) {
+			for (const error of [
+				new ProcessingOverloadedError(2),
+				new ProcessingTimeoutError(),
+			]) {
 				const res = createMockResponse()
 				cacheOp.setup.mockRejectedValue(new Error('Setup failed'))
 				cacheOp.optimizeAndServeDefaultImage.mockRejectedValue(error)
@@ -451,7 +473,12 @@ describe('imageStreamService', () => {
 
 			await withLog(log, () => service.processAndStream(createContext(), createRequest(), createMockResponse()))
 
-			expect(log).toMatchObject({ cache: 'memory', outcome: 'ok', outputFormat: 'avif', outputBytes: cached.data.length })
+			expect(log).toMatchObject({
+				cache: 'memory',
+				outcome: 'ok',
+				outputFormat: 'avif',
+				outputBytes: cached.data.length,
+			})
 			expect(log.error).toBeUndefined()
 		})
 
@@ -483,7 +510,12 @@ describe('imageStreamService', () => {
 
 			await withLog(log, () => service.processAndStream(createContext(), createRequest(), createMockResponse()))
 
-			expect(log).toMatchObject({ cache: 'miss', outcome: 'ok', outputFormat: 'png', outputBytes: processed.data.length })
+			expect(log).toMatchObject({
+				cache: 'miss',
+				outcome: 'ok',
+				outputFormat: 'png',
+				outputBytes: processed.data.length,
+			})
 			expect(log.coalesced).toBeUndefined()
 		})
 

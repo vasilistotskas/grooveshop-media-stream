@@ -31,7 +31,9 @@ export function parseEnvValue(
 			// PROCESSING_CPU_CORES=1.5 survive; invalid input falls back to the
 			// schema default instead of propagating NaN into the config tree.
 			const parsed = Number.parseFloat(rawValue)
-			return Number.isNaN(parsed) ? schema.default : parsed
+			return Number.isNaN(parsed)
+				? schema.default
+				: parsed
 		}
 		case 'boolean':
 			return typeof rawValue === 'string'
@@ -103,7 +105,11 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	// Comma-separated PLATFORM origins (scheme://host[:port]). Store origins are
 	// never listed here — they are admitted per request from the dynamic
 	// tenant-domain allowlist (see buildCorsOrigin). '*' is a dev-only default.
-	'server.cors.origin': { env: 'CORS_ORIGIN', default: ['*'], type: 'array' },
+	'server.cors.origin': {
+		env: 'CORS_ORIGIN',
+		default: ['*'],
+		type: 'array',
+	},
 	'server.cors.methods': { env: 'CORS_METHODS', default: 'GET', type: 'string' },
 	'server.cors.maxAge': { env: 'CORS_MAX_AGE', default: 86400, type: 'number' },
 

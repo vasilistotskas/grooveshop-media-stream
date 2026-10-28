@@ -101,12 +101,17 @@ export class RedisHealthIndicator extends BaseHealthIndicator {
 				},
 			}
 
-			this.lastHealthCheck = { result, timestamp: Date.now() }
+			this.lastHealthCheck = {
+				result,
+				timestamp: Date.now(),
+			}
 			return result
 		}
 		catch (error: unknown) {
 			const responseTime = Date.now() - startTime
-			CorrelatedLogger.error(`Redis health check failed: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, RedisHealthIndicator.name)
+			CorrelatedLogger.error(`Redis health check failed: ${errorMessage(error)}`, error instanceof Error
+				? error.stack
+				: undefined, RedisHealthIndicator.name)
 
 			return {
 				[this.key]: {

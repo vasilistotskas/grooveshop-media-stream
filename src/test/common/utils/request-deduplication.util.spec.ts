@@ -37,7 +37,10 @@ describe('requestDeduplicator', () => {
 			return 'r'
 		}
 
-		await Promise.all([dedup.execute('a', work), dedup.execute('b', work)])
+		await Promise.all([
+			dedup.execute('a', work),
+			dedup.execute('b', work),
+		])
 
 		expect(calls).toBe(2)
 	})

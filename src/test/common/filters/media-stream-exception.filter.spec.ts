@@ -268,10 +268,23 @@ describe('mediaStreamExceptionFilter', () => {
 
 	describe('image request log', () => {
 		function catchFor(exception: Error): ImageRequestLog {
-			const log: ImageRequestLog = { correlationId: 'c', startedAt: 0n, path: 'p', admissionWaitMs: 0 }
+			const log: ImageRequestLog = {
+				correlationId: 'c',
+				startedAt: 0n,
+				path: 'p',
+				admissionWaitMs: 0,
+			}
 			mockResponse.setHeader = vi.fn()
 			requestContextStorage.run(
-				{ correlationId: 'c', timestamp: 0, clientIp: '127.0.0.1', method: 'GET', url: '/', startTime: 0n, imageRequest: log },
+				{
+					correlationId: 'c',
+					timestamp: 0,
+					clientIp: '127.0.0.1',
+					method: 'GET',
+					url: '/',
+					startTime: 0n,
+					imageRequest: log,
+				},
 				() => filter.catch(exception, mockArgumentsHost),
 			)
 			return log

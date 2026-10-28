@@ -21,7 +21,12 @@ const CIRCUIT_BREAKER_KEY = 'circuit_breaker:http_client'
 const CIRCUIT_BREAKER_STATE_TTL_SECONDS = 300
 /** Exponential moving average smoothing factor for the response-time stat. */
 const EMA_ALPHA = 0.1
-const RETRYABLE_ERRNO_CODES = new Set(['ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'ENOTFOUND'])
+const RETRYABLE_ERRNO_CODES = new Set([
+	'ECONNRESET',
+	'ETIMEDOUT',
+	'ECONNREFUSED',
+	'ENOTFOUND',
+])
 const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504])
 
 interface HttpErrorLike {
@@ -200,7 +205,9 @@ export class HttpClientService implements OnModuleInit, OnModuleDestroy {
 							// caller logs at the level it deserves (a missing image
 							// is a WARN in FetchResourceResponseJob).
 							if (upstreamFailure) {
-								CorrelatedLogger.error(`HTTP request failed: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, HttpClientService.name)
+								CorrelatedLogger.error(`HTTP request failed: ${errorMessage(error)}`, error instanceof Error
+									? error.stack
+									: undefined, HttpClientService.name)
 							}
 							else {
 								CorrelatedLogger.debug(`HTTP request answered ${errorMessage(error)}`, HttpClientService.name)

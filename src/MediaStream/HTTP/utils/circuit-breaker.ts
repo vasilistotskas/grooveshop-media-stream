@@ -136,7 +136,10 @@ export class CircuitBreaker {
 	recordSuccess(): void {
 		this.successCount++
 		this.totalRequests++
-		this.requestWindow.push({ timestamp: Date.now(), success: true })
+		this.requestWindow.push({
+			timestamp: Date.now(),
+			success: true,
+		})
 		this.pruneWindow()
 
 		if (this.state === CircuitState.HALF_OPEN) {
@@ -152,7 +155,10 @@ export class CircuitBreaker {
 		this.failureCount++
 		this.totalRequests++
 		this.windowFailureCount++
-		this.requestWindow.push({ timestamp: Date.now(), success: false })
+		this.requestWindow.push({
+			timestamp: Date.now(),
+			success: false,
+		})
 		this.pruneWindow()
 
 		if (this.state === CircuitState.HALF_OPEN) {

@@ -52,7 +52,13 @@ function resolveLogLevels(): LogLevel[] {
 		case 'debug':
 			return ['error', 'warn', 'log', 'debug']
 		case 'verbose':
-			return ['error', 'warn', 'log', 'debug', 'verbose']
+			return [
+				'error',
+				'warn',
+				'log',
+				'debug',
+				'verbose',
+			]
 		case 'info':
 		case 'log':
 		default:
@@ -77,7 +83,11 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<void> {
 			// structured event (CorrelatedLogger.event) at the top level of the
 			// line, next to `level` and `message`, the flat layout the Django
 			// and gateway logs use, so they arrive as `log.<field>`.
-			logger: new ConsoleLogger({ logLevels: resolveLogLevels(), json: isProduction(), flattenParams: true }),
+			logger: new ConsoleLogger({
+				logLevels: resolveLogLevels(),
+				json: isProduction(),
+				flattenParams: true,
+			}),
 		})
 
 		// A hop count, never `true`: trusting the whole X-Forwarded-For chain
@@ -154,7 +164,9 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<void> {
 		logger.log(`Application is running on: http://${serverConfig.host}:${serverConfig.port}`)
 	}
 	catch (error: unknown) {
-		logger.error(`Failed to start application: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined)
+		logger.error(`Failed to start application: ${errorMessage(error)}`, error instanceof Error
+			? error.stack
+			: undefined)
 		if (opts.exitProcess) {
 			process.exit(1)
 		}
@@ -171,7 +183,9 @@ if (!isTest()) {
 			await bootstrap()
 		}
 		catch (error) {
-			logger.error(`Unhandled error during bootstrap: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined)
+			logger.error(`Unhandled error during bootstrap: ${errorMessage(error)}`, error instanceof Error
+				? error.stack
+				: undefined)
 			process.exit(1)
 		}
 	})()

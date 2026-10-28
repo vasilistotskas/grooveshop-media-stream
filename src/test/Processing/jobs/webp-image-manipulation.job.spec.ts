@@ -16,7 +16,16 @@ vi.mock('sharp', () => ({
 const SHARP_INPUT_OPTIONS = { limitInputPixels: 268402689, sequentialRead: true }
 const TRANSPARENT = { r: 0, g: 0, b: 0, alpha: 0 }
 /** What the shrink-on-load working copy resolves to (raw pixels + geometry). */
-const WORKING_COPY = { data: Buffer.from('raw-working-copy'), info: { width: 1024, height: 768, channels: 3, size: 1024 * 768 * 3, format: 'raw' } }
+const WORKING_COPY = {
+	data: Buffer.from('raw-working-copy'),
+	info: {
+		width: 1024,
+		height: 768,
+		channels: 3,
+		size: 1024 * 768 * 3,
+		format: 'raw',
+	},
+}
 
 describe('webpImageManipulationJob', () => {
 	let job: WebpImageManipulationJob
@@ -62,7 +71,10 @@ describe('webpImageManipulationJob', () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks()
-		mockManipulation.toBuffer.mockResolvedValue({ data: testBuffer, info: { size: 1000, format: 'webp' } })
+		mockManipulation.toBuffer.mockResolvedValue({
+			data: testBuffer,
+			info: { size: 1000, format: 'webp' },
+		})
 		mockManipulation.metadata.mockResolvedValue({ width: 1200, height: 900 })
 		;(sharp as any).mockReturnValue(mockManipulation)
 		job = new WebpImageManipulationJob(createConfigServiceMock({ 'processing.timeoutSeconds': 20 }))
@@ -157,7 +169,10 @@ describe('webpImageManipulationJob', () => {
 		})
 
 		it('encodes AVIF for any source size: the decode cost is the trim, not the encoder', async () => {
-			mockManipulation.toBuffer.mockResolvedValue({ data: testBuffer, info: { size: 1000, format: 'heif' } })
+			mockManipulation.toBuffer.mockResolvedValue({
+				data: testBuffer,
+				info: { size: 1000, format: 'heif' },
+			})
 
 			const result = await job.handle('huge-12mp.jpg', options({ format: SupportedResizeFormats.avif, trimThreshold: 0 }))
 
@@ -186,7 +201,12 @@ describe('webpImageManipulationJob', () => {
 			describe('keeps the requested aspect for a source smaller than the request', () => {
 				async function resizeBox(source: Record<string, number>, overrides: Partial<ResizeOptions>): Promise<unknown> {
 					mockManipulation.metadata.mockResolvedValue(source)
-					await job.handle('small.jpg', options({ trimThreshold: 0, width: 1040, height: 684, ...overrides }))
+					await job.handle('small.jpg', options({
+						trimThreshold: 0,
+						width: 1040,
+						height: 684,
+						...overrides,
+					}))
 					return mockManipulation.resize.mock.calls.at(-1)![0]
 				}
 
@@ -279,7 +299,12 @@ describe('webpImageManipulationJob', () => {
 				mockManipulation.metadata.mockResolvedValue({ width: 2400, height: 600, orientation: 6 })
 				primeTrimmedRun()
 
-				await job.handle('rotated.jpg', options({ width: 1000, height: 0, trimThreshold: 0, fit: FitOptions.inside }))
+				await job.handle('rotated.jpg', options({
+					width: 1000,
+					height: 0,
+					trimThreshold: 0,
+					fit: FitOptions.inside,
+				}))
 
 				expect(mockManipulation.sharpen).not.toHaveBeenCalled()
 			})
@@ -299,11 +324,18 @@ describe('webpImageManipulationJob', () => {
 				await job.handle('test.webp', options({ trimThreshold: 10 }))
 
 				// Pass 1: the source pipeline is shrunk (covering twice the target, never enlarged) to raw pixels...
-				expect(mockManipulation.resize).toHaveBeenNthCalledWith(1, { width: 1600, height: 1200, fit: 'outside', withoutEnlargement: true })
+				expect(mockManipulation.resize).toHaveBeenNthCalledWith(1, {
+					width: 1600,
+					height: 1200,
+					fit: 'outside',
+					withoutEnlargement: true,
+				})
 				expect(mockManipulation.raw).toHaveBeenCalledTimes(1)
 				expect(mockManipulation.toBuffer).toHaveBeenNthCalledWith(1, { resolveWithObject: true })
 				// ...pass 2: a second pipeline over those pixels trims, then resizes to the target.
-				expect(sharp).toHaveBeenNthCalledWith(2, WORKING_COPY.data, { raw: { width: 1024, height: 768, channels: 3 } })
+				expect(sharp).toHaveBeenNthCalledWith(2, WORKING_COPY.data, {
+					raw: { width: 1024, height: 768, channels: 3 },
+				})
 				expect(mockManipulation.trim).toHaveBeenCalledWith({ background: TRANSPARENT, threshold: 10 })
 				expect(mockManipulation.resize).toHaveBeenNthCalledWith(2, expect.objectContaining({ width: 800, height: 600 }))
 				expect(mockManipulation.trim).toHaveBeenCalledTimes(1)
@@ -328,7 +360,12 @@ describe('webpImageManipulationJob', () => {
 				;(sharp as any).mockReturnValue(mockManipulation)
 				primeTrimmedRun()
 				await job.handle('a.jpg', options({ width: 300, height: 0 }))
-				expect(mockManipulation.resize).toHaveBeenNthCalledWith(1, { width: TRIM_WORKING_SIZE, height: undefined, fit: 'outside', withoutEnlargement: true })
+				expect(mockManipulation.resize).toHaveBeenNthCalledWith(1, {
+					width: TRIM_WORKING_SIZE,
+					height: undefined,
+					fit: 'outside',
+					withoutEnlargement: true,
+				})
 			})
 
 			it('is skipped entirely (one pipeline, shrink-on-load intact) when the threshold is unset', async () => {
@@ -388,17 +425,30 @@ describe('webpImageManipulationJob', () => {
 				expect(mockManipulation.autoOrient).toHaveBeenCalledTimes(1)
 				expect(mockManipulation.trim).toHaveBeenCalledWith({ background: TRANSPARENT, threshold: 5 })
 				expect(mockManipulation.resize).toHaveBeenLastCalledWith(expect.objectContaining({ width: 800, height: 600 }))
-				expect(mockManipulation.png).toHaveBeenCalledWith({ quality: 80, adaptiveFiltering: true, palette: true, compressionLevel: 6 })
+				expect(mockManipulation.png).toHaveBeenCalledWith({
+					quality: 80,
+					adaptiveFiltering: true,
+					palette: true,
+					compressionLevel: 6,
+				})
 				expect(result.format).toBe('png')
 			})
 
 			it('does not sniff the source: a non-SVG source with SVG output requested takes the same pipeline', async () => {
-				mockManipulation.toBuffer.mockResolvedValue({ data: testBuffer, info: { size: 1000, format: 'png' } })
+				mockManipulation.toBuffer.mockResolvedValue({
+					data: testBuffer,
+					info: { size: 1000, format: 'png' },
+				})
 
 				const result = await job.handle('test-does-not-exist-on-disk.jpg', options({ format: SupportedResizeFormats.svg, trimThreshold: 0 }))
 
 				expect(sharp).toHaveBeenCalledTimes(1)
-				expect(mockManipulation.png).toHaveBeenCalledWith({ quality: 80, adaptiveFiltering: true, palette: true, compressionLevel: 6 })
+				expect(mockManipulation.png).toHaveBeenCalledWith({
+					quality: 80,
+					adaptiveFiltering: true,
+					palette: true,
+					compressionLevel: 6,
+				})
 				expect(mockManipulation.destroy).toHaveBeenCalledTimes(1)
 				expect(result.format).toBe('png')
 			})

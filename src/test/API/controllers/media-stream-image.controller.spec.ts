@@ -456,9 +456,18 @@ describe('mediaStreamImageController', () => {
 		const PATH = '/media_stream-image/media/acme/uploads/test/image.webp/100/100/contain/entropy/transparent/5/80.webp'
 
 		it.each([
-			['a validation 400', new BadRequestException('Invalid width')],
-			['a rate-limit 429', new HttpException('Rate limit exceeded', HttpStatus.TOO_MANY_REQUESTS)],
-			['an unexpected 500', new Error('boom')],
+			[
+				'a validation 400',
+				new BadRequestException('Invalid width'),
+			],
+			[
+				'a rate-limit 429',
+				new HttpException('Rate limit exceeded', HttpStatus.TOO_MANY_REQUESTS),
+			],
+			[
+				'an unexpected 500',
+				new Error('boom'),
+			],
 		])('writes no line of its own for %s, and still counts it', async (_label, thrown) => {
 			const error = vi.spyOn(CorrelatedLogger, 'error')
 			const warn = vi.spyOn(CorrelatedLogger, 'warn')
@@ -483,11 +492,24 @@ describe('mediaStreamImageController', () => {
 
 	describe('request log record', () => {
 		function inRequest(log: ImageRequestLog, fn: () => Promise<void>): Promise<void> {
-			return requestContextStorage.run({ correlationId: 'c', timestamp: 0, clientIp: '127.0.0.1', method: 'GET', url: '/', startTime: 0n, imageRequest: log }, fn)
+			return requestContextStorage.run({
+				correlationId: 'c',
+				timestamp: 0,
+				clientIp: '127.0.0.1',
+				method: 'GET',
+				url: '/',
+				startTime: 0n,
+				imageRequest: log,
+			}, fn)
 		}
 
 		function newLog(): ImageRequestLog {
-			return { correlationId: 'c', startedAt: 0n, path: 'raw', admissionWaitMs: 0 }
+			return {
+				correlationId: 'c',
+				startedAt: 0n,
+				path: 'raw',
+				admissionWaitMs: 0,
+			}
 		}
 
 		it('describes the matched route: source, schema, decoded path and resize options', async () => {
@@ -518,7 +540,12 @@ describe('mediaStreamImageController', () => {
 
 			await expect(inRequest(log, () => controller.handleImageRequest({ path } as any, mockResponse))).rejects.toThrow('Invalid parameters')
 
-			expect(log).toMatchObject({ source: 'STATIC_IMAGES', schema: 'public', height: 100, format: 'webp' })
+			expect(log).toMatchObject({
+				source: 'STATIC_IMAGES',
+				schema: 'public',
+				height: 100,
+				format: 'webp',
+			})
 			expect(log.width).toBeUndefined()
 		})
 	})
