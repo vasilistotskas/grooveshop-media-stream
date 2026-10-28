@@ -1,7 +1,6 @@
 ---
 name: cache-trace
 description: Reference for tracing requests through the multi-layer cache (Memory → Redis, plus file storage) when debugging cache misses, stale entries, or warming behavior
-disable-model-invocation: false
 ---
 
 Use when debugging cache hit/miss behavior, stale entries, warming, or eviction in grooveshop-media-stream.
@@ -49,7 +48,7 @@ Examples: accessCount=5 → multiplier 1.5 → TTL = base × 1.5. accessCount≥
 
 ## Common Debug Questions
 
-- **Cache miss for an image that was just fetched**: check Memory TTL/maxKeys (LRU eviction), then check Redis with `redis-cli -n 0 KEYS "image:*"`.
+- **Cache miss for an image that was just fetched**: check Memory TTL/maxKeys (LRU eviction), then check Redis with `redis-cli -n "${REDIS_DB:-0}" --scan --pattern 'image:*' | head`.
 - **Stale entry served**: TTL preserved during backfill — verify the source layer's TTL is correct, not the destination's.
 - **Warmer not warming a known-popular image**: confirm `accessCount >= 5` in its `ResourceMetaData` (`.rsm` JSON file). Access count is bumped on every served image (`loadResource` and a fresh `persist` in `CacheImageResourceOperation`) by `AccessCountTracker` (batched; flushed every 30 s / 1000 pending / shutdown).
 - **Backfill blocking requests**: search for any `await this.backfillLayers(` — there should be none in the request path.

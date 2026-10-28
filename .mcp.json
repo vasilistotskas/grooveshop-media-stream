@@ -1,9 +1,5 @@
 {
   "mcpServers": {
-    "github": {
-      "type": "http",
-      "url": "https://api.githubcopilot.com/mcp/"
-    },
     "redis": {
       "command": "uvx",
       "args": [
@@ -11,7 +7,7 @@
         "redis-mcp-server==0.5.1",
         "redis-mcp-server",
         "--url",
-        "${REDIS_URL:-redis://localhost:6379/0}"
+        "${REDIS_URL:-redis://127.0.0.1:6379/0}"
       ]
     }
   }

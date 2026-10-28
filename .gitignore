@@ -51,6 +51,7 @@ test-cache
 .claude/settings.local.json
 .claude/.typecheck-pending
 .claude/agent-memory/
+.claude/worktrees/
 .cursor
 .cursorrules
 .windsurfrules
