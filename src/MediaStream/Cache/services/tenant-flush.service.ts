@@ -117,11 +117,18 @@ export class TenantFlushService implements OnModuleInit {
 		}
 
 		CorrelatedLogger.log(
-			`Cache flush complete for ${namespace}: ${local.filesRemoved} file pair(s) removed${local.diskErrors.length ? `, ${local.diskErrors.length} error(s)` : ''}, broadcast reached ${broadcastReceivers} subscriber(s)`,
+			`Cache flush complete for ${namespace}: ${local.filesRemoved} file pair(s) removed${local.diskErrors.length
+				? `, ${local.diskErrors.length} error(s)`
+				: ''}, broadcast reached ${broadcastReceivers} subscriber(s)`,
 			TenantFlushService.name,
 		)
 
-		return { namespace, filesRemoved: local.filesRemoved, diskErrors: local.diskErrors, broadcastReceivers }
+		return {
+			namespace,
+			filesRemoved: local.filesRemoved,
+			diskErrors: local.diskErrors,
+			broadcastReceivers,
+		}
 	}
 
 	/** The tenant feed, then disk, then each layered tier bottom-up, advancing the epoch before each; never stops at a failing step. */
@@ -198,7 +205,9 @@ export class TenantFlushService implements OnModuleInit {
 		}
 		if (local.failures.length === 0) {
 			CorrelatedLogger.log(
-				`Peer flush for ${namespace}: ${local.filesRemoved} file pair(s) removed${local.diskErrors.length ? `, ${local.diskErrors.length} error(s)` : ''}`,
+				`Peer flush for ${namespace}: ${local.filesRemoved} file pair(s) removed${local.diskErrors.length
+					? `, ${local.diskErrors.length} error(s)`
+					: ''}`,
 				TenantFlushService.name,
 			)
 		}

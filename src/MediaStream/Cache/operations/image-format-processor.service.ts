@@ -73,19 +73,28 @@ export class ImageFormatProcessor {
 
 		if (!needsResizing) {
 			const data = Buffer.from(sanitized, 'utf8')
-			return { data, metadata: this.buildMetadata(String(data.length), SupportedResizeFormats.svg, tenantSchema) }
+			return {
+				data,
+				metadata: this.buildMetadata(String(data.length), SupportedResizeFormats.svg, tenantSchema),
+			}
 		}
 
 		// Sharp reads by path — overwrite the temp file with the sanitised markup.
 		await writeFile(tempPath, sanitized, 'utf8')
 		CorrelatedLogger.debug('SVG needs resizing, sanitized and converting to raster via Sharp', ImageFormatProcessor.name)
 		const result = await this.runJob(tempPath, resizeOptions)
-		return { data: result.buffer, metadata: this.buildMetadata(result.size, result.format, tenantSchema) }
+		return {
+			data: result.buffer,
+			metadata: this.buildMetadata(result.size, result.format, tenantSchema),
+		}
 	}
 
 	async processRaster(tempPath: string, resizeOptions: ResizeOptions, tenantSchema: string = PUBLIC_TENANT_SCHEMA): Promise<ProcessedImage> {
 		const result = await this.runJob(tempPath, resizeOptions)
-		return { data: result.buffer, metadata: this.buildMetadata(result.size, result.format, tenantSchema) }
+		return {
+			data: result.buffer,
+			metadata: this.buildMetadata(result.size, result.format, tenantSchema),
+		}
 	}
 
 	/**

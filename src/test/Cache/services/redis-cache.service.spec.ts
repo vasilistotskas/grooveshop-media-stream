@@ -88,7 +88,12 @@ describe('redisCacheService', () => {
 
 	async function createService(overrides: Record<string, unknown> = {}): Promise<RedisCacheService> {
 		const created = new RedisCacheService(
-			createConfigServiceMock({ 'cache.redis': { ...REDIS_CONFIG, ...overrides } }),
+			createConfigServiceMock({
+				'cache.redis': {
+					...REDIS_CONFIG,
+					...overrides,
+				},
+			}),
 			metricsService,
 		)
 		await created.onModuleInit()
@@ -155,7 +160,10 @@ describe('redisCacheService', () => {
 					status: 'reconnecting',
 					connect: vi.fn().mockRejectedValue(new Error('ECONNREFUSED')),
 					on: vi.fn(),
-					duplicate: vi.fn(() => ({ on: vi.fn(), connect: vi.fn().mockRejectedValue(new Error('ECONNREFUSED')) })),
+					duplicate: vi.fn(() => ({
+						on: vi.fn(),
+						connect: vi.fn().mockRejectedValue(new Error('ECONNREFUSED')),
+					})),
 				}
 				Object.assign(this, instance)
 				return instance
@@ -290,7 +298,9 @@ describe('redisCacheService', () => {
 		})
 
 		it('should decode the binary envelope without copying the payload', async () => {
-			const meta = Buffer.from(JSON.stringify({ metadata: { format: 'webp' } }), 'utf8')
+			const meta = Buffer.from(JSON.stringify({
+				metadata: { format: 'webp' },
+			}), 'utf8')
 			const image = Buffer.from([1, 2, 3, 4])
 			const header = Buffer.alloc(5)
 			header[0] = 0x00
@@ -342,12 +352,17 @@ describe('redisCacheService', () => {
 
 		it('should use the binary envelope for values carrying a Buffer', async () => {
 			const data = Buffer.from([9, 8, 7])
-			await service.set('image:acme:x', { data, metadata: { format: 'png' } }, 30)
+			await service.set('image:acme:x', {
+				data,
+				metadata: { format: 'png' },
+			}, 30)
 
 			const stored = redis.set.mock.calls[0][1] as Buffer
 			expect(stored[0]).toBe(0x00)
 			const metaLength = stored.readUInt32BE(1)
-			expect(JSON.parse(stored.toString('utf8', 5, 5 + metaLength))).toEqual({ metadata: { format: 'png' } })
+			expect(JSON.parse(stored.toString('utf8', 5, 5 + metaLength))).toEqual({
+				metadata: { format: 'png' },
+			})
 			expect(stored.subarray(5 + metaLength).equals(data)).toBe(true)
 		})
 
@@ -391,8 +406,14 @@ describe('redisCacheService', () => {
 	describe('clear', () => {
 		it('should SCAN image keys and DEL each batch', async () => {
 			redis.scan
-				.mockResolvedValueOnce(['5', ['image:acme:a', 'image:acme:b']])
-				.mockResolvedValueOnce(['0', ['image:public:c']])
+				.mockResolvedValueOnce([
+					'5',
+					['image:acme:a', 'image:acme:b'],
+				])
+				.mockResolvedValueOnce([
+					'0',
+					['image:public:c'],
+				])
 
 			await service.clear()
 
@@ -440,7 +461,14 @@ describe('redisCacheService', () => {
 
 			const stats = await service.getStats()
 
-			expect(stats).toEqual({ hits: 1, misses: 1, keys: 42, ksize: 0, vsize: 2048, hitRate: 0.5 })
+			expect(stats).toEqual({
+				hits: 1,
+				misses: 1,
+				keys: 42,
+				ksize: 0,
+				vsize: 2048,
+				hitRate: 0.5,
+			})
 			expect(metricsService.updateCacheHitRatio).toHaveBeenCalledWith('redis', 0.5)
 		})
 
@@ -482,7 +510,12 @@ describe('redisCacheService', () => {
 
 			expect(service.getConnectionStatus()).toEqual({
 				connected: true,
-				stats: { hits: 0, misses: 1, operations: 1, errors: 0 },
+				stats: {
+					hits: 0,
+					misses: 1,
+					operations: 1,
+					errors: 0,
+				},
 			})
 		})
 

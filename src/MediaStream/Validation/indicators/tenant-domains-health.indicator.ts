@@ -37,7 +37,9 @@ export class TenantDomainsHealthIndicator extends BaseHealthIndicator {
 		const configured = this.tenantDomainsService.isEnabled()
 		const domainCount = this.tenantDomainsService.getDomains().size
 		const lastSuccessfulRefreshAt = this.tenantDomainsService.getLastSuccessfulRefresh()
-		const lastSuccessfulRefresh = lastSuccessfulRefreshAt ? new Date(lastSuccessfulRefreshAt).toISOString() : null
+		const lastSuccessfulRefresh = lastSuccessfulRefreshAt
+			? new Date(lastSuccessfulRefreshAt).toISOString()
+			: null
 
 		if (!configured) {
 			return this.createHealthyResult({

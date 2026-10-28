@@ -29,7 +29,9 @@ describe('metricsController', () => {
 			// this isolated unit module — overriding it avoids importing ConfigModule purely for
 			// the guard, while still exercising the controller's own logic.
 			.overrideGuard(MetricsTokenGuard)
-			.useValue({ canActivate: () => true })
+			.useValue({
+				canActivate: () => true,
+			})
 			.compile()
 
 		controller = module.get<MetricsController>(MetricsController)

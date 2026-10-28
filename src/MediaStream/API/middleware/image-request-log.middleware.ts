@@ -20,7 +20,9 @@ const OUTPUT_FORMATS: ReadonlySet<string> = new Set(Object.values(SupportedResiz
 const ROUTE_PREFIX = `/${IMAGE}/`
 
 export function truncateForLog(value: string, maxLength: number): string {
-	return value.length > maxLength ? value.slice(0, maxLength) : value
+	return value.length > maxLength
+		? value.slice(0, maxLength)
+		: value
 }
 
 /** The outcome of a request nothing on the image path classified: a guard, the router or the exception filter answered. */
@@ -31,7 +33,9 @@ function outcomeForStatus(status: number): ImageRequestOutcome {
 	if (status === 429) {
 		return 'rate_limited'
 	}
-	return status < 500 ? 'invalid' : 'error'
+	return status < 500
+		? 'invalid'
+		: 'error'
 }
 
 /**
@@ -62,7 +66,9 @@ export class ImageRequestLogMiddleware implements NestMiddleware {
 			correlationId: context?.correlationId ?? '',
 			startedAt: process.hrtime.bigint(),
 			// Raw until the controller replaces it with the decoded form.
-			path: truncateForLog(pathname.startsWith(ROUTE_PREFIX) ? pathname.slice(ROUTE_PREFIX.length) : pathname, MAX_LOGGED_PATH_LENGTH),
+			path: truncateForLog(pathname.startsWith(ROUTE_PREFIX)
+				? pathname.slice(ROUTE_PREFIX.length)
+				: pathname, MAX_LOGGED_PATH_LENGTH),
 			admissionWaitMs: 0,
 		}
 		if (context) {
@@ -75,11 +81,15 @@ export class ImageRequestLogMiddleware implements NestMiddleware {
 
 	private complete(record: ImageRequestLog, res: Response): void {
 		try {
-			const outcome = res.writableFinished ? record.outcome ?? outcomeForStatus(res.statusCode) : 'aborted'
+			const outcome = res.writableFinished
+				? record.outcome ?? outcomeForStatus(res.statusCode)
+				: 'aborted'
 			const durationMs = Number(process.hrtime.bigint() - record.startedAt) / 1e6
 
 			CorrelatedLogger.event(
-				outcome === 'rejected' ? 'warn' : 'log',
+				outcome === 'rejected'
+					? 'warn'
+					: 'log',
 				`image ${outcome} ${res.statusCode} ${Math.round(durationMs)}ms`,
 				{
 					correlation_id: record.correlationId,
@@ -107,12 +117,16 @@ export class ImageRequestLogMiddleware implements NestMiddleware {
 				IMAGE_REQUEST_LOG_CONTEXT,
 			)
 
-			const format = record.format !== undefined && OUTPUT_FORMATS.has(record.format) ? record.format : 'none'
+			const format = record.format !== undefined && OUTPUT_FORMATS.has(record.format)
+				? record.format
+				: 'none'
 			this.metricsService.recordImageRequest(outcome, format, record.cache ?? 'none', durationMs / 1000)
 		}
 		catch (error: unknown) {
 			// A throw in a `close` listener would be an uncaught exception.
-			CorrelatedLogger.error(`Failed to record the image request: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, ImageRequestLogMiddleware.name)
+			CorrelatedLogger.error(`Failed to record the image request: ${errorMessage(error)}`, error instanceof Error
+				? error.stack
+				: undefined, ImageRequestLogMiddleware.name)
 		}
 	}
 }

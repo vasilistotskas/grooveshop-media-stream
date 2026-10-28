@@ -111,7 +111,9 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 
 			CorrelatedLogger.error(
 				`Rate limit check failed, allowing request: ${errorMessage(error)}`,
-				error instanceof Error ? error.stack : undefined,
+				error instanceof Error
+					? error.stack
+					: undefined,
 				AdaptiveRateLimitGuard.name,
 			)
 		}
@@ -189,7 +191,9 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 	/** An entry matches itself and every subdomain; a leading `*.` is accepted and ignored. */
 	private matchesDomain(hostname: string): boolean {
 		return this.whitelistedDomains.some((whitelisted) => {
-			const domain = whitelisted.startsWith('*.') ? whitelisted.slice(2) : whitelisted
+			const domain = whitelisted.startsWith('*.')
+				? whitelisted.slice(2)
+				: whitelisted
 			return hostname === domain || hostname.endsWith(`.${domain}`)
 		})
 	}
@@ -223,7 +227,9 @@ export class AdaptiveRateLimitGuard implements CanActivate {
 
 	private headerValue(request: GuardRequest, name: string): string {
 		const value = request.headers[name]
-		return Array.isArray(value) ? value[0] ?? '' : value ?? ''
+		return Array.isArray(value)
+			? value[0] ?? ''
+			: value ?? ''
 	}
 
 	private pathname(request: GuardRequest): string {

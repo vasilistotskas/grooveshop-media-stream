@@ -95,7 +95,9 @@ describe('fetchResourceResponseJob', () => {
 		] as const)('logs an upstream %i at %s', async (status, level) => {
 			const warn = vi.spyOn(CorrelatedLogger, 'warn').mockImplementation(() => {})
 			const error = vi.spyOn(CorrelatedLogger, 'error').mockImplementation(() => {})
-			const config = { headers: new AxiosHeaders() }
+			const config = {
+				headers: new AxiosHeaders(),
+			}
 			httpClientService.request.mockRejectedValue(new AxiosError('upstream', 'ERR_BAD_RESPONSE', config, null, {
 				status,
 				statusText: '',
@@ -104,10 +106,17 @@ describe('fetchResourceResponseJob', () => {
 				data: null,
 			} as any))
 
-			await job.handle(new CacheImageRequest({ resourceTarget: 'http://example.com/image.jpg', resizeOptions: new ResizeOptions() }))
+			await job.handle(new CacheImageRequest({
+				resourceTarget: 'http://example.com/image.jpg',
+				resizeOptions: new ResizeOptions(),
+			}))
 
-			expect(level === 'warn' ? warn : error).toHaveBeenCalledTimes(1)
-			expect(level === 'warn' ? error : warn).not.toHaveBeenCalled()
+			expect(level === 'warn'
+				? warn
+				: error).toHaveBeenCalledTimes(1)
+			expect(level === 'warn'
+				? error
+				: warn).not.toHaveBeenCalled()
 			warn.mockRestore()
 			error.mockRestore()
 		})

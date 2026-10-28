@@ -97,7 +97,9 @@ describe('httpHealthIndicator', () => {
 			// Reset all mocks
 			vi.clearAllMocks()
 
-			mockConfigService = createConfigServiceMock({ 'http.healthCheck.urls': ['https://api.example.com/health', 'https://cdn.example.com/health'] })
+			mockConfigService = createConfigServiceMock({
+				'http.healthCheck.urls': ['https://api.example.com/health', 'https://cdn.example.com/health'],
+			})
 
 			// Recreate the indicator with new configuration
 			const module: TestingModule = await Test.createTestingModule({
@@ -243,7 +245,9 @@ describe('httpHealthIndicator', () => {
 	describe('error Handling', () => {
 		it('should handle unexpected errors gracefully', async () => {
 			// Need to recreate the indicator with health check URLs configured
-			mockConfigService = createConfigServiceMock({ 'http.healthCheck.urls': ['http://test-url.com'] })
+			mockConfigService = createConfigServiceMock({
+				'http.healthCheck.urls': ['http://test-url.com'],
+			})
 
 			// Recreate the indicator with the new configuration
 			const module: TestingModule = await Test.createTestingModule({

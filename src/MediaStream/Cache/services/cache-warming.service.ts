@@ -80,7 +80,9 @@ export class CacheWarmingService implements OnModuleInit {
 				await this.warmupCache()
 			}
 			catch (error: unknown) {
-				CorrelatedLogger.error(`Scheduled cache warmup failed: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, CacheWarmingService.name)
+				CorrelatedLogger.error(`Scheduled cache warmup failed: ${errorMessage(error)}`, error instanceof Error
+					? error.stack
+					: undefined, CacheWarmingService.name)
 			}
 		})
 
@@ -122,7 +124,9 @@ export class CacheWarmingService implements OnModuleInit {
 			this.metricsService.recordCacheOperation('warmup', 'memory', 'success')
 		}
 		catch (error: unknown) {
-			CorrelatedLogger.error(`Cache warmup failed: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, CacheWarmingService.name)
+			CorrelatedLogger.error(`Cache warmup failed: ${errorMessage(error)}`, error instanceof Error
+				? error.stack
+				: undefined, CacheWarmingService.name)
 			this.metricsService.recordCacheOperation('warmup', 'memory', 'error')
 		}
 	}
@@ -180,7 +184,9 @@ export class CacheWarmingService implements OnModuleInit {
 				})
 		}
 		catch (error: unknown) {
-			CorrelatedLogger.error(`Failed to get popular files: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, CacheWarmingService.name)
+			CorrelatedLogger.error(`Failed to get popular files: ${errorMessage(error)}`, error instanceof Error
+				? error.stack
+				: undefined, CacheWarmingService.name)
 			return []
 		}
 	}

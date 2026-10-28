@@ -16,8 +16,22 @@ function ftyp(major: string, compatible: string[]): Buffer {
 
 describe('sniffImageFormat', () => {
 	// The sniffer must agree with what Sharp writes (and therefore reads).
-	it.each(['png', 'jpeg', 'webp', 'gif', 'tiff', 'avif'] as const)('recognises a %s encoded by Sharp', async (format) => {
-		const encoded = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#336699' } })
+	it.each([
+		'png',
+		'jpeg',
+		'webp',
+		'gif',
+		'tiff',
+		'avif',
+	] as const)('recognises a %s encoded by Sharp', async (format) => {
+		const encoded = await sharp({
+			create: {
+				width: 8,
+				height: 8,
+				channels: 3,
+				background: '#336699',
+			},
+		})
 			.toFormat(format)
 			.toBuffer()
 
@@ -46,7 +60,16 @@ describe('sniffImageFormat', () => {
 	// 2026-09-25: a C2PA-tagged PNG carries an SVG icon in its first kilobyte.
 	it('reads a PNG with an SVG in its metadata as PNG', () => {
 		const c2paPng = Buffer.concat([
-			Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
+			Buffer.from([
+				0x89,
+				0x50,
+				0x4E,
+				0x47,
+				0x0D,
+				0x0A,
+				0x1A,
+				0x0A,
+			]),
 			Buffer.from('\x00\x00\x00\x0DcaBXimage/svg+xml<svg xmlns="http://www.w3.org/2000/svg"><path/></svg>', 'latin1'),
 		])
 

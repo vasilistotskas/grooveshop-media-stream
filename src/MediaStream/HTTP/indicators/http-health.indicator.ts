@@ -66,7 +66,11 @@ export class HttpHealthIndicator extends BaseHealthIndicator {
 			}
 		}
 		catch (error: unknown) {
-			return { url, success: false, error: errorMessage(error) }
+			return {
+				url,
+				success: false,
+				error: errorMessage(error),
+			}
 		}
 	}
 

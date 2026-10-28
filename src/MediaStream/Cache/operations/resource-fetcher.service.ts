@@ -94,7 +94,12 @@ class SourceGuard extends Transform {
 		if (this.declaredBytes !== null && !this.withinLimit(this.declaredBytes, format)) {
 			callback(new UpstreamResourceTooLargeError(
 				`Declared Content-Length ${this.declaredBytes} bytes exceeds the ${format} limit`,
-				{ resource: this.resource, declaredBytes: this.declaredBytes, maxBytes: MAX_FILE_SIZES[format], format },
+				{
+					resource: this.resource,
+					declaredBytes: this.declaredBytes,
+					maxBytes: MAX_FILE_SIZES[format],
+					format,
+				},
 			))
 			return
 		}
@@ -115,7 +120,12 @@ class SourceGuard extends Transform {
 		}
 		return new UpstreamResourceTooLargeError(
 			`Upstream stream exceeded the ${format} limit after ${this.bytes} bytes`,
-			{ resource: this.resource, bytesSeen: this.bytes, maxBytes: MAX_FILE_SIZES[format], format },
+			{
+				resource: this.resource,
+				bytesSeen: this.bytes,
+				maxBytes: MAX_FILE_SIZES[format],
+				format,
+			},
 		)
 	}
 }
@@ -161,7 +171,10 @@ export class ResourceFetcher {
 		const response = await this.fetchResourceResponseJob.handle(request)
 		if (!response || response.status >= 400) {
 			const status = response?.status || 404
-			await this.cacheManager.set(namespace, negativeCacheKey, { status, timestamp: Date.now() }, this.negativeCacheTtl)
+			await this.cacheManager.set(namespace, negativeCacheKey, {
+				status,
+				timestamp: Date.now(),
+			}, this.negativeCacheTtl)
 			CorrelatedLogger.warn(`Caching negative result for ${request.resourceTarget} (status: ${status})`, ResourceFetcher.name)
 			throw new UnableToFetchResourceException(request.resourceTarget)
 		}
@@ -173,7 +186,9 @@ export class ResourceFetcher {
 
 		// An unparsable Content-Length is treated as absent; the streamed count still applies.
 		const declared = Number.parseInt(String(response.headers['content-length'] ?? ''), 10)
-		const declaredBytes = Number.isFinite(declared) ? declared : null
+		const declaredBytes = Number.isFinite(declared)
+			? declared
+			: null
 		if (log && declaredBytes !== null) {
 			log.inputBytes = declaredBytes
 		}
@@ -197,7 +212,9 @@ export class ResourceFetcher {
 			if (error instanceof UpstreamResourceTooLargeError || error instanceof UnsupportedSourceFormatError) {
 				throw error
 			}
-			CorrelatedLogger.error(`Failed to store ${request.resourceTarget} to ${tempPath}: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, ResourceFetcher.name)
+			CorrelatedLogger.error(`Failed to store ${request.resourceTarget} to ${tempPath}: ${errorMessage(error)}`, error instanceof Error
+				? error.stack
+				: undefined, ResourceFetcher.name)
 			throw new UnableToStoreFetchedResourceException(request.resourceTarget)
 		}
 

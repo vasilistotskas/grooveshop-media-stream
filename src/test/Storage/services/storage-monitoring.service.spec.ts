@@ -109,19 +109,29 @@ describe('storageMonitoringService', () => {
 		it('groups an .rsc/.rsm pair into one entry read from the sidecar', async () => {
 			useDisk({
 				'abc.rsc': { size: 4 * MB },
-				'abc.rsm': { size: 200, content: metaJson({ dateCreated: NOW - 5000, privateTTL: 9000, accessCount: 7, tenantSchema: 'acme' }) },
+				'abc.rsm': {
+					size: 200,
+					content: metaJson({
+						dateCreated: NOW - 5000,
+						privateTTL: 9000,
+						accessCount: 7,
+						tenantSchema: 'acme',
+					}),
+				},
 			})
 
 			const inventory = await service.getInventory()
 
-			expect(inventory.entries).toEqual([{
-				id: 'abc',
-				size: 4 * MB + 200,
-				dateCreated: NOW - 5000,
-				privateTTL: 9000,
-				accessCount: 7,
-				tenantSchema: 'acme',
-			}])
+			expect(inventory.entries).toEqual([
+				{
+					id: 'abc',
+					size: 4 * MB + 200,
+					dateCreated: NOW - 5000,
+					privateTTL: 9000,
+					accessCount: 7,
+					tenantSchema: 'acme',
+				},
+			])
 			expect(inventory.orphans).toEqual([])
 			expect(inventory.totalFiles).toBe(2)
 			expect(inventory.totalSize).toBe(4 * MB + 200)
@@ -132,7 +142,14 @@ describe('storageMonitoringService', () => {
 		})
 
 		it('fills legacy sidecar defaults: tenantSchema "public", accessCount 0', async () => {
-			const legacy = JSON.stringify({ version: 1, size: '10', format: 'webp', dateCreated: NOW - 1000, privateTTL: 5000, publicTTL: 5000 })
+			const legacy = JSON.stringify({
+				version: 1,
+				size: '10',
+				format: 'webp',
+				dateCreated: NOW - 1000,
+				privateTTL: 5000,
+				publicTTL: 5000,
+			})
 			useDisk({
 				'legacy.rsc': { size: 10 },
 				'legacy.rsm': { size: legacy.length, content: legacy },
@@ -183,7 +200,10 @@ describe('storageMonitoringService', () => {
 		it('treats a sidecar without numeric dateCreated/privateTTL as unparsable', async () => {
 			useDisk({
 				'odd.rsc': { size: 100 },
-				'odd.rsm': { size: 5, content: JSON.stringify({ dateCreated: 'yesterday', privateTTL: 1000 }) },
+				'odd.rsm': {
+					size: 5,
+					content: JSON.stringify({ dateCreated: 'yesterday', privateTTL: 1000 }),
+				},
 				'arr.rsc': { size: 100 },
 				'arr.rsm': { size: 5, content: '[1,2,3]' },
 			})
@@ -199,7 +219,10 @@ describe('storageMonitoringService', () => {
 				'.gitkeep': { size: 0 },
 				'default_optimized_0123abcd.webp': { size: 3 * MB },
 				'img.rsc': { size: 1 * MB },
-				'img.rsm': { size: 100, content: metaJson() },
+				'img.rsm': {
+					size: 100,
+					content: metaJson(),
+				},
 			})
 
 			const inventory = await service.getInventory()
@@ -234,7 +257,9 @@ describe('storageMonitoringService', () => {
 
 	describe('snapshot caching', () => {
 		beforeEach(() => {
-			useDisk({ 'a.rst': { size: 1 } })
+			useDisk({
+				'a.rst': { size: 1 },
+			})
 		})
 
 		it('serves the snapshot without rescanning while it is younger than the TTL', async () => {
@@ -273,7 +298,10 @@ describe('storageMonitoringService', () => {
 		})
 
 		it('shares one scan between concurrent callers', async () => {
-			const [first, second] = await Promise.all([service.getInventory(0), service.getInventory(0)])
+			const [first, second] = await Promise.all([
+				service.getInventory(0),
+				service.getInventory(0),
+			])
 
 			expect(second).toBe(first)
 			expect(mockFs.readdir).toHaveBeenCalledTimes(1)

@@ -56,7 +56,9 @@ export function isInternalIp(ip: string): boolean {
 		return true
 
 	// Strip IPv4-mapped IPv6 prefix so the checks below work uniformly
-	const bare = ip.startsWith('::ffff:') ? ip.slice(7) : ip
+	const bare = ip.startsWith('::ffff:')
+		? ip.slice(7)
+		: ip
 
 	const parts = bare.split('.').map(Number)
 	if (parts.length !== 4 || parts.some(n => Number.isNaN(n))) {

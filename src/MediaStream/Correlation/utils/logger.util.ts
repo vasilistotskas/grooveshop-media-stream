@@ -24,7 +24,9 @@ export class CorrelatedLogger {
 
 	private static withCorrelationId(message: string): string {
 		const correlationId = requestContextStorage.getStore()?.correlationId
-		return correlationId ? `[${correlationId}] ${message}` : message
+		return correlationId
+			? `[${correlationId}] ${message}`
+			: message
 	}
 
 	static log(message: string, context?: string): void {

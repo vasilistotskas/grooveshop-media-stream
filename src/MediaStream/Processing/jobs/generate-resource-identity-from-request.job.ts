@@ -11,7 +11,10 @@ const DASH_RE = /-/g
 
 function generateUUIDv5(name: string, namespace: string = NAMESPACE_URL): string {
 	const ns = Buffer.from(namespace.replace(DASH_RE, ''), 'hex')
-	const hash = createHash('sha1').update(Buffer.concat([ns, Buffer.from(name)])).digest()
+	const hash = createHash('sha1').update(Buffer.concat([
+		ns,
+		Buffer.from(name),
+	])).digest()
 
 	hash[6] = (hash[6] & 0x0F) | 0x50
 	hash[8] = (hash[8] & 0x3F) | 0x80

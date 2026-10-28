@@ -117,7 +117,10 @@ describe('httpClientService', () => {
 				imports: [NestHttpModule],
 				providers: [
 					HttpClientService,
-					{ provide: ConfigService, useValue: createConfigServiceMock({ 'http.maxRetries': 0 }) },
+					{
+						provide: ConfigService,
+						useValue: createConfigServiceMock({ 'http.maxRetries': 0 }),
+					},
 					{ provide: RedisCacheService, useValue: mockRedisCacheService },
 				],
 			}).compile()

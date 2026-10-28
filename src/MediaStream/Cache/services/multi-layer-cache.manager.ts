@@ -71,7 +71,10 @@ export class MultiLayerCacheManager implements OnModuleInit {
 						CorrelatedLogger.warn(`Backfill failed for key ${key}: ${errorMessage(error)}`, MultiLayerCacheManager.name)
 					})
 
-					return { value, layer: layer.getLayerName() }
+					return {
+						value,
+						layer: layer.getLayerName(),
+					}
 				}
 			}
 			catch (error: unknown) {
@@ -190,7 +193,13 @@ export class MultiLayerCacheManager implements OnModuleInit {
 			}
 			catch (error: unknown) {
 				CorrelatedLogger.warn(`Failed to get stats from ${layer.getLayerName()} layer: ${errorMessage(error)}`, MultiLayerCacheManager.name)
-				layerStats[layer.getLayerName()] = { hits: 0, misses: 0, keys: 0, hitRate: 0, errors: 1 }
+				layerStats[layer.getLayerName()] = {
+					hits: 0,
+					misses: 0,
+					keys: 0,
+					hitRate: 0,
+					errors: 1,
+				}
 			}
 		}
 
@@ -200,7 +209,9 @@ export class MultiLayerCacheManager implements OnModuleInit {
 			layers: layerStats,
 			totalHits,
 			totalMisses,
-			overallHitRate: totalRequests > 0 ? totalHits / totalRequests : 0,
+			overallHitRate: totalRequests > 0
+				? totalHits / totalRequests
+				: 0,
 			layerHitDistribution,
 		}
 	}

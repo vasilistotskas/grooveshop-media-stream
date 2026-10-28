@@ -95,7 +95,12 @@ export class StorageMonitoringService implements OnModuleInit {
 	constructor(configService: ConfigService) {
 		this.directory = storageDirectory(configService)
 		const { warningSize, criticalSize, warningFileCount, criticalFileCount } = configService.get<StorageConfig>('storage')
-		this.thresholds = { warningSize, criticalSize, warningFileCount, criticalFileCount }
+		this.thresholds = {
+			warningSize,
+			criticalSize,
+			warningFileCount,
+			criticalFileCount,
+		}
 	}
 
 	async onModuleInit(): Promise<void> {
@@ -105,7 +110,9 @@ export class StorageMonitoringService implements OnModuleInit {
 		catch (error: unknown) {
 			CorrelatedLogger.error(
 				`Failed to create storage directory ${this.directory}: ${errorMessage(error)}`,
-				error instanceof Error ? error.stack : undefined,
+				error instanceof Error
+					? error.stack
+					: undefined,
 				StorageMonitoringService.name,
 			)
 			throw error
@@ -175,7 +182,9 @@ export class StorageMonitoringService implements OnModuleInit {
 			if (extension === '.rsc' || extension === '.rsm') {
 				const id = basename(file.name, extension)
 				const pair = pairs.get(id) ?? {}
-				pair[extension === '.rsc' ? 'rsc' : 'rsm'] = file
+				pair[extension === '.rsc'
+					? 'rsc'
+					: 'rsm'] = file
 				pairs.set(id, pair)
 			}
 			else if (TEMP_EXTENSIONS.has(extension)) {
@@ -185,7 +194,9 @@ export class StorageMonitoringService implements OnModuleInit {
 
 		const entries: StorageEntry[] = []
 		const resolved = await mapInBatches([...pairs], async ([id, { rsc, rsm }]) => {
-			const metadata = rsc && rsm ? await this.readMetadata(rsm.name) : null
+			const metadata = rsc && rsm
+				? await this.readMetadata(rsm.name)
+				: null
 			return { id, rsc, rsm, metadata }
 		})
 
@@ -209,7 +220,13 @@ export class StorageMonitoringService implements OnModuleInit {
 			}
 		}
 
-		this.snapshot = { entries, orphans, totalFiles, totalSize, scannedAt: Date.now() }
+		this.snapshot = {
+			entries,
+			orphans,
+			totalFiles,
+			totalSize,
+			scannedAt: Date.now(),
+		}
 		CorrelatedLogger.debug(
 			`Storage scan: ${entries.length} entries, ${orphans.length} orphans, ${totalFiles} files, ${formatBytes(totalSize)}`,
 			StorageMonitoringService.name,
@@ -221,7 +238,9 @@ export class StorageMonitoringService implements OnModuleInit {
 	private async statFile(name: string): Promise<ScannedFile | null> {
 		try {
 			const stats = await fs.stat(join(this.directory, name))
-			return stats.isFile() ? { name, size: stats.size, mtime: stats.mtimeMs } : null
+			return stats.isFile()
+				? { name, size: stats.size, mtime: stats.mtimeMs }
+				: null
 		}
 		catch {
 			return null
@@ -236,7 +255,9 @@ export class StorageMonitoringService implements OnModuleInit {
 				return null
 			}
 			const metadata = new ResourceMetaData(parsed as Partial<ResourceMetaData>)
-			return Number.isFinite(metadata.dateCreated) && Number.isFinite(metadata.privateTTL) ? metadata : null
+			return Number.isFinite(metadata.dateCreated) && Number.isFinite(metadata.privateTTL)
+				? metadata
+				: null
 		}
 		catch (error: unknown) {
 			CorrelatedLogger.debug(`Unreadable metadata sidecar ${name}: ${errorMessage(error)}`, StorageMonitoringService.name)

@@ -157,7 +157,9 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 	}
 
 	private subscribeAll(): void {
-		const channels = [...this.subscriptions.keys()]
+		const channels = [
+			...this.subscriptions.keys(),
+		]
 		if (channels.length === 0) {
 			return
 		}
@@ -207,7 +209,9 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			return
 		}
 
-		const effectiveTtl = ttl !== undefined && ttl > 0 ? ttl : this.config.ttl
+		const effectiveTtl = ttl !== undefined && ttl > 0
+			? ttl
+			: this.config.ttl
 		if (effectiveTtl <= 0) {
 			throw new Error(`[RedisCacheService] Redis TTL must be > 0 — cache.redis.ttl is misconfigured (got ${effectiveTtl})`)
 		}
@@ -286,7 +290,9 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 
 	async getStats(): Promise<CacheStats> {
 		const total = this.stats.hits + this.stats.misses
-		const hitRate = total > 0 ? this.stats.hits / total : 0
+		const hitRate = total > 0
+			? this.stats.hits / total
+			: 0
 		this.metricsService.updateCacheHitRatio('redis', hitRate)
 
 		let keys = 0
@@ -369,7 +375,9 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 
 	private extractMemoryValue(info: string, key: string): number {
 		const match = info.match(new RegExp(`${key}:(\\d+(?:\\.\\d+)?)`))
-		return match ? Number.parseFloat(match[1]) : 0
+		return match
+			? Number.parseFloat(match[1])
+			: 0
 	}
 
 	/** Objects carrying a `data: Buffer` use the binary envelope; everything else is JSON. */
@@ -391,7 +399,10 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 			const metaLength = value.readUInt32BE(1)
 			if (metaLength > 0 && BINARY_HEADER_BYTES + metaLength <= value.length) {
 				const rest = JSON.parse(value.toString('utf8', BINARY_HEADER_BYTES, BINARY_HEADER_BYTES + metaLength))
-				return { ...rest, data: value.subarray(BINARY_HEADER_BYTES + metaLength) } as T
+				return {
+					...rest,
+					data: value.subarray(BINARY_HEADER_BYTES + metaLength),
+				} as T
 			}
 		}
 

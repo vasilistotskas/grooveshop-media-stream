@@ -92,7 +92,18 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			name: 'mediastream_http_request_duration_seconds',
 			help: 'Duration of HTTP requests in seconds',
 			labelNames: ['method', 'route', 'status_code'],
-			buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10],
+			buckets: [
+				0.001,
+				0.005,
+				0.01,
+				0.05,
+				0.1,
+				0.5,
+				1,
+				2,
+				5,
+				10,
+			],
 			registers: [this.register],
 		})
 
@@ -100,7 +111,14 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			name: 'mediastream_http_request_size_bytes',
 			help: 'Size of HTTP requests in bytes',
 			labelNames: ['method', 'route'],
-			buckets: [100, 1000, 10000, 100000, 1000000, 10000000],
+			buckets: [
+				100,
+				1000,
+				10000,
+				100000,
+				1000000,
+				10000000,
+			],
 			registers: [this.register],
 		})
 
@@ -108,7 +126,14 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			name: 'mediastream_http_response_size_bytes',
 			help: 'Size of HTTP responses in bytes',
 			labelNames: ['method', 'route', 'status_code'],
-			buckets: [100, 1000, 10000, 100000, 1000000, 10000000],
+			buckets: [
+				100,
+				1000,
+				10000,
+				100000,
+				1000000,
+				10000000,
+			],
 			registers: [this.register],
 		})
 
@@ -183,7 +208,20 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			name: 'mediastream_image_request_duration_seconds',
 			help: 'Image-route request duration from the first middleware to the response closing, by outcome and cache result',
 			labelNames: ['outcome', 'cache'],
-			buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30],
+			buckets: [
+				0.005,
+				0.01,
+				0.025,
+				0.05,
+				0.1,
+				0.25,
+				0.5,
+				1,
+				2.5,
+				5,
+				10,
+				30,
+			],
 			registers: [this.register],
 		})
 
@@ -191,7 +229,17 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			name: 'mediastream_image_input_bytes',
 			help: 'Size of each completed upstream download, by the format sniffed from its bytes',
 			labelNames: ['format'],
-			buckets: [16384, 65536, 262144, 524288, 1048576, 2097152, 4194304, 8388608, 10485760],
+			buckets: [
+				16384,
+				65536,
+				262144,
+				524288,
+				1048576,
+				2097152,
+				4194304,
+				8388608,
+				10485760,
+			],
 			registers: [this.register],
 		})
 
@@ -468,7 +516,9 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	updateTenantDomainsMetrics(domainCount: number, suspendedSchemaCount: number, lastSuccessfulRefreshAt: number | undefined): void {
 		this.tenantDomainsCount.set(domainCount)
 		this.tenantSuspendedSchemasCount.set(suspendedSchemaCount)
-		this.tenantDomainsLastRefreshTimestamp.set(lastSuccessfulRefreshAt ? lastSuccessfulRefreshAt / 1000 : 0)
+		this.tenantDomainsLastRefreshTimestamp.set(lastSuccessfulRefreshAt
+			? lastSuccessfulRefreshAt / 1000
+			: 0)
 	}
 
 	/**
@@ -575,7 +625,9 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			this._logger.debug('System metrics collected')
 		}
 		catch (error: unknown) {
-			this._logger.error(`Failed to collect system metrics: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined)
+			this._logger.error(`Failed to collect system metrics: ${errorMessage(error)}`, error instanceof Error
+				? error.stack
+				: undefined)
 			this.recordError('metrics_collection', 'system_metrics')
 		}
 	}
@@ -589,7 +641,9 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			})
 		}
 		catch (error: unknown) {
-			this._logger.error(`Failed to collect performance metrics: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined)
+			this._logger.error(`Failed to collect performance metrics: ${errorMessage(error)}`, error instanceof Error
+				? error.stack
+				: undefined)
 			this.recordError('metrics_collection', 'performance_metrics')
 		}
 	}
@@ -610,7 +664,9 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
 				return
 			}
-			this._logger.error(`Failed to collect disk space metrics: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined)
+			this._logger.error(`Failed to collect disk space metrics: ${errorMessage(error)}`, error instanceof Error
+				? error.stack
+				: undefined)
 			this.recordError('metrics_collection', 'disk_space')
 		}
 	}

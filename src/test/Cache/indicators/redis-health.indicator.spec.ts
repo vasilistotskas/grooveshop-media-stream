@@ -31,7 +31,9 @@ describe('redisHealthIndicator', () => {
 			keys: vi.fn(),
 		}
 
-		const mockConfigService = createConfigServiceMock({ 'cache.redis': { ...mockConfig, healthCheckCacheTtl: 10000 } })
+		const mockConfigService = createConfigServiceMock({
+			'cache.redis': { ...mockConfig, healthCheckCacheTtl: 10000 },
+		})
 
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [
@@ -87,7 +89,12 @@ describe('redisHealthIndicator', () => {
 			})
 			redisCacheService.getConnectionStatus.mockReturnValue({
 				connected: true,
-				stats: { hits: 10, misses: 2, operations: 15, errors: 0 },
+				stats: {
+					hits: 10,
+					misses: 2,
+					operations: 15,
+					errors: 0,
+				},
 			})
 
 			const result = await indicator.isHealthy()
@@ -134,7 +141,10 @@ describe('redisHealthIndicator', () => {
 		})
 
 		it('should return unhealthy status for slow response times', async () => {
-			const testValue = { timestamp: Date.now(), test: true }
+			const testValue = {
+				timestamp: Date.now(),
+				test: true,
+			}
 
 			// Mock slow operations
 			redisCacheService.ping.mockImplementation(() =>
@@ -160,7 +170,12 @@ describe('redisHealthIndicator', () => {
 			})
 			redisCacheService.getConnectionStatus.mockReturnValue({
 				connected: true,
-				stats: { hits: 10, misses: 2, operations: 15, errors: 0 },
+				stats: {
+					hits: 10,
+					misses: 2,
+					operations: 15,
+					errors: 0,
+				},
 			})
 
 			const result = await indicator.isHealthy()
@@ -206,7 +221,12 @@ describe('redisHealthIndicator', () => {
 			})
 			redisCacheService.getConnectionStatus.mockReturnValue({
 				connected: true,
-				stats: { hits: 5, misses: 10, operations: 20, errors: 3 }, // Has errors
+				stats: {
+					hits: 5,
+					misses: 10,
+					operations: 20,
+					errors: 3,
+				}, // Has errors
 			})
 
 			const result = await indicator.isHealthy()

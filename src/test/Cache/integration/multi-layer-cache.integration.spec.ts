@@ -210,7 +210,12 @@ describe('multiLayerCacheManager Integration', () => {
 
 			mockRedisCacheService.getConnectionStatus.mockReturnValue({
 				connected: true,
-				stats: { hits: 80, misses: 40, operations: 120, errors: 2 },
+				stats: {
+					hits: 80,
+					misses: 40,
+					operations: 120,
+					errors: 2,
+				},
 			})
 
 			const stats = await cacheManager.getStats()
@@ -236,7 +241,12 @@ describe('multiLayerCacheManager Integration', () => {
 			})
 			mockRedisCacheService.getConnectionStatus.mockReturnValue({
 				connected: true,
-				stats: { hits: 50, misses: 10, operations: 60, errors: 0 },
+				stats: {
+					hits: 50,
+					misses: 10,
+					operations: 60,
+					errors: 0,
+				},
 			})
 
 			const stats = await cacheManager.getStats()

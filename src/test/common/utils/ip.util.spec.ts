@@ -29,15 +29,22 @@ describe('ip.util', () => {
 
 	describe('getClientIp', () => {
 		it('should prefer req.ip', () => {
-			expect(getClientIp({ ip: '1.2.3.4', socket: { remoteAddress: '5.6.7.8' } })).toBe('1.2.3.4')
+			expect(getClientIp({
+				ip: '1.2.3.4',
+				socket: { remoteAddress: '5.6.7.8' },
+			})).toBe('1.2.3.4')
 		})
 
 		it('should fall back to socket.remoteAddress', () => {
-			expect(getClientIp({ socket: { remoteAddress: '5.6.7.8' } })).toBe('5.6.7.8')
+			expect(getClientIp({
+				socket: { remoteAddress: '5.6.7.8' },
+			})).toBe('5.6.7.8')
 		})
 
 		it('should fall back to connection.remoteAddress', () => {
-			expect(getClientIp({ connection: { remoteAddress: '9.10.11.12' } })).toBe('9.10.11.12')
+			expect(getClientIp({
+				connection: { remoteAddress: '9.10.11.12' },
+			})).toBe('9.10.11.12')
 		})
 
 		it('should return "unknown" when nothing is available', () => {

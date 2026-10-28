@@ -101,10 +101,20 @@ export default class CacheImageResourceOperation {
 			const flushEpoch = this.tenantCacheEpochs.current(cacheImageRequest.tenantSchema)
 			const id = await this.generateResourceIdentityFromRequestJob.handle(cacheImageRequest)
 			CorrelatedLogger.debug(`Resource ID generated: ${id}`, CacheImageResourceOperation.name)
-			return { request: cacheImageRequest, id, metaData: null, cached: null, cacheTier: null, flushEpoch, tempToken: randomUUID() }
+			return {
+				request: cacheImageRequest,
+				id,
+				metaData: null,
+				cached: null,
+				cacheTier: null,
+				flushEpoch,
+				tempToken: randomUUID(),
+			}
 		}
 		catch (error: unknown) {
-			CorrelatedLogger.error(`Setup failed: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, CacheImageResourceOperation.name)
+			CorrelatedLogger.error(`Setup failed: ${errorMessage(error)}`, error instanceof Error
+				? error.stack
+				: undefined, CacheImageResourceOperation.name)
 			this.metricsService.recordError('validation', 'setup')
 			throw error
 		}
@@ -259,7 +269,9 @@ export default class CacheImageResourceOperation {
 				CorrelatedLogger.warn(`Source refused: ${errorMessage(error)}`, CacheImageResourceOperation.name)
 			}
 			else if (!(error instanceof UnableToFetchResourceException)) {
-				CorrelatedLogger.error(`Failed to execute CacheImageResourceOperation: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, CacheImageResourceOperation.name)
+				CorrelatedLogger.error(`Failed to execute CacheImageResourceOperation: ${errorMessage(error)}`, error instanceof Error
+					? error.stack
+					: undefined, CacheImageResourceOperation.name)
 			}
 			this.metricsService.recordError('image_processing', 'execute')
 			this.metricsService.recordImageProcessing('execute', 'unknown', 'error', duration || 0)

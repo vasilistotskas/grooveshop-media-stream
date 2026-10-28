@@ -26,7 +26,9 @@ describe('tenantFlushService', () => {
 
 	/** Delivers a message the way Redis would, then lets the async handler settle. */
 	async function deliver(message: unknown): Promise<void> {
-		onBroadcast(typeof message === 'string' ? message : JSON.stringify(message))
+		onBroadcast(typeof message === 'string'
+			? message
+			: JSON.stringify(message))
 		await new Promise(resolve => setImmediate(resolve))
 	}
 
@@ -83,7 +85,12 @@ describe('tenantFlushService', () => {
 		it('re-reads the tenant feed, then clears disk, then Redis, then memory, advancing the epoch before each tier', async () => {
 			await service.flushTenant('acme')
 
-			expect(clears).toEqual(['feed', 'disk@1', 'redis@2', 'memory@3'])
+			expect(clears).toEqual([
+				'feed',
+				'disk@1',
+				'redis@2',
+				'memory@3',
+			])
 			expect(cacheManager.invalidateNamespace).toHaveBeenCalledWith('image:acme', 'redis')
 			expect(cacheManager.invalidateNamespace).toHaveBeenCalledWith('image:acme', 'memory')
 		})
@@ -107,18 +114,30 @@ describe('tenantFlushService', () => {
 		})
 
 		it('reports the namespace, the removed files and the broadcast receivers', async () => {
-			storage.removeTenantFiles.mockResolvedValue({ filesRemoved: 4, errors: ['boom'], complete: true })
+			storage.removeTenantFiles.mockResolvedValue({
+				filesRemoved: 4,
+				errors: ['boom'],
+				complete: true,
+			})
 
 			const result = await service.flushTenant('acme')
 
-			expect(result).toEqual({ namespace: 'image:acme', filesRemoved: 4, diskErrors: ['boom'], broadcastReceivers: 2 })
+			expect(result).toEqual({
+				namespace: 'image:acme',
+				filesRemoved: 4,
+				diskErrors: ['boom'],
+				broadcastReceivers: 2,
+			})
 		})
 
 		it('broadcasts the tenant on the scoped channel', async () => {
 			await service.flushTenant('acme')
 
 			expect(redis.publish).toHaveBeenCalledExactlyOnceWith('mediastream:tenant-flush:2', expect.any(String))
-			expect(publishedMessage()).toEqual({ tenantSchema: 'acme', origin: expect.any(String) })
+			expect(publishedMessage()).toEqual({
+				tenantSchema: 'acme',
+				origin: expect.any(String),
+			})
 		})
 
 		it('still succeeds locally, with zero receivers, when only the broadcast fails', async () => {
@@ -142,24 +161,39 @@ describe('tenantFlushService', () => {
 
 			expect(error).toBeInstanceOf(TenantFlushIncompleteError)
 			expect((error as TenantFlushIncompleteError).status).toBe(503)
-			expect((error as TenantFlushIncompleteError).context).toMatchObject({ failures: ['redis: Redis not connected'] })
+			expect((error as TenantFlushIncompleteError).context).toMatchObject({
+				failures: ['redis: Redis not connected'],
+			})
 			expect(clears).toContain('memory')
 			expect(redis.publish).toHaveBeenCalledOnce()
 		})
 
 		it('fails with 503 when a pair of the tenant could not be removed from disk', async () => {
-			storage.removeTenantFiles.mockResolvedValue({ filesRemoved: 0, errors: ['Failed to remove x.rsm and its .rsc: EACCES'], complete: false })
+			storage.removeTenantFiles.mockResolvedValue({
+				filesRemoved: 0,
+				errors: ['Failed to remove x.rsm and its .rsc: EACCES'],
+				complete: false,
+			})
 
 			const error = await service.flushTenant('acme').catch((caught: unknown) => caught)
 
 			expect(error).toBeInstanceOf(TenantFlushIncompleteError)
-			expect((error as TenantFlushIncompleteError).context).toMatchObject({ failures: ['disk: Failed to remove x.rsm and its .rsc: EACCES'] })
+			expect((error as TenantFlushIncompleteError).context).toMatchObject({
+				failures: ['disk: Failed to remove x.rsm and its .rsc: EACCES'],
+			})
 		})
 
 		it('still succeeds when the sweep only met sidecars it could not read', async () => {
-			storage.removeTenantFiles.mockResolvedValue({ filesRemoved: 2, errors: ['Failed to parse metadata corrupt.rsm'], complete: true })
+			storage.removeTenantFiles.mockResolvedValue({
+				filesRemoved: 2,
+				errors: ['Failed to parse metadata corrupt.rsm'],
+				complete: true,
+			})
 
-			await expect(service.flushTenant('acme')).resolves.toMatchObject({ filesRemoved: 2, diskErrors: ['Failed to parse metadata corrupt.rsm'] })
+			await expect(service.flushTenant('acme')).resolves.toMatchObject({
+				filesRemoved: 2,
+				diskErrors: ['Failed to parse metadata corrupt.rsm'],
+			})
 		})
 
 		it('fails with 503 when the disk sweep throws', async () => {
@@ -177,7 +211,9 @@ describe('tenantFlushService', () => {
 
 			expect(error).toBeInstanceOf(TenantFlushIncompleteError)
 			expect((error as TenantFlushIncompleteError).context).toMatchObject({
-				failures: [expect.stringContaining('tenant feed')],
+				failures: [
+					expect.stringContaining('tenant feed'),
+				],
 			})
 			expect(clears).toEqual(['disk@1', 'redis@2', 'memory@3'])
 			expect(redis.publish).toHaveBeenCalledOnce()
@@ -190,7 +226,12 @@ describe('tenantFlushService', () => {
 		it('re-reads the tenant feed, then clears disk, then Redis, then memory, advancing the epoch before each tier', async () => {
 			await deliver({ tenantSchema: 'acme', origin: PEER })
 
-			expect(clears).toEqual(['feed', 'disk@1', 'redis@2', 'memory@3'])
+			expect(clears).toEqual([
+				'feed',
+				'disk@1',
+				'redis@2',
+				'memory@3',
+			])
 		})
 
 		it('names a tenant feed it could not read', async () => {
@@ -225,11 +266,26 @@ describe('tenantFlushService', () => {
 			['unparsable JSON', '{nope'],
 			['a non-object', '42'],
 			['a null payload', 'null'],
-			['a missing origin', { tenantSchema: 'acme' }],
-			['a missing tenant', { origin: PEER }],
-			['a non-string tenant', { tenantSchema: 7, origin: PEER }],
-			['an invalid schema', { tenantSchema: 'Bad-Schema', origin: PEER }],
-			['a traversal attempt', { tenantSchema: '../etc', origin: PEER }],
+			[
+				'a missing origin',
+				{ tenantSchema: 'acme' },
+			],
+			[
+				'a missing tenant',
+				{ origin: PEER },
+			],
+			[
+				'a non-string tenant',
+				{ tenantSchema: 7, origin: PEER },
+			],
+			[
+				'an invalid schema',
+				{ tenantSchema: 'Bad-Schema', origin: PEER },
+			],
+			[
+				'a traversal attempt',
+				{ tenantSchema: '../etc', origin: PEER },
+			],
 		])('ignores %s', async (_name, message) => {
 			await deliver(message)
 

@@ -59,7 +59,19 @@ function metadata(overrides: Partial<ResourceMetaData> = {}): ResourceMetaData {
 }
 
 /** Bytes that sniff as PNG (the signature); Sharp is mocked, so nothing decodes them. */
-const PNG_BYTES = Buffer.concat([Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]), Buffer.from('mock-image-data')])
+const PNG_BYTES = Buffer.concat([
+	Buffer.from([
+		0x89,
+		0x50,
+		0x4E,
+		0x47,
+		0x0D,
+		0x0A,
+		0x1A,
+		0x0A,
+	]),
+	Buffer.from('mock-image-data'),
+])
 
 function streamResponse(body: Buffer = PNG_BYTES): any {
 	return {
@@ -88,18 +100,30 @@ describe('cacheImageResourceOperation', () => {
 
 	beforeEach(async () => {
 		vi.resetAllMocks()
-		mockCreateWriteStream.mockImplementation(() => new Writable({ write: (_chunk, _encoding, callback) => callback() }) as any)
+		mockCreateWriteStream.mockImplementation(() => new Writable({
+			write: (_chunk, _encoding, callback) => callback(),
+		}) as any)
 		mockedFs.writeFile.mockResolvedValue()
 		mockedFs.rename.mockResolvedValue()
 		mockedFs.unlink.mockResolvedValue()
 
 		request = new CacheImageRequest({
 			resourceTarget: 'https://example.com/image.jpg',
-			resizeOptions: new ResizeOptions({ width: 100, height: 100, quality: 80, format: SupportedResizeFormats.webp, trimThreshold: 10 }),
+			resizeOptions: new ResizeOptions({
+				width: 100,
+				height: 100,
+				quality: 80,
+				format: SupportedResizeFormats.webp,
+				trimThreshold: 10,
+			}),
 		})
 
-		identityJob = { handle: vi.fn().mockResolvedValue(RESOURCE_ID) } as any
-		fetchJob = { handle: vi.fn().mockImplementation(async () => streamResponse()) } as any
+		identityJob = {
+			handle: vi.fn().mockResolvedValue(RESOURCE_ID),
+		} as any
+		fetchJob = {
+			handle: vi.fn().mockImplementation(async () => streamResponse()),
+		} as any
 		webpJob = {
 			handle: vi.fn().mockResolvedValue(new ManipulationJobResult({ format: 'webp', size: '1000', buffer: processedBuffer })),
 		} as any
@@ -110,8 +134,13 @@ describe('cacheImageResourceOperation', () => {
 			delete: vi.fn().mockResolvedValue(undefined),
 			exists: vi.fn().mockResolvedValue(false),
 		} as any
-		validation = { validateFileSize: vi.fn().mockReturnValue(true) } as any
-		tracker = { record: vi.fn(), flush: vi.fn() } as any
+		validation = {
+			validateFileSize: vi.fn().mockReturnValue(true),
+		} as any
+		tracker = {
+			record: vi.fn(),
+			flush: vi.fn(),
+		} as any
 		metricsService = {
 			recordCacheOperation: vi.fn(),
 			recordImageProcessing: vi.fn(),
@@ -133,7 +162,12 @@ describe('cacheImageResourceOperation', () => {
 				{ provide: GenerateResourceIdentityFromRequestJob, useValue: identityJob },
 				{ provide: FetchResourceResponseJob, useValue: fetchJob },
 				{ provide: WebpImageManipulationJob, useValue: webpJob },
-				{ provide: ProcessingAdmissionService, useValue: { run: (fn: () => Promise<unknown>) => fn() } },
+				{
+					provide: ProcessingAdmissionService,
+					useValue: {
+						run: (fn: () => Promise<unknown>) => fn(),
+					},
+				},
 				{ provide: MultiLayerCacheManager, useValue: cacheManager },
 				{ provide: ResourceValidationService, useValue: validation },
 				{ provide: AccessCountTracker, useValue: tracker },
@@ -162,7 +196,15 @@ describe('cacheImageResourceOperation', () => {
 	describe('setup', () => {
 		it('returns a context with the generated identity and nothing loaded yet', () => {
 			expect(identityJob.handle).toHaveBeenCalledWith(request)
-			expect(ctx).toEqual({ request, id: RESOURCE_ID, metaData: null, cached: null, cacheTier: null, flushEpoch: 0, tempToken: expect.any(String) })
+			expect(ctx).toEqual({
+				request,
+				id: RESOURCE_ID,
+				metaData: null,
+				cached: null,
+				cacheTier: null,
+				flushEpoch: 0,
+				tempToken: expect.any(String),
+			})
 		})
 
 		it('records a validation error and rethrows when identity generation fails', async () => {
@@ -175,7 +217,10 @@ describe('cacheImageResourceOperation', () => {
 
 	describe('checkResourceExists', () => {
 		it('keeps a valid layered hit and the layer that answered on the context, and records no cache metric of its own', async () => {
-			const cached: ProcessedImage = { data: Buffer.from('cached-data'), metadata: metadata() }
+			const cached: ProcessedImage = {
+				data: Buffer.from('cached-data'),
+				metadata: metadata(),
+			}
 			cacheManager.lookup.mockResolvedValue({ value: cached, layer: 'redis' })
 
 			await expect(operation.checkResourceExists(ctx)).resolves.toBe(true)
@@ -201,7 +246,13 @@ describe('cacheImageResourceOperation', () => {
 		})
 
 		it('deletes a corrupted layered entry and falls through to the disk check', async () => {
-			cacheManager.lookup.mockResolvedValue({ value: { data: Buffer.from('x'), metadata: {} }, layer: 'memory' })
+			cacheManager.lookup.mockResolvedValue({
+				value: {
+					data: Buffer.from('x'),
+					metadata: {},
+				},
+				layer: 'memory',
+			})
 			mockedFs.readFile.mockRejectedValue(new Error('ENOENT'))
 
 			await expect(operation.checkResourceExists(ctx)).resolves.toBe(false)
@@ -211,7 +262,13 @@ describe('cacheImageResourceOperation', () => {
 		})
 
 		it('deletes an expired layered entry and falls through to the disk check', async () => {
-			cacheManager.lookup.mockResolvedValue({ value: { data: Buffer.from('x'), metadata: metadata({ dateCreated: Date.now() - 7 * MONTH_MS }) }, layer: 'memory' })
+			cacheManager.lookup.mockResolvedValue({
+				value: {
+					data: Buffer.from('x'),
+					metadata: metadata({ dateCreated: Date.now() - 7 * MONTH_MS }),
+				},
+				layer: 'memory',
+			})
 			mockedFs.readFile.mockRejectedValue(new Error('ENOENT'))
 
 			await expect(operation.checkResourceExists(ctx)).resolves.toBe(false)
@@ -292,7 +349,10 @@ describe('cacheImageResourceOperation', () => {
 
 	describe('loadResource', () => {
 		it('returns the layered payload without touching the disk and counts the access', async () => {
-			const cached: ProcessedImage = { data: Buffer.from('cached-data'), metadata: metadata() }
+			const cached: ProcessedImage = {
+				data: Buffer.from('cached-data'),
+				metadata: metadata(),
+			}
 			ctx.cached = cached
 			ctx.metaData = cached.metadata
 
@@ -314,7 +374,10 @@ describe('cacheImageResourceOperation', () => {
 			const result = await operation.loadResource(ctx)
 
 			expect(mockedFs.readFile).toHaveBeenCalledWith(operation.getResourcePath(ctx))
-			expect(result).toEqual({ data: Buffer.from('file-data'), metadata: ctx.metaData })
+			expect(result).toEqual({
+				data: Buffer.from('file-data'),
+				metadata: ctx.metaData,
+			})
 			expect(cacheManager.set).toHaveBeenCalledWith('image:public', RESOURCE_ID, result, 6 * 30 * 24 * 3600)
 			expect(tracker.record).toHaveBeenCalledWith(operation.getResourceMetaPath(ctx))
 			releaseSet()
@@ -325,7 +388,9 @@ describe('cacheImageResourceOperation', () => {
 			mockedFs.readFile.mockResolvedValue(Buffer.from('file-data'))
 			cacheManager.set.mockRejectedValue(new Error('redis down'))
 
-			await expect(operation.loadResource(ctx)).resolves.toMatchObject({ data: Buffer.from('file-data') })
+			await expect(operation.loadResource(ctx)).resolves.toMatchObject({
+				data: Buffer.from('file-data'),
+			})
 			await new Promise(resolve => setImmediate(resolve))
 		})
 
@@ -353,7 +418,12 @@ describe('cacheImageResourceOperation', () => {
 			expect(mockCreateWriteStream).toHaveBeenCalledWith(operation.getResourceTempPath(ctx))
 			expect(webpJob.handle).toHaveBeenCalledWith(operation.getResourceTempPath(ctx), request.resizeOptions)
 			expect(result.data).toBe(processedBuffer)
-			expect(result.metadata).toMatchObject({ version: 1, size: '1000', format: 'webp', tenantSchema: 'public' })
+			expect(result.metadata).toMatchObject({
+				version: 1,
+				size: '1000',
+				format: 'webp',
+				tenantSchema: 'public',
+			})
 			expect(cacheManager.set).toHaveBeenCalledWith('image:public', RESOURCE_ID, result, 6 * 30 * 24 * 3600)
 			expect(metricsService.recordImageProcessing).toHaveBeenCalledWith('process', 'webp', 'success', expect.any(Number))
 			expect(metricsService.recordImageInput).toHaveBeenCalledWith('png', PNG_BYTES.length)
@@ -415,7 +485,10 @@ describe('cacheImageResourceOperation', () => {
 
 		it('propagates typed errors unchanged so the caller sees their HTTP status', async () => {
 			validation.validateFileSize.mockReturnValue(false)
-			fetchJob.handle.mockResolvedValue({ ...streamResponse(), headers: { 'content-length': '50000000' } })
+			fetchJob.handle.mockResolvedValue({
+				...streamResponse(),
+				headers: { 'content-length': '50000000' },
+			})
 
 			await expect(operation.execute(ctx)).rejects.toBeInstanceOf(UpstreamResourceTooLargeError)
 			expect(metricsService.recordImageProcessing).toHaveBeenCalledWith('execute', 'unknown', 'error', expect.any(Number))
@@ -429,7 +502,12 @@ describe('cacheImageResourceOperation', () => {
 			it('logs no ERROR for a missing source: the fetcher logged its 404 at WARN', async () => {
 				const error = vi.spyOn(CorrelatedLogger, 'error').mockImplementation(() => {})
 				const warn = vi.spyOn(CorrelatedLogger, 'warn').mockImplementation(() => {})
-				fetchJob.handle.mockResolvedValue({ ...streamResponse(), status: 404, statusText: 'Not Found', data: null })
+				fetchJob.handle.mockResolvedValue({
+					...streamResponse(),
+					status: 404,
+					statusText: 'Not Found',
+					data: null,
+				})
 
 				await expect(operation.execute(ctx)).rejects.toBeInstanceOf(UnableToFetchResourceException)
 
@@ -441,7 +519,10 @@ describe('cacheImageResourceOperation', () => {
 				const error = vi.spyOn(CorrelatedLogger, 'error').mockImplementation(() => {})
 				const warn = vi.spyOn(CorrelatedLogger, 'warn').mockImplementation(() => {})
 				validation.validateFileSize.mockReturnValue(false)
-				fetchJob.handle.mockResolvedValue({ ...streamResponse(), headers: { 'content-length': '50000000' } })
+				fetchJob.handle.mockResolvedValue({
+					...streamResponse(),
+					headers: { 'content-length': '50000000' },
+				})
 
 				await expect(operation.execute(ctx)).rejects.toBeInstanceOf(UpstreamResourceTooLargeError)
 
@@ -572,7 +653,9 @@ describe('cacheImageResourceOperation', () => {
 			mockedFs.readFile.mockResolvedValue(Buffer.from('file-data'))
 			epochs.advance('public')
 
-			await expect(operation.loadResource(ctx)).resolves.toMatchObject({ data: Buffer.from('file-data') })
+			await expect(operation.loadResource(ctx)).resolves.toMatchObject({
+				data: Buffer.from('file-data'),
+			})
 
 			expect(cacheManager.set).not.toHaveBeenCalled()
 		})
@@ -614,7 +697,12 @@ describe('cacheImageResourceOperation', () => {
 			expect(result).toBe(processedBuffer)
 			expect(webpJob.handle).toHaveBeenCalledWith(
 				join(cwd(), 'public', 'default.png'),
-				expect.objectContaining({ width: 100, height: 100, format: 'webp', quality: 100 }),
+				expect.objectContaining({
+					width: 100,
+					height: 100,
+					format: 'webp',
+					quality: 100,
+				}),
 			)
 		})
 	})
@@ -624,7 +712,9 @@ describe('cacheImageResourceOperation', () => {
 			const t0 = 1_700_000_000_000
 			vi.useFakeTimers()
 			vi.setSystemTime(t0)
-			cacheManager.get.mockImplementation(async (_ns, key) => key === `negative:${RESOURCE_ID}` ? { status: 404, timestamp: t0 } : null)
+			cacheManager.get.mockImplementation(async (_ns, key) => key === `negative:${RESOURCE_ID}`
+				? { status: 404, timestamp: t0 }
+				: null)
 
 			vi.setSystemTime(t0 + (NEGATIVE_CACHE_TTL_SECONDS - 1) * 1000)
 

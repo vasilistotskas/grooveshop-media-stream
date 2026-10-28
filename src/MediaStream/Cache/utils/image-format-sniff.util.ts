@@ -6,7 +6,16 @@ import { isSvgHeader, SVG_SNIFF_BYTES } from './svg-sanitizer.util.js'
 export const FORMAT_SNIFF_BYTES = SVG_SNIFF_BYTES
 
 /** PNG signature (PNG specification, 3rd edition, §5.2). */
-const PNG_SIGNATURE = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
+const PNG_SIGNATURE = [
+	0x89,
+	0x50,
+	0x4E,
+	0x47,
+	0x0D,
+	0x0A,
+	0x1A,
+	0x0A,
+]
 /** JPEG SOI marker followed by the next marker's 0xFF (ITU-T T.81, B.1.1.3). */
 const JPEG_SIGNATURE = [0xFF, 0xD8, 0xFF]
 /** TIFF byte-order mark + version 42, and BigTIFF's 43 (TIFF 6.0 §2; BigTIFF design). */

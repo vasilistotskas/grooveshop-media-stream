@@ -69,7 +69,9 @@ describe('bootstrap', () => {
 
 		expect(NestFactory.create).toHaveBeenCalledWith(
 			MediaStreamModule,
-			expect.objectContaining({ logger: expect.any(ConsoleLogger) }),
+			expect.objectContaining({
+				logger: expect.any(ConsoleLogger),
+			}),
 		)
 
 		expect(mockApp.useStaticAssets).toHaveBeenCalledWith('public')
@@ -119,10 +121,22 @@ describe('bootstrap', () => {
 
 		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 		try {
-			logger.warn('image rejected 200 12ms', { correlation_id: 'c-1', schema: 'webside', input_bytes: 3_000_000, level: 'spoofed' }, 'ImageRequest')
+			logger.warn('image rejected 200 12ms', {
+				correlation_id: 'c-1',
+				schema: 'webside',
+				input_bytes: 3_000_000,
+				level: 'spoofed',
+			}, 'ImageRequest')
 			const line = JSON.parse(String(write.mock.calls[0][0]))
 
-			expect(line).toMatchObject({ level: 'warn', context: 'ImageRequest', message: 'image rejected 200 12ms', correlation_id: 'c-1', schema: 'webside', input_bytes: 3_000_000 })
+			expect(line).toMatchObject({
+				level: 'warn',
+				context: 'ImageRequest',
+				message: 'image rejected 200 12ms',
+				correlation_id: 'c-1',
+				schema: 'webside',
+				input_bytes: 3_000_000,
+			})
 			expect(line.params).toBeUndefined()
 		}
 		finally {

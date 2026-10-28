@@ -57,7 +57,24 @@ describe('isSvgHeader', () => {
 		// manifest in a caBX chunk right after IHDR, whose c2pa.icon assertion
 		// is an image/svg+xml document — namespace and all — inside the sniff window.
 		const c2paPng = Buffer.concat([
-			Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52]),
+			Buffer.from([
+				0x89,
+				0x50,
+				0x4E,
+				0x47,
+				0x0D,
+				0x0A,
+				0x1A,
+				0x0A,
+				0x00,
+				0x00,
+				0x00,
+				0x0D,
+				0x49,
+				0x48,
+				0x44,
+				0x52,
+			]),
 			Buffer.from('caBXjumbjumdc2pa.assertionsc2pa.iconimage/svg+xml'),
 			Buffer.from('<svg width="716" height="716" viewBox="0 0 716 716" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 0"/></svg>'),
 		]).toString('utf8')
@@ -67,7 +84,16 @@ describe('isSvgHeader', () => {
 	})
 
 	it('rejects any header that does not open with markup, whatever it contains', () => {
-		const avifBox = Buffer.from([0x00, 0x00, 0x00, 0x1C, 0x66, 0x74, 0x79, 0x70]).toString('utf8')
+		const avifBox = Buffer.from([
+			0x00,
+			0x00,
+			0x00,
+			0x1C,
+			0x66,
+			0x74,
+			0x79,
+			0x70,
+		]).toString('utf8')
 		expect(isSvgHeader(`${avifBox}avif <svg xmlns="http://www.w3.org/2000/svg">`)).toBe(false)
 		expect(isSvgHeader('GIF89a xmlns="http://www.w3.org/2000/svg"')).toBe(false)
 	})

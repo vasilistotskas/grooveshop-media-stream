@@ -14,7 +14,11 @@ describe('mediaStreamModule', () => {
 
 	beforeEach(async () => {
 		module = await Test.createTestingModule({
-			imports: [HttpModule, ScheduleModule.forRoot(), MediaStreamModule],
+			imports: [
+				HttpModule,
+				ScheduleModule.forRoot(),
+				MediaStreamModule,
+			],
 		}).compile()
 	})
 

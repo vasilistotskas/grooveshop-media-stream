@@ -89,7 +89,9 @@ function parseColor(color: string): RGBA {
 			.join('')
 	}
 	const num = Number.parseInt(hex.slice(0, 6), 16)
-	const alpha = hex.length === 8 ? Number.parseInt(hex.slice(6, 8), 16) / 255 : 1
+	const alpha = hex.length === 8
+		? Number.parseInt(hex.slice(6, 8), 16) / 255
+		: 1
 	return {
 		r: num >> 16,
 		g: (num >> 8) & 255,
@@ -114,12 +116,18 @@ export class ResizeOptions {
 		const { width, height, trimThreshold, background, fit, position, format, quality } = data
 		this.width = width ?? null
 		this.height = height ?? null
-		this.trimThreshold = trimThreshold ? Number(trimThreshold) : null
-		this.background = background ? parseColor(String(background)) : RESIZE_DEFAULTS.background
+		this.trimThreshold = trimThreshold
+			? Number(trimThreshold)
+			: null
+		this.background = background
+			? parseColor(String(background))
+			: RESIZE_DEFAULTS.background
 		this.fit = fit ?? RESIZE_DEFAULTS.fit
 		this.position = position ?? RESIZE_DEFAULTS.position
 		this.format = format ?? RESIZE_DEFAULTS.format
-		this.quality = quality !== undefined ? Number(quality) : RESIZE_DEFAULTS.quality
+		this.quality = quality !== undefined
+			? Number(quality)
+			: RESIZE_DEFAULTS.quality
 	}
 }
 

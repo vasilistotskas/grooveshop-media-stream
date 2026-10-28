@@ -19,7 +19,15 @@ const thresholds = {
 }
 
 function entry(id: string, overrides: Partial<StorageEntry> = {}): StorageEntry {
-	return { id, size: MB, dateCreated: NOW - DAY, privateTTL: 30 * DAY, accessCount: 0, tenantSchema: 'public', ...overrides }
+	return {
+		id,
+		size: MB,
+		dateCreated: NOW - DAY,
+		privateTTL: 30 * DAY,
+		accessCount: 0,
+		tenantSchema: 'public',
+		...overrides,
+	}
 }
 
 const entries = [
@@ -30,7 +38,9 @@ const entries = [
 
 const inventory: StorageInventory = {
 	entries,
-	orphans: [{ name: 'x.rst', size: 1024, mtime: NOW }],
+	orphans: [
+		{ name: 'x.rst', size: 1024, mtime: NOW },
+	],
 	totalFiles: 100,
 	totalSize: 50 * MB,
 	scannedAt: NOW,
@@ -60,8 +70,19 @@ describe('storageHealthIndicator', () => {
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [
 				StorageHealthIndicator,
-				{ provide: StorageMonitoringService, useValue: { checkThresholds: vi.fn(), thresholds } },
-				{ provide: StorageCleanupService, useValue: { getCleanupStatus: vi.fn() } },
+				{
+					provide: StorageMonitoringService,
+					useValue: {
+						checkThresholds: vi.fn(),
+						thresholds,
+					},
+				},
+				{
+					provide: StorageCleanupService,
+					useValue: {
+						getCleanupStatus: vi.fn(),
+					},
+				},
 			],
 		}).compile()
 
@@ -115,7 +136,13 @@ describe('storageHealthIndicator', () => {
 		storageMonitoring.checkThresholds.mockResolvedValue({
 			status: 'healthy',
 			issues: [],
-			inventory: { entries: [], orphans: [], totalFiles: 0, totalSize: 0, scannedAt: NOW },
+			inventory: {
+				entries: [],
+				orphans: [],
+				totalFiles: 0,
+				totalSize: 0,
+				scannedAt: NOW,
+			},
 		})
 
 		const result = await indicator.isHealthy()
@@ -134,11 +161,22 @@ describe('storageHealthIndicator', () => {
 	})
 
 	it('passes through a cleanup that has never run and has no schedule', async () => {
-		storageCleanup.getCleanupStatus.mockReturnValue({ ...cleanupStatus, enabled: false, dryRun: true, lastCleanup: null, nextCleanup: null })
+		storageCleanup.getCleanupStatus.mockReturnValue({
+			...cleanupStatus,
+			enabled: false,
+			dryRun: true,
+			lastCleanup: null,
+			nextCleanup: null,
+		})
 
 		const result = await indicator.isHealthy()
 
-		expect(result.storage.cleanupStatus).toEqual({ enabled: false, dryRun: true, lastCleanup: null, nextCleanup: null })
+		expect(result.storage.cleanupStatus).toEqual({
+			enabled: false,
+			dryRun: true,
+			lastCleanup: null,
+			nextCleanup: null,
+		})
 	})
 
 	it('stays up with a warning marker and the issues when a warning threshold is hit', async () => {

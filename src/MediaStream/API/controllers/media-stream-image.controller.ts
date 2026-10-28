@@ -232,7 +232,9 @@ export default class MediaStreamImageController {
 			// for a thrown error (ERROR for 5xx, WARN for 4xx and capacity
 			// sheds), and the image request line carries the params, status
 			// and error class. A second line here doubled every 400 at ERROR.
-			this.metricsService.recordError(phaseKey, error instanceof Error ? error.constructor.name : 'UnknownError')
+			this.metricsService.recordError(phaseKey, error instanceof Error
+				? error.constructor.name
+				: 'UnknownError')
 			throw error
 		}
 		finally {
@@ -260,7 +262,9 @@ export default class MediaStreamImageController {
 			fit: params.fit as FitOptions | undefined,
 			trimThreshold: Number(params.trimThreshold),
 			format,
-			quality: format === SupportedResizeFormats.avif ? Math.min(quality, this.avifMaxQuality) : quality,
+			quality: format === SupportedResizeFormats.avif
+				? Math.min(quality, this.avifMaxQuality)
+				: quality,
 		})
 	}
 
@@ -270,10 +274,14 @@ export default class MediaStreamImageController {
 	 * strings are capped, and a number that does not parse is left out.
 	 */
 	private describeRequest(log: ImageRequestLog, sourceKey: ImageSourceKey, params: ImageProcessingParams): void {
-		const text = (value: string | undefined): string | undefined => value === undefined ? undefined : truncateForLog(value, MAX_LOGGED_PARAM_LENGTH)
+		const text = (value: string | undefined): string | undefined => value === undefined
+			? undefined
+			: truncateForLog(value, MAX_LOGGED_PARAM_LENGTH)
 		const number = (value: string | undefined): number | undefined => {
 			const parsed = Number(value)
-			return value !== undefined && Number.isFinite(parsed) ? parsed : undefined
+			return value !== undefined && Number.isFinite(parsed)
+				? parsed
+				: undefined
 		}
 		log.source = sourceKey
 		log.schema = text(params.tenantSchema ?? PUBLIC_TENANT_SCHEMA)

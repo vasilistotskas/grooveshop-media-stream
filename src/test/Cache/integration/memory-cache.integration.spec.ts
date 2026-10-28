@@ -63,7 +63,10 @@ describe('memoryCacheService Integration', () => {
 
 	it('should set and get values', async () => {
 		const key = 'test-key'
-		const value = { data: 'test-value', timestamp: Date.now() }
+		const value = {
+			data: 'test-value',
+			timestamp: Date.now(),
+		}
 
 		await service.set(key, value)
 		const result = await service.get(key)

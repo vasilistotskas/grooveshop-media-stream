@@ -20,9 +20,14 @@ const SCHEMA_PATHS: ReadonlySet<string> = new Set(
 
 function collectMessages(errors: ValidationError[], prefix = ''): string[] {
 	return errors.flatMap((error) => {
-		const property = prefix ? `${prefix}.${error.property}` : error.property
+		const property = prefix
+			? `${prefix}.${error.property}`
+			: error.property
 		const own = Object.values(error.constraints ?? {}).map(message => `${property}: ${message}`)
-		return [...own, ...collectMessages(error.children ?? [], property)]
+		return [
+			...own,
+			...collectMessages(error.children ?? [], property),
+		]
 	})
 }
 

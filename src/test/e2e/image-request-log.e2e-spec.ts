@@ -33,7 +33,9 @@ async function noisePng(side: number): Promise<Buffer> {
 	for (let i = 0; i < noise.length; i++) {
 		noise[i] = (i * 2654435761) % 256
 	}
-	return sharp(noise, { raw: { width: side, height: side, channels: 3 } }).png({ compressionLevel: 0 }).toBuffer()
+	return sharp(noise, {
+		raw: { width: side, height: side, channels: 3 },
+	}).png({ compressionLevel: 0 }).toBuffer()
 }
 
 describe('image request log (e2e)', () => {
@@ -71,7 +73,16 @@ describe('image request log (e2e)', () => {
 		bodies.set(`/media/acme/uploads/ok-${RUN}.png`, png)
 		bodies.set(`/media/acme/uploads/svg-as-png-${RUN}.png`, svg)
 		bodies.set(`/media/acme/uploads/png-as-svg-${RUN}.svg`, bigPng)
-		bodies.set(`/media/acme/uploads/gzip-${RUN}.png`, Buffer.from([0x1F, 0x8B, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00]))
+		bodies.set(`/media/acme/uploads/gzip-${RUN}.png`, Buffer.from([
+			0x1F,
+			0x8B,
+			0x08,
+			0x00,
+			0x00,
+			0x00,
+			0x00,
+			0x00,
+		]))
 
 		upstream = createServer((req, res) => {
 			const body = bodies.get(req.url || '')
@@ -91,7 +102,9 @@ describe('image request log (e2e)', () => {
 
 		event = vi.spyOn(CorrelatedLogger, 'event')
 
-		moduleFixture = await Test.createTestingModule({ imports: [MediaStreamModule] }).compile()
+		moduleFixture = await Test.createTestingModule({
+			imports: [MediaStreamModule],
+		}).compile()
 		app = moduleFixture.createNestApplication()
 		await app.init()
 	})
@@ -144,11 +157,23 @@ describe('image request log (e2e)', () => {
 		// The pre-decode line, written before Sharp saw the bytes.
 		const decodes = event.mock.calls.filter(([, , fields, context]) => context === IMAGE_DECODE_LOG_CONTEXT && (fields as Record<string, unknown>).correlation_id === miss.fields.correlation_id)
 		expect(decodes).toHaveLength(1)
-		expect(decodes[0][2]).toMatchObject({ schema: 'acme', source: 'UPLOADED_MEDIA', path: miss.fields.path, input_format: 'png', input_bytes: miss.fields.input_bytes, resource_id: expect.any(String) })
+		expect(decodes[0][2]).toMatchObject({
+			schema: 'acme',
+			source: 'UPLOADED_MEDIA',
+			path: miss.fields.path,
+			input_format: 'png',
+			input_bytes: miss.fields.input_bytes,
+			resource_id: expect.any(String),
+		})
 
 		const hit = await lineFor(path)
 		expect(event.mock.calls.some(([, , fields, context]) => context === IMAGE_DECODE_LOG_CONTEXT && (fields as Record<string, unknown>).correlation_id === hit.fields.correlation_id)).toBe(false)
-		expect(hit.fields).toMatchObject({ cache: 'memory', outcome: 'ok', status: 200, output_bytes: miss.fields.output_bytes })
+		expect(hit.fields).toMatchObject({
+			cache: 'memory',
+			outcome: 'ok',
+			status: 200,
+			output_bytes: miss.fields.output_bytes,
+		})
 		expect(hit.fields.input_format).toBeUndefined()
 
 		const first = await request(app.getHttpServer()).get(path)
@@ -191,17 +216,32 @@ describe('image request log (e2e)', () => {
 
 		expect(status).toBe(200)
 		expect(level).toBe('log')
-		expect(fields).toMatchObject({ outcome: 'fallback', error: 'UnableToFetchResourceException', cache: 'miss', output_format: 'webp' })
+		expect(fields).toMatchObject({
+			outcome: 'fallback',
+			error: 'UnableToFetchResourceException',
+			cache: 'miss',
+			output_format: 'webp',
+		})
 	})
 
 	it('logs a 400 and an unmatched route as invalid', async () => {
 		const badWidth = await lineFor(`/media_stream-image/media/acme/uploads/ok-${RUN}.png/999999/64/contain/entropy/transparent/0/80.webp`)
-		expect(badWidth.fields).toMatchObject({ status: 400, outcome: 'invalid', width: 999999, source: 'UPLOADED_MEDIA' })
+		expect(badWidth.fields).toMatchObject({
+			status: 400,
+			outcome: 'invalid',
+			width: 999999,
+			source: 'UPLOADED_MEDIA',
+		})
 		expect(badWidth.fields.error).toBeDefined()
 		expect(badWidth.fields.cache).toBeUndefined()
 
 		const unmatched = await lineFor('/media_stream-image/definitely/not/a/route')
-		expect(unmatched.fields).toMatchObject({ status: 404, outcome: 'invalid', error: 'NotFoundException', path: 'definitely/not/a/route' })
+		expect(unmatched.fields).toMatchObject({
+			status: 404,
+			outcome: 'invalid',
+			error: 'NotFoundException',
+			path: 'definitely/not/a/route',
+		})
 		expect(unmatched.fields.source).toBeUndefined()
 	})
 })

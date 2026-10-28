@@ -28,7 +28,9 @@ describe('adminCacheController', () => {
 			],
 		})
 			.overrideGuard(InternalSecretGuard)
-			.useValue({ canActivate: () => true })
+			.useValue({
+				canActivate: () => true,
+			})
 			.compile()
 
 		controller = module.get<AdminCacheController>(AdminCacheController)
@@ -57,7 +59,12 @@ describe('adminCacheController', () => {
 			expect(tenantFlushService.flushTenant).toHaveBeenCalledWith(tenantSchema)
 		})
 
-		it.each(['UPPERCASE', 'bad-schema', 'sch@ma!', ''])('rejects the schema %j', async (tenantSchema) => {
+		it.each([
+			'UPPERCASE',
+			'bad-schema',
+			'sch@ma!',
+			'',
+		])('rejects the schema %j', async (tenantSchema) => {
 			await expect(controller.flushTenant({ tenantSchema })).rejects.toThrow(BadRequestException)
 			expect(tenantFlushService.flushTenant).not.toHaveBeenCalled()
 		})

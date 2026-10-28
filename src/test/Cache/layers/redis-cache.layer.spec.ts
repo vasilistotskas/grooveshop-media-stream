@@ -57,12 +57,30 @@ describe('redisCacheLayer', () => {
 		// MultiLayerCacheManager catches per layer and records exactly one error
 		// sample, so the layer must not swallow anything.
 		it.each([
-			['get', () => layer.get('k')],
-			['set', () => layer.set('k', 'v', 10)],
-			['delete', () => layer.delete('k')],
-			['has', () => layer.exists('k')],
-			['clear', () => layer.clear()],
-			['getStats', () => layer.getStats()],
+			[
+				'get',
+				() => layer.get('k'),
+			],
+			[
+				'set',
+				() => layer.set('k', 'v', 10),
+			],
+			[
+				'delete',
+				() => layer.delete('k'),
+			],
+			[
+				'has',
+				() => layer.exists('k'),
+			],
+			[
+				'clear',
+				() => layer.clear(),
+			],
+			[
+				'getStats',
+				() => layer.getStats(),
+			],
 		] as const)('should propagate %s failures', async (method, call) => {
 			redisCacheService[method].mockRejectedValue(new Error('Redis error'))
 
@@ -80,8 +98,14 @@ describe('redisCacheLayer', () => {
 		it('should SCAN the prefix and DEL every batch', async () => {
 			const client = {
 				scan: vi.fn()
-					.mockResolvedValueOnce(['7', ['image:acme:a', 'image:acme:b']])
-					.mockResolvedValueOnce(['0', ['image:acme:c']]),
+					.mockResolvedValueOnce([
+						'7',
+						['image:acme:a', 'image:acme:b'],
+					])
+					.mockResolvedValueOnce([
+						'0',
+						['image:acme:c'],
+					]),
 				del: vi.fn().mockResolvedValue(1),
 			}
 			redisCacheService.getClient.mockReturnValue(client as unknown as Redis)
@@ -97,10 +121,31 @@ describe('redisCacheLayer', () => {
 
 	describe('statistics', () => {
 		it('should combine service stats with the connection error count', async () => {
-			redisCacheService.getStats.mockResolvedValue({ hits: 10, misses: 5, keys: 20, ksize: 0, vsize: 512, hitRate: 0.67 })
-			redisCacheService.getConnectionStatus.mockReturnValue({ connected: true, stats: { hits: 10, misses: 5, operations: 15, errors: 2 } })
+			redisCacheService.getStats.mockResolvedValue({
+				hits: 10,
+				misses: 5,
+				keys: 20,
+				ksize: 0,
+				vsize: 512,
+				hitRate: 0.67,
+			})
+			redisCacheService.getConnectionStatus.mockReturnValue({
+				connected: true,
+				stats: {
+					hits: 10,
+					misses: 5,
+					operations: 15,
+					errors: 2,
+				},
+			})
 
-			await expect(layer.getStats()).resolves.toEqual({ hits: 10, misses: 5, keys: 20, hitRate: 0.67, errors: 2 })
+			await expect(layer.getStats()).resolves.toEqual({
+				hits: 10,
+				misses: 5,
+				keys: 20,
+				hitRate: 0.67,
+				errors: 2,
+			})
 		})
 	})
 

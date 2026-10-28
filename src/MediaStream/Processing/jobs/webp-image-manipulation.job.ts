@@ -18,7 +18,12 @@ const SHARP_INPUT_OPTIONS = { limitInputPixels: SHARP_INPUT_PIXEL_LIMIT, sequent
 const PNG_PALETTE_BELOW_QUALITY = 95
 
 const ENCODER_OPTIONS = {
-	jpeg: { progressive: true, mozjpeg: true, trellisQuantisation: true, overshootDeringing: true },
+	jpeg: {
+		progressive: true,
+		mozjpeg: true,
+		trellisQuantisation: true,
+		overshootDeringing: true,
+	},
 	png: { adaptiveFiltering: true, compressionLevel: 6 },
 	webp: { smartSubsample: true, effort: 4 },
 	avif: { effort: AVIF_EFFORT, chromaSubsampling: AVIF_CHROMA_SUBSAMPLING, lossless: false },
@@ -29,7 +34,9 @@ const ENCODER_OPTIONS = {
  * rasterised to PNG, everything else is encoded as requested.
  */
 export function outputFormat(format: SupportedResizeFormats): SupportedResizeFormats {
-	return format === SupportedResizeFormats.svg ? SupportedResizeFormats.png : format
+	return format === SupportedResizeFormats.svg
+		? SupportedResizeFormats.png
+		: format
 }
 
 /**
@@ -39,10 +46,16 @@ export function outputFormat(format: SupportedResizeFormats): SupportedResizeFor
  */
 function downscaleFactor(source: { width: number, height: number }, target: { width?: number, height?: number }, fit: FitOptions): number {
 	const ratios = [
-		target.width ? source.width / target.width : undefined,
-		target.height ? source.height / target.height : undefined,
+		target.width
+			? source.width / target.width
+			: undefined,
+		target.height
+			? source.height / target.height
+			: undefined,
 	].filter((ratio): ratio is number => ratio !== undefined)
-	return fit === FitOptions.contain || fit === FitOptions.inside ? Math.max(...ratios) : Math.min(...ratios)
+	return fit === FitOptions.contain || fit === FitOptions.inside
+		? Math.max(...ratios)
+		: Math.min(...ratios)
 }
 
 /**
@@ -73,8 +86,16 @@ function boxWithinSource(source: { width: number, height: number }, target: { wi
 	const { width, height } = target
 	if (!width || !height) {
 		return {
-			...(width ? { width: Math.min(width, source.width) } : {}),
-			...(height ? { height: Math.min(height, source.height) } : {}),
+			...(width
+				? {
+						width: Math.min(width, source.width),
+					}
+				: {}),
+			...(height
+				? {
+						height: Math.min(height, source.height),
+					}
+				: {}),
 		}
 	}
 	const widthRatio = source.width / width
@@ -84,16 +105,28 @@ function boxWithinSource(source: { width: number, height: number }, target: { wi
 			return target
 		}
 		return widthRatio <= heightRatio
-			? { width: source.width, height: Math.min(source.height, Math.max(1, Math.round(height * widthRatio))) }
-			: { width: Math.min(source.width, Math.max(1, Math.round(width * heightRatio))), height: source.height }
+			? {
+					width: source.width,
+					height: Math.min(source.height, Math.max(1, Math.round(height * widthRatio))),
+				}
+			: {
+					width: Math.min(source.width, Math.max(1, Math.round(width * heightRatio))),
+					height: source.height,
+				}
 	}
 	if (fit === FitOptions.contain) {
 		if (Math.max(widthRatio, heightRatio) >= 1) {
 			return target
 		}
 		return widthRatio >= heightRatio
-			? { width: source.width, height: Math.ceil(height * widthRatio) }
-			: { width: Math.ceil(width * heightRatio), height: source.height }
+			? {
+					width: source.width,
+					height: Math.ceil(height * widthRatio),
+				}
+			: {
+					width: Math.ceil(width * heightRatio),
+					height: source.height,
+				}
 	}
 	return target
 }
@@ -133,8 +166,12 @@ export default class WebpImageManipulationJob {
 			// Pipeline order: trim → resize → format conversion
 			if (Object.keys(resizeScales).length > 0) {
 				const source = await this.sourceSize(manipulation)
-				const box = source ? boxWithinSource(source, resizeScales, options.fit) : resizeScales
-				const factor = source ? downscaleFactor(source, box, options.fit) : 1
+				const box = source
+					? boxWithinSource(source, resizeScales, options.fit)
+					: resizeScales
+				const factor = source
+					? downscaleFactor(source, box, options.fit)
+					: 1
 				if (options.trimThreshold !== null && !Number.isNaN(options.trimThreshold)) {
 					manipulation = await this.trimOnWorkingCopy(manipulation, options, resizeScales)
 				}
@@ -186,7 +223,9 @@ export default class WebpImageManipulationJob {
 			// through to application/octet-stream. See lovell/sharp#2504.
 			return new ManipulationJobResult({
 				size: String(info.size),
-				format: info.format === 'heif' ? SupportedResizeFormats.avif : info.format,
+				format: info.format === 'heif'
+					? SupportedResizeFormats.avif
+					: info.format,
 				buffer: data,
 			})
 		}
@@ -207,8 +246,12 @@ export default class WebpImageManipulationJob {
 	 */
 	private async trimOnWorkingCopy(source: Sharp, options: ResizeOptions, target: { width?: number, height?: number }): Promise<Sharp> {
 		const box = {
-			width: target.width ? Math.max(TRIM_WORKING_SIZE, 2 * target.width) : undefined,
-			height: target.height ? Math.max(TRIM_WORKING_SIZE, 2 * target.height) : undefined,
+			width: target.width
+				? Math.max(TRIM_WORKING_SIZE, 2 * target.width)
+				: undefined,
+			height: target.height
+				? Math.max(TRIM_WORKING_SIZE, 2 * target.height)
+				: undefined,
 		}
 		const { data, info } = await this.toBuffer(
 			source.resize({ ...box, fit: 'outside', withoutEnlargement: true }).raw(),
@@ -216,8 +259,13 @@ export default class WebpImageManipulationJob {
 		)
 		source.destroy()
 
-		return this.withTimeout(sharp(data, { raw: { width: info.width, height: info.height, channels: info.channels } }))
-			.trim({ background: options.background, threshold: Number(options.trimThreshold) })
+		return this.withTimeout(sharp(data, {
+			raw: { width: info.width, height: info.height, channels: info.channels },
+		}))
+			.trim({
+				background: options.background,
+				threshold: Number(options.trimThreshold),
+			})
 	}
 
 	/**
@@ -232,11 +280,15 @@ export default class WebpImageManipulationJob {
 			return undefined
 		}
 		const rotated = orientation !== undefined && orientation >= 5
-		return rotated ? { width: height, height: width } : { width, height }
+		return rotated
+			? { width: height, height: width }
+			: { width, height }
 	}
 
 	private withTimeout(pipeline: Sharp): Sharp {
-		return this.timeoutSeconds > 0 ? pipeline.timeout({ seconds: this.timeoutSeconds }) : pipeline
+		return this.timeoutSeconds > 0
+			? pipeline.timeout({ seconds: this.timeoutSeconds })
+			: pipeline
 	}
 
 	/**

@@ -35,7 +35,10 @@ export class CacheHealthIndicator extends BaseHealthIndicator {
 		const startTime = Date.now()
 
 		try {
-			const testValue = { timestamp: Date.now(), test: true }
+			const testValue = {
+				timestamp: Date.now(),
+				test: true,
+			}
 
 			await this.memoryCacheService.set(HEALTH_CHECK_KEY, testValue, 60)
 
@@ -99,7 +102,9 @@ export class CacheHealthIndicator extends BaseHealthIndicator {
 		}
 		catch (error: unknown) {
 			const responseTime = Date.now() - startTime
-			CorrelatedLogger.error(`Cache health check failed: ${errorMessage(error)}`, error instanceof Error ? error.stack : undefined, CacheHealthIndicator.name)
+			CorrelatedLogger.error(`Cache health check failed: ${errorMessage(error)}`, error instanceof Error
+				? error.stack
+				: undefined, CacheHealthIndicator.name)
 
 			return {
 				[this.key]: {

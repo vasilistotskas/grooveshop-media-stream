@@ -3,5 +3,7 @@
  * stringified instead of producing the literal "undefined" in a log line.
  */
 export function errorMessage(error: unknown): string {
-	return error instanceof Error ? error.message : String(error)
+	return error instanceof Error
+		? error.message
+		: String(error)
 }

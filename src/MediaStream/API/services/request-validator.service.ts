@@ -128,7 +128,12 @@ export class RequestValidatorService {
 		if (width * height > MAX_TOTAL_PIXELS) {
 			throw new InvalidRequestError(
 				`Requested resize target (${width}x${height}) exceeds the maximum of ${MAX_TOTAL_PIXELS} total pixels`,
-				{ correlationId, width, height, max: MAX_TOTAL_PIXELS },
+				{
+					correlationId,
+					width,
+					height,
+					max: MAX_TOTAL_PIXELS,
+				},
 			)
 		}
 	}

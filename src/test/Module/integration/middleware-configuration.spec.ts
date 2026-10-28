@@ -84,29 +84,41 @@ describe('middleware Configuration', () => {
 			})
 			.overrideProvider(CacheHealthIndicator)
 			.useValue({
-				isHealthy: vi.fn().mockResolvedValue({ cache: { status: 'up' } }),
+				isHealthy: vi.fn().mockResolvedValue({
+					cache: { status: 'up' },
+				}),
 			})
 			.overrideProvider(RedisHealthIndicator)
 			.useValue({
-				isHealthy: vi.fn().mockResolvedValue({ redis: { status: 'up' } }),
+				isHealthy: vi.fn().mockResolvedValue({
+					redis: { status: 'up' },
+				}),
 			})
 			.overrideProvider(DiskSpaceHealthIndicator)
 			.useValue({
-				isHealthy: vi.fn().mockResolvedValue({ disk: { status: 'up', free: '10GB', used: '5GB' } }),
+				isHealthy: vi.fn().mockResolvedValue({
+					disk: { status: 'up', free: '10GB', used: '5GB' },
+				}),
 				getCurrentDiskInfo: vi.fn().mockResolvedValue({ free: '10GB', used: '5GB', total: '15GB' }),
 			})
 			.overrideProvider(MemoryHealthIndicator)
 			.useValue({
-				isHealthy: vi.fn().mockResolvedValue({ memory: { status: 'up', used: '100MB', free: '900MB' } }),
+				isHealthy: vi.fn().mockResolvedValue({
+					memory: { status: 'up', used: '100MB', free: '900MB' },
+				}),
 				getCurrentMemoryInfo: vi.fn().mockReturnValue({ used: '100MB', free: '900MB', total: '1GB' }),
 			})
 			.overrideProvider(HttpHealthIndicator)
 			.useValue({
-				isHealthy: vi.fn().mockResolvedValue({ http: { status: 'up' } }),
+				isHealthy: vi.fn().mockResolvedValue({
+					http: { status: 'up' },
+				}),
 			})
 			.overrideProvider(StorageHealthIndicator)
 			.useValue({
-				isHealthy: vi.fn().mockResolvedValue({ storage: { status: 'up' } }),
+				isHealthy: vi.fn().mockResolvedValue({
+					storage: { status: 'up' },
+				}),
 			})
 			.compile()
 

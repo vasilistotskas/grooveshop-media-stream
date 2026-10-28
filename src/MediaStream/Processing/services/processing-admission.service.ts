@@ -41,7 +41,9 @@ export class ProcessingAdmissionService implements OnModuleDestroy {
 	) {
 		const configured = configService.get<number>('processing.maxConcurrent')
 		const cpuCores = configService.get<number>('processing.cpuCores')
-		this.maxConcurrent = Math.max(1, configured > 0 ? Math.floor(configured) : Math.ceil(cpuCores))
+		this.maxConcurrent = Math.max(1, configured > 0
+			? Math.floor(configured)
+			: Math.ceil(cpuCores))
 		this.maxQueue = Math.max(0, configService.get<number>('processing.maxQueue'))
 		this.queueTimeoutMs = Math.max(0, configService.get<number>('processing.queueTimeoutMs'))
 		CorrelatedLogger.log(`Processing admission: ${this.maxConcurrent} concurrent pipeline(s), queue ${this.maxQueue}, queue timeout ${this.queueTimeoutMs}ms`, ProcessingAdmissionService.name)
@@ -58,7 +60,12 @@ export class ProcessingAdmissionService implements OnModuleDestroy {
 
 	/** Current occupancy, for health and metrics. */
 	get stats(): { inFlight: number, queued: number, maxConcurrent: number, maxQueue: number } {
-		return { inFlight: this.inFlight, queued: this.waiters.length, maxConcurrent: this.maxConcurrent, maxQueue: this.maxQueue }
+		return {
+			inFlight: this.inFlight,
+			queued: this.waiters.length,
+			maxConcurrent: this.maxConcurrent,
+			maxQueue: this.maxQueue,
+		}
 	}
 
 	/** Run `fn` once a pipeline slot is available; rejects with ProcessingOverloadedError when it never becomes one. */
