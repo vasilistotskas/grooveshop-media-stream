@@ -1,3 +1,10 @@
+## [3.11.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.11.2...v3.11.3) (2026-10-28)
+
+
+### Bug Fixes
+
+* **deps:** bump NestJS 12.3, axios 1.21, antfu eslint-config 10, pnpm 12.15 ([#45](https://github.com/vasilistotskas/grooveshop-media-stream/issues/45)) ([9bfc196](https://github.com/vasilistotskas/grooveshop-media-stream/commit/9bfc196f0355c3e7980c2397a3aba11d87daba9d))
+
 ## [3.11.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.11.1...v3.11.2) (2026-10-26)
 
 
