@@ -3,7 +3,7 @@ name: run-tests
 description: Run vitest tests for specific modules or all tests in grooveshop-media-stream
 argument-hint: "[module|all|e2e|perf]"
 arguments: [module]
-allowed-tools: Read, Grep, Glob, Bash
+allowed-tools: Read Grep Glob Bash(pnpm run test*) Bash(pnpm exec vitest *)
 ---
 
 Run tests for the grooveshop-media-stream project. Target: `$module`

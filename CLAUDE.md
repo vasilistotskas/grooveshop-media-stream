@@ -23,7 +23,7 @@ pnpm run test:perf        # Performance specs (wall-clock assertions; excluded f
 pnpm run cache:clear      # Clear Redis + file system cache
 ```
 
-Run a single test file: `pnpm exec vitest run src/test/Cache/services/memory-cache.service.spec.ts --no-coverage`. Use `pnpm exec`, never `npx`. Tests require Redis running locally (CI uses Redis 8 Alpine).
+Run a single test file: `pnpm exec vitest run src/test/Cache/services/memory-cache.service.spec.ts --no-coverage`. Use `pnpm exec`, never `npx`. Tests require Redis running locally (the CI service image is in `.github/workflows/ci.yml`).
 
 ## Architecture
 

@@ -9,7 +9,13 @@
 import { readFileSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 
-const input = JSON.parse(readFileSync(0, 'utf8'))
+let input = {}
+try {
+  input = JSON.parse(readFileSync(0, 'utf8'))
+}
+catch {
+  process.exit(0)
+}
 const filePath = input.tool_input?.file_path
 
 if (filePath && /\.(ts|mts|js|mjs|cjs)$/.test(filePath)) {
