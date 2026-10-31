@@ -123,6 +123,7 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 
 	// Memory cache configuration
 	'cache.memory.maxSize': { env: 'CACHE_MEMORY_MAX_SIZE', default: 104857600, type: 'number' },
+	// Seconds; applies only to writes that pass no TTL. Image entries use cache.image.privateTtl
 	'cache.memory.defaultTtl': { env: 'CACHE_MEMORY_DEFAULT_TTL', default: 3600, type: 'number' },
 	'cache.memory.checkPeriod': { env: 'CACHE_MEMORY_CHECK_PERIOD', default: 600, type: 'number' },
 	'cache.memory.maxKeys': { env: 'CACHE_MEMORY_MAX_KEYS', default: 1000, type: 'number' },
@@ -133,6 +134,7 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	'cache.redis.port': { env: 'REDIS_PORT', default: 6379, type: 'number' },
 	'cache.redis.password': { env: 'REDIS_PASSWORD', default: undefined, type: 'string' },
 	'cache.redis.db': { env: 'REDIS_DB', default: 0, type: 'number' },
+	// Seconds; applies only to writes that pass no TTL. Image entries use cache.image.privateTtl
 	'cache.redis.ttl': { env: 'REDIS_TTL', default: 7200, type: 'number' },
 	'cache.redis.maxRetries': { env: 'REDIS_MAX_RETRIES', default: 3, type: 'number' },
 	// TTL (ms) for memoising the Redis health probe result

@@ -42,8 +42,8 @@ This service provides image processing capabilities for the Grooveshop platform,
 - `BACKEND_URL`: URL for the upstream image server
 - `REDIS_HOST` / `REDIS_PORT`: Redis connection (required for cache)
 - `CACHE_MEMORY_MAX_SIZE`: Memory cache limit (default: 100MB)
-- `CACHE_MEMORY_DEFAULT_TTL`: Memory cache TTL in seconds (default: 3600)
-- `REDIS_TTL`: Redis cache TTL in seconds (default: 7200)
+- `CACHE_MEMORY_DEFAULT_TTL`: Memory cache TTL in seconds for writes that pass no TTL (default: 3600). Image entries use `CACHE_IMAGE_PRIVATE_TTL`
+- `REDIS_TTL`: Redis TTL in seconds for writes that pass no TTL (default: 7200). Image entries use `CACHE_IMAGE_PRIVATE_TTL` (default: 15552000, 180 days) in Redis, memory and disk
 - `CACHE_FILE_DIRECTORY`: File cache directory (default: `./storage`)
 - `PROCESSING_CPU_CORES`: Sharp concurrency, CPU cores (fractions allowed, default: 1.5)
 - `MONITORING_ENABLED`: Enable monitoring (default: true)
