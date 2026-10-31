@@ -30,7 +30,7 @@ vi.mock('#microservice/Correlation/utils/performance-tracker.util', () => ({
 	},
 }))
 
-const AVIF_MAX_QUALITY = 60
+const AVIF_MAX_QUALITY = 55
 
 describe('mediaStreamImageController', () => {
 	let controller: MediaStreamImageController

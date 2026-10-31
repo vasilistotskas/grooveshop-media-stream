@@ -17,7 +17,7 @@ Review code changes for performance regressions in the image-processing hot path
 ### 1. Sharp Pipeline
 - `src/MediaStream/Processing/services/sharp-config.service.ts` — concurrency formula `max(2, min(4, floor(cpuCores * 2)))`, 100MB cache, 20 files, 150 items. Don't raise these without measuring memory ceiling.
 - `src/MediaStream/Processing/jobs/webp-image-manipulation.job.ts` — every `sharp()` call on a fetched source must use `SHARP_INPUT_PIXEL_LIMIT` (`image-limits.constant.ts`) as `limitInputPixels` to prevent decompression bombs.
-- AVIF encoder tunables (`image-encoding.constant.ts`: effort 3, 4:4:4) — raising effort costs 4-8x encode time; bump `PROCESSING_VERSION` with any change to produced bytes. The quality ceiling is `PROCESSING_AVIF_MAX_QUALITY` (default 60), clamped before hashing, so changing it needs no version bump.
+- AVIF encoder tunables (`image-encoding.constant.ts`: effort 3, 4:4:4) — raising effort costs 4-8x encode time; bump `PROCESSING_VERSION` with any change to produced bytes. The quality ceiling is `PROCESSING_AVIF_MAX_QUALITY` (default 55), clamped before hashing, so changing it needs no version bump.
 - Watch for new `await sharp(...)` calls inside per-request hot paths without size gating.
 
 ### 2. Synchronous Processing
