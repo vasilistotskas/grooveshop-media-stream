@@ -350,6 +350,14 @@ describe('redisCacheService', () => {
 			expect(redis.set).toHaveBeenCalledWith('key', expect.any(Buffer), 'EX', 7200)
 		})
 
+		it('should keep an explicit TTL longer than cache.redis.ttl (the default only applies without one)', async () => {
+			const sixMonths = 6 * 30 * 24 * 3600
+
+			await service.set('key', 'value', sixMonths)
+
+			expect(redis.set).toHaveBeenCalledWith('key', expect.any(Buffer), 'EX', sixMonths)
+		})
+
 		it('should use the binary envelope for values carrying a Buffer', async () => {
 			const data = Buffer.from([9, 8, 7])
 			await service.set('image:acme:x', {

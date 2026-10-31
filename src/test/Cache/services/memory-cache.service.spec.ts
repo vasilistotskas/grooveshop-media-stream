@@ -132,6 +132,14 @@ describe('memoryCacheService', () => {
 			}
 		})
 
+		it('should keep an explicit TTL longer than the configured default', async () => {
+			const sixMonths = 6 * 30 * 24 * 3600
+
+			await service.set('long', 'value', sixMonths)
+
+			expect(service.getTtl('long')).toBeGreaterThan(Date.now() + (sixMonths - 60) * 1000)
+		})
+
 		it('should get TTL for a key', async () => {
 			const key = 'ttl-test'
 			const value = 'test-value'
