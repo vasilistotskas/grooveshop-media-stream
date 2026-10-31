@@ -1,3 +1,10 @@
+## [3.11.4](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.11.3...v3.11.4) (2026-10-31)
+
+
+### Performance Improvements
+
+* **processing:** lower the AVIF quality ceiling to 55 ([#48](https://github.com/vasilistotskas/grooveshop-media-stream/issues/48)) ([acffd8b](https://github.com/vasilistotskas/grooveshop-media-stream/commit/acffd8b7beecc0c8a7ffc9dfee2d082433fa4554))
+
 ## [3.11.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.11.2...v3.11.3) (2026-10-28)
 
 
