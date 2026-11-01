@@ -1,5 +1,6 @@
 import type { Response } from 'express'
 import type { MockedObject } from 'vitest'
+import type { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
 import type { ImageRequestLog } from '#microservice/Correlation/utils/image-request-log.util'
 import { BadRequestException, HttpException, HttpStatus, NotFoundException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
@@ -8,6 +9,7 @@ import MediaStreamImageController from '#microservice/API/controllers/media-stre
 import { ImageStreamService } from '#microservice/API/services/image-stream.service'
 import { RequestValidatorService } from '#microservice/API/services/request-validator.service'
 import { UrlBuilderService } from '#microservice/API/services/url-builder.service'
+import { RenditionSizeService } from '#microservice/Cache/services/rendition-size.service'
 import { TenantSuspendedError } from '#microservice/common/errors/media-stream.errors'
 import { ConfigService } from '#microservice/Config/config.service'
 import { requestContextStorage } from '#microservice/Correlation/async-local-storage'
@@ -40,6 +42,7 @@ describe('mediaStreamImageController', () => {
 	let mockCorrelationService: MockedObject<CorrelationService>
 	let mockMetricsService: MockedObject<MetricsService>
 	let mockTenantDomainsService: MockedObject<TenantDomainsService>
+	let mockRenditionSizes: { isKnown: ReturnType<typeof vi.fn>, touch: ReturnType<typeof vi.fn> }
 	let mockResponse: MockedObject<Response>
 
 	beforeEach(async () => {
@@ -64,6 +67,10 @@ describe('mediaStreamImageController', () => {
 			recordError: vi.fn(),
 		} as any
 
+		mockRenditionSizes = {
+			isKnown: vi.fn().mockReturnValue(false),
+			touch: vi.fn(),
+		}
 		mockTenantDomainsService = {
 			isSuspended: vi.fn().mockReturnValue(false),
 		} as any
@@ -108,6 +115,10 @@ describe('mediaStreamImageController', () => {
 				{
 					provide: TenantDomainsService,
 					useValue: mockTenantDomainsService,
+				},
+				{
+					provide: RenditionSizeService,
+					useValue: mockRenditionSizes,
 				},
 				{
 					provide: ConfigService,
@@ -396,6 +407,40 @@ describe('mediaStreamImageController', () => {
 
 		it('leaves other formats at the requested quality', async () => {
 			expect(await requestedQuality('/media_stream-image/media/acme/uploads/a.jpg/768/576/cover/attention/transparent/0/80.webp')).toBe(80)
+		})
+	})
+
+	describe('rendition presets', () => {
+		async function requestedOptions(path: string): Promise<ResizeOptions> {
+			await controller.handleImageRequest({ path } as any, mockResponse)
+			return mockImageStreamService.processAndStream.mock.calls[0][1].resizeOptions
+		}
+
+		it('hashes an unknown size as the preset it snaps to, so neighbouring sizes share one entry', async () => {
+			const options = await requestedOptions('/media_stream-image/media/acme/uploads/a.jpg/704/820/cover/attention/transparent/0/80.avif')
+			expect(options).toMatchObject({ width: 752, height: 876 })
+			expect(mockRenditionSizes.touch).toHaveBeenCalledWith('704x820')
+		})
+
+		it('answers a size the service has learned exactly', async () => {
+			mockRenditionSizes.isKnown.mockImplementation((key: string) => key === '704x820')
+
+			const options = await requestedOptions('/media_stream-image/media/acme/uploads/a.jpg/704/820/cover/attention/transparent/0/80.avif')
+
+			expect(options).toMatchObject({ width: 704, height: 820 })
+			expect(mockRenditionSizes.isKnown).toHaveBeenCalledWith('704x820')
+		})
+
+		it('sends the same options for two requests that snap to one preset', async () => {
+			const first = await requestedOptions('/media_stream-image/media/acme/uploads/a.jpg/672/0/inside/entropy/transparent/0/80.avif')
+			mockImageStreamService.processAndStream.mockClear()
+			const second = await requestedOptions('/media_stream-image/media/acme/uploads/a.jpg/650/0/inside/center/transparent/0/100.avif')
+			expect(second).toEqual(first)
+		})
+
+		it('bounds the original size at the widest preset', async () => {
+			const options = await requestedOptions('/media_stream-image/media/acme/uploads/a.png/0/0/inside/center/transparent/0/90.png')
+			expect(options).toMatchObject({ width: 2048, height: 0, quality: 90 })
 		})
 	})
 

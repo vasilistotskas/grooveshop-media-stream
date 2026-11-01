@@ -140,17 +140,8 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	// TTL (ms) for memoising the Redis health probe result
 	'cache.redis.healthCheckCacheTtl': { env: 'REDIS_HEALTH_CACHE_TTL', default: 10000, type: 'number' },
 
-	// File cache configuration
+	// Scratch directory: source downloads in flight and the fallback image's renditions
 	'cache.file.directory': { env: 'CACHE_FILE_DIRECTORY', default: './storage', type: 'string' },
-
-	// Cache warming configuration
-	'cache.warming.enabled': { env: 'CACHE_WARMING_ENABLED', default: true, type: 'boolean' },
-	'cache.warming.warmupOnStart': { env: 'CACHE_WARMING_ON_START', default: true, type: 'boolean' },
-	'cache.warming.maxFilesToWarm': { env: 'CACHE_WARMING_MAX_FILES', default: 50, type: 'number' },
-	'cache.warming.warmupCron': { env: 'CACHE_WARMING_CRON', default: '0 */6 * * *', type: 'string' },
-	'cache.warming.popularImageThreshold': { env: 'CACHE_WARMING_THRESHOLD', default: 5, type: 'number' },
-	// Base TTL (seconds) for warmed entries; access count scales it up
-	'cache.warming.baseTtl': { env: 'CACHE_WARMING_BASE_TTL', default: 3600, type: 'number' },
 
 	// Image TTL configuration (in seconds — cache layers expect seconds)
 	'cache.image.publicTtl': { env: 'CACHE_IMAGE_PUBLIC_TTL', default: 12 * 30 * 24 * 3600, type: 'number' },
@@ -238,22 +229,33 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	'tenantDomains.secret': { env: 'INTERNAL_DOMAINS_SECRET', default: '', type: 'string' },
 	'tenantDomains.refreshIntervalMs': { env: 'TENANT_DOMAINS_REFRESH_INTERVAL_MS', default: 300000, type: 'number' },
 
-	// On-disk cache tier thresholds (bytes / file counts). Cleanup evicts down
-	// to the warning values; the health check reports `down` at the critical ones.
-	'storage.warningSize': { env: 'STORAGE_WARNING_SIZE', default: 838860800, type: 'number' },
-	'storage.criticalSize': { env: 'STORAGE_CRITICAL_SIZE', default: 1073741824, type: 'number' },
-	'storage.warningFileCount': { env: 'STORAGE_WARNING_FILE_COUNT', default: 5000, type: 'number' },
-	'storage.criticalFileCount': { env: 'STORAGE_CRITICAL_FILE_COUNT', default: 10000, type: 'number' },
+	// The rendition store: an S3-compatible bucket (Cloudflare R2) every replica
+	// reads and writes, behind the memory and Redis tiers. Every call has a short
+	// timeout and fails fast to a miss (read) or to serving the image uncached
+	// (write). Off while the endpoint or the bucket is empty.
+	'renditions.store.endpoint': { env: 'RENDITION_STORE_ENDPOINT', default: '', type: 'string' },
+	'renditions.store.bucket': { env: 'RENDITION_STORE_BUCKET', default: '', type: 'string' },
+	'renditions.store.accessKeyId': { env: 'RENDITION_STORE_ACCESS_KEY_ID', default: '', type: 'string' },
+	'renditions.store.secretAccessKey': { env: 'RENDITION_STORE_SECRET_ACCESS_KEY', default: '', type: 'string' },
+	'renditions.store.readTimeoutMs': { env: 'RENDITION_STORE_READ_TIMEOUT_MS', default: 1000, type: 'number' },
+	'renditions.store.writeTimeoutMs': { env: 'RENDITION_STORE_WRITE_TIMEOUT_MS', default: 5000, type: 'number' },
 
-	// Storage cleanup cron: expired pairs, stale orphans/temp files, then
-	// score-based eviction to the warning thresholds. Dry run reports only.
-	'storage.cleanup.enabled': { env: 'STORAGE_CLEANUP_ENABLED', default: true, type: 'boolean' },
-	'storage.cleanup.cronSchedule': { env: 'STORAGE_CLEANUP_CRON', default: '0 2 * * *', type: 'string' },
-	'storage.cleanup.dryRun': { env: 'STORAGE_CLEANUP_DRY_RUN', default: false, type: 'boolean' },
-	'storage.cleanup.maxDuration': { env: 'STORAGE_CLEANUP_MAX_DURATION', default: 300000, type: 'number' },
+	// Exact sizes, learned: a requested size becomes exact (answered with no
+	// extra pixel) once the service has rendered it for this many uploads, stays
+	// exact while it is asked for within the window, and at most `maxKnown`
+	// sizes are exact at once (the least recently asked leaves first). Any other
+	// size snaps up the width ladder.
+	'renditions.sizes.minSources': { env: 'RENDITION_SIZES_MIN_SOURCES', default: 10, type: 'number' },
+	'renditions.sizes.windowDays': { env: 'RENDITION_SIZES_WINDOW_DAYS', default: 30, type: 'number' },
+	'renditions.sizes.maxKnown': { env: 'RENDITION_SIZES_MAX_KNOWN', default: 300, type: 'number' },
 
-	// Pairs with at least this many recorded cache hits are evicted last.
-	'storage.eviction.minAccessCount': { env: 'STORAGE_EVICTION_MIN_ACCESS_COUNT', default: 5, type: 'number' },
+	// Rendition pre-generation: the cron renders the renditions an upload is
+	// shown at (learned from the renditions already made for its folder) before
+	// anyone asks. Needs the store; off while the media directory is empty.
+	'renditions.mediaDirectory': { env: 'RENDITIONS_MEDIA_DIRECTORY', default: '', type: 'string' },
+	'renditions.cronSchedule': { env: 'RENDITIONS_CRON', default: '*/10 * * * *', type: 'string' },
+	'renditions.minSources': { env: 'RENDITIONS_MIN_SOURCES', default: 3, type: 'number' },
+	'renditions.maxPerSource': { env: 'RENDITIONS_MAX_PER_SOURCE', default: 16, type: 'number' },
 
 	// Graceful shutdown configuration
 	'shutdown.timeout': { env: 'SHUTDOWN_TIMEOUT', default: 30000, type: 'number' },

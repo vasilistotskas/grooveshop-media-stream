@@ -55,14 +55,23 @@ describe('appConfigDto', () => {
 			expect(errors.find(error => error.property === 'cache')).toBeDefined()
 		})
 
-		it('should fail validation with a zero eviction access threshold', async () => {
+		it('should fail validation with a rendition store timeout too short to be a deadline', async () => {
 			const plain = schemaDefaults()
-			plain.storage.eviction.minAccessCount = 0
+			plain.renditions.store.readTimeoutMs = 0
 
 			const errors = await validateConfig(plain)
 
 			expect(errors.length).toBeGreaterThan(0)
-			expect(errors.find(error => error.property === 'storage')).toBeDefined()
+			expect(errors.find(error => error.property === 'renditions')).toBeDefined()
+		})
+
+		it('should fail validation with an exact-size threshold of zero uploads', async () => {
+			const plain = schemaDefaults()
+			plain.renditions.sizes.minSources = 0
+
+			const errors = await validateConfig(plain)
+
+			expect(errors.find(error => error.property === 'renditions')).toBeDefined()
 		})
 
 		it('should fail validation when a leaf field is missing', async () => {

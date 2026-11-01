@@ -43,8 +43,11 @@ This service provides image processing capabilities for the Grooveshop platform,
 - `REDIS_HOST` / `REDIS_PORT`: Redis connection (required for cache)
 - `CACHE_MEMORY_MAX_SIZE`: Memory cache limit (default: 100MB)
 - `CACHE_MEMORY_DEFAULT_TTL`: Memory cache TTL in seconds for writes that pass no TTL (default: 3600). Image entries use `CACHE_IMAGE_PRIVATE_TTL`
-- `REDIS_TTL`: Redis TTL in seconds for writes that pass no TTL (default: 7200). Image entries use `CACHE_IMAGE_PRIVATE_TTL` (default: 15552000, 180 days) in Redis, memory and disk
-- `CACHE_FILE_DIRECTORY`: File cache directory (default: `./storage`)
+- `REDIS_TTL`: Redis TTL in seconds for writes that pass no TTL (default: 7200). Image entries use `CACHE_IMAGE_PRIVATE_TTL` (default: 15552000, 180 days) in Redis, memory and the rendition store
+- `CACHE_FILE_DIRECTORY`: Scratch directory for source downloads in flight (default: `./storage`)
+- `RENDITION_STORE_ENDPOINT`, `RENDITION_STORE_BUCKET`, `RENDITION_STORE_ACCESS_KEY_ID`, `RENDITION_STORE_SECRET_ACCESS_KEY`: the S3-compatible bucket (Cloudflare R2) that holds every rendition for all replicas; empty endpoint or bucket turns it off (default: off). `RENDITION_STORE_READ_TIMEOUT_MS` (1000) and `RENDITION_STORE_WRITE_TIMEOUT_MS` (5000) are the deadlines after which a call is a miss or leaves the image uncached
+- `RENDITION_SIZES_MIN_SOURCES` (10), `RENDITION_SIZES_WINDOW_DAYS` (30), `RENDITION_SIZES_MAX_KNOWN` (300): a requested size is answered exactly once it was rendered for that many uploads, while it is asked for within the window, at most that many at once; any other size snaps up a width ladder (see `docs/renditions.md`)
+- `RENDITIONS_MEDIA_DIRECTORY`, `RENDITIONS_CRON`, `RENDITIONS_MIN_SOURCES`, `RENDITIONS_MAX_PER_SOURCE`: pre-generation of an upload's renditions (see `docs/renditions.md`; off while the directory is empty)
 - `PROCESSING_CPU_CORES`: Sharp concurrency, CPU cores (fractions allowed, default: 1.5)
 - `MONITORING_ENABLED`: Enable monitoring (default: true)
 - `CORS_ORIGIN`: comma-separated platform origins, `scheme://host[:port]` (default: `*`, refused in production). Store origins are never listed: any hostname in the tenant-domain feed is allowed per request
@@ -138,15 +141,14 @@ The project uses Vitest with SWC for fast compilation. Unit tests are in `src/te
 ```
 src/MediaStream/
 ├── API/            # Controllers, DTOs, image source config, request validation, URL building, streaming
-├── Cache/          # Multi-layer caching (Memory → Redis → File), cache warming, eviction
+├── Cache/          # Multi-layer caching (Memory → Redis → rendition store), rendition catalogue
 ├── Config/         # Centralized config service, single-source schema-based validation
 ├── Correlation/    # Request correlation IDs, timing middleware, performance tracking
-├── Health/         # Health check indicators (disk, memory, Sharp, cache, Redis, HTTP, storage, tenant domains)
+├── Health/         # Health check indicators (disk space, memory, Sharp, cache, Redis, HTTP, tenant domains)
 ├── HTTP/           # HTTP client with circuit breaker pattern, retry with exponential backoff
 ├── Metrics/        # Prometheus metrics via prom-client, request/system/cache metrics
 ├── Processing/     # Stateless Sharp jobs (fetch, store, identity, format manipulation)
 ├── RateLimit/      # Adaptive rate limiting guard with domain whitelisting
-├── Storage/        # On-disk cache inventory and nightly cleanup (TTL expiry, orphan sweep, threshold eviction)
 ├── Validation/     # Input sanitization, security threat detection
 └── common/         # Shared error classes, exception filter, types, graceful shutdown
 ```

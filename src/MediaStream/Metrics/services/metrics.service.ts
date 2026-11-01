@@ -14,6 +14,27 @@ import { ConfigService } from '#microservice/Config/config.service'
 export const PROCESSING_REJECT_REASONS = ['queue_full', 'queue_timeout'] as const
 export type ProcessingRejectReason = (typeof PROCESSING_REJECT_REASONS)[number]
 
+/** Every call to the rendition store, by operation and outcome. */
+export const RENDITION_STORE_OPERATIONS = ['get', 'put', 'head', 'delete', 'list'] as const
+export const RENDITION_STORE_RESULTS = [
+	'hit',
+	'miss',
+	'ok',
+	'error',
+	'skipped',
+] as const
+export type RenditionStoreOperationName = (typeof RENDITION_STORE_OPERATIONS)[number]
+export type RenditionStoreResultName = (typeof RENDITION_STORE_RESULTS)[number]
+
+/** Every outcome of one rendition the pre-generation cron looked at. */
+export const RENDITION_RESULTS = [
+	'generated',
+	'present',
+	'yielded',
+	'failed',
+] as const
+export type RenditionResult = (typeof RENDITION_RESULTS)[number]
+
 @Injectable()
 export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	private readonly _logger = new Logger(MetricsService.name)
@@ -56,6 +77,9 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 
 	private readonly processingPipelines: promClient.Gauge
 	private readonly processingRejectedTotal: promClient.Counter
+	private readonly renditionPregenerationTotal: promClient.Counter
+	private readonly renditionBacklogSources: promClient.Gauge
+	private readonly renditionStoreOperationsTotal: promClient.Counter
 
 	private startTime: number = Date.now()
 	private requestsInFlightCount: number = 0
@@ -322,6 +346,26 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			registers: [this.register],
 		})
 
+		this.renditionPregenerationTotal = new promClient.Counter({
+			name: 'mediastream_rendition_pregeneration_total',
+			help: 'Renditions the pre-generation cron looked at, by result: generated, already stored, stepped aside for a request (yielded) or failed',
+			labelNames: ['result'],
+			registers: [this.register],
+		})
+
+		this.renditionStoreOperationsTotal = new promClient.Counter({
+			name: 'mediastream_rendition_store_operations_total',
+			help: 'Calls to the rendition store (S3-compatible bucket) by operation and result; error covers a failure and a timeout, skipped a call the breaker did not make',
+			labelNames: ['operation', 'result'],
+			registers: [this.register],
+		})
+
+		this.renditionBacklogSources = new promClient.Gauge({
+			name: 'mediastream_rendition_backlog_sources',
+			help: 'Uploads still missing their pre-generated renditions, as found by the last pre-generation scan',
+			registers: [this.register],
+		})
+
 		this.tenantDomainsCount = new promClient.Gauge({
 			name: 'mediastream_tenant_domains_count',
 			help: 'Number of hostnames currently in the dynamic per-tenant domain allowlist (TenantDomainsService)',
@@ -348,6 +392,15 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		this.setProcessingAdmission(0, 0)
 		for (const reason of PROCESSING_REJECT_REASONS) {
 			this.processingRejectedTotal.inc({ reason }, 0)
+		}
+		for (const result of RENDITION_RESULTS) {
+			this.renditionPregenerationTotal.inc({ result }, 0)
+		}
+		this.setRenditionBacklog(0)
+		for (const operation of RENDITION_STORE_OPERATIONS) {
+			for (const result of RENDITION_STORE_RESULTS) {
+				this.renditionStoreOperationsTotal.inc({ operation, result }, 0)
+			}
 		}
 	}
 
@@ -462,6 +515,21 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	/** One image request shed by admission control (503). */
 	recordProcessingRejected(reason: ProcessingRejectReason): void {
 		this.processingRejectedTotal.inc({ reason })
+	}
+
+	/** One rendition the pre-generation cron looked at. */
+	recordRenditionPregeneration(result: RenditionResult): void {
+		this.renditionPregenerationTotal.inc({ result })
+	}
+
+	/** One call to the rendition store. */
+	recordRenditionStoreOperation(operation: RenditionStoreOperationName, result: RenditionStoreResultName): void {
+		this.renditionStoreOperationsTotal.inc({ operation, result })
+	}
+
+	/** Uploads still missing their renditions after the last pre-generation scan. */
+	setRenditionBacklog(sources: number): void {
+		this.renditionBacklogSources.set(sources)
 	}
 
 	/**

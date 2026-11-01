@@ -4,14 +4,12 @@ import request from 'supertest'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { CacheHealthIndicator } from '#microservice/Cache/indicators/cache-health.indicator'
 import { RedisHealthIndicator } from '#microservice/Cache/indicators/redis-health.indicator'
-import { CacheWarmingService } from '#microservice/Cache/services/cache-warming.service'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { DiskSpaceHealthIndicator } from '#microservice/Health/indicators/disk-space-health.indicator'
 import { MemoryHealthIndicator } from '#microservice/Health/indicators/memory-health.indicator'
 import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
 import MediaStreamModule from '#microservice/media-stream.module'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
-import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
 
 describe('middleware Configuration', () => {
 	let app: INestApplication
@@ -76,11 +74,7 @@ describe('middleware Configuration', () => {
 				disconnect: vi.fn().mockResolvedValue(undefined),
 				subscribe: vi.fn(),
 				publish: vi.fn().mockResolvedValue(0),
-			})
-			.overrideProvider(CacheWarmingService)
-			.useValue({
-				warmCache: vi.fn().mockResolvedValue(undefined),
-				onModuleInit: vi.fn(),
+				getClient: vi.fn().mockReturnValue(null),
 			})
 			.overrideProvider(CacheHealthIndicator)
 			.useValue({
@@ -112,12 +106,6 @@ describe('middleware Configuration', () => {
 			.useValue({
 				isHealthy: vi.fn().mockResolvedValue({
 					http: { status: 'up' },
-				}),
-			})
-			.overrideProvider(StorageHealthIndicator)
-			.useValue({
-				isHealthy: vi.fn().mockResolvedValue({
-					storage: { status: 'up' },
 				}),
 			})
 			.compile()

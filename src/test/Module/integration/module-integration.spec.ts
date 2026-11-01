@@ -1,7 +1,6 @@
 import type { INestApplication } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { CacheWarmingService } from '#microservice/Cache/services/cache-warming.service'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { ConfigService } from '#microservice/Config/config.service'
@@ -35,11 +34,7 @@ describe('module Integration', () => {
 				disconnect: vi.fn().mockResolvedValue(undefined),
 				subscribe: vi.fn(),
 				publish: vi.fn().mockResolvedValue(0),
-			})
-			.overrideProvider(CacheWarmingService)
-			.useValue({
-				warmCache: vi.fn().mockResolvedValue(undefined),
-				onModuleInit: vi.fn(),
+				getClient: vi.fn().mockReturnValue(null),
 			})
 			.compile()
 

@@ -1,6 +1,7 @@
 import type { OnModuleDestroy } from '@nestjs/common'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { Injectable } from '@nestjs/common'
-import { ProcessingOverloadedError } from '#microservice/common/errors/media-stream.errors'
+import { BackgroundYieldError, ProcessingOverloadedError } from '#microservice/common/errors/media-stream.errors'
 import { ConfigService } from '#microservice/Config/config.service'
 import { currentImageRequest } from '#microservice/Correlation/utils/image-request-log.util'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
@@ -14,6 +15,18 @@ interface Waiter {
 
 /** Retry-After sent with every admission rejection. */
 const RETRY_AFTER_SECONDS = 2
+
+const backgroundWork = new AsyncLocalStorage<true>()
+
+/**
+ * Run `fn` as background work: every pipeline it starts is admitted only when a
+ * slot is free and nothing waits for one, and otherwise yields at once with a
+ * `BackgroundYieldError` (not counted as a shed). A request that arrives meanwhile therefore waits for at most the
+ * pipeline already running, never behind queued background work.
+ */
+export function runAsBackground<T>(fn: () => Promise<T>): Promise<T> {
+	return backgroundWork.run(true, fn)
+}
 
 /**
  * Bounded admission for Sharp pipelines.
@@ -90,6 +103,10 @@ export class ProcessingAdmissionService implements OnModuleDestroy {
 	}
 
 	private acquire(): Promise<void> {
+		if (backgroundWork.getStore() && (this.inFlight >= this.maxConcurrent || this.waiters.length > 0)) {
+			return Promise.reject(new BackgroundYieldError(RETRY_AFTER_SECONDS, { reason: 'background_yield', queued: this.waiters.length, inFlight: this.inFlight }))
+		}
+
 		if (this.inFlight < this.maxConcurrent) {
 			this.inFlight++
 			this.publish()
