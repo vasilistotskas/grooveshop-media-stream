@@ -84,15 +84,14 @@ export class ImageStreamService {
 					return
 				}
 
-				const cached = await this.cacheImageResourceOperation.loadResource(opCtx)
-				if (cached) {
+				// A copy found by checkResourceExists() always comes with its payload.
+				if (opCtx.cached) {
 					if (log) {
 						log.cache = opCtx.cacheTier ?? undefined
 					}
-					this.send(res, cached)
+					this.send(res, opCtx.cached)
 					return
 				}
-				CorrelatedLogger.warn(`Cached resource ${opCtx.id} vanished before it could be read, processing it again`, ImageStreamService.name)
 			}
 
 			// Concurrent misses for the same identity share one fetch + process;

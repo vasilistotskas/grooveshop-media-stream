@@ -3,7 +3,6 @@ import type { OperationContext } from '#microservice/Cache/operations/cache-imag
 import type { RenditionsConfig } from '#microservice/Config/interfaces/app-config.interface'
 import type { RenditionResult } from '#microservice/Metrics/services/metrics.service'
 import type { UploadedSource } from './rendition-source-scanner.service.js'
-import { access } from 'node:fs/promises'
 import { Injectable } from '@nestjs/common'
 import { SchedulerRegistry } from '@nestjs/schedule'
 import { CronJob } from 'cron'
@@ -12,6 +11,8 @@ import CacheImageRequest, { ResizeOptions } from '#microservice/API/dto/cache-im
 import { UrlBuilderService } from '#microservice/API/services/url-builder.service'
 import CacheImageResourceOperation from '#microservice/Cache/operations/cache-image-resource.operation'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
+import { RenditionCatalogueService } from '#microservice/Cache/services/rendition-catalogue.service'
+import { RenditionStoreService } from '#microservice/Cache/services/rendition-store.service'
 import { BackgroundYieldError } from '#microservice/common/errors/media-stream.errors'
 import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { uploadKind } from '#microservice/common/utils/upload-source.util'
@@ -19,9 +20,7 @@ import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { runAsBackground } from '#microservice/Processing/services/processing-admission.service'
-import { StorageMonitoringService } from '#microservice/Storage/services/storage-monitoring.service'
 import { TenantDomainsService } from '#microservice/Validation/services/tenant-domains.service'
-import { learnCatalogue } from '../utils/rendition-catalogue.util.js'
 import { RenditionSourceScanner } from './rendition-source-scanner.service.js'
 
 const CRON_JOB_NAME = 'rendition-pregeneration'
@@ -37,9 +36,6 @@ export const SOURCE_LOCK_TTL_SECONDS = 600
 
 /** A source that could not be rendered (missing, too large, not an image) is left alone for this long. */
 export const FAILED_SOURCE_RETRY_MS = 6 * 60 * 60 * 1000
-
-/** How old the learned catalogue may be before the stored renditions are read again. */
-export const CATALOGUE_MAX_AGE_MS = 30 * 60 * 1000
 
 /** Uploads checked for completeness per batch of filesystem calls. */
 const CHECK_BATCH_SIZE = 50
@@ -86,14 +82,16 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 	private running = false
 	private stopping = false
 	private readonly failedUntil = new Map<string, number>()
-	private catalogue = new Map<string, ResizeOptions[]>()
+	/** Uploads known to have all their renditions stored: not asked about again until a restart. */
+	private readonly complete = new Set<string>()
 
 	constructor(
 		configService: ConfigService,
 		private readonly operation: CacheImageResourceOperation,
 		private readonly scanner: RenditionSourceScanner,
 		private readonly urlBuilder: UrlBuilderService,
-		private readonly monitoring: StorageMonitoringService,
+		private readonly catalogueService: RenditionCatalogueService,
+		private readonly store: RenditionStoreService,
 		private readonly redis: RedisCacheService,
 		private readonly tenantDomains: TenantDomainsService,
 		private readonly metrics: MetricsService,
@@ -103,8 +101,8 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 	}
 
 	onModuleInit(): void {
-		if (!this.config.mediaDirectory) {
-			CorrelatedLogger.log('Rendition pre-generation disabled: RENDITIONS_MEDIA_DIRECTORY is empty', RenditionGeneratorService.name)
+		if (!this.config.mediaDirectory || !this.store.enabled) {
+			CorrelatedLogger.log('Rendition pre-generation disabled: it needs RENDITIONS_MEDIA_DIRECTORY and the rendition store', RenditionGeneratorService.name)
 			return
 		}
 		this.cronJob = CronJob.from({
@@ -131,21 +129,16 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 		this.running = true
 		const deadline = Date.now() + CYCLE_BUDGET_MS
 		try {
-			// Nothing learned yet (a fresh volume): read the stored renditions again
-			// every cycle instead of waiting out the snapshot's age.
-			const inventory = await this.monitoring.getInventory(this.catalogue.size === 0
-				? 0
-				: CATALOGUE_MAX_AGE_MS)
-			this.catalogue = learnCatalogue(inventory.entries, Date.now(), {
+			const catalogue = await this.catalogueService.learn({
 				minSources: this.config.minSources,
 				maxPerKind: this.config.maxPerSource,
 			})
-			if (this.catalogue.size === 0) {
+			if (catalogue.size === 0) {
 				this.metrics.setRenditionBacklog(0)
 				return result
 			}
 
-			const pending = await this.findPending(this.catalogue)
+			const pending = await this.findPending(catalogue)
 			result.pending = pending.length
 			this.metrics.setRenditionBacklog(pending.length)
 
@@ -179,13 +172,17 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 		}
 	}
 
-	/** Uploads whose last (least shared) rendition is not stored yet, newest first. */
+	/**
+	 * Uploads whose last (least shared) rendition is not stored yet, newest first.
+	 * One HEAD per upload not yet known to be complete; a store that cannot answer
+	 * ends the pass, because "unknown" is not "missing".
+	 */
 	private async findPending(catalogue: Map<string, ResizeOptions[]>): Promise<PendingSource[]> {
 		const now = Date.now()
 		const candidates: Array<UploadedSource & { renditions: ResizeOptions[] }> = []
 		for (const source of await this.scanner.scan(this.config.mediaDirectory)) {
 			const renditions = catalogue.get(uploadKind(source.source))
-			if (renditions && !this.tenantDomains.isSuspended(source.tenantSchema) && (this.failedUntil.get(this.keyOf(source)) ?? 0) <= now) {
+			if (renditions && !this.tenantDomains.isSuspended(source.tenantSchema) && !this.complete.has(this.keyOf(source)) && (this.failedUntil.get(this.keyOf(source)) ?? 0) <= now) {
 				candidates.push({ ...source, renditions })
 			}
 		}
@@ -193,9 +190,12 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 		const pending: PendingSource[] = []
 		for (let index = 0; index < candidates.length; index += CHECK_BATCH_SIZE) {
 			const batch = candidates.slice(index, index + CHECK_BATCH_SIZE)
-			const complete = await Promise.all(batch.map(async candidate => this.isStored(await this.contextFor(candidate, candidate.renditions[candidate.renditions.length - 1]))))
+			const stored = await Promise.all(batch.map(candidate => this.isLastStored(candidate)))
 			for (const [position, candidate] of batch.entries()) {
-				if (!complete[position]) {
+				if (stored[position]) {
+					this.complete.add(this.keyOf(candidate))
+				}
+				else {
 					pending.push({ ...candidate, modifiedAt: await this.scanner.modifiedAt(this.config.mediaDirectory, candidate) })
 				}
 			}
@@ -216,6 +216,11 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 					return outcome
 				}
 			}
+			// A write the store refused does not fail the encode that made it, so
+			// the upload is done only once its last rendition is seen to be stored.
+			if (await this.isLastStored(source)) {
+				this.complete.add(this.keyOf(source))
+			}
 			return 'completed'
 		}
 		finally {
@@ -234,6 +239,7 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 		while (!this.stopping && Date.now() < deadline) {
 			try {
 				await runAsBackground(() => this.operation.execute(ctx))
+				await ctx.stored
 				this.record('generated')
 				return 'completed'
 			}
@@ -266,12 +272,13 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 		}))
 	}
 
-	/** Whether the rendition is on the shared volume, which is where every replica finds it. */
-	private async isStored(ctx: OperationContext): Promise<boolean> {
-		return access(this.operation.getResourceMetaPath(ctx)).then(
-			() => access(this.operation.getResourcePath(ctx)).then(() => true, () => false),
-			() => false,
-		)
+	/** Whether the upload's last rendition is in the store, which is where every replica finds it. */
+	private async isLastStored(source: UploadedSource & { renditions: ResizeOptions[] }): Promise<boolean> {
+		return this.isStored(await this.contextFor(source, source.renditions[source.renditions.length - 1]))
+	}
+
+	private isStored(ctx: OperationContext): Promise<boolean> {
+		return this.store.has(ctx.request.tenantSchema, ctx.id)
 	}
 
 	private keyOf({ tenantSchema, source }: UploadedSource): string {

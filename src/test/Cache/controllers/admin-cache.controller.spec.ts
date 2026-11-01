@@ -15,8 +15,8 @@ describe('adminCacheController', () => {
 		const mockTenantFlushService = {
 			flushTenant: vi.fn().mockImplementation(async (tenantSchema: string) => ({
 				namespace: `image:${tenantSchema}`,
-				filesRemoved: 0,
-				diskErrors: [],
+				objectsRemoved: 0,
+				storeErrors: [],
 				broadcastReceivers: 2,
 			})),
 		}
@@ -77,8 +77,8 @@ describe('adminCacheController', () => {
 		it('reports zero broadcast receivers when the other replicas could not be reached', async () => {
 			tenantFlushService.flushTenant.mockResolvedValue({
 				namespace: 'image:acme',
-				filesRemoved: 1,
-				diskErrors: [],
+				objectsRemoved: 1,
+				storeErrors: [],
 				broadcastReceivers: 0,
 			})
 

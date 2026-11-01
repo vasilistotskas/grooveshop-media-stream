@@ -4,7 +4,6 @@ import { CacheModule } from '#microservice/Cache/cache.module'
 import { InternalSecretGuard } from '#microservice/common/guards/internal-secret.guard'
 import { ConfigModule } from '#microservice/Config/config.module'
 import { HttpModule } from '#microservice/HTTP/http.module'
-import { StorageModule } from '#microservice/Storage/storage.module'
 import { ValidationModule } from '#microservice/Validation/validation.module'
 import { HealthController } from './controllers/health.controller.js'
 import { HealthDetailGuard } from './guards/health-detail.guard.js'
@@ -18,9 +17,8 @@ import { SharpHealthIndicator } from './indicators/sharp-health.indicator.js'
 		ConfigModule,
 		HttpModule,
 		CacheModule,
-		StorageModule,
 		// TenantDomainsHealthIndicator lives in Validation/indicators, exported
-		// alongside TenantDomainsService (same pattern as Cache/HTTP/Storage
+		// alongside TenantDomainsService (same pattern as Cache/HTTP
 		// owning their own health indicators, consumed here by HealthController).
 		ValidationModule,
 	],

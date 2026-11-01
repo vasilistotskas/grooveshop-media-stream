@@ -8,11 +8,11 @@ import { TenantFlushIncompleteError } from '#microservice/common/errors/media-st
 import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
-import { StorageCleanupService } from '#microservice/Storage/services/storage-cleanup.service'
 import { TenantDomainsService } from '#microservice/Validation/services/tenant-domains.service'
 import { imageNamespace } from '../utils/cache-namespace.util.js'
 import { MultiLayerCacheManager } from './multi-layer-cache.manager.js'
 import { RedisCacheService } from './redis-cache.service.js'
+import { RenditionStoreService } from './rendition-store.service.js'
 import { TenantCacheEpochs } from './tenant-cache-epochs.service.js'
 
 const TENANT_FLUSH_CHANNEL = 'mediastream:tenant-flush'
@@ -20,8 +20,9 @@ const TENANT_FLUSH_CHANNEL = 'mediastream:tenant-flush'
 /**
  * Layered tiers in the order they are cleared: a tier is cleared only after
  * every tier it can be refilled from (memory is backfilled from Redis, both
- * from disk), so a request arriving mid-flush cannot copy a stale entry into a
- * tier that is already done. The disk tier goes first, before these.
+ * from the rendition store), so a request arriving mid-flush cannot copy a
+ * stale entry into a tier that is already done. The store goes first, before
+ * these.
  */
 const LAYERS_BOTTOM_UP: readonly CacheLayerName[] = ['redis', 'memory']
 
@@ -32,16 +33,16 @@ interface TenantFlushMessage {
 }
 
 interface LocalClear {
-	filesRemoved: number
-	diskErrors: string[]
+	objectsRemoved: number
+	storeErrors: string[]
 	/** Tiers that could not be cleared, with the reason. */
 	failures: string[]
 }
 
 export interface TenantFlushResult {
 	namespace: string
-	filesRemoved: number
-	diskErrors: string[]
+	objectsRemoved: number
+	storeErrors: string[]
 	/** Subscribers that received the broadcast, this replica included; 0 when Redis is unreachable. */
 	broadcastReceivers: number
 }
@@ -57,17 +58,18 @@ function isTenantFlushMessage(value: unknown): value is TenantFlushMessage {
 /**
  * Per-tenant cache flush across every replica.
  *
- * Redis is shared, but each replica also holds a private memory tier and an
- * on-disk tier that a request to one replica cannot reach. The replica that
- * takes the request clears itself and then broadcasts the tenant over Redis
- * pub/sub; every other replica clears itself the same way.
+ * Redis and the rendition store are shared, but each replica also holds a
+ * private memory tier that a request to one replica cannot reach. The replica
+ * that takes the request clears itself and then broadcasts the tenant over
+ * Redis pub/sub; every other replica clears itself the same way (the store
+ * sweep is idempotent).
  *
  * Clearing a replica starts by re-reading Django's tenant feed: Django sends
  * the flush when a store is suspended or reactivated, so the replica refuses
  * or serves the store's images from then on, not from its next poll, and a
  * request arriving after the clear cannot refill a suspended store's tiers.
  *
- * Then disk, then Redis, then memory (bottom-up, see
+ * Then the store, then Redis, then memory (bottom-up, see
  * LAYERS_BOTTOM_UP), advancing the tenant's epoch before each tier. Every
  * cache write checks the epoch the request started with after it lands and
  * removes itself when it moved, so a write that lands after a tier was cleared
@@ -84,7 +86,7 @@ export class TenantFlushService implements OnModuleInit {
 		private readonly redisCacheService: RedisCacheService,
 		private readonly cacheManager: MultiLayerCacheManager,
 		private readonly tenantCacheEpochs: TenantCacheEpochs,
-		private readonly storageCleanupService: StorageCleanupService,
+		private readonly renditionStore: RenditionStoreService,
 		private readonly tenantDomainsService: TenantDomainsService,
 	) {
 		// Pub/sub channels are server-wide, not per database: scope the channel to
@@ -117,25 +119,25 @@ export class TenantFlushService implements OnModuleInit {
 		}
 
 		CorrelatedLogger.log(
-			`Cache flush complete for ${namespace}: ${local.filesRemoved} file pair(s) removed${local.diskErrors.length
-				? `, ${local.diskErrors.length} error(s)`
+			`Cache flush complete for ${namespace}: ${local.objectsRemoved} stored rendition(s) removed${local.storeErrors.length
+				? `, ${local.storeErrors.length} error(s)`
 				: ''}, broadcast reached ${broadcastReceivers} subscriber(s)`,
 			TenantFlushService.name,
 		)
 
 		return {
 			namespace,
-			filesRemoved: local.filesRemoved,
-			diskErrors: local.diskErrors,
+			objectsRemoved: local.objectsRemoved,
+			storeErrors: local.storeErrors,
 			broadcastReceivers,
 		}
 	}
 
-	/** The tenant feed, then disk, then each layered tier bottom-up, advancing the epoch before each; never stops at a failing step. */
+	/** The tenant feed, then the store, then each layered tier bottom-up, advancing the epoch before each; never stops at a failing step. */
 	private async clearLocal(tenantSchema: string, namespace: string): Promise<LocalClear> {
 		const failures: string[] = []
-		let filesRemoved = 0
-		let diskErrors: string[] = []
+		let objectsRemoved = 0
+		let storeErrors: string[] = []
 
 		if (!(await this.tenantDomainsService.refresh())) {
 			failures.push('tenant feed: could not be read, the store\'s suspension state is not current')
@@ -143,15 +145,15 @@ export class TenantFlushService implements OnModuleInit {
 
 		this.tenantCacheEpochs.advance(tenantSchema)
 		try {
-			const disk = await this.storageCleanupService.removeTenantFiles(tenantSchema)
-			filesRemoved = disk.filesRemoved
-			diskErrors = disk.errors
-			if (!disk.complete) {
-				failures.push(`disk: ${disk.errors.join('; ')}`)
+			const sweep = await this.renditionStore.deleteTenant(tenantSchema)
+			objectsRemoved = sweep.removed
+			storeErrors = sweep.errors
+			if (!sweep.complete) {
+				failures.push(`store: ${sweep.errors.join('; ')}`)
 			}
 		}
 		catch (error: unknown) {
-			failures.push(`disk: ${errorMessage(error)}`)
+			failures.push(`store: ${errorMessage(error)}`)
 		}
 
 		for (const layer of LAYERS_BOTTOM_UP) {
@@ -164,7 +166,7 @@ export class TenantFlushService implements OnModuleInit {
 			}
 		}
 
-		return { filesRemoved, diskErrors, failures }
+		return { objectsRemoved, storeErrors, failures }
 	}
 
 	/** A failed broadcast leaves the other replicas unflushed, which the result reports as zero receivers. */
@@ -205,8 +207,8 @@ export class TenantFlushService implements OnModuleInit {
 		}
 		if (local.failures.length === 0) {
 			CorrelatedLogger.log(
-				`Peer flush for ${namespace}: ${local.filesRemoved} file pair(s) removed${local.diskErrors.length
-					? `, ${local.diskErrors.length} error(s)`
+				`Peer flush for ${namespace}: ${local.objectsRemoved} stored rendition(s) removed${local.storeErrors.length
+					? `, ${local.storeErrors.length} error(s)`
 					: ''}`,
 				TenantFlushService.name,
 			)

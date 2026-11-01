@@ -9,7 +9,6 @@ import { ProcessingAdmissionService } from '#microservice/Processing/services/pr
 import { SharpConfigService } from '#microservice/Processing/services/sharp-config.service'
 import { ValidationModule } from '#microservice/Validation/validation.module'
 import { CacheModule } from './cache.module.js'
-import { AccessCountTracker } from './operations/access-count-tracker.service.js'
 import CacheImageResourceOperation from './operations/cache-image-resource.operation.js'
 import { ImageFormatProcessor } from './operations/image-format-processor.service.js'
 import { ResourceFetcher } from './operations/resource-fetcher.service.js'
@@ -30,7 +29,6 @@ import { ResourceFetcher } from './operations/resource-fetcher.service.js'
 		CacheImageResourceOperation,
 		ResourceFetcher,
 		ImageFormatProcessor,
-		AccessCountTracker,
 		GenerateResourceIdentityFromRequestJob,
 		FetchResourceResponseJob,
 		WebpImageManipulationJob,

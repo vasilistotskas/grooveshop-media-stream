@@ -33,7 +33,7 @@ export type ImageRequestOutcome
 		| 'aborted'
 
 /** Where a request's bytes came from: a layered cache (`memory`, `redis`), the on-disk tier, or none. */
-export type ImageCacheResult = CacheLayerName | 'disk' | 'miss'
+export type ImageCacheResult = CacheLayerName | 'store' | 'miss'
 
 /**
  * Everything the one structured line of an image request carries,

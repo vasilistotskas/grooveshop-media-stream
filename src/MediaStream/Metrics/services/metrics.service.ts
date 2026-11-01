@@ -14,6 +14,18 @@ import { ConfigService } from '#microservice/Config/config.service'
 export const PROCESSING_REJECT_REASONS = ['queue_full', 'queue_timeout'] as const
 export type ProcessingRejectReason = (typeof PROCESSING_REJECT_REASONS)[number]
 
+/** Every call to the rendition store, by operation and outcome. */
+export const RENDITION_STORE_OPERATIONS = ['get', 'put', 'head', 'delete', 'list'] as const
+export const RENDITION_STORE_RESULTS = [
+	'hit',
+	'miss',
+	'ok',
+	'error',
+	'skipped',
+] as const
+export type RenditionStoreOperationName = (typeof RENDITION_STORE_OPERATIONS)[number]
+export type RenditionStoreResultName = (typeof RENDITION_STORE_RESULTS)[number]
+
 /** Every outcome of one rendition the pre-generation cron looked at. */
 export const RENDITION_RESULTS = [
 	'generated',
@@ -67,6 +79,7 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	private readonly processingRejectedTotal: promClient.Counter
 	private readonly renditionPregenerationTotal: promClient.Counter
 	private readonly renditionBacklogSources: promClient.Gauge
+	private readonly renditionStoreOperationsTotal: promClient.Counter
 
 	private startTime: number = Date.now()
 	private requestsInFlightCount: number = 0
@@ -340,6 +353,13 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			registers: [this.register],
 		})
 
+		this.renditionStoreOperationsTotal = new promClient.Counter({
+			name: 'mediastream_rendition_store_operations_total',
+			help: 'Calls to the rendition store (S3-compatible bucket) by operation and result; error covers a failure and a timeout, skipped a call the breaker did not make',
+			labelNames: ['operation', 'result'],
+			registers: [this.register],
+		})
+
 		this.renditionBacklogSources = new promClient.Gauge({
 			name: 'mediastream_rendition_backlog_sources',
 			help: 'Uploads still missing their pre-generated renditions, as found by the last pre-generation scan',
@@ -377,6 +397,11 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			this.renditionPregenerationTotal.inc({ result }, 0)
 		}
 		this.setRenditionBacklog(0)
+		for (const operation of RENDITION_STORE_OPERATIONS) {
+			for (const result of RENDITION_STORE_RESULTS) {
+				this.renditionStoreOperationsTotal.inc({ operation, result }, 0)
+			}
+		}
 	}
 
 	async onModuleInit(): Promise<void> {
@@ -495,6 +520,11 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	/** One rendition the pre-generation cron looked at. */
 	recordRenditionPregeneration(result: RenditionResult): void {
 		this.renditionPregenerationTotal.inc({ result })
+	}
+
+	/** One call to the rendition store. */
+	recordRenditionStoreOperation(operation: RenditionStoreOperationName, result: RenditionStoreResultName): void {
+		this.renditionStoreOperationsTotal.inc({ operation, result })
 	}
 
 	/** Uploads still missing their renditions after the last pre-generation scan. */

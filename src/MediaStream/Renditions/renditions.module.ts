@@ -4,7 +4,6 @@ import { CacheOperationsModule } from '#microservice/Cache/cache-operations.modu
 import { CacheModule } from '#microservice/Cache/cache.module'
 import { ConfigModule } from '#microservice/Config/config.module'
 import { MetricsModule } from '#microservice/Metrics/metrics.module'
-import { StorageModule } from '#microservice/Storage/storage.module'
 import { ValidationModule } from '#microservice/Validation/validation.module'
 import { RenditionGeneratorService } from './services/rendition-generator.service.js'
 import { RenditionSourceScanner } from './services/rendition-source-scanner.service.js'
@@ -17,7 +16,6 @@ import { RenditionSourceScanner } from './services/rendition-source-scanner.serv
 		CacheOperationsModule,
 		ConfigModule,
 		MetricsModule,
-		StorageModule,
 		ValidationModule,
 	],
 	providers: [

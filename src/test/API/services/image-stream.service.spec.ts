@@ -112,15 +112,16 @@ describe('imageStreamService', () => {
 	let deduplicator: MockedObject<RequestDeduplicator<ProcessedImage>>
 	let opCtx: OperationContext
 
-	/** Make checkResourceExists() report a hit whose payload loadResource() then returns. */
-	function primeHit(cached: ProcessedImage, onDisk = false): void {
+	/** Make checkResourceExists() report a hit, from the memory tier or the rendition store. */
+	function primeHit(cached: ProcessedImage, inStore = false): void {
 		cacheOp.checkResourceExists.mockImplementation(async (ctx) => {
 			ctx.metaData = cached.metadata
-			ctx.cached = onDisk ? null : cached
-			ctx.cacheTier = onDisk ? 'disk' : 'memory'
+			ctx.cached = cached
+			ctx.cacheTier = inStore
+				? 'store'
+				: 'memory'
 			return true
 		})
-		cacheOp.loadResource.mockImplementation(async ctx => ctx.cached ?? cached)
 	}
 
 	beforeEach(async () => {
@@ -137,7 +138,6 @@ describe('imageStreamService', () => {
 		cacheOp = {
 			setup: vi.fn().mockResolvedValue(opCtx),
 			checkResourceExists: vi.fn().mockResolvedValue(false),
-			loadResource: vi.fn().mockResolvedValue(null),
 			execute: vi.fn().mockResolvedValue(createProcessedImage('processed-image')),
 			optimizeAndServeDefaultImage: vi.fn().mockResolvedValue(Buffer.from('default-image-data')),
 		} as any
@@ -170,7 +170,6 @@ describe('imageStreamService', () => {
 
 			await service.processAndStream(createContext(), createRequest(), res)
 
-			expect(cacheOp.loadResource).toHaveBeenCalledWith(opCtx)
 			expect(opCtx.cached).toBe(cached)
 			expect(res.end).toHaveBeenCalledWith(cached.data)
 			expect(deduplicator.execute).not.toHaveBeenCalled()
@@ -196,9 +195,9 @@ describe('imageStreamService', () => {
 			expect(headerValue(res, 'X-Correlation-ID')).toBeUndefined()
 		})
 
-		it('streams a disk-only hit through loadResource', async () => {
+		it('streams a hit from the rendition store', async () => {
 			const res = createMockResponse()
-			const cached = createProcessedImage('disk-data')
+			const cached = createProcessedImage('stored-data')
 			primeHit(cached, true)
 
 			await service.processAndStream(createContext(), createRequest(), res)
@@ -207,10 +206,9 @@ describe('imageStreamService', () => {
 			expect(cacheOp.execute).not.toHaveBeenCalled()
 		})
 
-		it('processes again when the cached copy vanished between the check and the read', async () => {
+		it('processes the request when the existence check found a copy but no payload', async () => {
 			const res = createMockResponse()
-			primeHit(createProcessedImage('gone'), true)
-			cacheOp.loadResource.mockResolvedValue(null)
+			cacheOp.checkResourceExists.mockResolvedValue(true)
 			const processed = createProcessedImage('reprocessed')
 			cacheOp.execute.mockResolvedValue(processed)
 
@@ -235,7 +233,6 @@ describe('imageStreamService', () => {
 			expect(headerValue(res, 'ETag')).toBe(etag)
 			expect(headerValue(res, 'Cache-Control')).toContain('max-age=86400')
 			expect(res.end).toHaveBeenCalledWith()
-			expect(cacheOp.loadResource).not.toHaveBeenCalled()
 			expect(cacheOp.execute).not.toHaveBeenCalled()
 		})
 
@@ -249,7 +246,6 @@ describe('imageStreamService', () => {
 			}))
 
 			expect(res.status).toHaveBeenCalledWith(304)
-			expect(cacheOp.loadResource).not.toHaveBeenCalled()
 		})
 
 		it('streams the full response when the validators do not match', async () => {
@@ -274,7 +270,6 @@ describe('imageStreamService', () => {
 
 			expect(deduplicator.execute).toHaveBeenCalledWith(`${opCtx.flushEpoch}:${opCtx.id}`, expect.any(Function))
 			expect(cacheOp.execute).toHaveBeenCalledWith(opCtx)
-			expect(cacheOp.loadResource).not.toHaveBeenCalled()
 			expect(res.end).toHaveBeenCalledWith(processed.data)
 			expect(headerValue(res, 'Content-Type')).toBe('image/png')
 			expect(headerValue(res, 'Content-Length')).toBe(String(processed.data.length))
@@ -482,13 +477,13 @@ describe('imageStreamService', () => {
 			expect(log.error).toBeUndefined()
 		})
 
-		it('records a disk hit', async () => {
+		it('records a hit from the rendition store', async () => {
 			const log = createLog()
 			primeHit(createProcessedImage('disk-data'), true)
 
 			await withLog(log, () => service.processAndStream(createContext(), createRequest(), createMockResponse()))
 
-			expect(log).toMatchObject({ cache: 'disk', outcome: 'ok' })
+			expect(log).toMatchObject({ cache: 'store', outcome: 'ok' })
 		})
 
 		it('records a 304 as not_modified from the tier that validated it, with no output', async () => {

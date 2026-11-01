@@ -42,15 +42,6 @@ export interface FileCacheConfig {
 	directory: string
 }
 
-export interface CacheWarmingConfig {
-	enabled: boolean
-	warmupOnStart: boolean
-	maxFilesToWarm: number
-	warmupCron: string
-	popularImageThreshold: number
-	baseTtl: number
-}
-
 export interface ImageCacheConfig {
 	publicTtl: number
 	privateTtl: number
@@ -61,7 +52,6 @@ export interface CacheConfig {
 	memory: MemoryCacheConfig
 	redis: RedisConfig
 	file: FileCacheConfig
-	warming: CacheWarmingConfig
 	image: ImageCacheConfig
 }
 
@@ -148,28 +138,20 @@ export interface TenantDomainsConfig {
 	refreshIntervalMs: number
 }
 
-export interface StorageCleanupConfig {
-	enabled: boolean
-	cronSchedule: string
-	dryRun: boolean
-	maxDuration: number
-}
-
-export interface StorageEvictionConfig {
-	/** Pairs with at least this many recorded cache hits are evicted last. */
-	minAccessCount: number
-}
-
-export interface StorageConfig {
-	warningSize: number
-	criticalSize: number
-	warningFileCount: number
-	criticalFileCount: number
-	cleanup: StorageCleanupConfig
-	eviction: StorageEvictionConfig
+export interface RenditionStoreConfig {
+	/** S3 API endpoint (`https://<account>.eu.r2.cloudflarestorage.com`); empty disables the store. */
+	endpoint: string
+	bucket: string
+	accessKeyId: string
+	secretAccessKey: string
+	/** Longest a GET or HEAD may take before it counts as a miss (ms). */
+	readTimeoutMs: number
+	/** Longest a PUT, DELETE or LIST may take before it counts as failed (ms). */
+	writeTimeoutMs: number
 }
 
 export interface RenditionsConfig {
+	store: RenditionStoreConfig
 	/** Root of the tenants' uploads (`{dir}/{tenantSchema}/uploads/...`); empty disables pre-generation. */
 	mediaDirectory: string
 	cronSchedule: string
@@ -195,7 +177,6 @@ export interface AppConfig {
 	rateLimit: RateLimitConfig
 	validation: ValidationConfig
 	tenantDomains: TenantDomainsConfig
-	storage: StorageConfig
 	renditions: RenditionsConfig
 	shutdown: ShutdownConfig
 }

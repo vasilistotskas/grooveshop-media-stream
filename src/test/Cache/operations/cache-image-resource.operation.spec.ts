@@ -12,17 +12,17 @@ import { Test } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CacheImageRequest, { ResizeOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
 import UnableToFetchResourceException from '#microservice/API/exceptions/unable-to-fetch-resource.exception'
-import { AccessCountTracker } from '#microservice/Cache/operations/access-count-tracker.service'
 import CacheImageResourceOperation from '#microservice/Cache/operations/cache-image-resource.operation'
 import { ImageFormatProcessor } from '#microservice/Cache/operations/image-format-processor.service'
 import { ResourceFetcher } from '#microservice/Cache/operations/resource-fetcher.service'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
+import { RenditionCatalogueService } from '#microservice/Cache/services/rendition-catalogue.service'
+import { RenditionStoreService } from '#microservice/Cache/services/rendition-store.service'
 import { TenantCacheEpochs } from '#microservice/Cache/services/tenant-cache-epochs.service'
 import { ProcessingOverloadedError, UpstreamResourceTooLargeError } from '#microservice/common/errors/media-stream.errors'
 import { storageDirectory } from '#microservice/common/utils/storage-path.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
-import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
 import ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import ManipulationJobResult from '#microservice/Processing/dto/manipulation-job-result.dto'
@@ -90,7 +90,8 @@ describe('cacheImageResourceOperation', () => {
 	let webpJob: MockedObject<WebpImageManipulationJob>
 	let cacheManager: MockedObject<MultiLayerCacheManager>
 	let validation: MockedObject<ResourceValidationService>
-	let tracker: MockedObject<AccessCountTracker>
+	let store: MockedObject<RenditionStoreService>
+	let catalogue: MockedObject<RenditionCatalogueService>
 	let metricsService: MockedObject<MetricsService>
 	let epochs: TenantCacheEpochs
 	let storageDir: string
@@ -104,7 +105,6 @@ describe('cacheImageResourceOperation', () => {
 			write: (_chunk, _encoding, callback) => callback(),
 		}) as any)
 		mockedFs.writeFile.mockResolvedValue()
-		mockedFs.rename.mockResolvedValue()
 		mockedFs.unlink.mockResolvedValue()
 
 		request = new CacheImageRequest({
@@ -137,9 +137,13 @@ describe('cacheImageResourceOperation', () => {
 		validation = {
 			validateFileSize: vi.fn().mockReturnValue(true),
 		} as any
-		tracker = {
-			record: vi.fn(),
-			flush: vi.fn(),
+		store = {
+			get: vi.fn().mockResolvedValue(null),
+			put: vi.fn().mockResolvedValue(undefined),
+			delete: vi.fn().mockResolvedValue(undefined),
+		} as any
+		catalogue = {
+			record: vi.fn().mockResolvedValue(undefined),
 		} as any
 		metricsService = {
 			recordCacheOperation: vi.fn(),
@@ -170,7 +174,8 @@ describe('cacheImageResourceOperation', () => {
 				},
 				{ provide: MultiLayerCacheManager, useValue: cacheManager },
 				{ provide: ResourceValidationService, useValue: validation },
-				{ provide: AccessCountTracker, useValue: tracker },
+				{ provide: RenditionStoreService, useValue: store },
+				{ provide: RenditionCatalogueService, useValue: catalogue },
 				{ provide: MetricsService, useValue: metricsService },
 				{ provide: TenantCacheEpochs, useValue: epochs },
 				{ provide: ConfigService, useValue: configService },
@@ -186,10 +191,8 @@ describe('cacheImageResourceOperation', () => {
 	})
 
 	describe('resource paths', () => {
-		it('resolve under the configured storage directory', () => {
-			expect(operation.getResourcePath(ctx)).toBe(join(storageDir, `${RESOURCE_ID}.rsc`))
+		it('puts the download temp file under the configured scratch directory', () => {
 			expect(operation.getResourceTempPath(ctx)).toBe(join(storageDir, `${RESOURCE_ID}.${ctx.tempToken}.rst`))
-			expect(operation.getResourceMetaPath(ctx)).toBe(join(storageDir, `${RESOURCE_ID}.rsm`))
 		})
 	})
 
@@ -216,7 +219,7 @@ describe('cacheImageResourceOperation', () => {
 	})
 
 	describe('checkResourceExists', () => {
-		it('keeps a valid layered hit and the layer that answered on the context, and records no cache metric of its own', async () => {
+		it('keeps a valid layered hit and the layer that answered on the context, and asks the store nothing', async () => {
 			const cached: ProcessedImage = {
 				data: Buffer.from('cached-data'),
 				metadata: metadata(),
@@ -229,23 +232,22 @@ describe('cacheImageResourceOperation', () => {
 			expect(ctx.cached).toBe(cached)
 			expect(ctx.metaData).toBe(cached.metadata)
 			expect(ctx.cacheTier).toBe('redis')
-			expect(mockedFs.readFile).not.toHaveBeenCalled()
+			expect(store.get).not.toHaveBeenCalled()
 			// The manager records the layered tier itself
 			expect(metricsService.recordCacheOperation).not.toHaveBeenCalled()
 		})
 
-		it('uses the tenant namespace of the request', async () => {
+		it('uses the tenant namespace of the request, for the layers and the store', async () => {
 			request.tenantSchema = 'acme'
 			ctx = await operation.setup(request)
-			mockedFs.readFile.mockRejectedValue(new Error('ENOENT'))
 
 			await operation.checkResourceExists(ctx)
 
 			expect(cacheManager.lookup).toHaveBeenCalledWith('image:acme', RESOURCE_ID, expect.any(Function))
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'miss', expect.any(Number))
+			expect(store.get).toHaveBeenCalledWith('acme', RESOURCE_ID)
 		})
 
-		it('deletes a corrupted layered entry and falls through to the disk check', async () => {
+		it('deletes a corrupted layered entry and falls through to the store', async () => {
 			cacheManager.lookup.mockResolvedValue({
 				value: {
 					data: Buffer.from('x'),
@@ -253,15 +255,15 @@ describe('cacheImageResourceOperation', () => {
 				},
 				layer: 'memory',
 			})
-			mockedFs.readFile.mockRejectedValue(new Error('ENOENT'))
 
 			await expect(operation.checkResourceExists(ctx)).resolves.toBe(false)
 
 			expect(cacheManager.delete).toHaveBeenCalledWith('image:public', RESOURCE_ID)
+			expect(store.get).toHaveBeenCalledTimes(1)
 			expect(ctx.cached).toBeNull()
 		})
 
-		it('deletes an expired layered entry and falls through to the disk check', async () => {
+		it('deletes an expired layered entry and falls through to the store', async () => {
 			cacheManager.lookup.mockResolvedValue({
 				value: {
 					data: Buffer.from('x'),
@@ -269,72 +271,66 @@ describe('cacheImageResourceOperation', () => {
 				},
 				layer: 'memory',
 			})
-			mockedFs.readFile.mockRejectedValue(new Error('ENOENT'))
 
 			await expect(operation.checkResourceExists(ctx)).resolves.toBe(false)
 
 			expect(cacheManager.delete).toHaveBeenCalledWith('image:public', RESOURCE_ID)
+			expect(store.get).toHaveBeenCalledTimes(1)
 		})
 
-		it('reports a valid disk pair as a filesystem hit, keeping the sidecar on the context but nothing cached', async () => {
-			mockedFs.readFile.mockResolvedValue(JSON.stringify(metadata({ tenantSchema: 'acme' })))
-			mockedFs.access.mockResolvedValue()
+		it('serves a valid stored rendition from the store and refills the layered cache without waiting for it', async () => {
+			const stored: ProcessedImage = {
+				data: Buffer.from('stored-data'),
+				metadata: metadata({ tenantSchema: 'acme' }),
+			}
+			store.get.mockResolvedValue(stored)
+			let releaseSet!: () => void
+			cacheManager.set.mockImplementation(() => new Promise<void>((resolve) => {
+				releaseSet = resolve
+			}))
 
 			await expect(operation.checkResourceExists(ctx)).resolves.toBe(true)
 
-			expect(mockedFs.readFile).toHaveBeenCalledWith(operation.getResourceMetaPath(ctx), 'utf8')
-			expect(mockedFs.access).toHaveBeenCalledWith(operation.getResourcePath(ctx))
-			expect(ctx.metaData).toBeInstanceOf(ResourceMetaData)
-			expect(ctx.metaData?.tenantSchema).toBe('acme')
+			expect(ctx.cached).toBe(stored)
+			expect(ctx.metaData).toBe(stored.metadata)
+			expect(ctx.cacheTier).toBe('store')
+			expect(cacheManager.set).toHaveBeenCalledWith('image:public', RESOURCE_ID, stored, 6 * 30 * 24 * 3600)
+			releaseSet()
+		})
+
+		it('is a miss when the store has nothing, or is off, down or slow (it answers null for all of them)', async () => {
+			await expect(operation.checkResourceExists(ctx)).resolves.toBe(false)
+
 			expect(ctx.cached).toBeNull()
-			expect(ctx.cacheTier).toBe('disk')
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledTimes(1)
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'hit', expect.any(Number))
-		})
-
-		it('records the filesystem duration in seconds', async () => {
-			vi.spyOn(PerformanceTracker, 'endPhase').mockReturnValue(250)
-			mockedFs.readFile.mockResolvedValue(JSON.stringify(metadata()))
-			mockedFs.access.mockResolvedValue()
-
-			await operation.checkResourceExists(ctx)
-
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'hit', 0.25)
-		})
-
-		it('is a miss without a sidecar', async () => {
-			mockedFs.readFile.mockRejectedValue(new Error('ENOENT'))
-
-			await expect(operation.checkResourceExists(ctx)).resolves.toBe(false)
-
-			expect(mockedFs.access).not.toHaveBeenCalled()
-			expect(ctx.metaData).toBeNull()
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'miss', expect.any(Number))
-		})
-
-		it('is a miss for an orphan sidecar whose .rsc is gone', async () => {
-			mockedFs.readFile.mockResolvedValue(JSON.stringify(metadata()))
-			mockedFs.access.mockRejectedValue(new Error('ENOENT'))
-
-			await expect(operation.checkResourceExists(ctx)).resolves.toBe(false)
 			expect(ctx.metaData).toBeNull()
 		})
 
-		it('is a miss for an unparsable sidecar, a foreign version, or an expired entry', async () => {
-			mockedFs.access.mockResolvedValue()
-
-			mockedFs.readFile.mockResolvedValueOnce('not json')
+		it('is a miss for a stored rendition of a foreign version or an expired one', async () => {
+			store.get.mockResolvedValueOnce({
+				data: Buffer.from('x'),
+				metadata: metadata({ version: 2 }),
+			})
 			await expect(operation.checkResourceExists(ctx)).resolves.toBe(false)
 
-			mockedFs.readFile.mockResolvedValueOnce(JSON.stringify(metadata({ version: 2 })))
+			store.get.mockResolvedValueOnce({
+				data: Buffer.from('x'),
+				metadata: metadata({ dateCreated: Date.now() - 7 * MONTH_MS }),
+			})
 			await expect(operation.checkResourceExists(ctx)).resolves.toBe(false)
 
-			mockedFs.readFile.mockResolvedValueOnce(JSON.stringify(metadata({ dateCreated: Date.now() - 7 * MONTH_MS })))
-			await expect(operation.checkResourceExists(ctx)).resolves.toBe(false)
+			expect(ctx.cached).toBeNull()
+			expect(cacheManager.set).not.toHaveBeenCalled()
+		})
 
-			expect(ctx.metaData).toBeNull()
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledTimes(3)
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'miss', expect.any(Number))
+		it('survives a failing backfill', async () => {
+			store.get.mockResolvedValue({
+				data: Buffer.from('stored-data'),
+				metadata: metadata(),
+			})
+			cacheManager.set.mockRejectedValue(new Error('redis down'))
+
+			await expect(operation.checkResourceExists(ctx)).resolves.toBe(true)
+			await new Promise(resolve => setImmediate(resolve))
 		})
 
 		it('never throws: an unexpected failure is a recorded miss', async () => {
@@ -343,70 +339,6 @@ describe('cacheImageResourceOperation', () => {
 			await expect(operation.checkResourceExists(ctx)).resolves.toBe(false)
 
 			expect(metricsService.recordError).toHaveBeenCalledWith('cache_check', 'resource_exists')
-			expect(metricsService.recordCacheOperation).toHaveBeenCalledWith('get', 'filesystem', 'error', expect.any(Number))
-		})
-	})
-
-	describe('loadResource', () => {
-		it('returns the layered payload without touching the disk and counts the access', async () => {
-			const cached: ProcessedImage = {
-				data: Buffer.from('cached-data'),
-				metadata: metadata(),
-			}
-			ctx.cached = cached
-			ctx.metaData = cached.metadata
-
-			await expect(operation.loadResource(ctx)).resolves.toBe(cached)
-
-			expect(mockedFs.readFile).not.toHaveBeenCalled()
-			expect(cacheManager.set).not.toHaveBeenCalled()
-			expect(tracker.record).toHaveBeenCalledWith(operation.getResourceMetaPath(ctx))
-		})
-
-		it('reads the .rsc for a disk hit, backfills the layered cache fire-and-forget and counts the access', async () => {
-			ctx.metaData = metadata()
-			mockedFs.readFile.mockResolvedValue(Buffer.from('file-data'))
-			let releaseSet!: () => void
-			cacheManager.set.mockImplementation(() => new Promise<void>((resolve) => {
-				releaseSet = resolve
-			}))
-
-			const result = await operation.loadResource(ctx)
-
-			expect(mockedFs.readFile).toHaveBeenCalledWith(operation.getResourcePath(ctx))
-			expect(result).toEqual({
-				data: Buffer.from('file-data'),
-				metadata: ctx.metaData,
-			})
-			expect(cacheManager.set).toHaveBeenCalledWith('image:public', RESOURCE_ID, result, 6 * 30 * 24 * 3600)
-			expect(tracker.record).toHaveBeenCalledWith(operation.getResourceMetaPath(ctx))
-			releaseSet()
-		})
-
-		it('survives a failing backfill', async () => {
-			ctx.metaData = metadata()
-			mockedFs.readFile.mockResolvedValue(Buffer.from('file-data'))
-			cacheManager.set.mockRejectedValue(new Error('redis down'))
-
-			await expect(operation.loadResource(ctx)).resolves.toMatchObject({
-				data: Buffer.from('file-data'),
-			})
-			await new Promise(resolve => setImmediate(resolve))
-		})
-
-		it('returns null, counting nothing, when the .rsc vanished after the check', async () => {
-			ctx.metaData = metadata()
-			mockedFs.readFile.mockRejectedValue(new Error('ENOENT'))
-
-			await expect(operation.loadResource(ctx)).resolves.toBeNull()
-
-			expect(tracker.record).not.toHaveBeenCalled()
-			expect(cacheManager.set).not.toHaveBeenCalled()
-		})
-
-		it('returns null for a context the existence check did not populate', async () => {
-			await expect(operation.loadResource(ctx)).resolves.toBeNull()
-			expect(mockedFs.readFile).not.toHaveBeenCalled()
 		})
 	})
 
@@ -429,47 +361,51 @@ describe('cacheImageResourceOperation', () => {
 			expect(metricsService.recordImageInput).toHaveBeenCalledWith('png', PNG_BYTES.length)
 		})
 
-		it('writes the .rsc/.rsm pair atomically, counts the write as the first access and removes the temp file', async () => {
-			const resourcePath = operation.getResourcePath(ctx)
-			const metaPath = operation.getResourceMetaPath(ctx)
+		it('does not make the response wait for the store: the image is made, and a slow store must not slow the request', async () => {
+			store.put.mockImplementation(() => new Promise(() => {}))
 
+			await expect(operation.execute(ctx)).resolves.toMatchObject({ data: processedBuffer })
+
+			expect(store.put).toHaveBeenCalledOnce()
+		})
+
+		it('stores the rendition in the layered cache and the rendition store, under the request tenant, and removes the temp file', async () => {
 			const result = await operation.execute(ctx)
+			await expect(ctx.stored).resolves.toBe(true)
 
-			expect(mockedFs.writeFile).toHaveBeenCalledTimes(2)
-			expect(mockedFs.writeFile).toHaveBeenCalledWith(`${resourcePath}.${ctx.tempToken}.tmp`, processedBuffer)
-			expect(mockedFs.writeFile).toHaveBeenCalledWith(`${metaPath}.${ctx.tempToken}.tmp`, JSON.stringify(result.metadata), 'utf8')
-			expect(mockedFs.rename).toHaveBeenCalledWith(`${resourcePath}.${ctx.tempToken}.tmp`, resourcePath)
-			expect(mockedFs.rename).toHaveBeenCalledWith(`${metaPath}.${ctx.tempToken}.tmp`, metaPath)
-			expect(Math.max(...mockedFs.writeFile.mock.invocationCallOrder)).toBeLessThan(Math.min(...mockedFs.rename.mock.invocationCallOrder))
-			expect(tracker.record).toHaveBeenCalledWith(metaPath)
-			expect(tracker.record.mock.invocationCallOrder[0]).toBeGreaterThan(Math.max(...mockedFs.rename.mock.invocationCallOrder))
+			expect(cacheManager.set).toHaveBeenCalledWith('image:public', RESOURCE_ID, result, 6 * 30 * 24 * 3600)
+			expect(store.put).toHaveBeenCalledWith('public', RESOURCE_ID, result)
 			expect(mockedFs.unlink).toHaveBeenCalledWith(operation.getResourceTempPath(ctx))
 		})
 
-		it('records on the sidecar which upload a rendition was made from and with which options, so its siblings can be made for other uploads', async () => {
+		it('counts a rendition of an upload towards its folder, so the folder\'s other uploads can be pre-generated', async () => {
 			const upload = new CacheImageRequest({ resourceTarget: 'http://static-svc/media/acme/uploads/blog%2Fa.png', resizeOptions: request.resizeOptions, tenantSchema: 'acme' })
+
 			const uploadCtx = await operation.setup(upload)
+			await operation.execute(uploadCtx)
+			await uploadCtx.stored
 
-			const result = await operation.execute(uploadCtx)
-
-			expect(result.metadata.source).toBe('blog/a.png')
-			expect(result.metadata.resizeOptions).toBe(upload.resizeOptions)
+			expect(catalogue.record).toHaveBeenCalledWith('blog', upload.resizeOptions)
 		})
 
-		it('serves the image uncached when the volume cannot be written, instead of the default image', async () => {
-			mockedFs.writeFile.mockRejectedValue(new Error('ENOSPC: no space left on device'))
+		it('counts nothing for a source that is not an upload', async () => {
+			const staticCtx = await operation.setup(new CacheImageRequest({ resourceTarget: 'http://static-svc/static/images/logo.png', resizeOptions: request.resizeOptions }))
+			await operation.execute(staticCtx)
+			await staticCtx.stored
+
+			expect(catalogue.record).not.toHaveBeenCalled()
+		})
+
+		it('serves the image uncached when the store cannot be written, instead of the default image', async () => {
+			store.put.mockRejectedValue(new Error('the store did not answer'))
 
 			const result = await operation.execute(ctx)
 
 			expect(result.data).toBe(processedBuffer)
+			await expect(ctx.stored).resolves.toBe(false)
 			expect(metricsService.recordError).toHaveBeenCalledWith('cache_persist', 'write')
+			expect(catalogue.record).not.toHaveBeenCalled()
 			expect(mockedFs.unlink).toHaveBeenCalledWith(operation.getResourceTempPath(ctx))
-		})
-
-		it('records no upload for a source that is not one', async () => {
-			const result = await operation.execute(await operation.setup(new CacheImageRequest({ resourceTarget: 'http://static-svc/static/images/logo.png', resizeOptions: request.resizeOptions })))
-
-			expect(result.metadata.source).toBeNull()
 		})
 
 		it('routes a source sniffed as SVG through the SVG path, whatever the URL extension', async () => {
@@ -491,8 +427,7 @@ describe('cacheImageResourceOperation', () => {
 			await expect(operation.execute(ctx)).rejects.toBeInstanceOf(InternalServerErrorException)
 
 			expect(mockedFs.unlink).toHaveBeenCalledWith(operation.getResourceTempPath(ctx))
-			expect(mockedFs.rename).not.toHaveBeenCalled()
-			expect(tracker.record).not.toHaveBeenCalled()
+			expect(store.put).not.toHaveBeenCalled()
 			expect(metricsService.recordError).toHaveBeenCalledWith('image_processing', 'execute')
 			expect(metricsService.recordImageProcessing).toHaveBeenCalledWith('process', 'unknown', 'error', expect.any(Number))
 			expect(metricsService.recordImageProcessing).toHaveBeenCalledWith('execute', 'unknown', 'error', expect.any(Number))
@@ -568,9 +503,6 @@ describe('cacheImageResourceOperation', () => {
 	})
 
 	describe('flush fencing', () => {
-		const RSC = () => operation.getResourcePath(ctx)
-		const RSM = () => operation.getResourceMetaPath(ctx)
-
 		it('records the tenant\'s flush epoch when the request starts', async () => {
 			epochs.advance('public')
 			epochs.advance('public')
@@ -595,9 +527,8 @@ describe('cacheImageResourceOperation', () => {
 
 			expect(result.data).toBe(processedBuffer)
 			expect(cacheManager.set).not.toHaveBeenCalled()
-			expect(mockedFs.writeFile).not.toHaveBeenCalled()
-			expect(mockedFs.rename).not.toHaveBeenCalled()
-			expect(tracker.record).not.toHaveBeenCalled()
+			expect(store.put).not.toHaveBeenCalled()
+			expect(catalogue.record).not.toHaveBeenCalled()
 			expect(mockedFs.unlink).toHaveBeenCalledWith(operation.getResourceTempPath(ctx))
 		})
 
@@ -609,24 +540,17 @@ describe('cacheImageResourceOperation', () => {
 			expect(operation.getResourceTempPath(ctx)).toMatch(/\.rst$/)
 		})
 
-		it('logs a copy it could not remove, but not a file that was already gone', async () => {
+		it('logs a copy it could not remove', async () => {
 			const warn = vi.spyOn(CorrelatedLogger, 'warn').mockImplementation(() => {})
 			cacheManager.set.mockImplementation(async () => {
 				epochs.advance('public')
 			})
-			mockedFs.unlink.mockImplementation(async (path) => {
-				if (path === RSC()) {
-					throw Object.assign(new Error('EACCES'), { code: 'EACCES' })
-				}
-				if (path === RSM()) {
-					throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
-				}
-			})
+			store.delete.mockRejectedValue(new Error('the store did not answer'))
 
 			await operation.execute(ctx)
 
 			const messages = warn.mock.calls.map(([message]) => String(message))
-			expect(messages.filter(m => m.includes('Could not remove a copy'))).toHaveLength(1)
+			expect(messages.filter(m => m.includes('Could not remove a copy')).length).toBeGreaterThan(0)
 			warn.mockRestore()
 		})
 
@@ -643,8 +567,9 @@ describe('cacheImageResourceOperation', () => {
 			await operation.execute(ctx)
 
 			expect(cacheManager.set).toHaveBeenCalledTimes(1)
-			expect(mockedFs.rename).toHaveBeenCalledTimes(2)
+			expect(store.put).toHaveBeenCalledTimes(1)
 			expect(cacheManager.delete).not.toHaveBeenCalled()
+			expect(store.delete).not.toHaveBeenCalled()
 		})
 
 		it('removes what it cached when a flush lands during the write', async () => {
@@ -653,59 +578,60 @@ describe('cacheImageResourceOperation', () => {
 			})
 
 			const result = await operation.execute(ctx)
+			await ctx.stored
 
 			expect(result.data).toBe(processedBuffer)
 			expect(cacheManager.delete).toHaveBeenCalledWith('image:public', RESOURCE_ID)
-			expect(mockedFs.unlink).toHaveBeenCalledWith(RSC())
-			expect(mockedFs.unlink).toHaveBeenCalledWith(RSM())
-			expect(tracker.record).not.toHaveBeenCalled()
+			expect(store.delete).toHaveBeenCalledWith('public', RESOURCE_ID)
+			expect(catalogue.record).not.toHaveBeenCalled()
 		})
 
-		it('does not fail the request when the files it removes are already gone', async () => {
+		it('does not fail the request when the copies it removes are already gone', async () => {
 			cacheManager.set.mockImplementation(async () => {
 				epochs.advance('public')
 			})
-			mockedFs.unlink.mockImplementation(async (path) => {
-				if (path === RSC() || path === RSM()) {
-					throw new Error('ENOENT')
-				}
-			})
+			store.delete.mockRejectedValue(new Error('gone'))
 
 			await expect(operation.execute(ctx)).resolves.toMatchObject({ data: processedBuffer })
 		})
 
-		it('does not backfill the layered cache from a disk read that a flush overtook', async () => {
-			ctx.metaData = metadata()
-			mockedFs.readFile.mockResolvedValue(Buffer.from('file-data'))
-			epochs.advance('public')
-
-			await expect(operation.loadResource(ctx)).resolves.toMatchObject({
-				data: Buffer.from('file-data'),
+		it('does not backfill the layered cache from a store read that a flush overtook', async () => {
+			store.get.mockImplementation(async () => {
+				epochs.advance('public')
+				return {
+					data: Buffer.from('stored-data'),
+					metadata: metadata(),
+				}
 			})
+
+			await expect(operation.checkResourceExists(ctx)).resolves.toBe(true)
 
 			expect(cacheManager.set).not.toHaveBeenCalled()
 		})
 
 		it('removes a backfill that a flush overtook while it was being written', async () => {
-			ctx.metaData = metadata()
-			mockedFs.readFile.mockResolvedValue(Buffer.from('file-data'))
+			store.get.mockResolvedValue({
+				data: Buffer.from('stored-data'),
+				metadata: metadata(),
+			})
 			cacheManager.set.mockImplementation(async () => {
 				epochs.advance('public')
 			})
 
-			await operation.loadResource(ctx)
+			await operation.checkResourceExists(ctx)
 			await new Promise(resolve => setImmediate(resolve))
 
 			expect(cacheManager.delete).toHaveBeenCalledWith('image:public', RESOURCE_ID)
-			expect(mockedFs.unlink).toHaveBeenCalledWith(RSC())
-			expect(mockedFs.unlink).toHaveBeenCalledWith(RSM())
+			expect(store.delete).toHaveBeenCalledWith('public', RESOURCE_ID)
 		})
 
 		it('leaves a backfill alone when no flush landed', async () => {
-			ctx.metaData = metadata()
-			mockedFs.readFile.mockResolvedValue(Buffer.from('file-data'))
+			store.get.mockResolvedValue({
+				data: Buffer.from('stored-data'),
+				metadata: metadata(),
+			})
 
-			await operation.loadResource(ctx)
+			await operation.checkResourceExists(ctx)
 			await new Promise(resolve => setImmediate(resolve))
 
 			expect(cacheManager.set).toHaveBeenCalledTimes(1)

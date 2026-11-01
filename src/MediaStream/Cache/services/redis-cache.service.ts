@@ -10,6 +10,7 @@ import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { IMAGE_KEY_PATTERN } from '../utils/cache-namespace.util.js'
+import { decodeImageEnvelope, encodeImageEnvelope } from '../utils/image-envelope.util.js'
 
 const USED_MEMORY_RE = /used_memory:(\d+)/
 /** Reconnect backoff: 2s, 4s, … capped at 30s (ioredis drives the retries). */
@@ -18,13 +19,6 @@ const KEEP_ALIVE_MS = 30000
 const CONNECT_TIMEOUT_MS = 10000
 const COMMAND_TIMEOUT_MS = 5000
 const SCAN_BATCH = 100
-
-/**
- * Binary envelope for cached images: [0x00][u32 metadata length][metadata JSON][raw bytes].
- * 0x00 can never start a JSON document, so plain-JSON values stay distinguishable.
- */
-const BINARY_MARKER = 0x00
-const BINARY_HEADER_BYTES = 5
 
 @Injectable()
 export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleDestroy {
@@ -403,26 +397,16 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 	private serializeValue<T>(value: T): Buffer {
 		if (value && typeof value === 'object' && 'data' in value && Buffer.isBuffer((value as { data: unknown }).data)) {
 			const { data, ...rest } = value as { data: Buffer } & Record<string, unknown>
-			const metaJson = Buffer.from(JSON.stringify(rest), 'utf8')
-			const header = Buffer.alloc(BINARY_HEADER_BYTES)
-			header[0] = BINARY_MARKER
-			header.writeUInt32BE(metaJson.length, 1)
-			return Buffer.concat([header, metaJson, data])
+			return encodeImageEnvelope(rest, data)
 		}
 		return Buffer.from(JSON.stringify(value), 'utf8')
 	}
 
-	/** The binary envelope's payload is returned as a subarray view — no copy of the image bytes. */
+	/** The binary envelope's payload is returned as a subarray view: no copy of the image bytes. */
 	private deserializeValue<T>(value: Buffer): T | null {
-		if (value.length >= BINARY_HEADER_BYTES && value[0] === BINARY_MARKER) {
-			const metaLength = value.readUInt32BE(1)
-			if (metaLength > 0 && BINARY_HEADER_BYTES + metaLength <= value.length) {
-				const rest = JSON.parse(value.toString('utf8', BINARY_HEADER_BYTES, BINARY_HEADER_BYTES + metaLength))
-				return {
-					...rest,
-					data: value.subarray(BINARY_HEADER_BYTES + metaLength),
-				} as T
-			}
+		const envelope = decodeImageEnvelope(value)
+		if (envelope) {
+			return { ...envelope.rest, data: envelope.data } as T
 		}
 
 		try {

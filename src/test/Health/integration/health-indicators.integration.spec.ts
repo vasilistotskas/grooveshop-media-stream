@@ -9,7 +9,6 @@ import { HealthModule } from '#microservice/Health/health.module'
 import { DiskSpaceHealthIndicator } from '#microservice/Health/indicators/disk-space-health.indicator'
 import { MemoryHealthIndicator } from '#microservice/Health/indicators/memory-health.indicator'
 import { HttpHealthIndicator } from '#microservice/HTTP/indicators/http-health.indicator'
-import { StorageHealthIndicator } from '#microservice/Storage/indicators/storage-health.indicator'
 import { TenantDomainsHealthIndicator } from '#microservice/Validation/indicators/tenant-domains-health.indicator'
 
 /**
@@ -79,12 +78,6 @@ describe('health Indicators Integration', () => {
 			const indicator = module.get<RedisHealthIndicator>(RedisHealthIndicator)
 			expect(indicator).toBeDefined()
 			expect(indicator.key).toBe('redis')
-		})
-
-		it('should register StorageHealthIndicator', () => {
-			const indicator = module.get<StorageHealthIndicator>(StorageHealthIndicator)
-			expect(indicator).toBeDefined()
-			expect(indicator.key).toBe('storage')
 		})
 
 		it('should register TenantDomainsHealthIndicator', () => {
@@ -182,14 +175,6 @@ describe('health Indicators Integration', () => {
 			// Should not throw when checking dependencies
 			expect(() => indicator.key).not.toThrow()
 		})
-
-		it('should resolve dependencies for storage health indicator', () => {
-			const indicator = module.get<StorageHealthIndicator>(StorageHealthIndicator)
-			expect(indicator).toBeDefined()
-
-			// Should not throw when checking dependencies
-			expect(() => indicator.key).not.toThrow()
-		})
 	})
 
 	describe('health Check Error Handling', () => {
@@ -268,7 +253,6 @@ describe('health Indicators Integration', () => {
 				HttpHealthIndicator,
 				CacheHealthIndicator,
 				RedisHealthIndicator,
-				StorageHealthIndicator,
 				TenantDomainsHealthIndicator,
 			]
 
