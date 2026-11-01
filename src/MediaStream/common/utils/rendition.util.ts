@@ -1,6 +1,14 @@
 import { FitOptions, PositionOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
 import { MAX_IMAGE_HEIGHT, MAX_TOTAL_PIXELS } from '#microservice/common/constants/image-limits.constant'
-import { KNOWN_RENDITION_SIZES, MAX_RENDITION_WIDTH, RENDITION_QUALITIES, RENDITION_WIDTHS } from '#microservice/common/constants/rendition-presets.constant'
+import { MAX_RENDITION_WIDTH, RENDITION_QUALITIES, RENDITION_WIDTHS } from '#microservice/common/constants/rendition-presets.constant'
+
+/** `{width}x{height}`, the key a size is known by (0 = unconstrained). */
+export function sizeKey(width: number, height: number): string {
+	return `${width}x${height}`
+}
+
+/** Whether a size is one the storefront asks for, which is answered exactly. */
+export type KnownSizePredicate = (key: string) => boolean
 
 /** The resize parameters a preset is chosen from; every field is validated before this runs. */
 export interface RenditionRequest {
@@ -28,7 +36,8 @@ function snapUp(value: number, ladder: readonly number[]): number {
 /**
  * Width and height of the preset a request maps to.
  *
- * A size the storefront asks for (`KNOWN_RENDITION_SIZES`) is answered exactly.
+ * A size the service has learned the storefront asks for (`isKnownSize`, backed
+ * by `RenditionSizeService`) is answered exactly.
  * Any other snaps up: the bounded axis to the width ladder, and with both axes
  * set the height follows the snapped width at the requested aspect ratio, so a
  * `cover` crop keeps its shape. Both axes 0 (the original size) becomes a bound
@@ -36,8 +45,8 @@ function snapUp(value: number, ladder: readonly number[]): number {
  * (an extreme aspect ratio) is kept as asked: it is not a preset and is
  * validated like any other.
  */
-function snapDimensions(width: number, height: number): { width: number, height: number } {
-	if (KNOWN_RENDITION_SIZES.has(`${width}x${height}`)) {
+function snapDimensions(width: number, height: number, isKnownSize: KnownSizePredicate): { width: number, height: number } {
+	if (isKnownSize(sizeKey(width, height))) {
 		return { width, height }
 	}
 	if (width > 0 && height > 0) {
@@ -99,9 +108,9 @@ function canonicalQuality(format: SupportedResizeFormats, quality: number, avifM
  * to itself, which is what lets pre-generated renditions and live requests
  * share one cache identity.
  */
-export function toRendition(request: RenditionRequest, avifMaxQuality: number): Rendition {
+export function toRendition(request: RenditionRequest, avifMaxQuality: number, isKnownSize: KnownSizePredicate): Rendition {
 	return {
-		...snapDimensions(request.width, request.height),
+		...snapDimensions(request.width, request.height, isKnownSize),
 		position: canonicalPosition(request.fit, request.position),
 		quality: canonicalQuality(request.format, request.quality, avifMaxQuality),
 	}

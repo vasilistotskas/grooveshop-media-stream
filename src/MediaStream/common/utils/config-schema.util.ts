@@ -240,6 +240,15 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	'renditions.store.readTimeoutMs': { env: 'RENDITION_STORE_READ_TIMEOUT_MS', default: 1000, type: 'number' },
 	'renditions.store.writeTimeoutMs': { env: 'RENDITION_STORE_WRITE_TIMEOUT_MS', default: 5000, type: 'number' },
 
+	// Exact sizes, learned: a requested size becomes exact (answered with no
+	// extra pixel) once the service has rendered it for this many uploads, stays
+	// exact while it is asked for within the window, and at most `maxKnown`
+	// sizes are exact at once (the least recently asked leaves first). Any other
+	// size snaps up the width ladder.
+	'renditions.sizes.minSources': { env: 'RENDITION_SIZES_MIN_SOURCES', default: 10, type: 'number' },
+	'renditions.sizes.windowDays': { env: 'RENDITION_SIZES_WINDOW_DAYS', default: 30, type: 'number' },
+	'renditions.sizes.maxKnown': { env: 'RENDITION_SIZES_MAX_KNOWN', default: 300, type: 'number' },
+
 	// Rendition pre-generation: the cron renders the renditions an upload is
 	// shown at (learned from the renditions already made for its folder) before
 	// anyone asks. Needs the store; off while the media directory is empty.

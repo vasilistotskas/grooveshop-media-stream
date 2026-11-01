@@ -150,8 +150,18 @@ export interface RenditionStoreConfig {
 	writeTimeoutMs: number
 }
 
+export interface RenditionSizesConfig {
+	/** A size becomes exact once it was rendered for this many uploads. */
+	minSources: number
+	/** Days a size stays exact without being asked for; also how long its count is kept. */
+	windowDays: number
+	/** Most sizes exact at once; the least recently asked leaves first. */
+	maxKnown: number
+}
+
 export interface RenditionsConfig {
 	store: RenditionStoreConfig
+	sizes: RenditionSizesConfig
 	/** Root of the tenants' uploads (`{dir}/{tenantSchema}/uploads/...`); empty disables pre-generation. */
 	mediaDirectory: string
 	cronSchedule: string

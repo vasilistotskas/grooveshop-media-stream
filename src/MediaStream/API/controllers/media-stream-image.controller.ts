@@ -3,11 +3,12 @@ import type { ImageRequestLog } from '#microservice/Correlation/utils/image-requ
 import type { ImageSourceKey } from '../config/image-sources.config.js'
 import type { ImageProcessingContext, ImageProcessingParams } from '../types/image-source.types.js'
 import { BadRequestException, Controller, Get, NotFoundException, Req, Res } from '@nestjs/common'
+import { RenditionSizeService } from '#microservice/Cache/services/rendition-size.service'
 import { IMAGE } from '#microservice/common/constants/route-prefixes.constant'
 import { PUBLIC_TENANT_SCHEMA } from '#microservice/common/constants/tenant.constant'
 import { TenantSuspendedError } from '#microservice/common/errors/media-stream.errors'
 import { decodePathFully } from '#microservice/common/utils/percent-decode.util'
-import { toRendition } from '#microservice/common/utils/rendition.util'
+import { sizeKey, toRendition } from '#microservice/common/utils/rendition.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { currentImageRequest } from '#microservice/Correlation/utils/image-request-log.util'
@@ -54,6 +55,7 @@ export default class MediaStreamImageController {
 		private readonly correlationService: CorrelationService,
 		private readonly metricsService: MetricsService,
 		private readonly tenantDomainsService: TenantDomainsService,
+		private readonly renditionSizes: RenditionSizeService,
 		configService: ConfigService,
 	) {
 		this.avifMaxQuality = configService.get<number>('processing.avifMaxQuality')
@@ -259,14 +261,18 @@ export default class MediaStreamImageController {
 	private buildResizeOptions(params: ImageProcessingParams): ResizeOptions {
 		const format = params.format as SupportedResizeFormats
 		const fit = params.fit as FitOptions
+		const width = Number(params.width)
+		const height = Number(params.height)
+		const size = sizeKey(width, height)
+		this.renditionSizes.touch(size)
 		const rendition = toRendition({
-			width: Number(params.width),
-			height: Number(params.height),
+			width,
+			height,
 			fit,
 			position: params.position ?? RESIZE_DEFAULTS.position,
 			format,
 			quality: Number(params.quality),
-		}, this.avifMaxQuality)
+		}, this.avifMaxQuality, key => this.renditionSizes.isKnown(key))
 		return new ResizeOptions({
 			...rendition,
 			background: params.background,

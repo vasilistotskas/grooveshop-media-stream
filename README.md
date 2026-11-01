@@ -46,6 +46,7 @@ This service provides image processing capabilities for the Grooveshop platform,
 - `REDIS_TTL`: Redis TTL in seconds for writes that pass no TTL (default: 7200). Image entries use `CACHE_IMAGE_PRIVATE_TTL` (default: 15552000, 180 days) in Redis, memory and the rendition store
 - `CACHE_FILE_DIRECTORY`: Scratch directory for source downloads in flight (default: `./storage`)
 - `RENDITION_STORE_ENDPOINT`, `RENDITION_STORE_BUCKET`, `RENDITION_STORE_ACCESS_KEY_ID`, `RENDITION_STORE_SECRET_ACCESS_KEY`: the S3-compatible bucket (Cloudflare R2) that holds every rendition for all replicas; empty endpoint or bucket turns it off (default: off). `RENDITION_STORE_READ_TIMEOUT_MS` (1000) and `RENDITION_STORE_WRITE_TIMEOUT_MS` (5000) are the deadlines after which a call is a miss or leaves the image uncached
+- `RENDITION_SIZES_MIN_SOURCES` (10), `RENDITION_SIZES_WINDOW_DAYS` (30), `RENDITION_SIZES_MAX_KNOWN` (300): a requested size is answered exactly once it was rendered for that many uploads, while it is asked for within the window, at most that many at once; any other size snaps up a width ladder (see `docs/renditions.md`)
 - `RENDITIONS_MEDIA_DIRECTORY`, `RENDITIONS_CRON`, `RENDITIONS_MIN_SOURCES`, `RENDITIONS_MAX_PER_SOURCE`: pre-generation of an upload's renditions (see `docs/renditions.md`; off while the directory is empty)
 - `PROCESSING_CPU_CORES`: Sharp concurrency, CPU cores (fractions allowed, default: 1.5)
 - `MONITORING_ENABLED`: Enable monitoring (default: true)

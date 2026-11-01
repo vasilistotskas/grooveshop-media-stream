@@ -1,13 +1,24 @@
-import type { RenditionRequest } from '#microservice/common/utils/rendition.util'
+import type { KnownSizePredicate, RenditionRequest } from '#microservice/common/utils/rendition.util'
 import { describe, expect, it } from 'vitest'
 import { FitOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
 import { MAX_IMAGE_HEIGHT, MAX_TOTAL_PIXELS } from '#microservice/common/constants/image-limits.constant'
-import { KNOWN_RENDITION_SIZES, MAX_RENDITION_WIDTH, RENDITION_QUALITIES, RENDITION_WIDTHS } from '#microservice/common/constants/rendition-presets.constant'
-import { toRendition } from '#microservice/common/utils/rendition.util'
+import { MAX_RENDITION_WIDTH, RENDITION_QUALITIES, RENDITION_WIDTHS } from '#microservice/common/constants/rendition-presets.constant'
+import { sizeKey, toRendition } from '#microservice/common/utils/rendition.util'
 
 const AVIF_MAX_QUALITY = 55
 
-function rendition(overrides: Partial<RenditionRequest>): ReturnType<typeof toRendition> {
+/** Sizes the service has learned the storefront asks for. */
+const KNOWN = new Set([
+	'704x820',
+	'672x340',
+	'264x264',
+	'672x0',
+	'1440x0',
+])
+const isKnown: KnownSizePredicate = key => KNOWN.has(key)
+const nothingKnown: KnownSizePredicate = () => false
+
+function rendition(overrides: Partial<RenditionRequest>, known: KnownSizePredicate = nothingKnown): ReturnType<typeof toRendition> {
 	return toRendition({
 		width: 640,
 		height: 480,
@@ -16,7 +27,7 @@ function rendition(overrides: Partial<RenditionRequest>): ReturnType<typeof toRe
 		format: SupportedResizeFormats.avif,
 		quality: 80,
 		...overrides,
-	}, AVIF_MAX_QUALITY)
+	}, AVIF_MAX_QUALITY, known)
 }
 
 describe('rendition presets', () => {
@@ -43,24 +54,35 @@ describe('rendition presets', () => {
 			expect(rendition({ width: requested, height: 0, fit: FitOptions.inside }).width).toBe(expected)
 		})
 
-		it('answers every size the storefront asks for exactly, at no extra pixel', () => {
-			for (const size of KNOWN_RENDITION_SIZES) {
+		it('answers a known size exactly, at no extra pixel', () => {
+			for (const size of KNOWN) {
 				const [width, height] = size.split('x').map(Number)
-				expect(rendition({ width, height })).toMatchObject({ width, height })
-			}
-			expect(KNOWN_RENDITION_SIZES.size).toBeGreaterThan(40)
-		})
-
-		it('keeps every known size inside the pixel budget and the width cap', () => {
-			for (const size of KNOWN_RENDITION_SIZES) {
-				const [width, height] = size.split('x').map(Number)
-				expect(width).toBeLessThanOrEqual(MAX_RENDITION_WIDTH)
-				expect(width * height).toBeLessThanOrEqual(MAX_TOTAL_PIXELS)
+				expect(rendition({ width, height }, isKnown)).toMatchObject({ width, height })
 			}
 		})
 
-		it('does not know the original size, which is capped instead', () => {
-			expect(KNOWN_RENDITION_SIZES.has('0x0')).toBe(false)
+		it('snaps the same size up while it is not known', () => {
+			expect(rendition({ width: 704, height: 820 })).toMatchObject({ width: 752, height: 876 })
+			expect(rendition({ width: 704, height: 820 }, isKnown)).toMatchObject({ width: 704, height: 820 })
+		})
+
+		it('asks the predicate for `{width}x{height}`, with 0 for an axis that is not constrained', () => {
+			const asked: string[] = []
+			rendition({ width: 700, height: 410 }, (key) => {
+				asked.push(key)
+				return false
+			})
+			rendition({ width: 300, height: 0 }, (key) => {
+				asked.push(key)
+				return false
+			})
+
+			expect(asked).toEqual(['700x410', '300x0'])
+			expect(sizeKey(700, 410)).toBe('700x410')
+		})
+
+		it('is never asked to treat the original size as known by the ladder: 0 x 0 is capped when nothing says otherwise', () => {
+			expect(rendition({ width: 0, height: 0 }, isKnown)).toMatchObject({ width: MAX_RENDITION_WIDTH, height: 0 })
 		})
 
 		it('never goes below the requested width', () => {
@@ -69,9 +91,9 @@ describe('rendition presets', () => {
 			}
 		})
 
-		it('maps every unknown width to a ladder step', () => {
-			const unknown = Array.from({ length: 8192 }, (_, index) => index + 1).filter(width => !KNOWN_RENDITION_SIZES.has(`${width}x0`))
-			expect(unknown.every(width => RENDITION_WIDTHS.includes(rendition({ width, height: 0 }).width))).toBe(true)
+		it('maps every width to a ladder step while nothing is known', () => {
+			const widths = Array.from({ length: 8192 }, (_, index) => index + 1)
+			expect(widths.every(width => RENDITION_WIDTHS.includes(rendition({ width, height: 0 }).width))).toBe(true)
 		})
 
 		it('keeps the aspect ratio of a request with both axes, rounding the height', () => {

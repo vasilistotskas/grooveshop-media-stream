@@ -9,6 +9,7 @@ import MediaStreamImageController from '#microservice/API/controllers/media-stre
 import { ImageStreamService } from '#microservice/API/services/image-stream.service'
 import { RequestValidatorService } from '#microservice/API/services/request-validator.service'
 import { UrlBuilderService } from '#microservice/API/services/url-builder.service'
+import { RenditionSizeService } from '#microservice/Cache/services/rendition-size.service'
 import { TenantSuspendedError } from '#microservice/common/errors/media-stream.errors'
 import { ConfigService } from '#microservice/Config/config.service'
 import { requestContextStorage } from '#microservice/Correlation/async-local-storage'
@@ -41,6 +42,7 @@ describe('mediaStreamImageController', () => {
 	let mockCorrelationService: MockedObject<CorrelationService>
 	let mockMetricsService: MockedObject<MetricsService>
 	let mockTenantDomainsService: MockedObject<TenantDomainsService>
+	let mockRenditionSizes: { isKnown: ReturnType<typeof vi.fn>, touch: ReturnType<typeof vi.fn> }
 	let mockResponse: MockedObject<Response>
 
 	beforeEach(async () => {
@@ -65,6 +67,10 @@ describe('mediaStreamImageController', () => {
 			recordError: vi.fn(),
 		} as any
 
+		mockRenditionSizes = {
+			isKnown: vi.fn().mockReturnValue(false),
+			touch: vi.fn(),
+		}
 		mockTenantDomainsService = {
 			isSuspended: vi.fn().mockReturnValue(false),
 		} as any
@@ -109,6 +115,10 @@ describe('mediaStreamImageController', () => {
 				{
 					provide: TenantDomainsService,
 					useValue: mockTenantDomainsService,
+				},
+				{
+					provide: RenditionSizeService,
+					useValue: mockRenditionSizes,
 				},
 				{
 					provide: ConfigService,
@@ -407,13 +417,18 @@ describe('mediaStreamImageController', () => {
 		}
 
 		it('hashes an unknown size as the preset it snaps to, so neighbouring sizes share one entry', async () => {
-			const options = await requestedOptions('/media_stream-image/media/acme/uploads/a.jpg/700/410/cover/attention/transparent/0/80.avif')
-			expect(options).toMatchObject({ width: 752, height: 440 })
+			const options = await requestedOptions('/media_stream-image/media/acme/uploads/a.jpg/704/820/cover/attention/transparent/0/80.avif')
+			expect(options).toMatchObject({ width: 752, height: 876 })
+			expect(mockRenditionSizes.touch).toHaveBeenCalledWith('704x820')
 		})
 
-		it('answers a size the storefront asks for exactly', async () => {
+		it('answers a size the service has learned exactly', async () => {
+			mockRenditionSizes.isKnown.mockImplementation((key: string) => key === '704x820')
+
 			const options = await requestedOptions('/media_stream-image/media/acme/uploads/a.jpg/704/820/cover/attention/transparent/0/80.avif')
+
 			expect(options).toMatchObject({ width: 704, height: 820 })
+			expect(mockRenditionSizes.isKnown).toHaveBeenCalledWith('704x820')
 		})
 
 		it('sends the same options for two requests that snap to one preset', async () => {

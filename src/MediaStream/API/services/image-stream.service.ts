@@ -9,6 +9,7 @@ import { CircuitBreakerOpenError, DefaultImageFallbackError, isRejectedSource, P
 import { getMimeType } from '#microservice/common/utils/content-negotiation.util'
 import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { checkETagMatch, checkIfModifiedSince, formatLastModified, generateWeakETag } from '#microservice/common/utils/etag.util'
+import { sizeKey } from '#microservice/common/utils/rendition.util'
 import { RequestDeduplicator } from '#microservice/common/utils/request-deduplication.util'
 import { currentImageRequest } from '#microservice/Correlation/utils/image-request-log.util'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
@@ -71,7 +72,7 @@ export class ImageStreamService {
 		PerformanceTracker.startPhase('image_request_processing')
 
 		try {
-			const opCtx = await this.cacheImageResourceOperation.setup(request)
+			const opCtx = await this.cacheImageResourceOperation.setup(request, sizeKey(Number(context.params.width), Number(context.params.height)))
 
 			if (await this.cacheImageResourceOperation.checkResourceExists(opCtx)) {
 				const headers = opCtx.metaData

@@ -15,6 +15,7 @@ The code wins over this page. Source files:
 |---|---|
 | `src/MediaStream/common/constants/rendition-presets.constant.ts` | The width ladder, the width cap, the quality ladder |
 | `src/MediaStream/common/utils/rendition.util.ts` | `toRendition`: the preset a request is answered with |
+| `src/MediaStream/Cache/services/rendition-size.service.ts` | The learned set of exact sizes: counts, promotes, expires, caps |
 | `src/MediaStream/API/controllers/media-stream-image.controller.ts` | Applies it in `buildResizeOptions`, before the request is hashed |
 | `src/MediaStream/Renditions/services/rendition-generator.service.ts` | The pre-generation cron |
 | `src/MediaStream/Renditions/services/rendition-source-scanner.service.ts` | Lists the uploads on the media volume |
@@ -53,7 +54,7 @@ that set snaps up:
 
 | Parameter | Preset |
 |---|---|
-| size in `KNOWN_RENDITION_SIZES` (`{width}x{height}`, 0 = unconstrained) | Exactly as asked, no extra pixel |
+| a known size (`{width}x{height}`, 0 = unconstrained), see below | Exactly as asked, no extra pixel |
 | any other width | The next step of `RENDITION_WIDTHS` at or above it (29 steps, 64 to 2048 px; 11-17 % apart from 192 px up) |
 | any other height, both axes set | Follows the snapped width at the requested aspect ratio (a `cover` crop keeps its shape) |
 | any other height, one axis set | Only that axis, snapped; the other stays 0 |
@@ -63,16 +64,39 @@ that set snaps up:
 | quality, GIF / TIFF | 100 (ignored by the encoder) |
 | position | `centre` is `center`; the fits that ignore it (`inside`, `outside`, `fill`) share `center` |
 
-`KNOWN_RENDITION_SIZES` is the set of sizes the 2026-10 request logs show asked
-of at least ten different uploads (two weeks, three tenants, both designs),
-plus the single-axis widths the storefront computes itself (the 672 and
-1440 px content column, 1200 px pages). What is left is a probe or an author's
-own width in TinyMCE content. The set is finite, so the work and disk a client
-can cause stay bounded and pre-generation works from a finite list. A size the
-storefront starts to use that is not in it still works, rounded up; add it when
-it carries real traffic. To refresh it, count distinct uploads per size in the
-request log (stats by `log.width`, `log.height`, `count_uniq(log.path)`) and
-keep the sizes at or above ten.
+**Known sizes are learned from traffic**, not listed in the code, so a size the
+storefront starts to use becomes exact on its own:
+
+1. Each time the service renders a size for an upload (a first rendering, so
+   the count is of uploads; it repeats only after a flush, an expiry or a
+   processing-version change), it counts one in a Redis hash
+   (`renditions:sizes:seen`).
+2. At `RENDITION_SIZES_MIN_SOURCES` (10) the size is promoted into a Redis
+   sorted set (`renditions:sizes:known`), scored by when it was last asked for.
+3. A size that is asked for keeps its score fresh (each pod reports what it
+   served every 30 s). One unused for `RENDITION_SIZES_WINDOW_DAYS` (30) leaves.
+   Past `RENDITION_SIZES_MAX_KNOWN` (300) the least recently asked leaves
+   first. A prober can therefore hold at most 300 sizes exact, each by having
+   it rendered for ten uploads; the counts are pruned too, so the hash cannot
+   grow without bound.
+4. `0x0`, a width past the 2048 cap and a size past the pixel budget are never
+   promoted.
+
+Requests never wait for Redis: each pod reads the set into memory every minute
+and answers from there. A promoted size is exact a few seconds after its tenth
+rendering (one more rendering per upload at the switch). **If Redis cannot be
+reached**, a pod keeps the last set it read (moving a size to a different
+rendition would only cause misses); a pod that never had a set snaps
+everything, and nothing errors. An empty set is seeded once from
+`SEED_RENDITION_SIZES` (`common/constants/rendition-size-seed.constant.ts`):
+the sizes of the 2026-10 request logs asked of at least ten uploads, plus the
+672, 1200 and 1440 px single-axis widths the storefront computes itself. It is
+a seed, not the source of truth: a deployment that already has a set ignores
+it, and a seed entry nobody asks for leaves after the window.
+
+Qualities are not learned: the five the storefront uses (75, 80, 85, 90, 100)
+are exact and any other rounds up to the next, which costs a few points of
+quality at most, not pixels.
 
 Properties that matter:
 
@@ -88,13 +112,13 @@ Properties that matter:
   aspect ratio the snap would push outside the pixel budget (1 x 8000) is
   kept as asked.
 
-Replayed over the 14-day log (13.8 thousand requests, 911 uploads) this adds
-**1.0 % pixels** (the tail of sizes asked of fewer than ten uploads is rounded
+Replayed over the 14-day log (13.8 thousand requests, 911 uploads) with the
+seeded set this adds **1.0 % pixels** (the tail of sizes asked of fewer than ten uploads is rounded
 up; 9.6 thousand requests of the 13 thousand with a size are exact) and removes
 0.6 % of the distinct renditions (4945 to 4915). The ladder is not what raises
 the hit ratio: the storefront already asks each upload for few sizes. It bounds
 the work and the disk a client that enumerates sizes can cause, and it makes a
-pre-generation list finite. Changing the ladder or the set re-keys the
+pre-generation list finite. Changing the ladder re-keys the
 renditions it changes and needs no `PROCESSING_VERSION` bump.
 
 ## 2. The rendition store
@@ -234,6 +258,9 @@ added behind the same admission error if the remaining 503 rate asks for it.
 | `RENDITION_STORE_ACCESS_KEY_ID`, `RENDITION_STORE_SECRET_ACCESS_KEY` | empty | An R2 token scoped to object read and write on the bucket |
 | `RENDITION_STORE_READ_TIMEOUT_MS` | 1000 | Deadline of a GET or HEAD; past it the read is a miss |
 | `RENDITION_STORE_WRITE_TIMEOUT_MS` | 5000 | Deadline of a PUT, DELETE or LIST; past it the image is served uncached |
+| `RENDITION_SIZES_MIN_SOURCES` | 10 | Uploads a size must be rendered for before it is answered exactly |
+| `RENDITION_SIZES_WINDOW_DAYS` | 30 | Days an exact size stays exact without being asked for |
+| `RENDITION_SIZES_MAX_KNOWN` | 300 | Most sizes exact at once; the least recently asked leaves first |
 | `RENDITIONS_MEDIA_DIRECTORY` | empty (off) | Root of the tenants' uploads: `{dir}/{tenant}/uploads/` |
 | `RENDITIONS_CRON` | `*/10 * * * *` | How often the pass runs (a six-field cron with seconds works) |
 | `RENDITIONS_MIN_SOURCES` | 3 | Sources of a folder that must share a rendition before it is pre-generated |

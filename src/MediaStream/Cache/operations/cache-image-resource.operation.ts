@@ -24,6 +24,7 @@ import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import GenerateResourceIdentityFromRequestJob from '#microservice/Processing/jobs/generate-resource-identity-from-request.job'
 import { MultiLayerCacheManager } from '../services/multi-layer-cache.manager.js'
 import { RenditionCatalogueService } from '../services/rendition-catalogue.service.js'
+import { RenditionSizeService } from '../services/rendition-size.service.js'
 import { RenditionStoreService } from '../services/rendition-store.service.js'
 import { TenantCacheEpochs } from '../services/tenant-cache-epochs.service.js'
 import { imageNamespace } from '../utils/cache-namespace.util.js'
@@ -57,6 +58,8 @@ export interface OperationContext {
 	 * made, and a slow store must not slow the request); pre-generation does.
 	 */
 	stored?: Promise<boolean>
+	/** The size the request named (`{width}x{height}`), before it was mapped to a preset; absent for a rendition made on the service's own initiative. */
+	requestedSize?: string
 }
 
 /**
@@ -79,6 +82,7 @@ export default class CacheImageResourceOperation {
 		private readonly cacheManager: MultiLayerCacheManager,
 		private readonly renditionStore: RenditionStoreService,
 		private readonly renditionCatalogue: RenditionCatalogueService,
+		private readonly renditionSizes: RenditionSizeService,
 		private readonly metricsService: MetricsService,
 		private readonly tenantCacheEpochs: TenantCacheEpochs,
 		configService: ConfigService,
@@ -96,7 +100,7 @@ export default class CacheImageResourceOperation {
 	 * subsequent method takes as its first argument. The controller has
 	 * already validated every parameter and the URL.
 	 */
-	async setup(cacheImageRequest: CacheImageRequest): Promise<OperationContext> {
+	async setup(cacheImageRequest: CacheImageRequest, requestedSize?: string): Promise<OperationContext> {
 		PerformanceTracker.startPhase('setup')
 		try {
 			// Before anything is read or fetched: a flush after this point makes the result stale.
@@ -111,6 +115,7 @@ export default class CacheImageResourceOperation {
 				cacheTier: null,
 				flushEpoch,
 				tempToken: randomUUID(),
+				requestedSize,
 			}
 		}
 		catch (error: unknown) {
@@ -330,6 +335,9 @@ export default class CacheImageResourceOperation {
 		const source = uploadedSourcePath(ctx.request.resourceTarget)
 		if (source !== null) {
 			void this.renditionCatalogue.record(uploadKind(source), ctx.request.resizeOptions)
+			if (ctx.requestedSize !== undefined) {
+				void this.renditionSizes.recordRendering(ctx.requestedSize)
+			}
 		}
 		return true
 	}

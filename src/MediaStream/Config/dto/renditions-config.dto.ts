@@ -24,11 +24,30 @@ export class RenditionStoreConfigDto {
 	writeTimeoutMs!: number
 }
 
+export class RenditionSizesConfigDto {
+	@IsNumber()
+	@Min(1)
+	minSources!: number
+
+	@IsNumber()
+	@Min(1)
+	windowDays!: number
+
+	@IsNumber()
+	@Min(1)
+	maxKnown!: number
+}
+
 export class RenditionsConfigDto {
 	@IsDefined()
 	@ValidateNested()
 	@Type(() => RenditionStoreConfigDto)
 	store!: RenditionStoreConfigDto
+
+	@IsDefined()
+	@ValidateNested()
+	@Type(() => RenditionSizesConfigDto)
+	sizes!: RenditionSizesConfigDto
 
 	// Blank disables pre-generation; a directory is not checked for existence here.
 	@IsString()

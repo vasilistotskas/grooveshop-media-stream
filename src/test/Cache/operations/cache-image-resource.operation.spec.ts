@@ -17,6 +17,7 @@ import { ImageFormatProcessor } from '#microservice/Cache/operations/image-forma
 import { ResourceFetcher } from '#microservice/Cache/operations/resource-fetcher.service'
 import { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
 import { RenditionCatalogueService } from '#microservice/Cache/services/rendition-catalogue.service'
+import { RenditionSizeService } from '#microservice/Cache/services/rendition-size.service'
 import { RenditionStoreService } from '#microservice/Cache/services/rendition-store.service'
 import { TenantCacheEpochs } from '#microservice/Cache/services/tenant-cache-epochs.service'
 import { ProcessingOverloadedError, UpstreamResourceTooLargeError } from '#microservice/common/errors/media-stream.errors'
@@ -92,6 +93,7 @@ describe('cacheImageResourceOperation', () => {
 	let validation: MockedObject<ResourceValidationService>
 	let store: MockedObject<RenditionStoreService>
 	let catalogue: MockedObject<RenditionCatalogueService>
+	let sizes: MockedObject<RenditionSizeService>
 	let metricsService: MockedObject<MetricsService>
 	let epochs: TenantCacheEpochs
 	let storageDir: string
@@ -145,6 +147,9 @@ describe('cacheImageResourceOperation', () => {
 		catalogue = {
 			record: vi.fn().mockResolvedValue(undefined),
 		} as any
+		sizes = {
+			recordRendering: vi.fn().mockResolvedValue(undefined),
+		} as any
 		metricsService = {
 			recordCacheOperation: vi.fn(),
 			recordImageProcessing: vi.fn(),
@@ -176,6 +181,7 @@ describe('cacheImageResourceOperation', () => {
 				{ provide: ResourceValidationService, useValue: validation },
 				{ provide: RenditionStoreService, useValue: store },
 				{ provide: RenditionCatalogueService, useValue: catalogue },
+				{ provide: RenditionSizeService, useValue: sizes },
 				{ provide: MetricsService, useValue: metricsService },
 				{ provide: TenantCacheEpochs, useValue: epochs },
 				{ provide: ConfigService, useValue: configService },
@@ -386,6 +392,30 @@ describe('cacheImageResourceOperation', () => {
 			await uploadCtx.stored
 
 			expect(catalogue.record).toHaveBeenCalledWith('blog', upload.resizeOptions)
+		})
+
+		it('counts the size the request named, not the preset it was mapped to, once the rendition is stored', async () => {
+			const upload = new CacheImageRequest({ resourceTarget: 'http://static-svc/media/acme/uploads/blog%2Fa.png', resizeOptions: request.resizeOptions, tenantSchema: 'acme' })
+			const uploadCtx = await operation.setup(upload, '700x410')
+
+			await operation.execute(uploadCtx)
+			await uploadCtx.stored
+
+			expect(uploadCtx.requestedSize).toBe('700x410')
+			expect(sizes.recordRendering).toHaveBeenCalledWith('700x410')
+		})
+
+		it('counts no size for a rendition the service made on its own initiative, or one the store refused', async () => {
+			const own = await operation.setup(new CacheImageRequest({ resourceTarget: 'http://static-svc/media/acme/uploads/blog%2Fa.png', resizeOptions: request.resizeOptions, tenantSchema: 'acme' }))
+			await operation.execute(own)
+			await own.stored
+			expect(sizes.recordRendering).not.toHaveBeenCalled()
+
+			store.put.mockRejectedValue(new Error('down'))
+			const refused = await operation.setup(new CacheImageRequest({ resourceTarget: 'http://static-svc/media/acme/uploads/blog%2Fb.png', resizeOptions: request.resizeOptions, tenantSchema: 'acme' }), '700x410')
+			await operation.execute(refused)
+			await refused.stored
+			expect(sizes.recordRendering).not.toHaveBeenCalled()
 		})
 
 		it('counts nothing for a source that is not an upload', async () => {

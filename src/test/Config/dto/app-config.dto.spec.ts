@@ -65,6 +65,15 @@ describe('appConfigDto', () => {
 			expect(errors.find(error => error.property === 'renditions')).toBeDefined()
 		})
 
+		it('should fail validation with an exact-size threshold of zero uploads', async () => {
+			const plain = schemaDefaults()
+			plain.renditions.sizes.minSources = 0
+
+			const errors = await validateConfig(plain)
+
+			expect(errors.find(error => error.property === 'renditions')).toBeDefined()
+		})
+
 		it('should fail validation when a leaf field is missing', async () => {
 			const plain = schemaDefaults()
 			delete plain.shutdown.timeout

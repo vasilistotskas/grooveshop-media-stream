@@ -12,6 +12,7 @@ import { MemoryCacheService } from './services/memory-cache.service.js'
 import { MultiLayerCacheManager } from './services/multi-layer-cache.manager.js'
 import { RedisCacheService } from './services/redis-cache.service.js'
 import { RenditionCatalogueService } from './services/rendition-catalogue.service.js'
+import { RenditionSizeService } from './services/rendition-size.service.js'
 import { RenditionStoreService } from './services/rendition-store.service.js'
 import { TenantCacheEpochs } from './services/tenant-cache-epochs.service.js'
 import { TenantFlushService } from './services/tenant-flush.service.js'
@@ -29,6 +30,7 @@ import { TenantFlushService } from './services/tenant-flush.service.js'
 		MemoryCacheService,
 		RedisCacheService,
 		RenditionCatalogueService,
+		RenditionSizeService,
 		RenditionStoreService,
 		MultiLayerCacheManager,
 		TenantCacheEpochs,
@@ -43,6 +45,7 @@ import { TenantFlushService } from './services/tenant-flush.service.js'
 		MemoryCacheService,
 		RedisCacheService,
 		RenditionCatalogueService,
+		RenditionSizeService,
 		RenditionStoreService,
 		MultiLayerCacheManager,
 		TenantCacheEpochs,
