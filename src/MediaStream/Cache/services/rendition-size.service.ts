@@ -54,10 +54,11 @@ function isPromotable(key: string): boolean {
  * `minSources` uploads each.
  *
  * Requests never wait for Redis: each pod reads the set into memory every
- * minute and `isKnown` answers from there. A Redis that is down changes
- * nothing for a pod that has a set (it keeps the last one: switching a size to
- * a different rendition would only cause a miss) and leaves a pod that never
- * had one answering nothing exactly, never an error. An empty set is seeded
+ * minute and `isKnown` answers from there. A Redis that is down degrades
+ * deliberately, it is not a fallback path: a pod that has a set keeps the last
+ * one (switching a size to a different rendition would only turn a Redis blip
+ * into a wave of misses), and a pod that never had one answers nothing exactly.
+ * Neither ever errors. An empty set is seeded
  * once from `SEED_RENDITION_SIZES`, so a first deploy starts where the logs
  * left off.
  */

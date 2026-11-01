@@ -11,6 +11,11 @@
  * on the set is learned from traffic (a size asked of enough uploads becomes
  * exact, one unused for the window leaves), and editing this list changes
  * nothing for a deployment that already has a set.
+ *
+ * Refreshing it (rarely needed, and only ever for the next empty set): count
+ * the distinct uploads per size in the request log, `log.context:="ImageRequest"
+ * | stats by (log.width, log.height) count_uniq(log.path)`, and keep the sizes
+ * asked of at least ten uploads.
  */
 export const SEED_RENDITION_SIZES: readonly string[] = Object.freeze([
 	'1200x630',

@@ -85,14 +85,18 @@ storefront starts to use becomes exact on its own:
 Requests never wait for Redis: each pod reads the set into memory every minute
 and answers from there. A promoted size is exact a few seconds after its tenth
 rendering (one more rendering per upload at the switch). **If Redis cannot be
-reached**, a pod keeps the last set it read (moving a size to a different
-rendition would only cause misses); a pod that never had a set snaps
-everything, and nothing errors. An empty set is seeded once from
+reached** the service degrades on purpose (this is not a fallback path): a
+pod keeps the last set it read, because moving a size to a different rendition
+would turn a Redis blip into a wave of misses; a pod that never had a set snaps
+everything. Nothing errors. An empty set is seeded once from
 `SEED_RENDITION_SIZES` (`common/constants/rendition-size-seed.constant.ts`):
 the sizes of the 2026-10 request logs asked of at least ten uploads, plus the
 672, 1200 and 1440 px single-axis widths the storefront computes itself. It is
 a seed, not the source of truth: a deployment that already has a set ignores
-it, and a seed entry nobody asks for leaves after the window.
+it, and a seed entry nobody asks for leaves after the window. To refresh it,
+count distinct uploads per size in the request log (`log.context:="ImageRequest"
+| stats by (log.width, log.height) count_uniq(log.path)`) and keep the sizes
+asked of at least ten.
 
 Qualities are not learned: the five the storefront uses (75, 80, 85, 90, 100)
 are exact and any other rounds up to the next, which costs a few points of
