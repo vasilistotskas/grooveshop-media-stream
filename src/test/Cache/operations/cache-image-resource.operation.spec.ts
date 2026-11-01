@@ -456,6 +456,16 @@ describe('cacheImageResourceOperation', () => {
 			expect(result.metadata.resizeOptions).toBe(upload.resizeOptions)
 		})
 
+		it('serves the image uncached when the volume cannot be written, instead of the default image', async () => {
+			mockedFs.writeFile.mockRejectedValue(new Error('ENOSPC: no space left on device'))
+
+			const result = await operation.execute(ctx)
+
+			expect(result.data).toBe(processedBuffer)
+			expect(metricsService.recordError).toHaveBeenCalledWith('cache_persist', 'write')
+			expect(mockedFs.unlink).toHaveBeenCalledWith(operation.getResourceTempPath(ctx))
+		})
+
 		it('records no upload for a source that is not one', async () => {
 			const result = await operation.execute(await operation.setup(new CacheImageRequest({ resourceTarget: 'http://static-svc/static/images/logo.png', resizeOptions: request.resizeOptions })))
 

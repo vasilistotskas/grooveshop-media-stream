@@ -417,7 +417,13 @@ export default class CacheImageResourceOperation {
 
 				processed.metadata.source = uploadedSourcePath(ctx.request.resourceTarget)
 				processed.metadata.resizeOptions = ctx.request.resizeOptions
-				await this.persist(ctx, processed)
+				// Caching is best effort: the image is already made, and a volume that
+				// cannot be written (full, or its share restarting) must cost the next
+				// request an encode, not turn this one into the default image.
+				await this.persist(ctx, processed).catch((error: unknown) => {
+					CorrelatedLogger.warn(`Could not cache ${ctx.id}, serving it uncached: ${errorMessage(error)}`, CacheImageResourceOperation.name)
+					this.metricsService.recordError('cache_persist', 'write')
+				})
 			}
 			finally {
 				await unlink(resourceTempPath).catch((error: unknown) => {
