@@ -2,7 +2,7 @@ import type { RenditionRequest } from '#microservice/common/utils/rendition.util
 import { describe, expect, it } from 'vitest'
 import { FitOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
 import { MAX_IMAGE_HEIGHT, MAX_TOTAL_PIXELS } from '#microservice/common/constants/image-limits.constant'
-import { MAX_RENDITION_WIDTH, RENDITION_QUALITIES, RENDITION_WIDTHS } from '#microservice/common/constants/rendition-presets.constant'
+import { KNOWN_RENDITION_SIZES, MAX_RENDITION_WIDTH, RENDITION_QUALITIES, RENDITION_WIDTHS } from '#microservice/common/constants/rendition-presets.constant'
 import { toRendition } from '#microservice/common/utils/rendition.util'
 
 const AVIF_MAX_QUALITY = 55
@@ -35,12 +35,32 @@ describe('rendition presets', () => {
 			[704, 752],
 			[382, 416],
 			[1124, 1232],
-			[1440, 1568],
+			[1300, 1392],
 			[480, 528],
 			[132, 144],
-			[2000, 2048],
-		])('rounds a width of %i up to %i', (requested, expected) => {
+			[2400, 2048],
+		])('rounds an unknown single-axis width of %i up to %i', (requested, expected) => {
 			expect(rendition({ width: requested, height: 0, fit: FitOptions.inside }).width).toBe(expected)
+		})
+
+		it('answers every size the storefront asks for exactly, at no extra pixel', () => {
+			for (const size of KNOWN_RENDITION_SIZES) {
+				const [width, height] = size.split('x').map(Number)
+				expect(rendition({ width, height })).toMatchObject({ width, height })
+			}
+			expect(KNOWN_RENDITION_SIZES.size).toBeGreaterThan(40)
+		})
+
+		it('keeps every known size inside the pixel budget and the width cap', () => {
+			for (const size of KNOWN_RENDITION_SIZES) {
+				const [width, height] = size.split('x').map(Number)
+				expect(width).toBeLessThanOrEqual(MAX_RENDITION_WIDTH)
+				expect(width * height).toBeLessThanOrEqual(MAX_TOTAL_PIXELS)
+			}
+		})
+
+		it('does not know the original size, which is capped instead', () => {
+			expect(KNOWN_RENDITION_SIZES.has('0x0')).toBe(false)
 		})
 
 		it('never goes below the requested width', () => {
@@ -49,16 +69,15 @@ describe('rendition presets', () => {
 			}
 		})
 
-		it('maps every width to a ladder step', () => {
-			for (let width = 1; width <= 8192; width++) {
-				expect(RENDITION_WIDTHS).toContain(rendition({ width, height: 0 }).width)
-			}
+		it('maps every unknown width to a ladder step', () => {
+			const unknown = Array.from({ length: 8192 }, (_, index) => index + 1).filter(width => !KNOWN_RENDITION_SIZES.has(`${width}x0`))
+			expect(unknown.every(width => RENDITION_WIDTHS.includes(rendition({ width, height: 0 }).width))).toBe(true)
 		})
 
 		it('keeps the aspect ratio of a request with both axes, rounding the height', () => {
-			expect(rendition({ width: 704, height: 820 })).toMatchObject({ width: 752, height: 876 })
+			expect(rendition({ width: 700, height: 410 })).toMatchObject({ width: 752, height: 440 })
 			expect(rendition({ width: 650, height: 328 })).toMatchObject({ width: 672, height: 339 })
-			expect(rendition({ width: 264, height: 264 })).toMatchObject({ width: 288, height: 288 })
+			expect(rendition({ width: 270, height: 270 })).toMatchObject({ width: 288, height: 288 })
 		})
 
 		it('snaps the height of a request with a height only', () => {
@@ -118,14 +137,15 @@ describe('rendition presets', () => {
 		})
 
 		it.each([
-			[50, 60],
-			[75, 80],
+			[50, 75],
+			[75, 75],
 			[80, 80],
-			[85, 90],
+			[82, 85],
+			[85, 85],
 			[90, 90],
 			[95, 100],
 			[100, 100],
-		])('rounds a WebP quality of %i up to %i', (requested, expected) => {
+		])('keeps a known WebP quality and rounds any other up: %i gives %i', (requested, expected) => {
 			expect(rendition({ format: SupportedResizeFormats.webp, quality: requested }).quality).toBe(expected)
 		})
 

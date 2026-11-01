@@ -406,9 +406,14 @@ describe('mediaStreamImageController', () => {
 			return mockImageStreamService.processAndStream.mock.calls[0][1].resizeOptions
 		}
 
-		it('hashes a request as the preset it snaps to, so neighbouring sizes share one entry', async () => {
+		it('hashes an unknown size as the preset it snaps to, so neighbouring sizes share one entry', async () => {
+			const options = await requestedOptions('/media_stream-image/media/acme/uploads/a.jpg/700/410/cover/attention/transparent/0/80.avif')
+			expect(options).toMatchObject({ width: 752, height: 440 })
+		})
+
+		it('answers a size the storefront asks for exactly', async () => {
 			const options = await requestedOptions('/media_stream-image/media/acme/uploads/a.jpg/704/820/cover/attention/transparent/0/80.avif')
-			expect(options).toMatchObject({ width: 752, height: 876 })
+			expect(options).toMatchObject({ width: 704, height: 820 })
 		})
 
 		it('sends the same options for two requests that snap to one preset', async () => {

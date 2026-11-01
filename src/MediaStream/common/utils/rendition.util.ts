@@ -1,6 +1,6 @@
 import { FitOptions, PositionOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
 import { MAX_IMAGE_HEIGHT, MAX_TOTAL_PIXELS } from '#microservice/common/constants/image-limits.constant'
-import { MAX_RENDITION_WIDTH, RENDITION_QUALITIES, RENDITION_WIDTHS } from '#microservice/common/constants/rendition-presets.constant'
+import { KNOWN_RENDITION_SIZES, MAX_RENDITION_WIDTH, RENDITION_QUALITIES, RENDITION_WIDTHS } from '#microservice/common/constants/rendition-presets.constant'
 
 /** The resize parameters a preset is chosen from; every field is validated before this runs. */
 export interface RenditionRequest {
@@ -28,14 +28,18 @@ function snapUp(value: number, ladder: readonly number[]): number {
 /**
  * Width and height of the preset a request maps to.
  *
- * The bounded axis snaps up to the width ladder. With both axes set the
- * height follows the snapped width at the requested aspect ratio, so a `cover`
- * crop keeps its shape. Both axes 0 (the original size) becomes a bound at the
- * widest preset. A request the snap would push outside the pixel budget (an
- * extreme aspect ratio) is kept as asked: it is not a preset and is validated
- * like any other.
+ * A size the storefront asks for (`KNOWN_RENDITION_SIZES`) is answered exactly.
+ * Any other snaps up: the bounded axis to the width ladder, and with both axes
+ * set the height follows the snapped width at the requested aspect ratio, so a
+ * `cover` crop keeps its shape. Both axes 0 (the original size) becomes a bound
+ * at the widest preset. A request the snap would push outside the pixel budget
+ * (an extreme aspect ratio) is kept as asked: it is not a preset and is
+ * validated like any other.
  */
 function snapDimensions(width: number, height: number): { width: number, height: number } {
+	if (KNOWN_RENDITION_SIZES.has(`${width}x${height}`)) {
+		return { width, height }
+	}
 	if (width > 0 && height > 0) {
 		const snappedWidth = Math.min(snapUp(width, RENDITION_WIDTHS), MAX_RENDITION_WIDTH)
 		const snappedHeight = Math.max(1, Math.round(height * snappedWidth / width))
@@ -75,7 +79,8 @@ function canonicalPosition(fit: FitOptions, position: string): string {
 /**
  * AVIF is capped at `avifMaxQuality` (the one number that decides it, so a
  * request at 80 and one at 100 name one entry). GIF and TIFF output ignore
- * quality. The other lossy formats round up to `RENDITION_QUALITIES`.
+ * quality. The other lossy formats keep a quality in `RENDITION_QUALITIES` and
+ * round any other up to the next one.
  */
 function canonicalQuality(format: SupportedResizeFormats, quality: number, avifMaxQuality: number): number {
 	switch (format) {
