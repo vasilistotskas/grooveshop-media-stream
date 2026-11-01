@@ -30,6 +30,11 @@ function enoent(): NodeJS.ErrnoException {
 	return Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' })
 }
 
+/** The temp name is per process (replicas share the volume), so a spec matches its shape, not its token. */
+function tempPath(name: string): ReturnType<typeof expect.stringMatching> {
+	return expect.stringMatching(new RegExp(`^/storage/${name}\\.rsm\\.[0-9a-f-]{36}\\.tmp$`))
+}
+
 function writtenJson(call: number): Record<string, unknown> {
 	return JSON.parse(mockWriteFile.mock.calls[call][1] as string)
 }
@@ -60,8 +65,8 @@ describe('accessCountTracker', () => {
 
 		expect(mockReadFile).toHaveBeenCalledTimes(2)
 		expect(mockWriteFile).toHaveBeenCalledTimes(2)
-		expect(mockWriteFile).toHaveBeenCalledWith('/storage/a.rsm.tmp', expect.stringContaining('"accessCount":7'), 'utf8')
-		expect(mockWriteFile).toHaveBeenCalledWith('/storage/b.rsm.tmp', expect.stringContaining('"accessCount":5'), 'utf8')
+		expect(mockWriteFile).toHaveBeenCalledWith(tempPath('a'), expect.stringContaining('"accessCount":7'), 'utf8')
+		expect(mockWriteFile).toHaveBeenCalledWith(tempPath('b'), expect.stringContaining('"accessCount":5'), 'utf8')
 	})
 
 	it('rewrites the sidecar atomically: tmp write, then rename over the live path, never a direct write', async () => {
@@ -70,8 +75,8 @@ describe('accessCountTracker', () => {
 		await tracker.flush()
 
 		expect(mockWriteFile).toHaveBeenCalledTimes(1)
-		expect(mockWriteFile).toHaveBeenCalledWith('/storage/a.rsm.tmp', expect.any(String), 'utf8')
-		expect(mockRename).toHaveBeenCalledWith('/storage/a.rsm.tmp', '/storage/a.rsm')
+		expect(mockWriteFile).toHaveBeenCalledWith(tempPath('a'), expect.any(String), 'utf8')
+		expect(mockRename).toHaveBeenCalledWith(tempPath('a'), '/storage/a.rsm')
 		expect(mockWriteFile.mock.invocationCallOrder[0]).toBeLessThan(mockRename.mock.invocationCallOrder[0])
 	})
 
@@ -108,7 +113,7 @@ describe('accessCountTracker', () => {
 		await expect(tracker.flush()).resolves.toBeUndefined()
 
 		expect(mockWriteFile).toHaveBeenCalledTimes(1)
-		expect(mockWriteFile).toHaveBeenCalledWith('/storage/good.rsm.tmp', expect.stringContaining('"accessCount":2'), 'utf8')
+		expect(mockWriteFile).toHaveBeenCalledWith(tempPath('good'), expect.stringContaining('"accessCount":2'), 'utf8')
 	})
 
 	it('flushes on its own once the pending set reaches the threshold', async () => {
@@ -129,7 +134,7 @@ describe('accessCountTracker', () => {
 		expect(mockReadFile).not.toHaveBeenCalled()
 		await vi.advanceTimersByTimeAsync(ACCESS_COUNT_FLUSH_INTERVAL_MS)
 
-		expect(mockRename).toHaveBeenCalledWith('/storage/a.rsm.tmp', '/storage/a.rsm')
+		expect(mockRename).toHaveBeenCalledWith(tempPath('a'), '/storage/a.rsm')
 	})
 
 	it('flushes what is pending on shutdown and stops the interval', async () => {
@@ -140,7 +145,7 @@ describe('accessCountTracker', () => {
 
 		await tracker.onModuleDestroy()
 
-		expect(mockRename).toHaveBeenCalledWith('/storage/a.rsm.tmp', '/storage/a.rsm')
+		expect(mockRename).toHaveBeenCalledWith(tempPath('a'), '/storage/a.rsm')
 		expect(clearSpy).toHaveBeenCalledTimes(1)
 
 		// The interval is gone: time passing triggers no further flush

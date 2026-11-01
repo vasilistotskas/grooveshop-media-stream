@@ -1,5 +1,6 @@
 import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import type ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
+import { randomUUID } from 'node:crypto'
 import { readFile, rename, writeFile } from 'node:fs/promises'
 import { Injectable } from '@nestjs/common'
 import { errorMessage } from '#microservice/common/utils/error-message.util'
@@ -15,13 +16,18 @@ export const ACCESS_COUNT_FLUSH_THRESHOLD = 1000
  *
  * Flushes every 30 s, when 1000 sidecars are pending, and on shutdown. Each
  * sidecar is rewritten atomically (write `.tmp`, then rename over the live
- * path); a sidecar that disappeared since the hit simply drops its delta.
+ * path, from a temp name of this process's own, because replicas share the
+ * storage volume); a sidecar that disappeared since the hit simply drops its
+ * delta. Two replicas folding into one sidecar at once can lose a delta: the
+ * count only ranks entries for eviction and warming, so that is accepted.
  */
 @Injectable()
 export class AccessCountTracker implements OnModuleInit, OnModuleDestroy {
 	private readonly pending = new Map<string, number>()
 	private timer: NodeJS.Timeout | null = null
 	private inFlight: Promise<void> | null = null
+	/** Names this process's temp files: replicas share one storage volume, and the process id is 1 in every container. */
+	private readonly tempToken = randomUUID()
 
 	onModuleInit(): void {
 		this.timer = setInterval(() => {
@@ -71,7 +77,7 @@ export class AccessCountTracker implements OnModuleInit, OnModuleDestroy {
 			try {
 				const metadata = JSON.parse(await readFile(rsmPath, 'utf8')) as ResourceMetaData
 				metadata.accessCount = (metadata.accessCount ?? 0) + delta
-				const tmpPath = `${rsmPath}.tmp`
+				const tmpPath = `${rsmPath}.${this.tempToken}.tmp`
 				await writeFile(tmpPath, JSON.stringify(metadata), 'utf8')
 				await rename(tmpPath, rsmPath)
 			}

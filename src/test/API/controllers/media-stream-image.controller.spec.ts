@@ -1,5 +1,6 @@
 import type { Response } from 'express'
 import type { MockedObject } from 'vitest'
+import type { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
 import type { ImageRequestLog } from '#microservice/Correlation/utils/image-request-log.util'
 import { BadRequestException, HttpException, HttpStatus, NotFoundException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
@@ -396,6 +397,30 @@ describe('mediaStreamImageController', () => {
 
 		it('leaves other formats at the requested quality', async () => {
 			expect(await requestedQuality('/media_stream-image/media/acme/uploads/a.jpg/768/576/cover/attention/transparent/0/80.webp')).toBe(80)
+		})
+	})
+
+	describe('rendition presets', () => {
+		async function requestedOptions(path: string): Promise<ResizeOptions> {
+			await controller.handleImageRequest({ path } as any, mockResponse)
+			return mockImageStreamService.processAndStream.mock.calls[0][1].resizeOptions
+		}
+
+		it('hashes a request as the preset it snaps to, so neighbouring sizes share one entry', async () => {
+			const options = await requestedOptions('/media_stream-image/media/acme/uploads/a.jpg/704/820/cover/attention/transparent/0/80.avif')
+			expect(options).toMatchObject({ width: 752, height: 876 })
+		})
+
+		it('sends the same options for two requests that snap to one preset', async () => {
+			const first = await requestedOptions('/media_stream-image/media/acme/uploads/a.jpg/672/0/inside/entropy/transparent/0/80.avif')
+			mockImageStreamService.processAndStream.mockClear()
+			const second = await requestedOptions('/media_stream-image/media/acme/uploads/a.jpg/650/0/inside/center/transparent/0/100.avif')
+			expect(second).toEqual(first)
+		})
+
+		it('bounds the original size at the widest preset', async () => {
+			const options = await requestedOptions('/media_stream-image/media/acme/uploads/a.png/0/0/inside/center/transparent/0/90.png')
+			expect(options).toMatchObject({ width: 2048, height: 0, quality: 90 })
 		})
 	})
 
