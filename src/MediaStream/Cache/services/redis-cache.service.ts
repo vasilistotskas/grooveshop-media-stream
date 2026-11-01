@@ -226,6 +226,25 @@ export class RedisCacheService implements ICacheManager, OnModuleInit, OnModuleD
 		}
 	}
 
+	/**
+	 * Take `key` for `ttlSeconds` if nobody holds it (SET NX EX). False when it is
+	 * held, and also while disconnected: work that needs the lock is skipped then,
+	 * not run unguarded. There is no unlock: the lock lapses, or `delete(key)` frees it.
+	 */
+	async acquireLock(key: string, ttlSeconds: number): Promise<boolean> {
+		if (!this.isConnected) {
+			return false
+		}
+		this.stats.operations++
+		try {
+			return await this.redis.set(key, '1', 'EX', ttlSeconds, 'NX') === 'OK'
+		}
+		catch (error: unknown) {
+			this.stats.errors++
+			throw error
+		}
+	}
+
 	async delete(key: string): Promise<void> {
 		if (!this.isConnected) {
 			CorrelatedLogger.warn('Redis not connected, skipping DELETE operation', RedisCacheService.name)

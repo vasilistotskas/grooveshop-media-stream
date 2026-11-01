@@ -7,6 +7,7 @@ import { HttpConfigDto } from './http-config.dto.js'
 import { MonitoringConfigDto } from './monitoring-config.dto.js'
 import { ProcessingConfigDto } from './processing-config.dto.js'
 import { RateLimitConfigDto } from './rate-limit-config.dto.js'
+import { RenditionsConfigDto } from './renditions-config.dto.js'
 import { ServerConfigDto } from './server-config.dto.js'
 import { ShutdownConfigDto } from './shutdown-config.dto.js'
 import { StorageConfigDto } from './storage-config.dto.js'
@@ -73,6 +74,11 @@ export class AppConfigDto {
 	@ValidateNested()
 	@Type(() => StorageConfigDto)
 	storage!: StorageConfigDto
+
+	@IsDefined()
+	@ValidateNested()
+	@Type(() => RenditionsConfigDto)
+	renditions!: RenditionsConfigDto
 
 	@IsDefined()
 	@ValidateNested()

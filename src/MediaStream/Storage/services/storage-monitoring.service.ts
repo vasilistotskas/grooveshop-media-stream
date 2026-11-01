@@ -1,4 +1,5 @@
 import type { OnModuleInit } from '@nestjs/common'
+import type { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
 import type { StorageConfig } from '#microservice/Config/interfaces/app-config.interface'
 import { promises as fs } from 'node:fs'
 import { basename, extname, join } from 'node:path'
@@ -28,6 +29,10 @@ export interface StorageEntry {
 	privateTTL: number
 	accessCount: number
 	tenantSchema: string
+	/** Upload the rendition was made from (`blog/a.png`), null when it is not one or the sidecar predates the field. */
+	source: string | null
+	/** Resize options of the rendition, null as for `source`. */
+	resizeOptions: ResizeOptions | null
 }
 
 /** A file the cache can never serve: half a pair, an unparsable sidecar, or a temp file. */
@@ -209,6 +214,8 @@ export class StorageMonitoringService implements OnModuleInit {
 					privateTTL: metadata.privateTTL,
 					accessCount: metadata.accessCount,
 					tenantSchema: metadata.tenantSchema,
+					source: metadata.source,
+					resizeOptions: metadata.resizeOptions,
 				})
 				continue
 			}

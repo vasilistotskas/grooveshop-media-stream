@@ -446,6 +446,22 @@ describe('cacheImageResourceOperation', () => {
 			expect(mockedFs.unlink).toHaveBeenCalledWith(operation.getResourceTempPath(ctx))
 		})
 
+		it('records on the sidecar which upload a rendition was made from and with which options, so its siblings can be made for other uploads', async () => {
+			const upload = new CacheImageRequest({ resourceTarget: 'http://static-svc/media/acme/uploads/blog%2Fa.png', resizeOptions: request.resizeOptions, tenantSchema: 'acme' })
+			const uploadCtx = await operation.setup(upload)
+
+			const result = await operation.execute(uploadCtx)
+
+			expect(result.metadata.source).toBe('blog/a.png')
+			expect(result.metadata.resizeOptions).toBe(upload.resizeOptions)
+		})
+
+		it('records no upload for a source that is not one', async () => {
+			const result = await operation.execute(await operation.setup(new CacheImageRequest({ resourceTarget: 'http://static-svc/static/images/logo.png', resizeOptions: request.resizeOptions })))
+
+			expect(result.metadata.source).toBeNull()
+		})
+
 		it('routes a source sniffed as SVG through the SVG path, whatever the URL extension', async () => {
 			const svg = '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'
 			fetchJob.handle.mockResolvedValue(streamResponse(Buffer.from(svg)))

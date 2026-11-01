@@ -169,6 +169,16 @@ export interface StorageConfig {
 	eviction: StorageEvictionConfig
 }
 
+export interface RenditionsConfig {
+	/** Root of the tenants' uploads (`{dir}/{tenantSchema}/uploads/...`); empty disables pre-generation. */
+	mediaDirectory: string
+	cronSchedule: string
+	/** A rendition is pre-generated for a folder once it exists for this many different sources of it. */
+	minSources: number
+	/** Most renditions pre-generated per source. */
+	maxPerSource: number
+}
+
 export interface ShutdownConfig {
 	timeout: number
 	forceTimeout: number
@@ -186,5 +196,6 @@ export interface AppConfig {
 	validation: ValidationConfig
 	tenantDomains: TenantDomainsConfig
 	storage: StorageConfig
+	renditions: RenditionsConfig
 	shutdown: ShutdownConfig
 }

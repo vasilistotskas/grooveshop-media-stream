@@ -255,6 +255,14 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	// Pairs with at least this many recorded cache hits are evicted last.
 	'storage.eviction.minAccessCount': { env: 'STORAGE_EVICTION_MIN_ACCESS_COUNT', default: 5, type: 'number' },
 
+	// Rendition pre-generation: the cron renders the renditions an upload is
+	// shown at (learned from the renditions already stored for its folder) before
+	// anyone asks. Off while the media directory is empty.
+	'renditions.mediaDirectory': { env: 'RENDITIONS_MEDIA_DIRECTORY', default: '', type: 'string' },
+	'renditions.cronSchedule': { env: 'RENDITIONS_CRON', default: '*/10 * * * *', type: 'string' },
+	'renditions.minSources': { env: 'RENDITIONS_MIN_SOURCES', default: 3, type: 'number' },
+	'renditions.maxPerSource': { env: 'RENDITIONS_MAX_PER_SOURCE', default: 16, type: 'number' },
+
 	// Graceful shutdown configuration
 	'shutdown.timeout': { env: 'SHUTDOWN_TIMEOUT', default: 30000, type: 'number' },
 	'shutdown.forceTimeout': { env: 'SHUTDOWN_FORCE_TIMEOUT', default: 60000, type: 'number' },

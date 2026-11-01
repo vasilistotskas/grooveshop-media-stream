@@ -109,6 +109,14 @@ export class ProcessingOverloadedError extends MediaStreamError {
 }
 
 /**
+ * Background work (rendition pre-generation) asked for a pipeline slot while a
+ * request held or awaited one, and stepped aside. Never reaches a client: it is
+ * a {@link ProcessingOverloadedError} only so the pipeline's capacity handling
+ * (no error metric, no fallback image) applies to it unchanged.
+ */
+export class BackgroundYieldError extends ProcessingOverloadedError {}
+
+/**
  * Sharp aborted a pipeline because it exceeded `processing.timeoutSeconds`.
  */
 export class ProcessingTimeoutError extends MediaStreamError {

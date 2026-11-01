@@ -10,9 +10,10 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common'
 import CacheImageRequest from '#microservice/API/dto/cache-image-request.dto'
 import UnableToFetchResourceException from '#microservice/API/exceptions/unable-to-fetch-resource.exception'
 import { PUBLIC_TENANT_SCHEMA } from '#microservice/common/constants/tenant.constant'
-import { isRejectedSource, MediaStreamError, ProcessingOverloadedError } from '#microservice/common/errors/media-stream.errors'
+import { BackgroundYieldError, isRejectedSource, MediaStreamError, ProcessingOverloadedError } from '#microservice/common/errors/media-stream.errors'
 import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { storageDirectory } from '#microservice/common/utils/storage-path.util'
+import { uploadedSourcePath } from '#microservice/common/utils/upload-source.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import { currentImageRequest, IMAGE_DECODE_LOG_CONTEXT } from '#microservice/Correlation/utils/image-request-log.util'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
@@ -257,7 +258,9 @@ export default class CacheImageResourceOperation {
 			// A shed request never reached a pipeline: it is capacity, not a
 			// processing failure, and is already counted by admission metrics.
 			if (error instanceof ProcessingOverloadedError) {
-				CorrelatedLogger.warn(`Shed by processing admission: ${errorMessage(error)}`, CacheImageResourceOperation.name)
+				if (!(error instanceof BackgroundYieldError)) {
+					CorrelatedLogger.warn(`Shed by processing admission: ${errorMessage(error)}`, CacheImageResourceOperation.name)
+				}
 				throw error
 			}
 			// A missing or unreachable source was logged where it was raised,
@@ -412,6 +415,8 @@ export default class CacheImageResourceOperation {
 					? await this.imageFormatProcessor.processSvg(resourceTempPath, ctx.request.resizeOptions, tenantSchema)
 					: await this.imageFormatProcessor.processRaster(resourceTempPath, ctx.request.resizeOptions, tenantSchema)
 
+				processed.metadata.source = uploadedSourcePath(ctx.request.resourceTarget)
+				processed.metadata.resizeOptions = ctx.request.resizeOptions
 				await this.persist(ctx, processed)
 			}
 			finally {

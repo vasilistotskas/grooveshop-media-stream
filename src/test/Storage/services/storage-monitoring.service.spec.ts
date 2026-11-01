@@ -4,6 +4,7 @@ import { promises as fs } from 'node:fs'
 import { resolve } from 'node:path'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
 import { ConfigService } from '#microservice/Config/config.service'
 import { INVENTORY_TTL_MS, StorageMonitoringService } from '#microservice/Storage/services/storage-monitoring.service'
 import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
@@ -106,6 +107,29 @@ describe('storageMonitoringService', () => {
 	})
 
 	describe('getInventory', () => {
+		it('reads the upload a rendition was made from and its resize options from the sidecar', async () => {
+			useDisk({
+				'abc.rsc': { size: 1000 },
+				'abc.rsm': {
+					size: 200,
+					content: metaJson({
+						dateCreated: NOW - 5000,
+						privateTTL: 9000,
+						tenantSchema: 'acme',
+						source: 'blog/a.png',
+						resizeOptions: new ResizeOptions({ width: 672, height: 340 }),
+					}),
+				},
+			})
+
+			const inventory = await service.getInventory()
+
+			expect(inventory.entries[0]).toMatchObject({
+				source: 'blog/a.png',
+				resizeOptions: { width: 672, height: 340 },
+			})
+		})
+
 		it('groups an .rsc/.rsm pair into one entry read from the sidecar', async () => {
 			useDisk({
 				'abc.rsc': { size: 4 * MB },
@@ -130,6 +154,8 @@ describe('storageMonitoringService', () => {
 					privateTTL: 9000,
 					accessCount: 7,
 					tenantSchema: 'acme',
+					source: null,
+					resizeOptions: null,
 				},
 			])
 			expect(inventory.orphans).toEqual([])

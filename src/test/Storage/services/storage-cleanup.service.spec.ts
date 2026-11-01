@@ -43,6 +43,8 @@ function entry(id: string, overrides: Partial<StorageEntry> = {}): StorageEntry 
 		privateTTL: 365 * DAY,
 		accessCount: 0,
 		tenantSchema: 'public',
+		source: null,
+		resizeOptions: null,
 		...overrides,
 	}
 }

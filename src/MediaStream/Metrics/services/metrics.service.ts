@@ -14,6 +14,15 @@ import { ConfigService } from '#microservice/Config/config.service'
 export const PROCESSING_REJECT_REASONS = ['queue_full', 'queue_timeout'] as const
 export type ProcessingRejectReason = (typeof PROCESSING_REJECT_REASONS)[number]
 
+/** Every outcome of one rendition the pre-generation cron looked at. */
+export const RENDITION_RESULTS = [
+	'generated',
+	'present',
+	'yielded',
+	'failed',
+] as const
+export type RenditionResult = (typeof RENDITION_RESULTS)[number]
+
 @Injectable()
 export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	private readonly _logger = new Logger(MetricsService.name)
@@ -56,6 +65,8 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 
 	private readonly processingPipelines: promClient.Gauge
 	private readonly processingRejectedTotal: promClient.Counter
+	private readonly renditionPregenerationTotal: promClient.Counter
+	private readonly renditionBacklogSources: promClient.Gauge
 
 	private startTime: number = Date.now()
 	private requestsInFlightCount: number = 0
@@ -322,6 +333,19 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 			registers: [this.register],
 		})
 
+		this.renditionPregenerationTotal = new promClient.Counter({
+			name: 'mediastream_rendition_pregeneration_total',
+			help: 'Renditions the pre-generation cron looked at, by result: generated, already stored, stepped aside for a request (yielded) or failed',
+			labelNames: ['result'],
+			registers: [this.register],
+		})
+
+		this.renditionBacklogSources = new promClient.Gauge({
+			name: 'mediastream_rendition_backlog_sources',
+			help: 'Uploads still missing their pre-generated renditions, as found by the last pre-generation scan',
+			registers: [this.register],
+		})
+
 		this.tenantDomainsCount = new promClient.Gauge({
 			name: 'mediastream_tenant_domains_count',
 			help: 'Number of hostnames currently in the dynamic per-tenant domain allowlist (TenantDomainsService)',
@@ -349,6 +373,10 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 		for (const reason of PROCESSING_REJECT_REASONS) {
 			this.processingRejectedTotal.inc({ reason }, 0)
 		}
+		for (const result of RENDITION_RESULTS) {
+			this.renditionPregenerationTotal.inc({ result }, 0)
+		}
+		this.setRenditionBacklog(0)
 	}
 
 	async onModuleInit(): Promise<void> {
@@ -462,6 +490,16 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	/** One image request shed by admission control (503). */
 	recordProcessingRejected(reason: ProcessingRejectReason): void {
 		this.processingRejectedTotal.inc({ reason })
+	}
+
+	/** One rendition the pre-generation cron looked at. */
+	recordRenditionPregeneration(result: RenditionResult): void {
+		this.renditionPregenerationTotal.inc({ result })
+	}
+
+	/** Uploads still missing their renditions after the last pre-generation scan. */
+	setRenditionBacklog(sources: number): void {
+		this.renditionBacklogSources.set(sources)
 	}
 
 	/**
