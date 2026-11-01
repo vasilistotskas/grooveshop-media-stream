@@ -34,6 +34,7 @@ describe('module Integration', () => {
 				disconnect: vi.fn().mockResolvedValue(undefined),
 				subscribe: vi.fn(),
 				publish: vi.fn().mockResolvedValue(0),
+				getClient: vi.fn().mockReturnValue(null),
 			})
 			.compile()
 
