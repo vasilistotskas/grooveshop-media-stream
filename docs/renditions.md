@@ -47,24 +47,38 @@ Measured on the production request log (VictoriaLogs, 14 days to
 ## 1. Presets: what is made is a finite set
 
 `toRendition` maps every request to a preset before it is hashed into its
-cache identity (the hash is the cache key, the Redis key and the store key):
+cache identity (the hash is the cache key, the Redis key and the store key).
+**A size the storefront asks for is answered exactly**; only a size outside
+that set snaps up:
 
 | Parameter | Preset |
 |---|---|
-| width | The next step of `RENDITION_WIDTHS` at or above it (29 steps, 64 to 2048 px; 11-17 % apart from 192 px up) |
-| height, both axes set | Follows the snapped width at the requested aspect ratio (a `cover` crop keeps its shape) |
-| height, one axis set | Only that axis, snapped; the other stays 0 |
+| size in `KNOWN_RENDITION_SIZES` (`{width}x{height}`, 0 = unconstrained) | Exactly as asked, no extra pixel |
+| any other width | The next step of `RENDITION_WIDTHS` at or above it (29 steps, 64 to 2048 px; 11-17 % apart from 192 px up) |
+| any other height, both axes set | Follows the snapped width at the requested aspect ratio (a `cover` crop keeps its shape) |
+| any other height, one axis set | Only that axis, snapped; the other stays 0 |
 | both axes 0 (original size), or wider than 2048 | The 2048 cap |
 | quality, AVIF | `min(requested, PROCESSING_AVIF_MAX_QUALITY)` |
-| quality, WebP / JPEG / PNG | The next step of `RENDITION_QUALITIES` (60, 80, 90, 100) |
+| quality, WebP / JPEG / PNG | A quality in `RENDITION_QUALITIES` (75, 80, 85, 90, 100) as asked; any other rounds up to the next |
 | quality, GIF / TIFF | 100 (ignored by the encoder) |
 | position | `centre` is `center`; the fits that ignore it (`inside`, `outside`, `fill`) share `center` |
+
+`KNOWN_RENDITION_SIZES` is the set of sizes the 2026-10 request logs show asked
+of at least ten different uploads (two weeks, three tenants, both designs),
+plus the single-axis widths the storefront computes itself (the 672 and
+1440 px content column, 1200 px pages). What is left is a probe or an author's
+own width in TinyMCE content. The set is finite, so the work and disk a client
+can cause stay bounded and pre-generation works from a finite list. A size the
+storefront starts to use that is not in it still works, rounded up; add it when
+it carries real traffic. To refresh it, count distinct uploads per size in the
+request log (stats by `log.width`, `log.height`, `count_uniq(log.path)`) and
+keep the sizes at or above ten.
 
 Properties that matter:
 
 - **No URL is refused for its size.** Every stored URL (TinyMCE content,
   feeds, sitemaps, emails) keeps working and is answered with the nearest
-  preset at or above what it asked for. Nothing needs a storefront release
+  preset at or above what it asked for (or exactly, for a known size). Nothing needs a storefront release
   first.
 - **A rendition is never smaller than requested** (except past the cap), and
   a source narrower than the preset is never enlarged.
@@ -74,13 +88,14 @@ Properties that matter:
   aspect ratio the snap would push outside the pixel budget (1 x 8000) is
   kept as asked.
 
-Replayed over the 14-day log this is **+10 % pixels** and **-4 % distinct
-renditions** (4945 to 4756 over 911 sources): the storefront already asks
-each source for few sizes, so the ladder is not what raises the hit ratio.
-It bounds the work and the disk a client that enumerates widths can cause,
-which is what a durable store needs, and it is what makes a pre-generation
-list finite. Changing a ladder re-keys the renditions it changes and needs no
-`PROCESSING_VERSION` bump.
+Replayed over the 14-day log (13.8 thousand requests, 911 uploads) this adds
+**1.0 % pixels** (the tail of sizes asked of fewer than ten uploads is rounded
+up; 9.6 thousand requests of the 13 thousand with a size are exact) and removes
+0.6 % of the distinct renditions (4945 to 4915). The ladder is not what raises
+the hit ratio: the storefront already asks each upload for few sizes. It bounds
+the work and the disk a client that enumerates sizes can cause, and it makes a
+pre-generation list finite. Changing the ladder or the set re-keys the
+renditions it changes and needs no `PROCESSING_VERSION` bump.
 
 ## 2. The rendition store
 
