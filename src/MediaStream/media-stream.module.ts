@@ -18,7 +18,7 @@ import { MetricsModule } from '#microservice/Metrics/metrics.module'
 import { MetricsMiddleware } from '#microservice/Metrics/middleware/metrics.middleware'
 import { AdaptiveRateLimitGuard } from '#microservice/RateLimit/guards/adaptive-rate-limit.guard'
 import { RateLimitModule } from '#microservice/RateLimit/rate-limit.module'
-import { StorageModule } from '#microservice/Storage/storage.module'
+import { RenditionsModule } from '#microservice/Renditions/renditions.module'
 import { ValidationModule } from '#microservice/Validation/validation.module'
 
 const controllers = [MediaStreamImageController]
@@ -38,7 +38,7 @@ const controllers = [MediaStreamImageController]
 		HttpModule,
 		MetricsModule,
 		RateLimitModule,
-		StorageModule,
+		RenditionsModule,
 		ValidationModule,
 		ScheduleModule.forRoot(),
 	],

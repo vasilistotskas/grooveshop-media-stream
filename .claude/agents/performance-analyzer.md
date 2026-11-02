@@ -5,7 +5,7 @@ description: >
   path: Sharp pipeline concurrency and cache limits, per-request buffering,
   cache-layer round trips, and synchronous work on the request thread. Use
   after touching anything under src/MediaStream/Processing/, Cache/ or
-  Storage/.
+  Renditions/.
 tools: Read, Grep, Glob
 ---
 # Performance Analyzer
@@ -30,10 +30,10 @@ Review code changes for performance regressions in the image-processing hot path
 
 ### 4. Cache Backfill (Fire-and-Forget)
 - `src/MediaStream/Cache/services/multi-layer-cache.manager.ts` — `backfillLayers()` MUST stay non-awaited from the request path (errors are logged, not awaited). An accidental `await` here serializes every cache hit on the slowest layer.
-- `src/MediaStream/Cache/services/cache-warming.service.ts` — `setImmediate(() => this.warmupCache())` keeps warm-up off the request path. Don't convert to await.
+- `src/MediaStream/Cache/services/rendition-store.service.ts` — every call has a deadline and a breaker, and the response never waits for the store write (`ctx.stored`). A new `await` on the store inside the request path, or a retry, makes a slow store a slow request.
 
-### 5. Access-Weighted TTL & Warming
-- `cache-warming.service.ts` — TTL formula `floor(baseTtl * (1 + min(accessCount/10, 5)))`. Threshold for "popular" = 5 accesses (`CACHE_WARMING_THRESHOLD`, default 5). Changes here shift cache pressure significantly.
+### 5. Background Work
+- `runAsBackground` (`Processing/services/processing-admission.service.ts`) must keep yielding at once (`BackgroundYieldError`) when a request holds or awaits a pipeline slot. Pre-generation that queues behind requests, or in front of them, makes the cron a latency source.
 
 ### 6. Request Deduplication
 - Removing or weakening `RequestDeduplicator` (60s timeout, ref counting) lets concurrent identical requests each hit Sharp — quadratic CPU/memory regression under load.

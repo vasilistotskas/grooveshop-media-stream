@@ -5,7 +5,6 @@ import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { BaseHealthIndicator } from '#microservice/Health/base/base-health-indicator'
-import { CacheWarmingService } from '../services/cache-warming.service.js'
 import { MemoryCacheService } from '../services/memory-cache.service.js'
 
 /** A round trip through the in-process cache slower than this means the event loop is starved. */
@@ -22,7 +21,6 @@ export class CacheHealthIndicator extends BaseHealthIndicator {
 
 	constructor(
 		private readonly memoryCacheService: MemoryCacheService,
-		private readonly cacheWarmingService: CacheWarmingService,
 		configService: ConfigService,
 	) {
 		super('cache')
@@ -55,7 +53,6 @@ export class CacheHealthIndicator extends BaseHealthIndicator {
 
 			const stats = await this.memoryCacheService.getStats()
 			const memoryUsage = this.memoryCacheService.getMemoryUsage()
-			const warmupStats = await this.cacheWarmingService.getWarmupStats()
 
 			const memoryUsagePercent = (memoryUsage.used / memoryUsage.total) * 100
 			const responseTime = Date.now() - startTime
@@ -85,10 +82,6 @@ export class CacheHealthIndicator extends BaseHealthIndicator {
 						keys: stats.keys,
 						keySize: stats.ksize,
 						valueSize: stats.vsize,
-					},
-					warming: {
-						enabled: warmupStats.enabled,
-						filesWarmed: warmupStats.filesWarmed,
 					},
 					thresholds: {
 						responseTime: `${RESPONSE_TIME_LIMIT_MS}ms`,

@@ -109,6 +109,25 @@ export class ProcessingOverloadedError extends MediaStreamError {
 }
 
 /**
+ * Background work (rendition pre-generation) asked for a pipeline slot while a
+ * request held or awaited one, and stepped aside. Never reaches a client: it is
+ * a {@link ProcessingOverloadedError} only so the pipeline's capacity handling
+ * (no error metric, no fallback image) applies to it unchanged.
+ */
+export class BackgroundYieldError extends ProcessingOverloadedError {}
+
+/**
+ * The rendition store (the S3-compatible bucket) is off, failing or too slow.
+ * Never reaches a client: a read that hits it is a miss and a write that hits
+ * it leaves the image uncached.
+ */
+export class RenditionStoreUnavailableError extends MediaStreamError {
+	constructor(message: string, context: Metadata = {}) {
+		super(message, HttpStatus.SERVICE_UNAVAILABLE, 'RENDITION_STORE_UNAVAILABLE', context)
+	}
+}
+
+/**
  * Sharp aborted a pipeline because it exceeded `processing.timeoutSeconds`.
  */
 export class ProcessingTimeoutError extends MediaStreamError {

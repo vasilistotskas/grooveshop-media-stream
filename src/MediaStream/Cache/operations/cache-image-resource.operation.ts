@@ -1,29 +1,33 @@
 import type { Buffer } from 'node:buffer'
 import type { ResizeOptions } from '#microservice/API/dto/cache-image-request.dto'
 import type { ResourceIdentifierKP } from '#microservice/common/constants/key-properties.constant'
+import type ResourceMetaData from '#microservice/HTTP/dto/resource-meta-data.dto'
 import type { CacheLayerName } from '../interfaces/cache-layer.interface.js'
 import type { ProcessedImage } from './image-format-processor.service.js'
 import { randomUUID } from 'node:crypto'
-import { access, readFile, rename, unlink, writeFile } from 'node:fs/promises'
+import { unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
 import CacheImageRequest from '#microservice/API/dto/cache-image-request.dto'
 import UnableToFetchResourceException from '#microservice/API/exceptions/unable-to-fetch-resource.exception'
 import { PUBLIC_TENANT_SCHEMA } from '#microservice/common/constants/tenant.constant'
-import { isRejectedSource, MediaStreamError, ProcessingOverloadedError } from '#microservice/common/errors/media-stream.errors'
+import { BackgroundYieldError, isRejectedSource, MediaStreamError, ProcessingOverloadedError } from '#microservice/common/errors/media-stream.errors'
 import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { storageDirectory } from '#microservice/common/utils/storage-path.util'
+import { uploadedSourcePath, uploadKind } from '#microservice/common/utils/upload-source.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import { currentImageRequest, IMAGE_DECODE_LOG_CONTEXT } from '#microservice/Correlation/utils/image-request-log.util'
 import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
 import { PerformanceTracker } from '#microservice/Correlation/utils/performance-tracker.util'
-import ResourceMetaData, { resourceMetaVersion } from '#microservice/HTTP/dto/resource-meta-data.dto'
+import { resourceMetaVersion } from '#microservice/HTTP/dto/resource-meta-data.dto'
 import { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import GenerateResourceIdentityFromRequestJob from '#microservice/Processing/jobs/generate-resource-identity-from-request.job'
 import { MultiLayerCacheManager } from '../services/multi-layer-cache.manager.js'
+import { RenditionCatalogueService } from '../services/rendition-catalogue.service.js'
+import { RenditionSizeService } from '../services/rendition-size.service.js'
+import { RenditionStoreService } from '../services/rendition-store.service.js'
 import { TenantCacheEpochs } from '../services/tenant-cache-epochs.service.js'
 import { imageNamespace } from '../utils/cache-namespace.util.js'
-import { AccessCountTracker } from './access-count-tracker.service.js'
 import { ImageFormatProcessor } from './image-format-processor.service.js'
 import { ResourceFetcher } from './resource-fetcher.service.js'
 
@@ -36,10 +40,10 @@ export interface OperationContext {
 	id: ResourceIdentifierKP
 	/** Metadata of the cached copy; set by checkResourceExists() when it finds a valid entry. */
 	metaData: ResourceMetaData | null
-	/** The full payload when the layered cache had it; a disk-only hit leaves this null until loadResource(). */
+	/** The full payload of the valid copy checkResourceExists() found, whichever tier held it. */
 	cached: ProcessedImage | null
-	/** Which tier checkResourceExists() found the valid copy in. */
-	cacheTier: CacheLayerName | 'disk' | null
+	/** Which tier checkResourceExists() found the valid copy in (`store` is the rendition store). */
+	cacheTier: CacheLayerName | 'store' | null
 	/** The tenant's flush epoch when the request started; a cache write is dropped if a flush landed since. */
 	flushEpoch: number
 	/**
@@ -48,14 +52,22 @@ export interface OperationContext {
 	 * must not write the same temp path.
 	 */
 	tempToken: string
+	/**
+	 * Set once the result is being written to the rendition store: resolves true
+	 * when the store accepted it. The response does not wait for it (the image is
+	 * made, and a slow store must not slow the request); pre-generation does.
+	 */
+	stored?: Promise<boolean>
+	/** The size the request named (`{width}x{height}`), before it was mapped to a preset; absent for a rendition made on the service's own initiative. */
+	requestedSize?: string
 }
 
 /**
  * Orchestrates caching and processing of image resources.
  *
  * Fetching lives in ResourceFetcher, format processing in ImageFormatProcessor;
- * this class owns identity setup, the cache/filesystem read paths, and the
- * atomic write of processed results.
+ * this class owns identity setup, the read path through the memory, Redis and
+ * rendition-store tiers, and the write of processed results to them.
  */
 @Injectable()
 export default class CacheImageResourceOperation {
@@ -68,7 +80,9 @@ export default class CacheImageResourceOperation {
 		private readonly resourceFetcher: ResourceFetcher,
 		private readonly imageFormatProcessor: ImageFormatProcessor,
 		private readonly cacheManager: MultiLayerCacheManager,
-		private readonly accessCountTracker: AccessCountTracker,
+		private readonly renditionStore: RenditionStoreService,
+		private readonly renditionCatalogue: RenditionCatalogueService,
+		private readonly renditionSizes: RenditionSizeService,
 		private readonly metricsService: MetricsService,
 		private readonly tenantCacheEpochs: TenantCacheEpochs,
 		configService: ConfigService,
@@ -77,16 +91,8 @@ export default class CacheImageResourceOperation {
 		this.storageDir = storageDirectory(configService)
 	}
 
-	getResourcePath(ctx: OperationContext): string {
-		return join(this.storageDir, `${ctx.id}.rsc`)
-	}
-
 	getResourceTempPath(ctx: OperationContext): string {
 		return join(this.storageDir, `${ctx.id}.${ctx.tempToken}.rst`)
-	}
-
-	getResourceMetaPath(ctx: OperationContext): string {
-		return join(this.storageDir, `${ctx.id}.rsm`)
 	}
 
 	/**
@@ -94,7 +100,7 @@ export default class CacheImageResourceOperation {
 	 * subsequent method takes as its first argument. The controller has
 	 * already validated every parameter and the URL.
 	 */
-	async setup(cacheImageRequest: CacheImageRequest): Promise<OperationContext> {
+	async setup(cacheImageRequest: CacheImageRequest, requestedSize?: string): Promise<OperationContext> {
 		PerformanceTracker.startPhase('setup')
 		try {
 			// Before anything is read or fetched: a flush after this point makes the result stale.
@@ -109,6 +115,7 @@ export default class CacheImageResourceOperation {
 				cacheTier: null,
 				flushEpoch,
 				tempToken: randomUUID(),
+				requestedSize,
 			}
 		}
 		catch (error: unknown) {
@@ -124,9 +131,9 @@ export default class CacheImageResourceOperation {
 	}
 
 	/**
-	 * Whether a valid copy exists — one layered cache lookup (the manager
-	 * records that tier's metrics), then the `.rsm`/`.rsc` pair on disk.
-	 * On a hit, `ctx.metaData` (and `ctx.cached` for a layered hit) are populated.
+	 * Whether a valid copy exists: one layered cache lookup (the manager records
+	 * that tier's metrics), then the rendition store. A store that is off, down
+	 * or slow is a miss. On a hit `ctx.cached` and `ctx.metaData` hold the copy.
 	 */
 	async checkResourceExists(ctx: OperationContext): Promise<boolean> {
 		PerformanceTracker.startPhase('resource_exists_check')
@@ -154,91 +161,32 @@ export default class CacheImageResourceOperation {
 				}
 			}
 
-			const resourceMetaPath = this.getResourceMetaPath(ctx)
-			let metadataContent: string
-			try {
-				metadataContent = await readFile(resourceMetaPath, 'utf8')
-			}
-			catch {
-				CorrelatedLogger.debug(`Metadata not found in filesystem: ${resourceMetaPath}`, CacheImageResourceOperation.name)
-				this.endPhaseAndRecord('resource_exists_check', 'miss')
+			const stored = await this.renditionStore.get(ctx.request.tenantSchema, ctx.id)
+			PerformanceTracker.endPhase('resource_exists_check')
+			if (!stored || typeof stored.metadata?.dateCreated !== 'number' || stored.metadata.version !== resourceMetaVersion || !this.isFresh(stored.metadata)) {
 				return false
 			}
 
-			const resourcePath = this.getResourcePath(ctx)
-			if (!await access(resourcePath).then(() => true, () => false)) {
-				CorrelatedLogger.debug(`Resource data not found in filesystem: ${resourcePath}`, CacheImageResourceOperation.name)
-				this.endPhaseAndRecord('resource_exists_check', 'miss')
-				return false
-			}
-
-			let headers: ResourceMetaData
-			try {
-				headers = new ResourceMetaData(JSON.parse(metadataContent))
-			}
-			catch {
-				CorrelatedLogger.warn(`Metadata sidecar is not valid JSON: ${resourceMetaPath}`, CacheImageResourceOperation.name)
-				this.endPhaseAndRecord('resource_exists_check', 'miss')
-				return false
-			}
-
-			if (headers.version !== resourceMetaVersion) {
-				CorrelatedLogger.warn(`Metadata sidecar has version ${headers.version}, expected ${resourceMetaVersion}: ${resourceMetaPath}`, CacheImageResourceOperation.name)
-				this.endPhaseAndRecord('resource_exists_check', 'miss')
-				return false
-			}
-
-			const isValid = this.isFresh(headers)
-			if (isValid) {
-				ctx.metaData = headers
-				ctx.cacheTier = 'disk'
-			}
-			this.endPhaseAndRecord('resource_exists_check', isValid ? 'hit' : 'miss')
-			return isValid
-		}
-		catch (error: unknown) {
-			CorrelatedLogger.warn(`Error checking resource existence: ${errorMessage(error)}`, CacheImageResourceOperation.name)
-			this.metricsService.recordError('cache_check', 'resource_exists')
-			this.endPhaseAndRecord('resource_exists_check', 'error')
-			return false
-		}
-	}
-
-	/**
-	 * The payload of a resource checkResourceExists() reported as present:
-	 * the layered copy when it had one, otherwise the `.rsc` file (backfilled
-	 * into the layered cache fire-and-forget). Every load counts as an access.
-	 * Returns null when the copy vanished between the check and the read.
-	 */
-	async loadResource(ctx: OperationContext): Promise<ProcessedImage | null> {
-		let resource = ctx.cached
-
-		if (!resource) {
-			if (!ctx.metaData) {
-				return null
-			}
-			let data: Buffer
-			try {
-				data = await readFile(this.getResourcePath(ctx))
-			}
-			catch (error: unknown) {
-				CorrelatedLogger.warn(`Cached resource could not be read: ${errorMessage(error)}`, CacheImageResourceOperation.name)
-				return null
-			}
-			resource = { data, metadata: ctx.metaData }
-			// Awaiting here would block the response on a Redis/memory write on every filesystem hit
+			ctx.cached = stored
+			ctx.metaData = stored.metadata
+			ctx.cacheTier = 'store'
+			// Awaiting here would block the response on a Redis/memory write on every store hit
 			if (!this.flushedSince(ctx)) {
-				this.cacheManager.set(imageNamespace(ctx.request.tenantSchema), ctx.id, resource, this.privateTtl)
+				this.cacheManager.set(namespace, ctx.id, stored, this.privateTtl)
 					.then(() => this.discardIfFlushed(ctx))
 					.catch((error: unknown) => {
 						CorrelatedLogger.warn(`Failed to backfill multi-layer cache for ${ctx.id}: ${errorMessage(error)}`, CacheImageResourceOperation.name)
 					})
 			}
-			CorrelatedLogger.debug(`Resource retrieved from filesystem and cached: ${ctx.id}`, CacheImageResourceOperation.name)
+			CorrelatedLogger.debug(`Resource retrieved from the rendition store and cached: ${ctx.id}`, CacheImageResourceOperation.name)
+			return true
 		}
-
-		this.accessCountTracker.record(this.getResourceMetaPath(ctx))
-		return resource
+		catch (error: unknown) {
+			CorrelatedLogger.warn(`Error checking resource existence: ${errorMessage(error)}`, CacheImageResourceOperation.name)
+			this.metricsService.recordError('cache_check', 'resource_exists')
+			PerformanceTracker.endPhase('resource_exists_check')
+			return false
+		}
 	}
 
 	/**
@@ -257,7 +205,9 @@ export default class CacheImageResourceOperation {
 			// A shed request never reached a pipeline: it is capacity, not a
 			// processing failure, and is already counted by admission metrics.
 			if (error instanceof ProcessingOverloadedError) {
-				CorrelatedLogger.warn(`Shed by processing admission: ${errorMessage(error)}`, CacheImageResourceOperation.name)
+				if (!(error instanceof BackgroundYieldError)) {
+					CorrelatedLogger.warn(`Shed by processing admission: ${errorMessage(error)}`, CacheImageResourceOperation.name)
+				}
 				throw error
 			}
 			// A missing or unreachable source was logged where it was raised,
@@ -302,7 +252,7 @@ export default class CacheImageResourceOperation {
 	 * Remove what this request cached if a flush landed while it was writing.
 	 * The flush advances the epoch before it clears anything, so a write that
 	 * finishes after the clear is caught here and one that finished before it
-	 * is removed by the clear itself. Missing files are expected, not errors.
+	 * is removed by the clear itself. A copy that is already gone is expected.
 	 */
 	private async discardIfFlushed(ctx: OperationContext): Promise<void> {
 		if (!this.flushedSince(ctx)) {
@@ -311,11 +261,10 @@ export default class CacheImageResourceOperation {
 		CorrelatedLogger.debug(`Tenant flushed while ${ctx.id} was being cached, discarding the copy`, CacheImageResourceOperation.name)
 		const results = await Promise.allSettled([
 			this.cacheManager.delete(imageNamespace(ctx.request.tenantSchema), ctx.id),
-			unlink(this.getResourcePath(ctx)),
-			unlink(this.getResourceMetaPath(ctx)),
+			this.renditionStore.delete(ctx.request.tenantSchema, ctx.id),
 		])
 		for (const result of results) {
-			if (result.status === 'rejected' && (result.reason as NodeJS.ErrnoException)?.code !== 'ENOENT') {
+			if (result.status === 'rejected') {
 				CorrelatedLogger.warn(`Could not remove a copy cached across a tenant flush for ${ctx.id}: ${errorMessage(result.reason)}`, CacheImageResourceOperation.name)
 			}
 		}
@@ -323,12 +272,6 @@ export default class CacheImageResourceOperation {
 
 	private isFresh(metadata: ResourceMetaData): boolean {
 		return metadata.dateCreated + metadata.privateTTL > Date.now()
-	}
-
-	/** End a performance phase and record the filesystem-tier cache metric (the histogram is in seconds). */
-	private endPhaseAndRecord(phase: string, result: 'hit' | 'miss' | 'error'): void {
-		const durationMs = PerformanceTracker.endPhase(phase)
-		this.metricsService.recordCacheOperation('get', 'filesystem', result, (durationMs || 0) / 1000)
 	}
 
 	/**
@@ -356,10 +299,11 @@ export default class CacheImageResourceOperation {
 	}
 
 	/**
-	 * Cache a processed result in the layered cache and on disk. Skipped when a
-	 * flush of the tenant landed since the request started (the result was built
-	 * from data the flush meant to drop; this request still serves it), and undone
-	 * when one lands during the write.
+	 * Cache a processed result in the layered cache and the rendition store.
+	 * Skipped when a flush of the tenant landed since the request started (the
+	 * result was built from data the flush meant to drop; this request still
+	 * serves it), and undone when one lands during the write. The layered write is
+	 * awaited; the store write is not (see `OperationContext.stored`).
 	 */
 	private async persist(ctx: OperationContext, processed: ProcessedImage): Promise<void> {
 		if (this.flushedSince(ctx)) {
@@ -367,29 +311,35 @@ export default class CacheImageResourceOperation {
 			return
 		}
 
-		const resourcePath = this.getResourcePath(ctx)
-		const resourceMetaPath = this.getResourceMetaPath(ctx)
-		// Write to sibling .tmp paths first, then rename() — rename is
-		// atomic within one filesystem, so concurrent readers either
-		// see the old file or the complete new file, never a partial one.
-		const resourceTmpPath = `${resourcePath}.${ctx.tempToken}.tmp`
-		const resourceMetaTmpPath = `${resourceMetaPath}.${ctx.tempToken}.tmp`
-
-		await Promise.all([
-			this.cacheManager.set(imageNamespace(ctx.request.tenantSchema), ctx.id, processed, this.privateTtl),
-			writeFile(resourceTmpPath, processed.data),
-			writeFile(resourceMetaTmpPath, JSON.stringify(processed.metadata), 'utf8'),
-		])
-		await Promise.all([
-			rename(resourceTmpPath, resourcePath),
-			rename(resourceMetaTmpPath, resourceMetaPath),
-		])
-
+		await this.cacheManager.set(imageNamespace(ctx.request.tenantSchema), ctx.id, processed, this.privateTtl)
+		ctx.stored = this.writeToStore(ctx, processed)
 		if (this.flushedSince(ctx)) {
 			await this.discardIfFlushed(ctx)
-			return
 		}
-		this.accessCountTracker.record(resourceMetaPath)
+	}
+
+	/** The store write: true when it landed and survived any flush, false when the store refused it (counted, the image is served uncached). Never rejects. */
+	private async writeToStore(ctx: OperationContext, processed: ProcessedImage): Promise<boolean> {
+		try {
+			await this.renditionStore.put(ctx.request.tenantSchema, ctx.id, processed)
+		}
+		catch (error: unknown) {
+			CorrelatedLogger.warn(`Could not store ${ctx.id}, it is served uncached: ${errorMessage(error)}`, CacheImageResourceOperation.name)
+			this.metricsService.recordError('cache_persist', 'write')
+			return false
+		}
+		if (this.flushedSince(ctx)) {
+			await this.discardIfFlushed(ctx)
+			return false
+		}
+		const source = uploadedSourcePath(ctx.request.resourceTarget)
+		if (source !== null) {
+			void this.renditionCatalogue.record(uploadKind(source), ctx.request.resizeOptions)
+			if (ctx.requestedSize !== undefined) {
+				void this.renditionSizes.recordRendering(ctx.requestedSize)
+			}
+		}
+		return true
 	}
 
 	private async processImage(ctx: OperationContext): Promise<ProcessedImage> {
@@ -412,7 +362,13 @@ export default class CacheImageResourceOperation {
 					? await this.imageFormatProcessor.processSvg(resourceTempPath, ctx.request.resizeOptions, tenantSchema)
 					: await this.imageFormatProcessor.processRaster(resourceTempPath, ctx.request.resizeOptions, tenantSchema)
 
-				await this.persist(ctx, processed)
+				// Caching is best effort: the image is already made, and a cache that
+				// cannot be written must cost the next request an encode, not turn this
+				// one into the default image.
+				await this.persist(ctx, processed).catch((error: unknown) => {
+					CorrelatedLogger.warn(`Could not cache ${ctx.id}, serving it uncached: ${errorMessage(error)}`, CacheImageResourceOperation.name)
+					this.metricsService.recordError('cache_persist', 'write')
+				})
 			}
 			finally {
 				await unlink(resourceTempPath).catch((error: unknown) => {

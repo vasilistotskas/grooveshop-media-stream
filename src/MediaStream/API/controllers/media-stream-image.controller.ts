@@ -3,10 +3,12 @@ import type { ImageRequestLog } from '#microservice/Correlation/utils/image-requ
 import type { ImageSourceKey } from '../config/image-sources.config.js'
 import type { ImageProcessingContext, ImageProcessingParams } from '../types/image-source.types.js'
 import { BadRequestException, Controller, Get, NotFoundException, Req, Res } from '@nestjs/common'
+import { RenditionSizeService } from '#microservice/Cache/services/rendition-size.service'
 import { IMAGE } from '#microservice/common/constants/route-prefixes.constant'
 import { PUBLIC_TENANT_SCHEMA } from '#microservice/common/constants/tenant.constant'
 import { TenantSuspendedError } from '#microservice/common/errors/media-stream.errors'
 import { decodePathFully } from '#microservice/common/utils/percent-decode.util'
+import { sizeKey, toRendition } from '#microservice/common/utils/rendition.util'
 import { ConfigService } from '#microservice/Config/config.service'
 import { CorrelationService } from '#microservice/Correlation/services/correlation.service'
 import { currentImageRequest } from '#microservice/Correlation/utils/image-request-log.util'
@@ -17,6 +19,7 @@ import { TenantDomainsService } from '#microservice/Validation/services/tenant-d
 import { IMAGE_SOURCES } from '../config/image-sources.config.js'
 import CacheImageRequest, {
 	FitOptions,
+	RESIZE_DEFAULTS,
 	ResizeOptions,
 	SupportedResizeFormats,
 } from '../dto/cache-image-request.dto.js'
@@ -52,6 +55,7 @@ export default class MediaStreamImageController {
 		private readonly correlationService: CorrelationService,
 		private readonly metricsService: MetricsService,
 		private readonly tenantDomainsService: TenantDomainsService,
+		private readonly renditionSizes: RenditionSizeService,
 		configService: ConfigService,
 	) {
 		this.avifMaxQuality = configService.get<number>('processing.avifMaxQuality')
@@ -247,24 +251,34 @@ export default class MediaStreamImageController {
 	 * converted verbatim; ResizeOptions supplies defaults only for programmatic
 	 * callers that omit a field.
 	 *
-	 * AVIF quality is clamped to `processing.avifMaxQuality` here, before the
-	 * request is hashed into its cache identity: requests that encode to the
-	 * same bytes share one entry, and changing the ceiling re-keys AVIF only.
+	 * Width, height, position and quality are replaced by the preset the request
+	 * maps to (toRendition) before the request is hashed into its cache
+	 * identity: requests that are answered with the same bytes share one entry,
+	 * and the set of entries per source is bounded by the presets rather than by
+	 * what a client types. The AVIF quality ceiling is part of that mapping, so
+	 * changing it re-keys AVIF only.
 	 */
 	private buildResizeOptions(params: ImageProcessingParams): ResizeOptions {
-		const format = params.format as SupportedResizeFormats | undefined
-		const quality = Number(params.quality)
+		const format = params.format as SupportedResizeFormats
+		const fit = params.fit as FitOptions
+		const width = Number(params.width)
+		const height = Number(params.height)
+		const size = sizeKey(width, height)
+		this.renditionSizes.touch(size)
+		const rendition = toRendition({
+			width,
+			height,
+			fit,
+			position: params.position ?? RESIZE_DEFAULTS.position,
+			format,
+			quality: Number(params.quality),
+		}, this.avifMaxQuality, key => this.renditionSizes.isKnown(key))
 		return new ResizeOptions({
-			width: Number(params.width),
-			height: Number(params.height),
-			position: params.position,
+			...rendition,
 			background: params.background,
-			fit: params.fit as FitOptions | undefined,
+			fit,
 			trimThreshold: Number(params.trimThreshold),
 			format,
-			quality: format === SupportedResizeFormats.avif
-				? Math.min(quality, this.avifMaxQuality)
-				: quality,
 		})
 	}
 

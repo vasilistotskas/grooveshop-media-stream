@@ -55,7 +55,7 @@ value is left out rather than written as `null`.
 | `path` | string | The path under `/media_stream-image/`, percent-decoded once the controller has decoded it, capped at 512 characters. Never the query string |
 | `width`, `height`, `quality` | number | As requested; absent when the segment is not a number |
 | `fit`, `position`, `format` | string | As requested (`format` is the requested output format), capped at 64 characters |
-| `cache` | string | `memory`, `redis`, `disk` or `miss`; absent when the request never reached the lookup (400, 404, 429) |
+| `cache` | string | `memory`, `redis`, `store` (the rendition store) or `miss`; absent when the request never reached the lookup (400, 404, 429) |
 | `coalesced` | boolean | `true` when the request waited for another request's fetch and processing of the same resource; it then has no input fields of its own |
 | `input_format` | string | The format sniffed from the bytes: `jpeg`, `png`, `webp`, `gif`, `tiff`, `avif`, `svg`; absent for a cache hit, or when the bytes matched none of them |
 | `input_bytes` | number | Bytes downloaded. For a source refused on its declared size, the declared `Content-Length` |
@@ -144,7 +144,7 @@ These metrics were already there and still apply: `mediastream_cache_operations_
 `mediastream_http_requests_total`.
 
 **Labels are closed sets.** `outcome` is the table above, `format` is a
-supported output format or `none`, `cache` is `memory` / `redis` / `disk` /
+supported output format or `none`, `cache` is `memory` / `redis` / `store` /
 `miss` or `none`, and the input `format` is one of the seven sniffed
 formats. That is at most 10 × 8 × 5 series for the counter.
 
@@ -228,7 +228,7 @@ PromQL for dashboards:
 sum by (outcome) (rate(mediastream_image_requests_total[5m]))
 
 # End-to-end cache hit ratio (requests that reached the lookup)
-sum(rate(mediastream_image_requests_total{cache=~"memory|redis|disk"}[5m]))
+sum(rate(mediastream_image_requests_total{cache=~"memory|redis|store"}[5m]))
   / sum(rate(mediastream_image_requests_total{cache!="none"}[5m]))
 
 # p95 latency of served images, per cache tier

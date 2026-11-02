@@ -1,9 +1,9 @@
 import type { ImageRequestLog } from '#microservice/Correlation/utils/image-request-log.util'
 import type { MetricsService } from '#microservice/Metrics/services/metrics.service'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ProcessingOverloadedError } from '#microservice/common/errors/media-stream.errors'
+import { BackgroundYieldError, ProcessingOverloadedError } from '#microservice/common/errors/media-stream.errors'
 import { requestContextStorage } from '#microservice/Correlation/async-local-storage'
-import { ProcessingAdmissionService } from '#microservice/Processing/services/processing-admission.service'
+import { ProcessingAdmissionService, runAsBackground } from '#microservice/Processing/services/processing-admission.service'
 import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 
 function deferred<T>(): { promise: Promise<T>, resolve: (value: T) => void, reject: (error: Error) => void } {
@@ -188,6 +188,64 @@ describe('processingAdmissionService', () => {
 
 		blocker.resolve()
 		await blocking
+	})
+
+	describe('background work', () => {
+		it('takes an idle slot like a request', async () => {
+			const service = build()
+
+			await expect(runAsBackground(() => service.run(async () => 'done'))).resolves.toBe('done')
+			expect(service.stats.inFlight).toBe(0)
+		})
+
+		it('steps aside at once while a request holds the only slot, without queueing or counting a shed', async () => {
+			const service = build()
+			const gate = deferred<void>()
+			const request = service.run(() => gate.promise)
+
+			await expect(runAsBackground(() => service.run(async () => 'x'))).rejects.toBeInstanceOf(BackgroundYieldError)
+
+			expect(service.stats).toMatchObject({ inFlight: 1, queued: 0 })
+			expect(metrics.recordProcessingRejected).not.toHaveBeenCalled()
+			gate.resolve()
+			await request
+		})
+
+		it('steps aside while a request waits for the slot, so it never gets in ahead of one', async () => {
+			const service = build()
+			const gate = deferred<void>()
+			const holder = service.run(() => gate.promise)
+			const waiting = service.run(async () => 'request')
+
+			await expect(runAsBackground(() => service.run(async () => 'x'))).rejects.toBeInstanceOf(BackgroundYieldError)
+
+			gate.resolve()
+			await holder
+			await expect(waiting).resolves.toBe('request')
+		})
+
+		it('is a capacity error, so the pipeline handles it like a shed request', async () => {
+			const service = build()
+			const gate = deferred<void>()
+			const request = service.run(() => gate.promise)
+
+			await expect(runAsBackground(() => service.run(async () => 'x'))).rejects.toBeInstanceOf(ProcessingOverloadedError)
+
+			gate.resolve()
+			await request
+		})
+
+		it('does not make a request that starts outside it yield', async () => {
+			const service = build()
+			const gate = deferred<void>()
+			const holder = service.run(() => gate.promise)
+			const queued = service.run(async () => 'request')
+			await Promise.resolve()
+
+			gate.resolve()
+			await holder
+			await expect(queued).resolves.toBe('request')
+		})
 	})
 
 	it('fails every waiter on shutdown so no request hangs', async () => {

@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer'
-import { IsBoolean, IsDefined, IsNumber, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator'
+import { IsDefined, IsNumber, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator'
 
 export class MemoryCacheConfigDto {
 	@IsNumber()
@@ -60,29 +60,6 @@ export class FileCacheConfigDto {
 	directory!: string
 }
 
-export class CacheWarmingConfigDto {
-	@IsBoolean()
-	enabled!: boolean
-
-	@IsBoolean()
-	warmupOnStart!: boolean
-
-	@IsNumber()
-	@Min(1)
-	maxFilesToWarm!: number
-
-	@IsString()
-	warmupCron!: string
-
-	@IsNumber()
-	@Min(1)
-	popularImageThreshold!: number
-
-	@IsNumber()
-	@Min(1)
-	baseTtl!: number
-}
-
 export class ImageCacheConfigDto {
 	@IsNumber()
 	@Min(1)
@@ -112,11 +89,6 @@ export class CacheConfigDto {
 	@ValidateNested()
 	@Type(() => FileCacheConfigDto)
 	file!: FileCacheConfigDto
-
-	@IsDefined()
-	@ValidateNested()
-	@Type(() => CacheWarmingConfigDto)
-	warming!: CacheWarmingConfigDto
 
 	@IsDefined()
 	@ValidateNested()

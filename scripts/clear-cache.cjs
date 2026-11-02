@@ -5,7 +5,7 @@
  *
  * This script clears all cache layers used by the media stream service:
  * 1. Redis cache (distributed cache)
- * 2. File cache (storage directory with .rsc, .rsm, .rst files)
+ * 2. Scratch directory (sources downloading, .rst files, and the optimized default images)
  * 3. Memory cache (cleared by restarting the server)
  *
  * Usage:
@@ -53,7 +53,7 @@ Media Stream Cache Clearing Script
 
 This script clears all cache layers used by the media stream service:
 1. Redis cache (distributed cache)
-2. File cache (storage directory with .rsc, .rsm, .rst files)
+2. Scratch directory (sources downloading, .rst files, and the optimized default images)
 3. Memory cache (cleared by restarting the server)
 
 Usage:
@@ -167,15 +167,11 @@ async function clearFileCache() {
 				continue
 			}
 
-			// Delete cache files:
-			// - .rsc (resource cache)
-			// - .rsm (resource metadata)
-			// - .rst (resource temp)
+			// Delete scratch files:
+			// - .rst (a source download in flight)
 			// - default_optimized_* (optimized default images)
 			const shouldDelete
-				= file.endsWith('.rsc')
-					|| file.endsWith('.rsm')
-					|| file.endsWith('.rst')
+				= file.endsWith('.rst')
 					|| file.startsWith('default_optimized_')
 
 			if (shouldDelete) {

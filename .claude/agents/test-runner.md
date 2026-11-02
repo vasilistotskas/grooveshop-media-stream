@@ -23,7 +23,7 @@ Run targeted tests for modified modules in the grooveshop-media-stream microserv
 | `src/MediaStream/Metrics/` | `src/test/Metrics/` | `pnpm exec vitest run src/test/Metrics/` |
 | `src/MediaStream/Processing/` | `src/test/Processing/` | `pnpm exec vitest run src/test/Processing/` |
 | `src/MediaStream/RateLimit/` | `src/test/RateLimit/` | `pnpm exec vitest run src/test/RateLimit/` |
-| `src/MediaStream/Storage/` | `src/test/Storage/` | `pnpm exec vitest run src/test/Storage/` |
+| `src/MediaStream/Renditions/` | `src/test/Renditions/` | `pnpm exec vitest run src/test/Renditions/` |
 | `src/MediaStream/Validation/` | `src/test/Validation/` | `pnpm exec vitest run src/test/Validation/` |
 | `src/MediaStream/common/` | `src/test/common/` | `pnpm exec vitest run src/test/common/` |
 | `src/MediaStream/media-stream.module.ts` (module wiring, middleware order) | `src/test/Module/` + `src/test/media-stream.module.spec.ts` | `pnpm exec vitest run src/test/Module/ src/test/media-stream.module.spec.ts` |

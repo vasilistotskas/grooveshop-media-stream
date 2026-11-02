@@ -411,6 +411,33 @@ describe('redisCacheService', () => {
 		})
 	})
 
+	describe('acquireLock', () => {
+		it('takes a free lock with SET NX EX', async () => {
+			await expect(service.acquireLock('renditions:lock:a', 600)).resolves.toBe(true)
+
+			expect(redis.set).toHaveBeenCalledWith('renditions:lock:a', '1', 'EX', 600, 'NX')
+		})
+
+		it('reports a lock someone else holds (SET NX answers null)', async () => {
+			redis.set.mockResolvedValueOnce(null)
+
+			await expect(service.acquireLock('renditions:lock:a', 600)).resolves.toBe(false)
+		})
+
+		it('does not take a lock while disconnected, so guarded work is skipped rather than run twice', async () => {
+			redis.status = 'end'
+
+			await expect(service.acquireLock('renditions:lock:a', 600)).resolves.toBe(false)
+			expect(redis.set).not.toHaveBeenCalled()
+		})
+
+		it('throws a command error', async () => {
+			redis.set.mockRejectedValueOnce(new Error('READONLY'))
+
+			await expect(service.acquireLock('renditions:lock:a', 600)).rejects.toThrow('READONLY')
+		})
+	})
+
 	describe('clear', () => {
 		it('should SCAN image keys and DEL each batch', async () => {
 			redis.scan

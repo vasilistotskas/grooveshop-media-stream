@@ -1,7 +1,7 @@
 import type { MockedObject } from 'vitest'
 import type { MultiLayerCacheManager } from '#microservice/Cache/services/multi-layer-cache.manager'
 import type { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
-import type { StorageCleanupService } from '#microservice/Storage/services/storage-cleanup.service'
+import type { RenditionStoreService } from '#microservice/Cache/services/rendition-store.service'
 import type { TenantDomainsService } from '#microservice/Validation/services/tenant-domains.service'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TenantCacheEpochs } from '#microservice/Cache/services/tenant-cache-epochs.service'
@@ -18,7 +18,7 @@ describe('tenantFlushService', () => {
 	let redis: MockedObject<RedisCacheService>
 	let cacheManager: MockedObject<MultiLayerCacheManager>
 	let epochs: TenantCacheEpochs
-	let storage: MockedObject<StorageCleanupService>
+	let store: MockedObject<RenditionStoreService>
 	let tenantFeed: MockedObject<TenantDomainsService>
 	let onBroadcast: Handler
 	/** Every tier clear, in order, with the tenant's epoch at that moment. */
@@ -51,12 +51,12 @@ describe('tenantFlushService', () => {
 				return 1
 			}),
 		} as unknown as MockedObject<MultiLayerCacheManager>
-		storage = {
-			removeTenantFiles: vi.fn(async (schema: string) => {
-				clears.push(`disk@${epochs.current(schema)}`)
-				return { filesRemoved: 1, errors: [], complete: true }
+		store = {
+			deleteTenant: vi.fn(async (schema: string) => {
+				clears.push(`store@${epochs.current(schema)}`)
+				return { removed: 1, errors: [], complete: true }
 			}),
-		} as unknown as MockedObject<StorageCleanupService>
+		} as unknown as MockedObject<RenditionStoreService>
 		tenantFeed = {
 			refresh: vi.fn(async () => {
 				clears.push('feed')
@@ -69,7 +69,7 @@ describe('tenantFlushService', () => {
 			redis,
 			cacheManager,
 			epochs,
-			storage,
+			store,
 			tenantFeed,
 		)
 		service.onModuleInit()
@@ -82,12 +82,12 @@ describe('tenantFlushService', () => {
 	})
 
 	describe('flushTenant', () => {
-		it('re-reads the tenant feed, then clears disk, then Redis, then memory, advancing the epoch before each tier', async () => {
+		it('re-reads the tenant feed, then clears the store, then Redis, then memory, advancing the epoch before each tier', async () => {
 			await service.flushTenant('acme')
 
 			expect(clears).toEqual([
 				'feed',
-				'disk@1',
+				'store@1',
 				'redis@2',
 				'memory@3',
 			])
@@ -113,9 +113,9 @@ describe('tenantFlushService', () => {
 			expect(epochs.current('tenant_b')).toBe(0)
 		})
 
-		it('reports the namespace, the removed files and the broadcast receivers', async () => {
-			storage.removeTenantFiles.mockResolvedValue({
-				filesRemoved: 4,
+		it('reports the namespace, the removed renditions and the broadcast receivers', async () => {
+			store.deleteTenant.mockResolvedValue({
+				removed: 4,
 				errors: ['boom'],
 				complete: true,
 			})
@@ -124,8 +124,8 @@ describe('tenantFlushService', () => {
 
 			expect(result).toEqual({
 				namespace: 'image:acme',
-				filesRemoved: 4,
-				diskErrors: ['boom'],
+				objectsRemoved: 4,
+				storeErrors: ['boom'],
 				broadcastReceivers: 2,
 			})
 		})
@@ -168,10 +168,10 @@ describe('tenantFlushService', () => {
 			expect(redis.publish).toHaveBeenCalledOnce()
 		})
 
-		it('fails with 503 when a pair of the tenant could not be removed from disk', async () => {
-			storage.removeTenantFiles.mockResolvedValue({
-				filesRemoved: 0,
-				errors: ['Failed to remove x.rsm and its .rsc: EACCES'],
+		it('fails with 503 when a rendition of the tenant could not be removed from the store', async () => {
+			store.deleteTenant.mockResolvedValue({
+				removed: 0,
+				errors: ['acme/x: AccessDenied'],
 				complete: false,
 			})
 
@@ -179,25 +179,25 @@ describe('tenantFlushService', () => {
 
 			expect(error).toBeInstanceOf(TenantFlushIncompleteError)
 			expect((error as TenantFlushIncompleteError).context).toMatchObject({
-				failures: ['disk: Failed to remove x.rsm and its .rsc: EACCES'],
+				failures: ['store: acme/x: AccessDenied'],
 			})
 		})
 
-		it('still succeeds when the sweep only met sidecars it could not read', async () => {
-			storage.removeTenantFiles.mockResolvedValue({
-				filesRemoved: 2,
-				errors: ['Failed to parse metadata corrupt.rsm'],
+		it('still succeeds when the sweep reports errors but removed everything it listed', async () => {
+			store.deleteTenant.mockResolvedValue({
+				removed: 2,
+				errors: ['listing warning'],
 				complete: true,
 			})
 
 			await expect(service.flushTenant('acme')).resolves.toMatchObject({
-				filesRemoved: 2,
-				diskErrors: ['Failed to parse metadata corrupt.rsm'],
+				objectsRemoved: 2,
+				storeErrors: ['listing warning'],
 			})
 		})
 
-		it('fails with 503 when the disk sweep throws', async () => {
-			storage.removeTenantFiles.mockRejectedValue(new Error('EIO'))
+		it('fails with 503 when the store sweep throws', async () => {
+			store.deleteTenant.mockRejectedValue(new Error('EIO'))
 
 			await expect(service.flushTenant('acme')).rejects.toBeInstanceOf(TenantFlushIncompleteError)
 		})
@@ -215,7 +215,7 @@ describe('tenantFlushService', () => {
 					expect.stringContaining('tenant feed'),
 				],
 			})
-			expect(clears).toEqual(['disk@1', 'redis@2', 'memory@3'])
+			expect(clears).toEqual(['store@1', 'redis@2', 'memory@3'])
 			expect(redis.publish).toHaveBeenCalledOnce()
 		})
 	})
@@ -223,12 +223,12 @@ describe('tenantFlushService', () => {
 	describe('peer broadcasts', () => {
 		const PEER = 'another-replica'
 
-		it('re-reads the tenant feed, then clears disk, then Redis, then memory, advancing the epoch before each tier', async () => {
+		it('re-reads the tenant feed, then clears the store, then Redis, then memory, advancing the epoch before each tier', async () => {
 			await deliver({ tenantSchema: 'acme', origin: PEER })
 
 			expect(clears).toEqual([
 				'feed',
-				'disk@1',
+				'store@1',
 				'redis@2',
 				'memory@3',
 			])
@@ -241,7 +241,7 @@ describe('tenantFlushService', () => {
 			await deliver({ tenantSchema: 'acme', origin: PEER })
 
 			expect(error).toHaveBeenCalledWith(expect.stringContaining('tenant feed'), undefined, 'TenantFlushService')
-			expect(clears).toEqual(['disk@1', 'redis@2', 'memory@3'])
+			expect(clears).toEqual(['store@1', 'redis@2', 'memory@3'])
 			error.mockRestore()
 		})
 
@@ -295,13 +295,13 @@ describe('tenantFlushService', () => {
 
 		it('keeps clearing the remaining tiers when one fails, and names it', async () => {
 			const error = vi.spyOn(CorrelatedLogger, 'error').mockImplementation(() => {})
-			storage.removeTenantFiles.mockRejectedValue(new Error('disk gone'))
+			store.deleteTenant.mockRejectedValue(new Error('store gone'))
 
 			await deliver({ tenantSchema: 'acme', origin: PEER })
 
 			expect(cacheManager.invalidateNamespace).toHaveBeenCalledWith('image:acme', 'redis')
 			expect(cacheManager.invalidateNamespace).toHaveBeenCalledWith('image:acme', 'memory')
-			expect(error).toHaveBeenCalledWith(expect.stringContaining('disk: disk gone'), undefined, 'TenantFlushService')
+			expect(error).toHaveBeenCalledWith(expect.stringContaining('store: store gone'), undefined, 'TenantFlushService')
 			error.mockRestore()
 		})
 	})
