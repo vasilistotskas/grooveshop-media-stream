@@ -237,7 +237,7 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	'renditions.store.bucket': { env: 'RENDITION_STORE_BUCKET', default: '', type: 'string' },
 	'renditions.store.accessKeyId': { env: 'RENDITION_STORE_ACCESS_KEY_ID', default: '', type: 'string' },
 	'renditions.store.secretAccessKey': { env: 'RENDITION_STORE_SECRET_ACCESS_KEY', default: '', type: 'string' },
-	'renditions.store.readTimeoutMs': { env: 'RENDITION_STORE_READ_TIMEOUT_MS', default: 1000, type: 'number' },
+	'renditions.store.readTimeoutMs': { env: 'RENDITION_STORE_READ_TIMEOUT_MS', default: 2000, type: 'number' },
 	'renditions.store.writeTimeoutMs': { env: 'RENDITION_STORE_WRITE_TIMEOUT_MS', default: 5000, type: 'number' },
 
 	// Exact sizes, learned: a requested size becomes exact (answered with no

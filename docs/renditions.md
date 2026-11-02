@@ -141,11 +141,21 @@ which do not use that pool, and every call is bounded:
 
 | Call | Deadline | When it fails |
 |---|---|---|
-| read (GET, HEAD) | `RENDITION_STORE_READ_TIMEOUT_MS`, 1 s | a miss: the request is processed |
+| read (GET, HEAD) | `RENDITION_STORE_READ_TIMEOUT_MS`, 2 s | a miss: the request is processed |
 | write (PUT, DELETE, LIST) | `RENDITION_STORE_WRITE_TIMEOUT_MS`, 5 s | the image is served uncached |
 
 - The deadline is an abort signal given to the SDK **and** a race against it,
   so a stalled socket cannot outlive it. The SDK is told not to retry.
+- **The read deadline is measured, not guessed.** From a staging pod (500m
+  CPU) to R2 in the EU jurisdiction, 2026-11-02, 200 calls each on 258 real
+  objects: HEAD p50 102 / p95 182 / p99 236 ms and GET p50 136 / p95 271 /
+  p99 485 ms on a reused connection; a new TLS connection adds about 70 ms
+  (HEAD p50 172 ms); with 8 in flight, GET p99 407 ms and max 1181 ms; 50
+  HEADs at once, which open 50 sockets, p50 834 / p95 1040 ms. 2 s is past
+  every call measured, and still below what a timed-out read costs instead:
+  an encode, p50 2.5 s on that pod for a first-time rendition. The SDK keeps
+  connections alive (its default agent, `keepAlive`, 50 sockets), so only a
+  burst pays a handshake per call.
 - Five failures in a row open a breaker for 30 s: the store is not called, a
   read is a miss at once and a write is skipped. The first call after the pause
   decides: a success closes it, a failure opens it again. A 404 is an answer,
@@ -175,8 +185,10 @@ operations (PUT, LIST), 10 million Class B operations (GET, HEAD), and egress
 is always free; beyond that $0.015 per GB-month, $4.50 per million Class A,
 $0.36 per million Class B. The platform's use, from the 14-day log: about 0.3 GB
 stored, about 30 thousand GETs and 35 thousand PUTs a month, plus about 50
-thousand HEADs for pre-generation (one per upload per pod start). That is
-under 1 % of every free allowance, so the expected bill is zero.
+thousand HEADs for pre-generation (one per rendition of each upload not yet
+known to be complete: about 5 thousand per pod start, so some 200 thousand at
+20 deploys a month with two replicas). That is under 2 % of every free
+allowance, so the expected bill is zero.
 
 ## Where the bucket lives
 
@@ -218,8 +230,13 @@ nothing: the state is the uploads and the store).
    rest, because a visitor, a refused write or the bucket's expiry can leave
    any of them absent. An upload seen to be done is not asked about again
    until the pod restarts or the catalogue of its folder changes (a new
-   rendition, not a new order). A store that cannot answer ends the pass:
-   unknown is not missing. Newest uploads
+   rendition, not a new order). At most 8 checks are in flight
+   (`CHECK_CONCURRENCY`): 50 at once on a pod with a CPU limit spent the read
+   deadline on TLS handshakes, lost every check and opened the breaker for live
+   requests. An upload the store could not answer about is left to the next
+   pass (unknown is not missing), and so is a rendition whose check failed
+   while rendering: it is not rendered blind. The pass ends only when the
+   breaker opens, which is the one case logged as an error. Newest uploads
    first, so a new upload is ready before the backlog. Suspended stores are
    skipped. Existing images are backfilled by the same pass.
 3. **Render them as background work.** `runAsBackground` admits a pipeline
@@ -265,7 +282,7 @@ added behind the same admission error if the remaining 503 rate asks for it.
 | `RENDITION_STORE_ENDPOINT` | empty (off) | S3 API endpoint, `https://<ACCOUNT_ID>.eu.r2.cloudflarestorage.com` for an EU R2 bucket |
 | `RENDITION_STORE_BUCKET` | empty (off) | The bucket |
 | `RENDITION_STORE_ACCESS_KEY_ID`, `RENDITION_STORE_SECRET_ACCESS_KEY` | empty | An R2 token scoped to object read and write on the bucket |
-| `RENDITION_STORE_READ_TIMEOUT_MS` | 1000 | Deadline of a GET or HEAD; past it the read is a miss |
+| `RENDITION_STORE_READ_TIMEOUT_MS` | 2000 | Deadline of a GET or HEAD; past it the read is a miss (the measurements are under "The rendition store") |
 | `RENDITION_STORE_WRITE_TIMEOUT_MS` | 5000 | Deadline of a PUT, DELETE or LIST; past it the image is served uncached |
 | `RENDITION_SIZES_MIN_SOURCES` | 10 | Uploads a size must be rendered for before it is answered exactly |
 | `RENDITION_SIZES_WINDOW_DAYS` | 30 | Days an exact size stays exact without being asked for |
@@ -315,7 +332,7 @@ never answers, or a closed port):
 | Store | Responses | Latency |
 |---|---|---|
 | Off | 30 x 200 | p50 30 ms |
-| Hangs | 30 x 200 | the first miss waited out the 1 s read timeout (1.2 s at most); then the breaker opened and the rest ran at p50 29 ms |
+| Hangs | 30 x 200 | the first miss waited out the read timeout (1 s at the time; 1.2 s at most); then the breaker opened and the rest ran at p50 29 ms |
 | Refuses connections | 30 x 200 | p50 30 ms |
 
 Writes to a hanging store ran in the background (5 s deadline) and never

@@ -85,6 +85,11 @@ export class RenditionStoreService implements OnModuleDestroy {
 		return this.config.endpoint !== '' && this.config.bucket !== ''
 	}
 
+	/** Configured and not paused by the breaker: a call now would reach the store. */
+	get available(): boolean {
+		return this.client !== null && Date.now() >= this.openUntil
+	}
+
 	onModuleDestroy(): void {
 		this.client?.destroy()
 	}
