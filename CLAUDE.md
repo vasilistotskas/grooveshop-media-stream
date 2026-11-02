@@ -20,7 +20,7 @@ pnpm run test             # Unit + integration tests (vitest; coverage off)
 pnpm run test:coverage    # Same suite with coverage and the floors from vitest.config.ts
 pnpm run test:e2e         # E2E tests (separate vitest config)
 pnpm run test:perf        # Performance specs (wall-clock assertions; excluded from `test`)
-pnpm run cache:clear      # Clear Redis + file system cache
+pnpm run cache:clear      # Clear the Redis image cache + the scratch directory
 ```
 
 Run a single test file: `pnpm exec vitest run src/test/Cache/services/memory-cache.service.spec.ts --no-coverage`. Use `pnpm exec`, never `npx`. Tests require Redis running locally (the CI service image is in `.github/workflows/ci.yml`).
@@ -155,7 +155,7 @@ Two-tier timeout: soft (`SHUTDOWN_TIMEOUT`, 30 s) waits for in-flight requests, 
 
 ### Utility Scripts
 
-- `scripts/clear-cache.cjs` — Clears Redis + file system cache (`--redis-only`, `--files-only`, `REDIS_*`/`CACHE_FILE_DIRECTORY` env or CLI flags)
+- `scripts/clear-cache.cjs` — Clears the Redis image cache + the scratch directory; the rendition store is cleared per tenant by the flush endpoint (`--redis-only`, `--files-only`, `REDIS_*`/`CACHE_FILE_DIRECTORY` env or CLI flags)
 
 ### Key Environment Variables
 

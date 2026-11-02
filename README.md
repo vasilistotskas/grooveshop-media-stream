@@ -21,8 +21,11 @@ behind basic auth).
   or height it is served as SVG, with one it is rasterised to the requested format.
 - Tenant-scoped media (`media/<tenantSchema>/uploads/...`) and shared static images. Images of a
   suspended store are refused with a 503.
-- Layered cache: memory, then Redis, then an on-disk store, with per-tenant keys, cache warming
-  of frequently read files and a nightly disk cleanup.
+- Layered cache: memory, then Redis, then a rendition store every replica shares (an
+  S3-compatible bucket, Cloudflare R2 in production), with per-tenant keys.
+- Bounded renditions: a request is mapped to a preset before it is cached, the sizes the
+  storefront asks for are learned and answered exactly, and a cron renders every upload's
+  renditions ahead of traffic ([`docs/renditions.md`](docs/renditions.md)).
 - Per-tenant cache flush across every replica (`POST /admin/cache/flush-tenant`, broadcast over
   Redis pub/sub), which Django calls when a store is suspended, reactivated or deleted.
 - Input hardening: request validation, a host allowlist for upstream fetches (static list plus
@@ -83,7 +86,7 @@ pnpm run test           # Unit and integration tests
 pnpm run test:coverage  # Same suite with the coverage floors from vitest.config.ts
 pnpm run test:e2e       # End-to-end tests
 pnpm run test:perf      # Performance specs (excluded from `test`)
-pnpm run cache:clear    # Clear the Redis and on-disk image cache
+pnpm run cache:clear    # Clear the Redis image cache and the scratch directory
 ```
 
 Run one file with `pnpm exec vitest run <path-to-spec> --no-coverage`.
@@ -93,7 +96,7 @@ Run one file with `pnpm exec vitest run <path-to-spec> --no-coverage`.
 ```
 src/MediaStream/
 ├── API/          # Image controller, request validation, URL building, streaming
-├── Cache/        # Memory and Redis layers, the image cache operation, warming, tenant flush
+├── Cache/        # Memory, Redis and rendition-store tiers, the image cache operation, tenant flush
 ├── Config/       # Schema-built configuration, validated at startup
 ├── Correlation/  # Correlation ids, timing, per-request log record
 ├── Health/       # Health endpoints and indicators
@@ -101,7 +104,7 @@ src/MediaStream/
 ├── Metrics/      # Prometheus metrics
 ├── Processing/   # Sharp jobs, admission control, Sharp configuration
 ├── RateLimit/    # Adaptive rate-limit guard
-├── Storage/      # On-disk cache inventory and nightly cleanup
+├── Renditions/   # Pre-generation of an upload's renditions
 ├── Validation/   # Security checks, upstream allowlist, tenant-domain feed
 └── common/       # Shared errors, utilities, constants
 ```

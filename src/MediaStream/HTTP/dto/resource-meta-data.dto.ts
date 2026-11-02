@@ -3,7 +3,7 @@ import { PUBLIC_TENANT_SCHEMA } from '#microservice/common/constants/tenant.cons
 export const resourceMetaVersion = 1
 
 /**
- * Sidecar (`.rsm`) shape and the metadata half of every cache payload.
+ * The metadata half of every cache payload (memory, Redis and the rendition store's envelope).
  * TTLs are milliseconds and are always supplied by the writer; an instance
  * without them is expired by construction.
  */
