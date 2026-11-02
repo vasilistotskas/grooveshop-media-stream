@@ -124,12 +124,12 @@ GitHub Container Registry. The cluster runs the version pinned in the GitOps rep
 
 ## Related repositories
 
-- [grooveshop-django-api](https://github.com/vasilistotskas/grooveshop-django-api): Django REST API, admin and Celery workers; the system of record for every tenant.
-- [grooveshop-storefront-ui-node-nuxt](https://github.com/vasilistotskas/grooveshop-storefront-ui-node-nuxt): Nuxt SSR storefront, one deployment serving every tenant's store.
-- [grooveshop-agent-gateway](https://github.com/vasilistotskas/grooveshop-agent-gateway): Go gateway for AI agents (MCP, UCP, ACP, product feeds, storefront chat).
-- [grooveshop-docs](https://github.com/vasilistotskas/grooveshop-docs): the documentation site at docs.grooveshop.space.
-- grooveshop-infrastructure (private): Kubernetes manifests and Argo CD applications for the K3s cluster.
+- [grooveshop-django-api](https://github.com/vasilistotskas/grooveshop-django-api): Django REST API, admin, and background jobs; the platform's source of truth
+- [grooveshop-storefront-ui-node-nuxt](https://github.com/vasilistotskas/grooveshop-storefront-ui-node-nuxt): Nuxt server-rendered storefront for every store
+- [grooveshop-agent-gateway](https://github.com/vasilistotskas/grooveshop-agent-gateway): Go gateway for AI agents (MCP, UCP, ACP), catalogue feeds and the storefront chat
+- grooveshop-infrastructure (private): Kubernetes manifests deployed by Argo CD
+- [grooveshop-docs](https://github.com/vasilistotskas/grooveshop-docs): the documentation site at docs.grooveshop.space
 
 ## Licence
 
-[MIT](LICENSE.md)
+MIT; see [LICENSE.md](LICENSE.md).
