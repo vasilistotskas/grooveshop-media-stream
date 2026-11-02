@@ -56,6 +56,14 @@ export interface CycleResult {
 
 type UploadOutcome = 'completed' | 'failed' | 'interrupted'
 
+/** A rendition's outcome: `unstored` is an encode the store refused to keep, which leaves its upload incomplete. */
+type RenditionOutcome = UploadOutcome | 'unstored'
+
+/** The set of renditions an upload was checked against, whatever order the catalogue lists them in. */
+function fingerprintOf(renditions: ResizeOptions[]): string {
+	return renditions.map(options => JSON.stringify(options)).sort().join('|')
+}
+
 /**
  * Renders the renditions of an upload before anyone asks for them, so the
  * encode cost follows uploads instead of traffic and a burst of first-time
@@ -82,8 +90,12 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 	private running = false
 	private stopping = false
 	private readonly failedUntil = new Map<string, number>()
-	/** Uploads known to have all their renditions stored: not asked about again until a restart. */
-	private readonly complete = new Set<string>()
+	/**
+	 * Uploads seen with every rendition of their folder's catalogue stored, with
+	 * that catalogue's fingerprint: not asked about again until a restart or until
+	 * the catalogue of their folder changes.
+	 */
+	private readonly complete = new Map<string, string>()
 
 	constructor(
 		configService: ConfigService,
@@ -173,16 +185,19 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 	}
 
 	/**
-	 * Uploads whose last (least shared) rendition is not stored yet, newest first.
-	 * One HEAD per upload not yet known to be complete; a store that cannot answer
-	 * ends the pass, because "unknown" is not "missing".
+	 * Uploads missing a rendition of their folder's catalogue, newest first. An
+	 * upload not yet known to be complete is checked rendition by rendition,
+	 * least shared first, up to the first one missing; no single rendition stands
+	 * for the rest, because a visitor, a refused write or the bucket's expiry can
+	 * leave any of them absent. A store that cannot answer ends the pass, because
+	 * "unknown" is not "missing".
 	 */
 	private async findPending(catalogue: Map<string, ResizeOptions[]>): Promise<PendingSource[]> {
 		const now = Date.now()
 		const candidates: Array<UploadedSource & { renditions: ResizeOptions[] }> = []
 		for (const source of await this.scanner.scan(this.config.mediaDirectory)) {
 			const renditions = catalogue.get(uploadKind(source.source))
-			if (renditions && !this.tenantDomains.isSuspended(source.tenantSchema) && !this.complete.has(this.keyOf(source)) && (this.failedUntil.get(this.keyOf(source)) ?? 0) <= now) {
+			if (renditions && !this.tenantDomains.isSuspended(source.tenantSchema) && this.complete.get(this.keyOf(source)) !== fingerprintOf(renditions) && (this.failedUntil.get(this.keyOf(source)) ?? 0) <= now) {
 				candidates.push({ ...source, renditions })
 			}
 		}
@@ -190,10 +205,10 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 		const pending: PendingSource[] = []
 		for (let index = 0; index < candidates.length; index += CHECK_BATCH_SIZE) {
 			const batch = candidates.slice(index, index + CHECK_BATCH_SIZE)
-			const stored = await Promise.all(batch.map(candidate => this.isLastStored(candidate)))
+			const stored = await Promise.all(batch.map(candidate => this.isEveryStored(candidate)))
 			for (const [position, candidate] of batch.entries()) {
 				if (stored[position]) {
-					this.complete.add(this.keyOf(candidate))
+					this.markComplete(candidate)
 				}
 				else {
 					pending.push({ ...candidate, modifiedAt: await this.scanner.modifiedAt(this.config.mediaDirectory, candidate) })
@@ -210,16 +225,20 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 			return 'completed'
 		}
 		try {
+			let everyStored = true
 			for (const options of source.renditions) {
 				const outcome = await this.generateOne(source, options, deadline)
-				if (outcome !== 'completed') {
+				if (outcome === 'unstored') {
+					everyStored = false
+				}
+				else if (outcome !== 'completed') {
 					return outcome
 				}
 			}
-			// A write the store refused does not fail the encode that made it, so
-			// the upload is done only once its last rendition is seen to be stored.
-			if (await this.isLastStored(source)) {
-				this.complete.add(this.keyOf(source))
+			// A write the store refused does not fail the encode that made it, but
+			// it leaves the upload to the next pass.
+			if (everyStored) {
+				this.markComplete(source)
 			}
 			return 'completed'
 		}
@@ -230,7 +249,7 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 		}
 	}
 
-	private async generateOne(source: PendingSource, options: ResizeOptions, deadline: number): Promise<UploadOutcome> {
+	private async generateOne(source: PendingSource, options: ResizeOptions, deadline: number): Promise<RenditionOutcome> {
 		const ctx = await this.contextFor(source, options)
 		if (await this.isStored(ctx)) {
 			this.record('present')
@@ -239,9 +258,13 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 		while (!this.stopping && Date.now() < deadline) {
 			try {
 				await runAsBackground(() => this.operation.execute(ctx))
-				await ctx.stored
+				// Unset when the operation found the rendition in memory or Redis and
+				// wrote nothing: then it is not known to be in the store either.
+				const stored = await ctx.stored === true
 				this.record('generated')
-				return 'completed'
+				return stored
+					? 'completed'
+					: 'unstored'
 			}
 			catch (error: unknown) {
 				if (error instanceof BackgroundYieldError) {
@@ -272,9 +295,18 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 		}))
 	}
 
-	/** Whether the upload's last rendition is in the store, which is where every replica finds it. */
-	private async isLastStored(source: UploadedSource & { renditions: ResizeOptions[] }): Promise<boolean> {
-		return this.isStored(await this.contextFor(source, source.renditions[source.renditions.length - 1]))
+	/** Whether every rendition of the upload is in the store, which is where every replica finds it; stops at the first one missing. */
+	private async isEveryStored(source: UploadedSource & { renditions: ResizeOptions[] }): Promise<boolean> {
+		for (const options of source.renditions.toReversed()) {
+			if (!await this.isStored(await this.contextFor(source, options))) {
+				return false
+			}
+		}
+		return true
+	}
+
+	private markComplete(source: UploadedSource & { renditions: ResizeOptions[] }): void {
+		this.complete.set(this.keyOf(source), fingerprintOf(source.renditions))
 	}
 
 	private isStored(ctx: OperationContext): Promise<boolean> {

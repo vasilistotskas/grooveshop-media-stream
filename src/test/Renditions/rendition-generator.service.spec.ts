@@ -27,7 +27,7 @@ function options(width: number): ResizeOptions {
 	})
 }
 
-/** A catalogue of one folder: its renditions, most shared first (the last one is the one an upload is checked for). */
+/** A catalogue of one folder: its renditions, most shared first. */
 function catalogueOf(...widths: number[]): Map<string, ResizeOptions[]> {
 	return new Map([
 		[
@@ -83,6 +83,7 @@ describe('renditionGeneratorService', () => {
 			}) as unknown as OperationContext),
 			execute: vi.fn(async (ctx: OperationContext) => {
 				stored.add(`${ctx.request.tenantSchema}/${ctx.id}`)
+				ctx.stored = Promise.resolve(true)
 				return {} as never
 			}),
 		} as never
@@ -170,15 +171,48 @@ describe('renditionGeneratorService', () => {
 			expect(catalogueService.learn).toHaveBeenCalledWith({ minSources: 3, maxPerKind: 16 })
 		})
 
-		it('treats an upload whose last rendition is stored as done, without checking the others', async () => {
+		it('treats an upload as done only when every rendition of its catalogue is stored', async () => {
+			stored.add('acme/blog_new.png-672')
 			stored.add('acme/blog_new.png-1024')
 
 			const result = await build().runCycle()
 
 			expect(result).toEqual({ pending: 0, completed: 0, failed: 0 })
 			expect(operation.execute).not.toHaveBeenCalled()
-			expect(store.has).toHaveBeenCalledTimes(1)
+			expect(store.has).toHaveBeenCalledTimes(2)
 			expect(metrics.setRenditionBacklog).toHaveBeenCalledWith(0)
+		})
+
+		it('renders the rest of an upload whose least shared rendition a visitor already made', async () => {
+			stored.add('acme/blog_new.png-1024')
+
+			const result = await build().runCycle()
+
+			expect(result.pending).toBe(1)
+			expect(operation.execute).toHaveBeenCalledTimes(1)
+			expect(stored).toContain('acme/blog_new.png-672')
+		})
+
+		it('checks a done upload again once the catalogue of its folder gains a rendition', async () => {
+			const service = build()
+			await service.runCycle()
+			catalogueService.learn.mockResolvedValue(catalogueOf(672, 1024, 1440))
+
+			const second = await service.runCycle()
+
+			expect(second).toEqual({ pending: 1, completed: 1, failed: 0 })
+			expect(stored).toContain('acme/blog_new.png-1440')
+		})
+
+		it('does not check a done upload again when its catalogue only changes order', async () => {
+			const service = build()
+			await service.runCycle()
+			store.has.mockClear()
+			catalogueService.learn.mockResolvedValue(catalogueOf(1024, 672))
+
+			await service.runCycle()
+
+			expect(store.has).not.toHaveBeenCalled()
 		})
 
 		it('does not ask the store about an upload again once it is known to be done', async () => {
@@ -202,8 +236,10 @@ describe('renditionGeneratorService', () => {
 			expect(metrics.recordRenditionPregeneration).toHaveBeenCalledWith('generated')
 		})
 
-		it('does not call an upload done when the store refused the write that made its last rendition', async () => {
-			operation.execute.mockResolvedValue({} as never)
+		it('does not call an upload done when the store refused the write of one of its renditions', async () => {
+			const real = operation.execute.getMockImplementation()!
+			operation.execute.mockImplementationOnce(async () => ({}) as never)
+			operation.execute.mockImplementation(real)
 			const service = build()
 
 			const first = await service.runCycle()

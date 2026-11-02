@@ -212,10 +212,14 @@ nothing: the state is the uploads and the store).
    client enumerating heights cannot grow it without bound.
 2. **Find the uploads that lack them.** The Django backend's media volume is
    mounted read-only at `RENDITIONS_MEDIA_DIRECTORY`
-   (`{dir}/{tenant}/uploads/**`). An upload is done when the last rendition
-   of its folder's catalogue is in the store, which is one HEAD; an upload
-   seen to be done is not asked about again until the pod restarts. A store
-   that cannot answer ends the pass: unknown is not missing. Newest uploads
+   (`{dir}/{tenant}/uploads/**`). An upload is done when every rendition of
+   its folder's catalogue is in the store: one HEAD each, least shared
+   first, up to the first one missing. No single rendition can stand for the
+   rest, because a visitor, a refused write or the bucket's expiry can leave
+   any of them absent. An upload seen to be done is not asked about again
+   until the pod restarts or the catalogue of its folder changes (a new
+   rendition, not a new order). A store that cannot answer ends the pass:
+   unknown is not missing. Newest uploads
    first, so a new upload is ready before the backlog. Suspended stores are
    skipped. Existing images are backfilled by the same pass.
 3. **Render them as background work.** `runAsBackground` admits a pipeline
@@ -230,9 +234,10 @@ nothing: the state is the uploads and the store).
 
 The pre-generated rendition is produced by the same `execute()` as a live
 request, so it is byte-identical to what the request would have produced and
-is served with the same headers. An upload is called done only when its last
-rendition is seen in the store: a write the store refused does not fail the
-encode that made it.
+is served with the same headers. An upload is called done only when each of
+its renditions is seen in the store or was written to it: a write the store
+refused does not fail the encode that made it, it leaves the upload to the
+next pass.
 
 ## Overload
 
