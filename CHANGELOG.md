@@ -1,3 +1,10 @@
+# [3.12.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.11.4...v3.12.0) (2026-11-02)
+
+
+### Features
+
+* **renditions:** bounded presets with learned exact sizes, an R2 rendition store and pre-generation ([#50](https://github.com/vasilistotskas/grooveshop-media-stream/issues/50)) ([65d9bab](https://github.com/vasilistotskas/grooveshop-media-stream/commit/65d9babebd4907acf22dd4742906c84f0215b5be))
+
 ## [3.11.4](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.11.3...v3.11.4) (2026-10-31)
 
 
