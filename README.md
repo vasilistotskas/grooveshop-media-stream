@@ -16,7 +16,9 @@ behind basic auth).
 
 - Resize, crop and convert on the fly: every option (width, height, fit, position, background,
   trim threshold, quality, output format) is a path segment, so each URL is one cacheable variant.
-  Output formats: AVIF, WebP, JPEG, PNG, GIF, TIFF (an SVG request is answered with PNG bytes).
+  Output formats: AVIF, WebP, JPEG, PNG, GIF, TIFF; SVG is never encoded, so an SVG output
+  request is answered with PNG bytes. An SVG source is sanitised first: requested without a width
+  or height it is served as SVG, with one it is rasterised to the requested format.
 - Tenant-scoped media (`media/<tenantSchema>/uploads/...`) and shared static images. Images of a
   suspended store are refused with a 503.
 - Layered cache: memory, then Redis, then an on-disk store, with per-tenant keys, cache warming
