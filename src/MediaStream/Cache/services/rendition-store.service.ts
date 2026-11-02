@@ -29,8 +29,15 @@ export interface TenantSweep {
 	errors: string[]
 }
 
+/**
+ * A missing object: `NoSuchKey` from a GET, `NotFound` from a HEAD (which has
+ * no body to name the cause). Any other 404, `NoSuchBucket` above all (a wrong
+ * bucket, or the default endpoint for a jurisdiction bucket), is a failure, so
+ * a misconfigured store opens the breaker instead of passing for an empty one.
+ */
 function isNotFound(error: unknown): boolean {
-	return (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404
+	const { name } = error as { name?: string }
+	return name === 'NoSuchKey' || name === 'NotFound'
 }
 
 /**

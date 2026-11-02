@@ -293,6 +293,21 @@ describe('renditionStoreService', () => {
 			await expect(store.has('acme', 'abc')).resolves.toBe(false)
 		})
 
+		it('counts a missing bucket as a failure, not as an absent object', async () => {
+			sent.send.mockRejectedValue(Object.assign(new Error('NoSuchBucket'), {
+				name: 'NoSuchBucket',
+				$metadata: { httpStatusCode: 404 },
+			}))
+			const store = build()
+
+			await expect(store.has('acme', 'abc')).rejects.toBeInstanceOf(RenditionStoreUnavailableError)
+			await expect(store.get('acme', 'abc')).resolves.toBeNull()
+
+			expect(metrics.recordRenditionStoreOperation).toHaveBeenCalledWith('head', 'error')
+			expect(metrics.recordRenditionStoreOperation).toHaveBeenCalledWith('get', 'error')
+			expect(metrics.recordRenditionStoreOperation).not.toHaveBeenCalledWith('get', 'miss')
+		})
+
 		it('throws rather than answer false when the store cannot say', async () => {
 			sent.send.mockRejectedValue(new Error('socket hang up'))
 
