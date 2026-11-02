@@ -1,3 +1,10 @@
+## [3.12.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.12.0...v3.12.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* **renditions:** check the store a few uploads at a time and survive a slow check ([#52](https://github.com/vasilistotskas/grooveshop-media-stream/issues/52)) ([8bb5015](https://github.com/vasilistotskas/grooveshop-media-stream/commit/8bb5015f653d311991744cc500dc80f2011b449a))
+
 # [3.12.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.11.4...v3.12.0) (2026-11-02)
 
 
