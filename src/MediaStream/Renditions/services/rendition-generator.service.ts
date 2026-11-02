@@ -13,7 +13,7 @@ import CacheImageResourceOperation from '#microservice/Cache/operations/cache-im
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { RenditionCatalogueService } from '#microservice/Cache/services/rendition-catalogue.service'
 import { RenditionStoreService } from '#microservice/Cache/services/rendition-store.service'
-import { BackgroundYieldError } from '#microservice/common/errors/media-stream.errors'
+import { BackgroundYieldError, RenditionStoreUnavailableError } from '#microservice/common/errors/media-stream.errors'
 import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { uploadKind } from '#microservice/common/utils/upload-source.util'
 import { ConfigService } from '#microservice/Config/config.service'
@@ -37,8 +37,15 @@ export const SOURCE_LOCK_TTL_SECONDS = 600
 /** A source that could not be rendered (missing, too large, not an image) is left alone for this long. */
 export const FAILED_SOURCE_RETRY_MS = 6 * 60 * 60 * 1000
 
-/** Uploads checked for completeness per batch of filesystem calls. */
-const CHECK_BATCH_SIZE = 50
+/**
+ * Store checks (HEAD) in flight at once. Each one in flight beyond the open
+ * sockets is a new TLS handshake, and a pod with a CPU limit pays for them
+ * together. Measured 2026-11-02 from a staging pod (500m CPU) to R2 in the EU
+ * jurisdiction: 8 in flight p50 106 ms, p99 340 ms; 50 at once p50 834 ms,
+ * p95 1040 ms, and the first pass after a restart lost every check to the read
+ * deadline, which opened the breaker for live requests too.
+ */
+export const CHECK_CONCURRENCY = 8
 
 interface PendingSource extends UploadedSource {
 	renditions: ResizeOptions[]
@@ -52,12 +59,20 @@ export interface CycleResult {
 	completed: number
 	/** Uploads that could not be rendered and are left alone for a while. */
 	failed: number
+	/** Uploads the store could not answer about (a check past its deadline): left to the next pass. */
+	unchecked: number
+	/** The pass ended because the store's breaker opened: the store is failing, not one slow call. */
+	storeUnavailable: boolean
 }
 
 type UploadOutcome = 'completed' | 'failed' | 'interrupted'
 
-/** A rendition's outcome: `unstored` is an encode the store refused to keep, which leaves its upload incomplete. */
-type RenditionOutcome = UploadOutcome | 'unstored'
+/**
+ * A rendition's outcome: `unstored` is an encode the store refused to keep and
+ * `unknown` a rendition the store could not say it holds. Either leaves the
+ * upload incomplete, for the next pass.
+ */
+type RenditionOutcome = UploadOutcome | 'unstored' | 'unknown'
 
 /** The set of renditions an upload was checked against, whatever order the catalogue lists them in. */
 function fingerprintOf(renditions: ResizeOptions[]): string {
@@ -134,7 +149,13 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 
 	/** One pass over the uploads; a pass already running makes this a no-op. */
 	async runCycle(): Promise<CycleResult> {
-		const result: CycleResult = { pending: 0, completed: 0, failed: 0 }
+		const result: CycleResult = {
+			pending: 0,
+			completed: 0,
+			failed: 0,
+			unchecked: 0,
+			storeUnavailable: false,
+		}
 		if (this.running) {
 			return result
 		}
@@ -150,12 +171,16 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 				return result
 			}
 
-			const pending = await this.findPending(catalogue)
+			const { pending, unchecked } = await this.findPending(catalogue)
 			result.pending = pending.length
+			result.unchecked = unchecked
 			this.metrics.setRenditionBacklog(pending.length)
 
 			for (const source of pending) {
 				if (this.stopping || Date.now() >= deadline) {
+					break
+				}
+				if (!this.store.available) {
 					break
 				}
 				const outcome = await this.generate(source, deadline)
@@ -163,6 +188,7 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 					result[outcome]++
 				}
 			}
+			result.storeUnavailable = !this.store.available
 			return result
 		}
 		finally {
@@ -173,8 +199,11 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 	private async runScheduled(): Promise<void> {
 		try {
 			const result = await this.runCycle()
-			if (result.pending > 0) {
-				CorrelatedLogger.log(`Rendition pre-generation: ${result.pending} upload(s) were missing renditions, ${result.completed} completed, ${result.failed} failed`, RenditionGeneratorService.name)
+			if (result.storeUnavailable) {
+				CorrelatedLogger.error(`Rendition pre-generation stopped: the rendition store is failing (its breaker is open); ${result.pending} upload(s) were missing renditions, ${result.completed} completed, ${result.unchecked} left unchecked`, undefined, RenditionGeneratorService.name)
+			}
+			else if (result.pending > 0 || result.unchecked > 0) {
+				CorrelatedLogger.log(`Rendition pre-generation: ${result.pending} upload(s) were missing renditions, ${result.completed} completed, ${result.failed} failed, ${result.unchecked} left unchecked`, RenditionGeneratorService.name)
 			}
 		}
 		catch (error: unknown) {
@@ -189,10 +218,11 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 	 * upload not yet known to be complete is checked rendition by rendition,
 	 * least shared first, up to the first one missing; no single rendition stands
 	 * for the rest, because a visitor, a refused write or the bucket's expiry can
-	 * leave any of them absent. A store that cannot answer ends the pass, because
-	 * "unknown" is not "missing".
+	 * leave any of them absent. At most `CHECK_CONCURRENCY` checks are in flight.
+	 * An upload the store could not answer about is left to the next pass, because
+	 * "unknown" is not "missing"; once the store's breaker opens, the rest are too.
 	 */
-	private async findPending(catalogue: Map<string, ResizeOptions[]>): Promise<PendingSource[]> {
+	private async findPending(catalogue: Map<string, ResizeOptions[]>): Promise<{ pending: PendingSource[], unchecked: number }> {
 		const now = Date.now()
 		const candidates: Array<UploadedSource & { renditions: ResizeOptions[] }> = []
 		for (const source of await this.scanner.scan(this.config.mediaDirectory)) {
@@ -203,11 +233,24 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 		}
 
 		const pending: PendingSource[] = []
-		for (let index = 0; index < candidates.length; index += CHECK_BATCH_SIZE) {
-			const batch = candidates.slice(index, index + CHECK_BATCH_SIZE)
-			const stored = await Promise.all(batch.map(candidate => this.isEveryStored(candidate)))
+		let unchecked = 0
+		for (let index = 0; index < candidates.length; index += CHECK_CONCURRENCY) {
+			if (!this.store.available) {
+				unchecked += candidates.length - index
+				break
+			}
+			const batch = candidates.slice(index, index + CHECK_CONCURRENCY)
+			const stored = await Promise.all(batch.map(candidate => this.isEveryStored(candidate).catch((error: unknown) => {
+				if (error instanceof RenditionStoreUnavailableError) {
+					return null
+				}
+				throw error
+			})))
 			for (const [position, candidate] of batch.entries()) {
-				if (stored[position]) {
+				if (stored[position] === null) {
+					unchecked++
+				}
+				else if (stored[position]) {
 					this.markComplete(candidate)
 				}
 				else {
@@ -215,7 +258,10 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 				}
 			}
 		}
-		return pending.sort((a, b) => b.modifiedAt - a.modifiedAt)
+		return {
+			pending: pending.sort((a, b) => b.modifiedAt - a.modifiedAt),
+			unchecked,
+		}
 	}
 
 	/** Render every rendition of one upload that is not stored. */
@@ -228,15 +274,15 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 			let everyStored = true
 			for (const options of source.renditions) {
 				const outcome = await this.generateOne(source, options, deadline)
-				if (outcome === 'unstored') {
+				if (outcome === 'unstored' || outcome === 'unknown') {
 					everyStored = false
 				}
 				else if (outcome !== 'completed') {
 					return outcome
 				}
 			}
-			// A write the store refused does not fail the encode that made it, but
-			// it leaves the upload to the next pass.
+			// A write the store refused, or a check it could not answer, does not
+			// fail the upload, but it leaves the upload to the next pass.
 			if (everyStored) {
 				this.markComplete(source)
 			}
@@ -251,9 +297,19 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 
 	private async generateOne(source: PendingSource, options: ResizeOptions, deadline: number): Promise<RenditionOutcome> {
 		const ctx = await this.contextFor(source, options)
-		if (await this.isStored(ctx)) {
-			this.record('present')
-			return 'completed'
+		try {
+			if (await this.isStored(ctx)) {
+				this.record('present')
+				return 'completed'
+			}
+		}
+		catch (error: unknown) {
+			// Not rendered blind: an encode for a rendition that may be stored costs
+			// more than the next pass asking again.
+			if (error instanceof RenditionStoreUnavailableError) {
+				return 'unknown'
+			}
+			throw error
 		}
 		while (!this.stopping && Date.now() < deadline) {
 			try {

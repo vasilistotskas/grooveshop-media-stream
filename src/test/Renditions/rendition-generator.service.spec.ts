@@ -1,4 +1,4 @@
-import type { MockedObject } from 'vitest'
+import type { Mock, MockedObject } from 'vitest'
 import type CacheImageResourceOperation from '#microservice/Cache/operations/cache-image-resource.operation'
 import type { OperationContext } from '#microservice/Cache/operations/cache-image-resource.operation'
 import type { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
@@ -11,7 +11,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CacheImageRequest, { FitOptions, ResizeOptions, SupportedResizeFormats } from '#microservice/API/dto/cache-image-request.dto'
 import { UrlBuilderService } from '#microservice/API/services/url-builder.service'
 import { BackgroundYieldError, RenditionStoreUnavailableError, UpstreamResourceTooLargeError } from '#microservice/common/errors/media-stream.errors'
-import { FAILED_SOURCE_RETRY_MS, RenditionGeneratorService, YIELD_BACKOFF_MS } from '#microservice/Renditions/services/rendition-generator.service'
+import { CorrelatedLogger } from '#microservice/Correlation/utils/logger.util'
+import { CHECK_CONCURRENCY, FAILED_SOURCE_RETRY_MS, RenditionGeneratorService, YIELD_BACKOFF_MS } from '#microservice/Renditions/services/rendition-generator.service'
 import { RenditionSourceScanner } from '#microservice/Renditions/services/rendition-source-scanner.service'
 import { createConfigServiceMock } from '../helpers/config-service.mock.js'
 
@@ -41,7 +42,7 @@ describe('renditionGeneratorService', () => {
 	let operation: MockedObject<Pick<CacheImageResourceOperation, 'setup' | 'execute'>>
 	let scanner: MockedObject<Pick<RenditionSourceScanner, 'scan' | 'modifiedAt'>>
 	let catalogueService: { learn: ReturnType<typeof vi.fn> }
-	let store: { enabled: boolean, has: ReturnType<typeof vi.fn> }
+	let store: { enabled: boolean, available: boolean, has: Mock<(tenant: string, id: string) => Promise<boolean>> }
 	let redis: MockedObject<Pick<RedisCacheService, 'acquireLock' | 'delete'>>
 	let tenantDomains: { isSuspended: ReturnType<typeof vi.fn> }
 	let metrics: MockedObject<Pick<MetricsService, 'recordRenditionPregeneration' | 'setRenditionBacklog'>>
@@ -98,7 +99,14 @@ describe('renditionGeneratorService', () => {
 		}
 		store = {
 			enabled: true,
-			has: vi.fn(async (tenant: string, id: string) => stored.has(`${tenant}/${id}`)),
+			available: true,
+			// Like the real store, a call while the breaker is open throws at once.
+			has: vi.fn(async (tenant: string, id: string) => {
+				if (!store.available) {
+					throw new RenditionStoreUnavailableError('breaker open')
+				}
+				return stored.has(`${tenant}/${id}`)
+			}),
 		}
 		redis = {
 			acquireLock: vi.fn(async () => true),
@@ -149,7 +157,13 @@ describe('renditionGeneratorService', () => {
 		it('renders every rendition of an upload that has none, most shared first', async () => {
 			const result = await build().runCycle()
 
-			expect(result).toEqual({ pending: 1, completed: 1, failed: 0 })
+			expect(result).toEqual({
+				pending: 1,
+				completed: 1,
+				failed: 0,
+				unchecked: 0,
+				storeUnavailable: false,
+			})
 			expect(operation.execute).toHaveBeenCalledTimes(2)
 			expect(stored).toEqual(new Set(['acme/blog_new.png-672', 'acme/blog_new.png-1024']))
 			expect(metrics.recordRenditionPregeneration).toHaveBeenCalledWith('generated')
@@ -177,7 +191,13 @@ describe('renditionGeneratorService', () => {
 
 			const result = await build().runCycle()
 
-			expect(result).toEqual({ pending: 0, completed: 0, failed: 0 })
+			expect(result).toEqual({
+				pending: 0,
+				completed: 0,
+				failed: 0,
+				unchecked: 0,
+				storeUnavailable: false,
+			})
 			expect(operation.execute).not.toHaveBeenCalled()
 			expect(store.has).toHaveBeenCalledTimes(2)
 			expect(metrics.setRenditionBacklog).toHaveBeenCalledWith(0)
@@ -200,7 +220,13 @@ describe('renditionGeneratorService', () => {
 
 			const second = await service.runCycle()
 
-			expect(second).toEqual({ pending: 1, completed: 1, failed: 0 })
+			expect(second).toEqual({
+				pending: 1,
+				completed: 1,
+				failed: 0,
+				unchecked: 0,
+				storeUnavailable: false,
+			})
 			expect(stored).toContain('acme/blog_new.png-1440')
 		})
 
@@ -254,17 +280,155 @@ describe('renditionGeneratorService', () => {
 
 			const result = await build().runCycle()
 
-			expect(result).toEqual({ pending: 0, completed: 0, failed: 0 })
+			expect(result).toEqual({
+				pending: 0,
+				completed: 0,
+				failed: 0,
+				unchecked: 0,
+				storeUnavailable: false,
+			})
 			expect(scanner.scan).not.toHaveBeenCalled()
 			expect(metrics.setRenditionBacklog).toHaveBeenCalledWith(0)
 		})
 
-		it('ends the pass when the store cannot answer: unknown is not missing', async () => {
-			store.has.mockRejectedValue(new RenditionStoreUnavailableError('down'))
+		it('leaves an upload the store could not answer about to the next pass: unknown is not missing', async () => {
+			store.has.mockRejectedValueOnce(new RenditionStoreUnavailableError('slow'))
+			const service = build()
 
-			await expect(build().runCycle()).rejects.toBeInstanceOf(RenditionStoreUnavailableError)
+			const first = await service.runCycle()
+			const second = await service.runCycle()
 
+			expect(first).toEqual({
+				pending: 0,
+				completed: 0,
+				failed: 0,
+				unchecked: 1,
+				storeUnavailable: false,
+			})
+			expect(second).toMatchObject({ pending: 1, completed: 1, unchecked: 0 })
+		})
+
+		it('goes on with the other uploads when one check misses its deadline', async () => {
+			scanner.scan.mockResolvedValue([
+				{ tenantSchema: 'acme', source: 'blog/slow.png' },
+				{ tenantSchema: 'acme', source: 'blog/new.png' },
+			])
+			const real = store.has.getMockImplementation()!
+			store.has.mockImplementation(async (tenant: string, id: string) => {
+				if (id.startsWith('blog_slow.png')) {
+					throw new RenditionStoreUnavailableError('slow')
+				}
+				return real(tenant, id)
+			})
+
+			const result = await build().runCycle()
+
+			expect(result).toEqual({
+				pending: 1,
+				completed: 1,
+				failed: 0,
+				unchecked: 1,
+				storeUnavailable: false,
+			})
+			expect(stored).toEqual(new Set(['acme/blog_new.png-672', 'acme/blog_new.png-1024']))
+		})
+
+		it('does not render a rendition the store could not say it holds, and leaves its upload incomplete', async () => {
+			const service = build()
+			const real = store.has.getMockImplementation()!
+			// The pending check answers (nothing stored); the per-rendition check of 1024 does not.
+			store.has.mockImplementation(async (tenant: string, id: string) => {
+				if (id.endsWith('-1024') && operation.execute.mock.calls.length > 0) {
+					throw new RenditionStoreUnavailableError('slow')
+				}
+				return real(tenant, id)
+			})
+
+			const first = await service.runCycle()
+			store.has.mockImplementation(real)
+			const second = await service.runCycle()
+
+			expect(first.completed).toBe(1)
+			expect(stored).toEqual(new Set(['acme/blog_new.png-672', 'acme/blog_new.png-1024']))
+			expect(operation.execute).toHaveBeenCalledTimes(2)
+			expect(second.pending).toBe(1)
+		})
+
+		it('ends the pass once the store breaker opens, checking nothing more', async () => {
+			scanner.scan.mockResolvedValue(Array.from({ length: CHECK_CONCURRENCY * 3 }, (_, i) => ({ tenantSchema: 'acme', source: `blog/${i}.png` })))
+			store.has.mockImplementation(async () => {
+				store.available = false
+				throw new RenditionStoreUnavailableError('down')
+			})
+
+			const result = await build().runCycle()
+
+			expect(store.has).toHaveBeenCalledTimes(CHECK_CONCURRENCY)
+			expect(result).toEqual({
+				pending: 0,
+				completed: 0,
+				failed: 0,
+				unchecked: CHECK_CONCURRENCY * 3,
+				storeUnavailable: true,
+			})
 			expect(operation.execute).not.toHaveBeenCalled()
+		})
+
+		it('stops rendering once the store breaker opens', async () => {
+			scanner.scan.mockResolvedValue([
+				{ tenantSchema: 'acme', source: 'blog/a.png' },
+				{ tenantSchema: 'acme', source: 'blog/b.png' },
+			])
+			const service = build()
+			operation.execute.mockImplementationOnce(async (ctx: OperationContext) => {
+				store.available = false
+				ctx.stored = Promise.resolve(false)
+				return {} as never
+			})
+
+			const result = await service.runCycle()
+
+			expect(result).toMatchObject({ pending: 2, completed: 1, storeUnavailable: true })
+			expect(operation.execute).toHaveBeenCalledTimes(1)
+		})
+
+		it('keeps at most CHECK_CONCURRENCY store checks in flight', async () => {
+			scanner.scan.mockResolvedValue(Array.from({ length: CHECK_CONCURRENCY * 4 }, (_, i) => ({ tenantSchema: 'acme', source: `blog/${i}.png` })))
+			stored = new Set(Array.from({ length: CHECK_CONCURRENCY * 4 }, (_, i) => [`acme/blog_${i}.png-672`, `acme/blog_${i}.png-1024`]).flat())
+			let inFlight = 0
+			let peak = 0
+			store.has.mockImplementation(async (tenant: string, id: string) => {
+				inFlight++
+				peak = Math.max(peak, inFlight)
+				await Promise.resolve()
+				inFlight--
+				return stored.has(`${tenant}/${id}`)
+			})
+
+			await build().runCycle()
+
+			expect(peak).toBe(CHECK_CONCURRENCY)
+		})
+
+		it('logs an error for a pass the breaker ended, and none for one slow check', async () => {
+			const error = vi.spyOn(CorrelatedLogger, 'error').mockImplementation(() => undefined)
+			const log = vi.spyOn(CorrelatedLogger, 'log').mockImplementation(() => undefined)
+			const scheduled = (service: RenditionGeneratorService): Promise<void> => (service as unknown as { runScheduled: () => Promise<void> }).runScheduled()
+
+			store.has.mockRejectedValueOnce(new RenditionStoreUnavailableError('slow'))
+			await scheduled(build())
+			expect(error).not.toHaveBeenCalled()
+			expect(log).toHaveBeenCalledWith(expect.stringContaining('1 left unchecked'), 'RenditionGeneratorService')
+
+			store.has.mockImplementation(async () => {
+				store.available = false
+				throw new RenditionStoreUnavailableError('down')
+			})
+			await scheduled(build())
+			expect(error).toHaveBeenCalledWith(expect.stringContaining('the rendition store is failing'), undefined, 'RenditionGeneratorService')
+
+			error.mockRestore()
+			log.mockRestore()
 		})
 
 		it('skips uploads of a folder with no learned rendition', async () => {
@@ -333,7 +497,13 @@ describe('renditionGeneratorService', () => {
 			vi.setSystemTime(NOW + FAILED_SOURCE_RETRY_MS + 1)
 			const third = await service.runCycle()
 
-			expect(first).toEqual({ pending: 1, completed: 0, failed: 1 })
+			expect(first).toEqual({
+				pending: 1,
+				completed: 0,
+				failed: 1,
+				unchecked: 0,
+				storeUnavailable: false,
+			})
 			expect(second.pending).toBe(0)
 			expect(third.pending).toBe(1)
 			expect(metrics.recordRenditionPregeneration).toHaveBeenCalledWith('failed')
@@ -352,7 +522,13 @@ describe('renditionGeneratorService', () => {
 			release()
 			await running
 
-			expect(overlapping).toEqual({ pending: 0, completed: 0, failed: 0 })
+			expect(overlapping).toEqual({
+				pending: 0,
+				completed: 0,
+				failed: 0,
+				unchecked: 0,
+				storeUnavailable: false,
+			})
 			expect(scanner.scan).toHaveBeenCalledTimes(1)
 		})
 
