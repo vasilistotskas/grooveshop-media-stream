@@ -55,6 +55,8 @@ All source code lives under `src/MediaStream/`. Each domain is a NestJS module:
 
 Scheduled tasks use `@nestjs/schedule`'s `SchedulerRegistry.addCronJob()` with config-driven schedules (`RENDITIONS_CRON`, read at boot). There are no `@Cron` decorators.
 
+**Source limits are a published contract.** `MAX_FILE_SIZES` and `SHARP_INPUT_PIXEL_LIMIT` (`common/constants/image-limits.constant.ts`) are mirrored in `contract/image-limits.json`, which grooveshop-django-api copies (pinned by git id) to refuse an upload this service would refuse at render. Change a limit in both; `image-limits-contract.spec.ts` fails until they agree. See `docs/image-limits.md`.
+
 ### Shared helpers (`common/`)
 
 - `utils/error-message.util.ts` — `errorMessage(err)`; never `(err as Error).message` on a caught value
