@@ -1,4 +1,4 @@
-import type { Mock, MockedObject } from 'vitest'
+import type { Mock, MockedObject, MockInstance } from 'vitest'
 import type CacheImageResourceOperation from '#microservice/Cache/operations/cache-image-resource.operation'
 import type { OperationContext } from '#microservice/Cache/operations/cache-image-resource.operation'
 import type { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
@@ -507,6 +507,90 @@ describe('renditionGeneratorService', () => {
 			expect(second.pending).toBe(0)
 			expect(third.pending).toBe(1)
 			expect(metrics.recordRenditionPregeneration).toHaveBeenCalledWith('failed')
+		})
+
+		describe('failure report', () => {
+			let event: MockInstance<typeof CorrelatedLogger.event>
+
+			beforeEach(() => {
+				event = vi.spyOn(CorrelatedLogger, 'event').mockImplementation(() => undefined)
+			})
+
+			afterEach(() => {
+				event.mockRestore()
+			})
+
+			it('names the upload, the rendition and the error as fields when a rendition cannot be rendered', async () => {
+				operation.execute.mockRejectedValue(new UpstreamResourceTooLargeError('Declared Content-Length 9263001 bytes exceeds the jpeg limit', { size: 9_263_001 }))
+
+				await build().runCycle()
+
+				expect(event).toHaveBeenCalledTimes(1)
+				expect(event).toHaveBeenCalledWith('warn', expect.stringContaining('acme/blog/new.png at 672x0 avif'), {
+					schema: 'acme',
+					upload: 'blog/new.png',
+					width: 672,
+					height: 0,
+					fit: FitOptions.inside,
+					position: expect.anything(),
+					format: SupportedResizeFormats.avif,
+					quality: 55,
+					error_class: 'UpstreamResourceTooLargeError',
+					error: 'Declared Content-Length 9263001 bytes exceeds the jpeg limit',
+					retry_in_hours: FAILED_SOURCE_RETRY_MS / 3_600_000,
+				}, 'RenditionGeneratorService')
+			})
+
+			it('reports an upload whose request cannot be built while rendering, and goes on with the others', async () => {
+				scanner.scan.mockResolvedValue([
+					{ tenantSchema: 'acme', source: 'blog/bad.png' },
+					{ tenantSchema: 'acme', source: 'blog/new.png' },
+				])
+				const real = operation.setup.getMockImplementation()!
+				// The checks build their requests; the render of bad.png does not.
+				operation.setup.mockImplementation(async (request: CacheImageRequest) => {
+					if (request.resourceTarget.includes('bad.png') && operation.execute.mock.calls.length > 0) {
+						throw new Error('identity failed')
+					}
+					return real(request)
+				})
+				modifiedAt = { 'blog/new.png': 2, 'blog/bad.png': 1 }
+
+				const result = await build().runCycle()
+
+				expect(result).toMatchObject({ pending: 2, completed: 1, failed: 1 })
+				expect(event).toHaveBeenCalledWith('warn', expect.any(String), expect.objectContaining({ upload: 'blog/bad.png', error_class: 'Error', error: 'identity failed' }), 'RenditionGeneratorService')
+			})
+
+			it('reports an upload whose request cannot be built while checking, instead of failing the pass', async () => {
+				scanner.scan.mockResolvedValue([
+					{ tenantSchema: 'acme', source: 'blog/bad.png' },
+					{ tenantSchema: 'acme', source: 'blog/new.png' },
+				])
+				const real = operation.setup.getMockImplementation()!
+				operation.setup.mockImplementation(async (request: CacheImageRequest) => {
+					if (request.resourceTarget.includes('bad.png')) {
+						throw new Error('identity failed')
+					}
+					return real(request)
+				})
+				const service = build()
+
+				const first = await service.runCycle()
+				const second = await service.runCycle()
+
+				expect(first).toEqual({
+					pending: 1,
+					completed: 1,
+					failed: 1,
+					unchecked: 0,
+					storeUnavailable: false,
+				})
+				expect(event).toHaveBeenCalledTimes(1)
+				expect(event).toHaveBeenCalledWith('warn', expect.any(String), expect.objectContaining({ schema: 'acme', upload: 'blog/bad.png', width: 1024 }), 'RenditionGeneratorService')
+				expect(second.failed).toBe(0)
+				expect(metrics.recordRenditionPregeneration).toHaveBeenCalledWith('failed')
+			})
 		})
 
 		it('runs one cycle at a time', async () => {

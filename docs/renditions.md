@@ -246,8 +246,12 @@ nothing: the state is the uploads and the store).
    replicas off the same one. A cycle ends after five minutes and the next
    tick rescans.
 4. **Leave what cannot be rendered alone** (source missing, too large, not
-   an image) for six hours, in memory, so a bad upload is not retried every
-   cycle.
+   an image, or a request that cannot be built) for six hours, in memory, so a
+   bad upload is not retried every cycle. Each failure is one WARN line with
+   the upload, the rendition and the error as fields (`log.schema`,
+   `log.upload`, `log.width`/`height`/`format`, `log.error_class`,
+   `log.error`; `docs/observability.md`). A failure while checking an upload
+   is reported the same way and fails only that upload, never the pass.
 
 The pre-generated rendition is produced by the same `execute()` as a live
 request, so it is byte-identical to what the request would have produced and
