@@ -3,6 +3,11 @@
  *
  * These constants ensure consistent validation across all services.
  * Consumed by RequestValidatorService and ResourceValidationService.
+ *
+ * `MAX_FILE_SIZES` and `SHARP_INPUT_PIXEL_LIMIT` are also published as
+ * `contract/image-limits.json`, which grooveshop-django-api copies to refuse
+ * an upload this service would refuse at render. Change one and the other:
+ * `image-limits-contract.spec.ts` fails until they agree (`docs/image-limits.md`).
  */
 
 /**
