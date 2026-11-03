@@ -21,6 +21,7 @@ low-cardinality labels for graphs.
 | `src/MediaStream/API/services/image-stream.service.ts` | Fills in the cache result, the outcome and the output |
 | `src/MediaStream/Cache/operations/resource-fetcher.service.ts` | Fills in the sniffed input format and the input size |
 | `src/MediaStream/Cache/operations/cache-image-resource.operation.ts` | Writes the pre-decode line (`ImageDecode`) |
+| `src/MediaStream/Renditions/services/rendition-generator.service.ts` | Writes the pre-generation failure line (`reportFailure`) |
 | `src/MediaStream/Processing/services/processing-admission.service.ts` | Adds the time spent waiting for a processing slot |
 | `src/MediaStream/common/filters/media-stream-exception.filter.ts` | Records the error class of a thrown error, and classifies `overloaded` and `timeout` |
 | `src/MediaStream/Correlation/utils/logger.util.ts` | `CorrelatedLogger.event()`, which writes a line with structured fields |
@@ -116,6 +117,32 @@ kills the process writes none. The decode line is already on stdout by
 then. **A decode line with no request line of the same `correlation_id`
 is the request that was running when the pod died.** Cache hits, which are
 most of the traffic, never write a decode line.
+
+### The pre-generation failure line
+
+Pre-generation renders without a request, so it writes no request line. An
+upload it cannot render, or whose request it cannot build, writes one line
+at WARN, then is left alone for six hours on that pod (each replica keeps
+its own list, so two replicas each write it once):
+
+```json
+{"level":"warn","message":"Rendition of webside/products/IMG_20210214_130445.jpg at 1200x630 avif not generated, left alone for 6 h: Declared Content-Length 9263001 bytes exceeds the jpeg limit",
+ "context":"RenditionGeneratorService","schema":"webside","upload":"products/IMG_20210214_130445.jpg",
+ "width":1200,"height":630,"fit":"cover","position":"entropy","format":"avif","quality":55,
+ "error_class":"UpstreamResourceTooLargeError","error":"Declared Content-Length 9263001 bytes exceeds the jpeg limit","retry_in_hours":6}
+```
+
+`upload` is the path under the tenant's `uploads/`; the rendition is the one
+being rendered or checked when it failed. Which uploads failed, and why:
+
+```logsql
+_time:1d kubernetes.pod_namespace:="grooveshop" kubernetes.container_name:="media-stream" log.context:="RenditionGeneratorService" log.level:="warn" log.upload:*
+  | stats by (log.schema, log.upload, log.error_class) count()
+```
+
+The pass summary (`Rendition pre-generation: … N failed`, at info) counts
+the same failures, by upload. `mediastream_rendition_pregeneration_total{result="failed"}`
+counts them too.
 
 ### Cost
 

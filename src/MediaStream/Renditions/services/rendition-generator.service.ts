@@ -171,9 +171,10 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 				return result
 			}
 
-			const { pending, unchecked } = await this.findPending(catalogue)
+			const { pending, unchecked, failed } = await this.findPending(catalogue)
 			result.pending = pending.length
 			result.unchecked = unchecked
+			result.failed = failed
 			this.metrics.setRenditionBacklog(pending.length)
 
 			for (const source of pending) {
@@ -221,8 +222,10 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 	 * leave any of them absent. At most `CHECK_CONCURRENCY` checks are in flight.
 	 * An upload the store could not answer about is left to the next pass, because
 	 * "unknown" is not "missing"; once the store's breaker opens, the rest are too.
+	 * An upload whose check itself fails (its request cannot be built) is reported
+	 * and left alone like one that cannot be rendered; the others go on.
 	 */
-	private async findPending(catalogue: Map<string, ResizeOptions[]>): Promise<{ pending: PendingSource[], unchecked: number }> {
+	private async findPending(catalogue: Map<string, ResizeOptions[]>): Promise<{ pending: PendingSource[], unchecked: number, failed: number }> {
 		const now = Date.now()
 		const candidates: Array<UploadedSource & { renditions: ResizeOptions[] }> = []
 		for (const source of await this.scanner.scan(this.config.mediaDirectory)) {
@@ -234,6 +237,7 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 
 		const pending: PendingSource[] = []
 		let unchecked = 0
+		let failed = 0
 		for (let index = 0; index < candidates.length; index += CHECK_CONCURRENCY) {
 			if (!this.store.available) {
 				unchecked += candidates.length - index
@@ -250,6 +254,9 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 				if (stored[position] === null) {
 					unchecked++
 				}
+				else if (stored[position] === 'failed') {
+					failed++
+				}
 				else if (stored[position]) {
 					this.markComplete(candidate)
 				}
@@ -261,6 +268,7 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 		return {
 			pending: pending.sort((a, b) => b.modifiedAt - a.modifiedAt),
 			unchecked,
+			failed,
 		}
 	}
 
@@ -296,8 +304,9 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 	}
 
 	private async generateOne(source: PendingSource, options: ResizeOptions, deadline: number): Promise<RenditionOutcome> {
-		const ctx = await this.contextFor(source, options)
+		let ctx: OperationContext
 		try {
+			ctx = await this.contextFor(source, options)
 			if (await this.isStored(ctx)) {
 				this.record('present')
 				return 'completed'
@@ -309,7 +318,8 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 			if (error instanceof RenditionStoreUnavailableError) {
 				return 'unknown'
 			}
-			throw error
+			this.reportFailure(source, options, error)
+			return 'failed'
 		}
 		while (!this.stopping && Date.now() < deadline) {
 			try {
@@ -328,9 +338,7 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 					await new Promise(resolve => setTimeout(resolve, YIELD_BACKOFF_MS))
 					continue
 				}
-				this.record('failed')
-				this.failedUntil.set(this.keyOf(source), Date.now() + FAILED_SOURCE_RETRY_MS)
-				CorrelatedLogger.warn(`Rendition of ${this.keyOf(source)} not generated, left alone for ${FAILED_SOURCE_RETRY_MS / 3_600_000} h: ${errorMessage(error)}`, RenditionGeneratorService.name)
+				this.reportFailure(source, options, error)
 				return 'failed'
 			}
 		}
@@ -351,14 +359,54 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 		}))
 	}
 
-	/** Whether every rendition of the upload is in the store, which is where every replica finds it; stops at the first one missing. */
-	private async isEveryStored(source: UploadedSource & { renditions: ResizeOptions[] }): Promise<boolean> {
+	/**
+	 * Whether every rendition of the upload is in the store, which is where every
+	 * replica finds it; stops at the first one missing. `failed` when the request
+	 * of a rendition cannot be built: reported, and the upload is left alone.
+	 * @throws RenditionStoreUnavailableError when the store cannot answer
+	 */
+	private async isEveryStored(source: UploadedSource & { renditions: ResizeOptions[] }): Promise<boolean | 'failed'> {
 		for (const options of source.renditions.toReversed()) {
-			if (!await this.isStored(await this.contextFor(source, options))) {
+			let ctx: OperationContext
+			try {
+				ctx = await this.contextFor(source, options)
+			}
+			catch (error: unknown) {
+				this.reportFailure(source, options, error)
+				return 'failed'
+			}
+			if (!await this.isStored(ctx)) {
 				return false
 			}
 		}
 		return true
+	}
+
+	/**
+	 * The one report of an upload that could not be pre-generated: counted, left
+	 * alone for `FAILED_SOURCE_RETRY_MS`, and logged as a structured event naming
+	 * the upload, the rendition and the error, so the failures can be found by
+	 * field (`log.upload`, `log.error_class`) rather than by reading messages.
+	 */
+	private reportFailure(source: UploadedSource, options: ResizeOptions, error: unknown): void {
+		this.record('failed')
+		this.failedUntil.set(this.keyOf(source), Date.now() + FAILED_SOURCE_RETRY_MS)
+		const retryHours = FAILED_SOURCE_RETRY_MS / 3_600_000
+		CorrelatedLogger.event('warn', `Rendition of ${this.keyOf(source)} at ${options.width}x${options.height} ${options.format} not generated, left alone for ${retryHours} h: ${errorMessage(error)}`, {
+			schema: source.tenantSchema,
+			upload: source.source,
+			width: options.width,
+			height: options.height,
+			fit: options.fit,
+			position: options.position,
+			format: options.format,
+			quality: options.quality,
+			error_class: error instanceof Error
+				? error.name
+				: typeof error,
+			error: errorMessage(error),
+			retry_in_hours: retryHours,
+		}, RenditionGeneratorService.name)
 	}
 
 	private markComplete(source: UploadedSource & { renditions: ResizeOptions[] }): void {
