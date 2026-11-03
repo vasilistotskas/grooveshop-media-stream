@@ -1,3 +1,10 @@
+# [3.13.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.12.2...v3.13.0) (2026-11-03)
+
+
+### Features
+
+* **contract:** publish the source image limits for the API that stores the uploads ([#54](https://github.com/vasilistotskas/grooveshop-media-stream/issues/54)) ([3455d46](https://github.com/vasilistotskas/grooveshop-media-stream/commit/3455d4641fa9360076614f35c37f1f57bd6e04e4))
+
 ## [3.12.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.12.1...v3.12.2) (2026-11-03)
 
 
