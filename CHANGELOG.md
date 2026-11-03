@@ -1,3 +1,10 @@
+## [3.12.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.12.1...v3.12.2) (2026-11-03)
+
+
+### Bug Fixes
+
+* **renditions:** log a failed pre-generation with its upload and rendition as fields ([#53](https://github.com/vasilistotskas/grooveshop-media-stream/issues/53)) ([d3f2c9f](https://github.com/vasilistotskas/grooveshop-media-stream/commit/d3f2c9f715f8fff80de79ee6b0cf376a5697fe0e))
+
 ## [3.12.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.12.0...v3.12.1) (2026-11-02)
 
 
