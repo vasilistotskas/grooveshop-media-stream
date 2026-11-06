@@ -21,7 +21,7 @@ Review code changes for security vulnerabilities specific to this image processi
 - Watch for path traversal in image path parameters (`../`, `%2e%2e`)
 
 ### 2. Image Processing Vulnerabilities
-- SVG bomb detection (recursive references, excessive elements)
+- SVG is sanitised by DOMPurify in a heap-capped worker (`SVG_SANITIZER_HEAP_LIMIT_MB`) with a deadline, failing closed: flag anything that sanitises on the main thread, drops the cap, or serves SVG unsanitised
 - Pixel flood attacks (decompression bombs: max 7680x4320 total pixels, max 8192 per dimension)
 - Sharp memory limits (100MB cache, concurrency based on CPU cores)
 - Format-specific limits in `MAX_FILE_SIZES` (`common/constants/image-limits.constant.ts`), keyed on the sniffed format
