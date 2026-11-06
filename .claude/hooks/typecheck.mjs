@@ -4,12 +4,13 @@
  * - Reads the session's marker (written by track-typecheck.mjs).
  * - If absent: exit 0 silently (no edits, nothing to check).
  * - If `stop_hook_active` is true: exit 0, so a Stop hook can't loop.
- * - Otherwise run the project's `type-check` script body in each checkout: `tsc
- *   --noEmit` for src plus `tsc --noEmit -p tsconfig.spec.json` for the spec project.
- *   Checking only the default project reports phantom errors on test files (vitest
- *   globals, test-only paths) and misses real ones in them. On failure, exit 2 with
- *   the compiler output on stderr so the errors have to be addressed before the turn
- *   ends.
+ * - Otherwise run the project's `type-check` script body in one marked checkout; any
+ *   other stays marked for the next Stop, because this hook's `timeout` in
+ *   settings.json covers one checkout: `tsc --noEmit` for src plus `tsc --noEmit -p
+ *   tsconfig.spec.json` for the spec project. Checking only the default project
+ *   reports phantom errors on test files (vitest globals, test-only paths) and misses
+ *   real ones in them. On failure, exit 2 with the compiler output on stderr so the
+ *   errors have to be addressed before the turn ends.
  *
  * Runs the checkout's own `tsc` with this process's node, never through `pnpm`:
  * `verifyDepsBeforeRun` defaults to `install`, and a hook must never install.
@@ -38,35 +39,37 @@ if (input.stop_hook_active) {
   process.exit(0)
 }
 
-let failed = false
-for (const checkout of takePending(input.session_id)) {
-  const tsc = join(checkout, 'node_modules', 'typescript', 'bin', 'tsc')
-  if (!existsSync(tsc)) {
-    process.stderr.write(`typescript is not installed in ${checkout}; skipping type-check.\n`)
-    continue
-  }
-  for (const args of TSC_RUNS) {
-    try {
-      execFileSync(process.execPath, [tsc, ...args], {
-        cwd: checkout,
-        stdio: 'pipe',
-        timeout: TIMEOUT_MS,
-        encoding: 'utf8',
-      })
-    }
-    catch (err) {
-      if (err.code === 'ETIMEDOUT' || err.signal === 'SIGTERM') {
-        markPending(input.session_id, checkout)
-        process.stderr.write(`tsc ${args.join(' ')} timed out in ${checkout}; it will run again next turn.\n`)
-        break
-      }
-      const output = `${err.stdout?.toString() || ''}${err.stderr?.toString() || ''}`.trim()
-      process.stderr.write(`Type check failed in ${checkout}. Fix the TypeScript errors below before stopping:\n\n`)
-      process.stderr.write(output || err.message || 'tsc failed with no output.')
-      failed = true
-      break
-    }
-  }
+const session = input.session_id
+const [checkout, ...later] = takePending(session)
+if (!checkout) {
+  process.exit(0)
+}
+for (const other of later) markPending(session, other)
+
+const tsc = join(checkout, 'node_modules', 'typescript', 'bin', 'tsc')
+if (!existsSync(tsc)) {
+  process.stderr.write(`typescript is not installed in ${checkout}; skipping type-check.\n`)
+  process.exit(0)
 }
 
-process.exit(failed ? 2 : 0)
+for (const args of TSC_RUNS) {
+  try {
+    execFileSync(process.execPath, [tsc, ...args], {
+      cwd: checkout,
+      stdio: 'pipe',
+      timeout: TIMEOUT_MS,
+      encoding: 'utf8',
+    })
+  }
+  catch (err) {
+    if (err.code === 'ETIMEDOUT' || err.signal === 'SIGTERM') {
+      markPending(session, checkout)
+      process.stderr.write(`tsc ${args.join(' ')} timed out in ${checkout}; it will run again next turn.\n`)
+      process.exit(0)
+    }
+    const output = `${err.stdout?.toString() || ''}${err.stderr?.toString() || ''}`.trim()
+    process.stderr.write(`Type check failed in ${checkout}. Fix the TypeScript errors below before stopping:\n\n`)
+    process.stderr.write(output || err.message || 'tsc failed with no output.')
+    process.exit(2)
+  }
+}

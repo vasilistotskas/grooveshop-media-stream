@@ -16,7 +16,7 @@ Audit new code for compliance with the project's correlation, logging, and metri
 
 ### 1. Correlated Logging
 - New services/controllers MUST use `CorrelatedLogger` (`src/MediaStream/Correlation/utils/logger.util.ts`), NOT `console.*` or a plain `Logger` from `@nestjs/common` for request-scoped log lines.
-- Static API: `CorrelatedLogger.log/warn/debug(message, context?)`, `CorrelatedLogger.error(message, trace?, context?)` and `CorrelatedLogger.event(level, message, fields, context?)` for structured events. Correlation ID is injected automatically from `requestContextStorage`.
+- Static API: `CorrelatedLogger.log/warn/debug(message, context?)`, `CorrelatedLogger.error(message, trace?, context?)` and `CorrelatedLogger.event(level, message, fields, context?)` for structured events. The first three prefix the correlation ID automatically from `requestContextStorage`; `event` does not, because it may run after the request's async context has ended, so its caller names the correlation ID among `fields`.
 - Flag any `new Logger(...)` in code that runs inside a request handler.
 
 ### 2. AsyncLocalStorage Context
@@ -38,7 +38,7 @@ Audit new code for compliance with the project's correlation, logging, and metri
 - `route` is `req.route.path` or `unmatched` (`getRoute()` in `Metrics/middleware/metrics.middleware.ts`). Flag any label whose value a client controls (path, tenant schema, query) — per-tenant numbers belong in the image request log.
 
 ### 6. Exception Handling
-- All thrown exceptions surface through `src/MediaStream/common/filters/media-stream-exception.filter.ts` (`MediaStreamExceptionFilter`), which logs 5xx via `CorrelatedLogger.error()` and 4xx and capacity sheds via `CorrelatedLogger.warn()`, and includes `correlationId` in the JSON response.
+- All thrown exceptions surface through `src/MediaStream/common/filters/media-stream-exception.filter.ts` (`MediaStreamExceptionFilter`), which logs an unexpected 5xx via `CorrelatedLogger.error()`, and a 4xx or an expected 503 (a capacity shed, a suspended tenant) via `CorrelatedLogger.warn()`, and includes `correlationId` in the JSON response.
 - New custom exceptions should extend the existing error hierarchy, not bypass the filter with raw `res.status(...).send(...)`.
 
 ### 7. Middleware Order
