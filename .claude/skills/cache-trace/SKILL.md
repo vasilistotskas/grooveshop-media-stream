@@ -9,7 +9,7 @@ Use when debugging cache hit/miss behavior, stale entries, the rendition store o
 
 `MultiLayerCacheManager` (`src/MediaStream/Cache/services/multi-layer-cache.manager.ts`) registers two layers, sorted by `getPriority()`:
 
-1. **Memory** (`memory-cache.service.ts`) — NodeCache. Defaults: TTL 3600s (`CACHE_MEMORY_DEFAULT_TTL`), maxKeys 1000 (`CACHE_MEMORY_MAX_KEYS`), maxSize 100MB (`CACHE_MEMORY_MAX_SIZE`), checkPeriod 600s.
+1. **Memory** (`memory-cache.service.ts`) — NodeCache. Defaults: TTL 3600s (`CACHE_MEMORY_DEFAULT_TTL`, only for writes that pass none; image entries use `CACHE_IMAGE_PRIVATE_TTL`), maxKeys 1000 (`CACHE_MEMORY_MAX_KEYS`), maxSize 100MB (`CACHE_MEMORY_MAX_SIZE`), checkPeriod 600s.
 2. **Redis** (`redis-cache.service.ts`) — ioredis. Default TTL 7200s (`REDIS_TTL`). Key pattern `image:*` (`IMAGE_KEY_PATTERN` in `cache-namespace.util.ts`). `clear()` deletes `image:*` via SCAN + DEL, never `FLUSHDB` — the DB also holds rate-limit counters and circuit-breaker state.
 
 > The **rendition store** (`rendition-store.service.ts`) is NOT a registered cache layer in `MultiLayerCacheManager`. It is an S3-compatible bucket (Cloudflare R2) shared by every replica, read by `CacheImageResourceOperation.checkResourceExists()` after the layered lookup and written after processing. Every call has a deadline, the SDK does not retry, and five failures in a row open a 30 s breaker; a failing read is a miss and a failing write leaves the image uncached. Its metrics are `mediastream_rendition_store_operations_total{operation,result}`. The `cache` field of the image request log says which tier answered: `memory`, `redis`, `store` or `miss`.
@@ -35,7 +35,7 @@ Use when debugging cache hit/miss behavior, stale entries, the rendition store o
 
 ## Common Debug Questions
 
-- **Cache miss for an image that was just fetched**: check Memory TTL/maxKeys (LRU eviction), then check Redis with `redis-cli -n "${REDIS_DB:-0}" --scan --pattern 'image:*' | head`.
+- **Cache miss for an image that was just fetched**: check Memory `maxKeys`/`maxSize` (eviction is TTL-ascending, the writer's tenant namespace first) and the entry's own TTL, then check Redis with `redis-cli -n "${REDIS_DB:-0}" --scan --pattern 'image:*' | head`.
 - **Stale entry served**: TTL preserved during backfill — verify the source layer's TTL is correct, not the destination's.
 - **Every miss after a deploy**: the store is off or failing. Check `mediastream_rendition_store_operations_total` for `error` and `skipped` (breaker open), and `RENDITION_STORE_ENDPOINT` / `RENDITION_STORE_BUCKET`.
 - **A new upload still misses**: pre-generation needs `RENDITIONS_MEDIA_DIRECTORY`, the store, and a catalogue for the upload's folder (`HGETALL renditions:catalogue` in the service's Redis DB); `mediastream_rendition_backlog_sources` says how many uploads are waiting.

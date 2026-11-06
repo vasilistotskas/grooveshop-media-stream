@@ -10,7 +10,7 @@ Run tests for the grooveshop-media-stream project. Target: `$module`
 (default `all` when no argument was given).
 
 Valid modules (directories under `src/test/`): API, Cache, Config,
-Correlation, Health, HTTP, Metrics, Module, Processing, RateLimit, Storage,
+Correlation, Health, HTTP, Metrics, Module, Processing, RateLimit, Renditions,
 Validation, common — plus `all`, `e2e` and `perf`.
 
 ## Instructions

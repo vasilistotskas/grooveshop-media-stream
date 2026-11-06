@@ -1,19 +1,14 @@
 /**
- * PostToolUse hook: mark TypeScript files as needing a type check.
+ * PostToolUse hook: mark the edited checkout as needing a type check.
  *
- * Touches `.claude/.typecheck-pending` whenever a .ts/.mts/.cts file is edited.
- * The Stop hook (typecheck.mjs) reads this marker to decide whether to run
- * `pnpm run type-check`, so a turn that touched no TypeScript costs nothing.
+ * Records the checkout under this session whenever a .ts/.mts/.cts file is edited.
+ * The Stop hook (typecheck.mjs) reads the marker to decide whether to type-check,
+ * so a turn that touched no TypeScript costs nothing.
  *
- * This replaces the previous approach of running a whole-project `tsc --noEmit`
- * on *every* edit: that spent up to 300s per keystroke-sized change, and
- * reported only the errors mentioning the edited file, so a break it caused
- * elsewhere went unseen. Mirrors the storefront's track/Stop pair.
- *
- * Receives JSON on stdin: { tool_name, tool_input: { file_path, ... } }
+ * Receives JSON on stdin: { session_id, tool_name, tool_input: { file_path, ... } }
  */
-import { readFileSync, mkdirSync, writeFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { readFileSync } from 'node:fs'
+import { checkoutOf, markPending } from './lib/checkout.mjs'
 
 let input = {}
 try {
@@ -25,14 +20,6 @@ catch {
 
 const filePath = input.tool_input?.file_path
 if (filePath && /\.(ts|mts|cts)$/.test(filePath)) {
-  // Anchor on CLAUDE_PROJECT_DIR, not cwd: the Stop hook must find the same
-  // marker even when the hook's working directory isn't the project root.
-  const markerPath = resolve(process.env.CLAUDE_PROJECT_DIR || '.', '.claude', '.typecheck-pending')
-  try {
-    mkdirSync(dirname(markerPath), { recursive: true })
-    writeFileSync(markerPath, String(Date.now()))
-  }
-  catch {
-    // A missing marker only skips the check; never break the edit over it.
-  }
+  const checkout = checkoutOf(filePath)
+  if (checkout) markPending(input.session_id, checkout)
 }
