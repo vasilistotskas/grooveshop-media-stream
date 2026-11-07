@@ -4,6 +4,23 @@ allowBuilds:
   esbuild: true
   msgpackr-extract: true
   sharp: true
+minimumReleaseAgeExclude:
+  - '@aws-sdk/checksums@3.1002.3'
+  - '@aws-sdk/client-s3@3.1164.0'
+  - '@aws-sdk/core@3.980.1'
+  - '@aws-sdk/credential-provider-env@3.972.82'
+  - '@aws-sdk/credential-provider-http@3.972.84'
+  - '@aws-sdk/credential-provider-ini@3.973.27'
+  - '@aws-sdk/credential-provider-login@3.972.89'
+  - '@aws-sdk/credential-provider-node@3.972.94'
+  - '@aws-sdk/credential-provider-process@3.972.82'
+  - '@aws-sdk/credential-provider-sso@3.973.26'
+  - '@aws-sdk/credential-provider-web-identity@3.972.88'
+  - '@aws-sdk/middleware-sdk-s3@3.972.87'
+  - '@aws-sdk/nested-clients@3.998.1'
+  - '@aws-sdk/token-providers@3.1164.0'
+  - isomorphic-dompurify@4.7.0
+  - supertest@7.3.2
 overrides:
   lodash: '>=4.18.1'
   # CVE-2026-9697, CVE-2026-6734, CVE-2026-12151 (HIGH) — undici
