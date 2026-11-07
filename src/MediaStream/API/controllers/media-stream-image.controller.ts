@@ -123,9 +123,8 @@ export default class MediaStreamImageController {
 	 * Find matching image source and extract parameters.
 	 *
 	 * Patterns are tested in V8 insertion order of the IMAGE_SOURCES object
-	 * literal: UPLOADED_MEDIA (``media/:tenantSchema/uploads/:imagePath+/…``)
-	 * then STATIC_IMAGES (``static/images/:image/…``). The patterns are
-	 * distinct enough that no ambiguity exists between the two.
+	 * literal. Each source starts with its own literal segment (``youtube/``,
+	 * ``media/``, ``static/images/``), so no ambiguity exists between them.
 	 */
 	private findMatchingSource(path: string): { sourceKey: ImageSourceKey, params: ImageProcessingParams } | null {
 		for (const [key, config] of Object.entries(IMAGE_SOURCES)) {

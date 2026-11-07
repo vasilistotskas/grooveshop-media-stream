@@ -1,5 +1,6 @@
 import type { ImageProcessingContext, ImageProcessingParams } from '#microservice/API/types/image-source.types'
 import { beforeEach, describe, expect, it } from 'vitest'
+import { IMAGE_SOURCES } from '#microservice/API/config/image-sources.config'
 import { UrlBuilderService } from '#microservice/API/services/url-builder.service'
 import { createConfigServiceMock } from '../../helpers/config-service.mock.js'
 
@@ -27,6 +28,14 @@ describe('urlBuilderService', () => {
 	it('should substitute backend.url and params into the URL pattern', () => {
 		const url = service.buildResourceUrl(createContext())
 		expect(url).toBe('http://backend:8000/media/uploads/blog%2Fcover.jpg')
+	})
+
+	it('should build a YouTube poster\'s URL on YouTube\'s image host, not the backend', () => {
+		expect(service.buildResourceUrl({
+			source: IMAGE_SOURCES.YOUTUBE_POSTER,
+			params: { videoId: 'eIiZ-JHL5aw' },
+			correlationId: 'test',
+		})).toBe('https://i.ytimg.com/vi/eIiZ-JHL5aw/hqdefault.jpg')
 	})
 
 	it('should URI-encode parameter values', () => {
