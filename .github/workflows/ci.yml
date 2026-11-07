@@ -24,7 +24,7 @@ permissions:
 
 env:
   # Same Node line as docker/Dockerfile's NODE_VERSION
-  NODE_VERSION: 24.19.0
+  NODE_VERSION: 26.13.0
 
 jobs:
   security-scan:

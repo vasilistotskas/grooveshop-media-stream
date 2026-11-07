@@ -1,11 +1,18 @@
-ARG NODE_VERSION=24.19.0
+ARG NODE_VERSION=26.13.0
+# Keep in step with "packageManager" in package.json.
+ARG PNPM_VERSION=12.18.0
+
+FROM ghcr.io/pnpm/pnpm:${PNPM_VERSION} AS pnpm
 
 FROM node:${NODE_VERSION}-slim AS base
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 
-RUN corepack enable
+# Node 25 stopped bundling corepack, so pnpm comes from its official image
+# (pnpm.io/docker). The whole directory is copied: it carries node-gyp.
+COPY --from=pnpm /opt/pnpm /opt/pnpm
+RUN for bin in pnpm pnpx pnx; do ln -s "/opt/pnpm/$bin" "/usr/local/bin/$bin"; done
 
 WORKDIR /usr/src/app
 
