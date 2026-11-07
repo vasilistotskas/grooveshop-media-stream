@@ -55,6 +55,65 @@ describe('httpClientService', () => {
 		})
 	})
 
+	describe('third-party image hosts and the backend\'s circuit breaker', () => {
+		const POSTER = 'https://i.ytimg.com/vi/eIiZ-JHL5aw/hqdefault.jpg'
+		const BACKEND = 'http://backend-service/media/acme/uploads/a.jpg'
+		const answered = {
+			data: null,
+			status: 200,
+			statusText: 'OK',
+			headers: {},
+			config: {},
+		} as AxiosResponse
+
+		function outage() {
+			const error = new AxiosError('Service Unavailable')
+			error.response = {
+				status: 501,
+				statusText: '',
+				headers: {},
+				config: {} as any,
+				data: null,
+			}
+			return throwError(() => error)
+		}
+
+		it('does not count a YouTube outage against the backend', async () => {
+			const recordFailure = vi.spyOn((service as any).circuitBreaker, 'recordFailure')
+			vi.spyOn(httpService, 'request').mockReturnValue(outage())
+
+			await expect(service.request({ url: POSTER })).rejects.toThrow('Service Unavailable')
+
+			expect(recordFailure).not.toHaveBeenCalled()
+		})
+
+		it('does not let a YouTube success hide a backend outage', async () => {
+			const recordSuccess = vi.spyOn((service as any).circuitBreaker, 'recordSuccess')
+			vi.spyOn(httpService, 'request').mockReturnValue(of(answered))
+
+			await service.request({ url: POSTER })
+
+			expect(recordSuccess).not.toHaveBeenCalled()
+		})
+
+		it('still counts a backend outage', async () => {
+			const recordFailure = vi.spyOn((service as any).circuitBreaker, 'recordFailure')
+			vi.spyOn(httpService, 'request').mockReturnValue(outage())
+
+			await expect(service.request({ url: BACKEND })).rejects.toThrow('Service Unavailable')
+
+			expect(recordFailure).toHaveBeenCalledOnce()
+		})
+
+		it('fetches a poster while the backend\'s breaker is open, and refuses the backend', async () => {
+			vi.spyOn((service as any).circuitBreaker, 'allowRequest').mockReturnValue(false)
+			vi.spyOn(httpService, 'request').mockReturnValue(of(answered))
+
+			await expect(service.request({ url: POSTER })).resolves.toBe(answered)
+			await expect(service.request({ url: BACKEND })).rejects.toBeInstanceOf(CircuitBreakerOpenError)
+		})
+	})
+
 	describe('hTTP Methods', () => {
 		it('should execute GET requests', async () => {
 			const mockResponse: AxiosResponse = {

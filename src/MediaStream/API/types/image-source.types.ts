@@ -9,7 +9,9 @@ export interface ImageSourceConfig {
 
 	/**
 	 * URL pattern for the upstream resource. Supports `{baseUrl}` plus one
-	 * placeholder per route param, e.g. `{tenantSchema}`, `{imagePath}`.
+	 * placeholder per route param, e.g. `{tenantSchema}`, `{imagePath}`. A
+	 * pattern with its own host must list it in `THIRD_PARTY_IMAGE_HOSTS`
+	 * (`common/utils/third-party-image-host.util.ts`).
 	 */
 	urlPattern: string
 
@@ -34,6 +36,7 @@ export interface ImageProcessingParams {
 	tenantSchema?: string
 	imagePath?: string
 	image?: string
+	videoId?: string
 	width?: string
 	height?: string
 	fit?: string

@@ -76,6 +76,7 @@ Scheduled tasks use `@nestjs/schedule`'s `SchedulerRegistry.addCronJob()` with c
 |---|---|---|---|
 | Tenant-scoped | `media/:tenantSchema/uploads/:imagePath+/…` | `UPLOADED_MEDIA` | extracted from URL |
 | Static images | `static/images/:image/…` | `STATIC_IMAGES` | always `"public"` |
+| YouTube posters | `youtube/:videoId/…` | `YOUTUBE_POSTER` | always `"public"` |
 
 There is no legacy (pre-multi-tenant) route — Django emits schema-prefixed URLs exclusively, so `media/uploads/…` (no tenant segment) 404s naturally.
 
@@ -99,7 +100,7 @@ Flushes the tenant on **every replica**. Each replica first re-reads Django's te
 
 ### Image Sources
 
-Defined in `src/MediaStream/API/config/image-sources.config.ts`. Each source maps a route pattern to an upstream URL pattern (`{baseUrl}` = `backend.url`). Route params: imagePath/image, width, height, fit, position, background, trimThreshold, quality, format — every segment is mandatory.
+Defined in `src/MediaStream/API/config/image-sources.config.ts`. Each source maps a route pattern to an upstream URL pattern (`{baseUrl}` = `backend.url`). Route params: imagePath/image/videoId, width, height, fit, position, background, trimThreshold, quality, format — every segment is mandatory. `YOUTUBE_POSTER` fetches from YouTube's image host so that a store's visitor contacts nobody but the store until they press play. That host is in `THIRD_PARTY_IMAGE_HOSTS`: allowed by code, and outside the backend's circuit breaker, so a YouTube outage costs posters and nothing else.
 
 ### Multi-Layer Cache
 

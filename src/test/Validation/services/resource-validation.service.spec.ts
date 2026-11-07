@@ -106,6 +106,13 @@ describe('resourceValidationService', () => {
 			expect(tenantDomainsService.isAllowed).toHaveBeenCalledWith('acme.example')
 		})
 
+		it('accepts the host an image source names itself, and only that host', () => {
+			expect(service.validateUrl('https://i.ytimg.com/vi/eIiZ-JHL5aw/hqdefault.jpg')).toBe(true)
+			expect(service.validateUrl('https://evil.i.ytimg.com/vi/eIiZ-JHL5aw/hqdefault.jpg')).toBe(false)
+			expect(service.validateUrl('https://i.ytimg.com.evil.example/vi/eIiZ-JHL5aw/hqdefault.jpg')).toBe(false)
+			expect(service.validateUrl('https://ytimg.com/vi/eIiZ-JHL5aw/hqdefault.jpg')).toBe(false)
+		})
+
 		it('still rejects a hostname absent from both the static and dynamic allowlists', () => {
 			tenantDomainsService.isAllowed.mockReturnValue(false)
 

@@ -35,8 +35,12 @@ const NUMERIC_RULES: Record<string, NumericRule> = {
 	trimThreshold: { min: MIN_TRIM_THRESHOLD, max: MAX_TRIM_THRESHOLD },
 }
 
+/** Every YouTube video id: 11 URL-safe base64 characters. */
+const YOUTUBE_VIDEO_ID_PATTERN = /^[\w-]{11}$/
+
 const PATTERN_RULES: Record<string, RegExp> = {
 	tenantSchema: TENANT_SCHEMA_PATTERN,
+	videoId: YOUTUBE_VIDEO_ID_PATTERN,
 }
 
 // Enum-valued resize params: anything Sharp would choke on is a 400 here, not

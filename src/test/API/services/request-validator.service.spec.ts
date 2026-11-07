@@ -144,6 +144,20 @@ describe('requestValidatorService', () => {
 			expect(() => service.validateRequest(createContext({ tenantSchema }))).not.toThrow()
 		})
 
+		it.each(['eIiZ-JHL5aw', 'a--b_c-d-e1', '___________'])('accepts a YouTube video id %s', (videoId) => {
+			expect(() => service.validateRequest(createContext({ videoId }))).not.toThrow()
+		})
+
+		it.each([
+			'short',
+			'twelve-chars',
+			'../../../etc',
+			'eIiZ-JHL5a?',
+			'eIiZ-JHL5a/',
+		])('rejects %s as a YouTube video id', (videoId) => {
+			expect(() => service.validateRequest(createContext({ videoId }))).toThrow(InvalidRequestError)
+		})
+
 		it.each([
 			['Acme'],
 			['tenant-1'],
