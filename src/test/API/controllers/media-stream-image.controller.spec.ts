@@ -444,6 +444,27 @@ describe('mediaStreamImageController', () => {
 		})
 	})
 
+	describe('youTube posters', () => {
+		const POSTER_PATH = '/media_stream-image/youtube/eIiZ-JHL5aw/480/360/cover/centre/transparent/0/80.webp'
+
+		it('matches the video id, under the public namespace', async () => {
+			await controller.handleImageRequest({ path: POSTER_PATH } as any, mockResponse)
+
+			expect(mockRequestValidatorService.validateRequest).toHaveBeenCalledWith(
+				expect.objectContaining({
+					source: expect.objectContaining({ name: 'youtube_poster' }),
+					params: expect.objectContaining({ videoId: 'eIiZ-JHL5aw', width: '480', format: 'webp' }),
+				}),
+			)
+		})
+
+		it('does not match a path with another segment before the sizes', async () => {
+			await expect(controller.handleImageRequest({
+				path: '/media_stream-image/youtube/eIiZ-JHL5aw/extra/480/360/cover/centre/transparent/0/80.webp',
+			} as any, mockResponse)).rejects.toThrow(NotFoundException)
+		})
+	})
+
 	describe('uploaded media route requires a tenant segment', () => {
 		it('keeps a literal "null" tenant segment as a string (no public fallback)', async () => {
 			// `media/null/uploads/…` used to coerce tenantSchema to null via

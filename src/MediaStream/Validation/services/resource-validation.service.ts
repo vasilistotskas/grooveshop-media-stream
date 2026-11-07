@@ -1,5 +1,6 @@
 import type { SourceImageFormat } from '#microservice/common/constants/image-limits.constant'
 import { Injectable } from '@nestjs/common'
+import { isThirdPartyImageHost } from '#microservice/API/config/image-sources.config'
 import { MAX_FILE_SIZES } from '#microservice/common/constants/image-limits.constant'
 import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { ConfigService } from '#microservice/Config/config.service'
@@ -26,9 +27,10 @@ export class ResourceValidationService {
 	}
 
 	/**
-	 * Only http(s) URLs whose hostname is in the static allowlist OR in the
-	 * dynamic tenant-domain set may be fetched. The static list is the
-	 * baseline that keeps working when the tenant feed is disabled or down.
+	 * Only http(s) URLs whose hostname is in the static allowlist, in the
+	 * dynamic tenant-domain set or named by an image source itself may be
+	 * fetched. The static list is the baseline that keeps working when the
+	 * tenant feed is disabled or down.
 	 */
 	validateUrl(url: string): boolean {
 		let parsed: URL
@@ -48,6 +50,7 @@ export class ResourceValidationService {
 		const { hostname } = parsed
 		const allowed = this.allowedDomains.some(domain => hostname === domain || hostname.endsWith(`.${domain}`))
 			|| this.tenantDomainsService.isAllowed(hostname)
+			|| isThirdPartyImageHost(hostname)
 
 		if (!allowed) {
 			CorrelatedLogger.warn(`URL blocked - not in whitelist: ${hostname}`, ResourceValidationService.name)

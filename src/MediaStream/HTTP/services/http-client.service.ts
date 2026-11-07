@@ -10,6 +10,7 @@ import { performance } from 'node:perf_hooks'
 import { HttpService } from '@nestjs/axios'
 import { Injectable } from '@nestjs/common'
 import { lastValueFrom, retry, tap, throwError, timer } from 'rxjs'
+import { isThirdPartyImageUrl } from '#microservice/API/config/image-sources.config'
 import { RedisCacheService } from '#microservice/Cache/services/redis-cache.service'
 import { CircuitBreakerOpenError } from '#microservice/common/errors/media-stream.errors'
 import { errorMessage } from '#microservice/common/utils/error-message.util'
@@ -105,11 +106,11 @@ export class HttpClientService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	async get<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
-		return this.executeRequest(() => this.httpService.get<T>(url, this.prepareConfig(config)))
+		return this.executeRequest(url, () => this.httpService.get<T>(url, this.prepareConfig(config)))
 	}
 
 	async request<T = unknown>(config: AxiosRequestConfig): Promise<AxiosResponse<T>> {
-		return this.executeRequest(() => this.httpService.request<T>(this.prepareConfig(config)))
+		return this.executeRequest(config.url, () => this.httpService.request<T>(this.prepareConfig(config)))
 	}
 
 	getStats(): HttpClientStats {
@@ -148,15 +149,22 @@ export class HttpClientService implements OnModuleInit, OnModuleDestroy {
 
 	/**
 	 * Run one request through the circuit breaker and the retry policy.
+	 *
+	 * The breaker is global across tenants and pods and guards the backend, so
+	 * a request to a third-party host neither asks it nor counts towards it: an
+	 * outage there must not serve every store's images the default one, and an
+	 * outage of the backend says nothing about that host.
 	 * @throws CircuitBreakerOpenError when the breaker rejects the attempt (no request is made).
 	 */
-	private async executeRequest<T>(requestFn: () => Observable<AxiosResponse<T>>): Promise<AxiosResponse<T>> {
+	private async executeRequest<T>(url: string | undefined, requestFn: () => Observable<AxiosResponse<T>>): Promise<AxiosResponse<T>> {
+		const guarded = this.circuitBreakerEnabled && !isThirdPartyImageUrl(url)
+
 		// Tracks whether THIS call claimed the HALF_OPEN canary slot (i.e. it
 		// is the one recovery trial), so the finally block below only ever
 		// releases a claim it actually owns — never a different concurrent
 		// request's in-flight trial.
 		let isHalfOpenTrial = false
-		if (this.circuitBreakerEnabled) {
+		if (guarded) {
 			if (!this.circuitBreaker.allowRequest()) {
 				CorrelatedLogger.warn('Circuit breaker is open, rejecting request', HttpClientService.name)
 				throw new CircuitBreakerOpenError()
@@ -198,7 +206,7 @@ export class HttpClientService implements OnModuleInit, OnModuleDestroy {
 							// result with its own 5-minute negative cache, not a
 							// sign the upstream is unwell.
 							const upstreamFailure = this.isUpstreamFailure(error)
-							if (this.circuitBreakerEnabled && upstreamFailure) {
+							if (guarded && upstreamFailure) {
 								this.circuitBreaker.recordFailure()
 							}
 							// Same rule for the log: a 4xx is an answer, which the
@@ -215,7 +223,7 @@ export class HttpClientService implements OnModuleInit, OnModuleDestroy {
 						},
 						next: (response: AxiosResponse<T>) => {
 							this.stats.successfulRequests++
-							if (this.circuitBreakerEnabled) {
+							if (guarded) {
 								this.circuitBreaker.recordSuccess()
 							}
 							CorrelatedLogger.debug(`HTTP request succeeded: ${response.config?.method?.toUpperCase()} ${response.config?.url} ${response.status}`, HttpClientService.name)
