@@ -1,3 +1,10 @@
+## [3.14.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.14.0...v3.14.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **deps:** Node 26 LTS, pnpm 12.18 and current NestJS, vitest and tooling ([#60](https://github.com/vasilistotskas/grooveshop-media-stream/issues/60)) ([88acf68](https://github.com/vasilistotskas/grooveshop-media-stream/commit/88acf683031d548cfc2d35f63da52d688d1b59bc))
+
 # [3.14.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.13.0...v3.14.0) (2026-11-07)
 
 
