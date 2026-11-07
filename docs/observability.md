@@ -51,8 +51,8 @@ value is left out rather than written as `null`.
 | Field | Type | Meaning |
 |---|---|---|
 | `correlation_id` | string | The `x-correlation-id` of the response, the same id every other line of the request carries in its message prefix |
-| `schema` | string | Tenant schema from the URL; `public` for `STATIC_IMAGES`. Unvalidated on a 400, capped at 64 characters |
-| `source` | string | `UPLOADED_MEDIA` or `STATIC_IMAGES`; absent when no route matched |
+| `schema` | string | Tenant schema from the URL; `public` for `STATIC_IMAGES` and `YOUTUBE_POSTER`. Unvalidated on a 400, capped at 64 characters |
+| `source` | string | `UPLOADED_MEDIA`, `STATIC_IMAGES` or `YOUTUBE_POSTER`; absent when no route matched |
 | `path` | string | The path under `/media_stream-image/`, percent-decoded once the controller has decoded it, capped at 512 characters. Never the query string |
 | `width`, `height`, `quality` | number | As requested; absent when the segment is not a number |
 | `fit`, `position`, `format` | string | As requested (`format` is the requested output format), capped at 64 characters |
