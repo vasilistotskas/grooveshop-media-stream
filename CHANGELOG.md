@@ -1,3 +1,10 @@
+# [3.14.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.13.0...v3.14.0) (2026-11-07)
+
+
+### Features
+
+* **images:** serve YouTube posters first-party ([#57](https://github.com/vasilistotskas/grooveshop-media-stream/issues/57)) ([58a63d7](https://github.com/vasilistotskas/grooveshop-media-stream/commit/58a63d733126d9b42f25c2ae0f0bb56e45019887))
+
 # [3.13.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.12.2...v3.13.0) (2026-11-03)
 
 
