@@ -1,3 +1,10 @@
+## [3.14.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.14.1...v3.14.2) (2026-11-08)
+
+
+### Bug Fixes
+
+* **deps:** re-resolve the transitive packages with open advisories ([#61](https://github.com/vasilistotskas/grooveshop-media-stream/issues/61)) ([7a2b15b](https://github.com/vasilistotskas/grooveshop-media-stream/commit/7a2b15bf7a5b2647d2344f5df01d4d7e08733cc9))
+
 ## [3.14.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.14.0...v3.14.1) (2026-11-07)
 
 
