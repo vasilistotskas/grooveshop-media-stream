@@ -1,3 +1,10 @@
+## [3.14.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.14.2...v3.14.3) (2026-11-16)
+
+
+### Bug Fixes
+
+* **renditions:** pre-generation writes the rendition store only ([#66](https://github.com/vasilistotskas/grooveshop-media-stream/issues/66)) ([84e5457](https://github.com/vasilistotskas/grooveshop-media-stream/commit/84e5457d02b712fdbef9715bbfd33d139e3a9afd)), closes [vasilistotskas/grooveshop-infrastructure#296](https://github.com/vasilistotskas/grooveshop-infrastructure/issues/296)
+
 ## [3.14.2](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.14.1...v3.14.2) (2026-11-08)
 
 
