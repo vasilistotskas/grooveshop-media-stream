@@ -244,7 +244,13 @@ nothing: the state is the uploads and the store).
    otherwise, which counts as no shed and no error), so a request is delayed
    by at most the encode already running. A Redis lock per upload keeps the
    replicas off the same one. A cycle ends after five minutes and the next
-   tick rescans.
+   tick rescans. The result goes to the store only, not to the memory and
+   Redis tiers (`OperationContext.storeOnly`): those hold what visitors ask
+   for, and a pass renders a folder's whole catalogue for every upload, most
+   of it asked for rarely. It used to write all three: two weeks after the
+   first pass, media-stream held 92 % of the shared Redis, most of it idle
+   for over a week. A visitor's first request for a rendition is a store
+   hit, which fills both tiers.
 4. **Leave what cannot be rendered alone** (source missing, too large, not
    an image, or a request that cannot be built) for six hours, in memory, so a
    bad upload is not retried every cycle. Each failure is one WARN line with

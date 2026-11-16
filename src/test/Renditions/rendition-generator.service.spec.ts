@@ -179,6 +179,15 @@ describe('renditionGeneratorService', () => {
 			expect(request.resizeOptions).toBeInstanceOf(ResizeOptions)
 		})
 
+		it('renders into the store only, so a rendition nobody asked for yet takes no room in the memory or Redis tier', async () => {
+			await build().runCycle()
+
+			expect(operation.execute).toHaveBeenCalledTimes(2)
+			for (const [ctx] of operation.execute.mock.calls) {
+				expect(ctx.storeOnly).toBe(true)
+			}
+		})
+
 		it('learns the catalogue from the renditions made, with the configured limits', async () => {
 			await build().runCycle()
 

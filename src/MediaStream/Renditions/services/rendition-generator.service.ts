@@ -324,8 +324,8 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 		while (!this.stopping && Date.now() < deadline) {
 			try {
 				await runAsBackground(() => this.operation.execute(ctx))
-				// Unset when the operation found the rendition in memory or Redis and
-				// wrote nothing: then it is not known to be in the store either.
+				// Unset when a flush of the tenant landed while it rendered and nothing
+				// was written: then it is not known to be in the store either.
 				const stored = await ctx.stored === true
 				this.record('generated')
 				return stored
@@ -345,18 +345,23 @@ export class RenditionGeneratorService implements OnModuleInit, OnModuleDestroy 
 		return 'interrupted'
 	}
 
-	/** The request a live visitor of this rendition would have made, hashed the same way. */
-	private contextFor(source: UploadedSource, options: ResizeOptions): Promise<OperationContext> {
+	/**
+	 * The request a live visitor of this rendition would have made, hashed the
+	 * same way, with its result kept in the store only: nobody has asked for it
+	 * yet, so it has no place in the memory and Redis tiers.
+	 */
+	private async contextFor(source: UploadedSource, options: ResizeOptions): Promise<OperationContext> {
 		const resourceTarget = this.urlBuilder.buildResourceUrl({
 			source: IMAGE_SOURCES.UPLOADED_MEDIA,
 			params: { tenantSchema: source.tenantSchema, imagePath: source.source },
 			correlationId: 'rendition-pregeneration',
 		})
-		return this.operation.setup(new CacheImageRequest({
+		const ctx = await this.operation.setup(new CacheImageRequest({
 			resourceTarget,
 			resizeOptions: Object.assign(new ResizeOptions(), options),
 			tenantSchema: source.tenantSchema,
 		}))
+		return { ...ctx, storeOnly: true }
 	}
 
 	/**

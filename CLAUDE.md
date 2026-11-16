@@ -108,7 +108,7 @@ Two registered layers, checked in priority order: Memory (node-cache, priority 1
 
 `MultiLayerCacheManager` is the only recorder of `mediastream_cache_operations_total` for the layered tier (one sample per layer probed); the rendition store records its own calls in `mediastream_rendition_store_operations_total{operation,result}`.
 
-There is no access counting and no cache warming: they read and ranked the on-disk pairs, which the store replaced. The memory tier fills on demand (a store hit is one GET) and the bucket's lifecycle rule, not the service, expires objects.
+There is no access counting and no cache warming: they read and ranked the on-disk pairs, which the store replaced. The memory and Redis tiers fill on demand (a store hit is one GET), and the bucket's lifecycle rule, not the service, expires objects. Pre-generation writes the store only (`OperationContext.storeOnly`): a rendition made before anyone asked would push visitors' entries out of both tiers.
 
 ### Processing Pipeline
 

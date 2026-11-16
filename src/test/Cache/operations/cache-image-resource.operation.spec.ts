@@ -203,7 +203,7 @@ describe('cacheImageResourceOperation', () => {
 	})
 
 	describe('setup', () => {
-		it('returns a context with the generated identity and nothing loaded yet', () => {
+		it('returns a context with the generated identity, nothing loaded yet, and its result bound for every tier', () => {
 			expect(identityJob.handle).toHaveBeenCalledWith(request)
 			expect(ctx).toEqual({
 				request,
@@ -213,6 +213,7 @@ describe('cacheImageResourceOperation', () => {
 				cacheTier: null,
 				flushEpoch: 0,
 				tempToken: expect.any(String),
+				storeOnly: false,
 			})
 		})
 
@@ -382,6 +383,16 @@ describe('cacheImageResourceOperation', () => {
 			expect(cacheManager.set).toHaveBeenCalledWith('image:public', RESOURCE_ID, result, 6 * 30 * 24 * 3600)
 			expect(store.put).toHaveBeenCalledWith('public', RESOURCE_ID, result)
 			expect(mockedFs.unlink).toHaveBeenCalledWith(operation.getResourceTempPath(ctx))
+		})
+
+		it('keeps a store-only rendition out of the memory and Redis tiers, which hold what visitors asked for', async () => {
+			ctx.storeOnly = true
+
+			const result = await operation.execute(ctx)
+			await expect(ctx.stored).resolves.toBe(true)
+
+			expect(cacheManager.set).not.toHaveBeenCalled()
+			expect(store.put).toHaveBeenCalledWith('public', RESOURCE_ID, result)
 		})
 
 		it('counts a rendition of an upload towards its folder, so the folder\'s other uploads can be pre-generated', async () => {
