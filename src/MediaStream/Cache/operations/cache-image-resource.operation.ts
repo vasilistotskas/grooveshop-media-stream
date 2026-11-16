@@ -60,6 +60,13 @@ export interface OperationContext {
 	stored?: Promise<boolean>
 	/** The size the request named (`{width}x{height}`), before it was mapped to a preset; absent for a rendition made on the service's own initiative. */
 	requestedSize?: string
+	/**
+	 * Write the result to the rendition store only, not to the memory and Redis
+	 * tiers. Pre-generation sets it: those tiers are for what visitors ask for,
+	 * and a rendition made before anyone asked would push their entries out. A
+	 * visitor's request for it later is a store hit, which fills both tiers.
+	 */
+	storeOnly: boolean
 }
 
 /**
@@ -116,6 +123,7 @@ export default class CacheImageResourceOperation {
 				flushEpoch,
 				tempToken: randomUUID(),
 				requestedSize,
+				storeOnly: false,
 			}
 		}
 		catch (error: unknown) {
@@ -303,7 +311,8 @@ export default class CacheImageResourceOperation {
 	 * Skipped when a flush of the tenant landed since the request started (the
 	 * result was built from data the flush meant to drop; this request still
 	 * serves it), and undone when one lands during the write. The layered write is
-	 * awaited; the store write is not (see `OperationContext.stored`).
+	 * awaited and skipped for a store-only result (`OperationContext.storeOnly`);
+	 * the store write is not awaited (see `OperationContext.stored`).
 	 */
 	private async persist(ctx: OperationContext, processed: ProcessedImage): Promise<void> {
 		if (this.flushedSince(ctx)) {
@@ -311,7 +320,9 @@ export default class CacheImageResourceOperation {
 			return
 		}
 
-		await this.cacheManager.set(imageNamespace(ctx.request.tenantSchema), ctx.id, processed, this.privateTtl)
+		if (!ctx.storeOnly) {
+			await this.cacheManager.set(imageNamespace(ctx.request.tenantSchema), ctx.id, processed, this.privateTtl)
+		}
 		ctx.stored = this.writeToStore(ctx, processed)
 		if (this.flushedSince(ctx)) {
 			await this.discardIfFlushed(ctx)

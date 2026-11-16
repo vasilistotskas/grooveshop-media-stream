@@ -133,6 +133,7 @@ describe('imageStreamService', () => {
 			cacheTier: null,
 			flushEpoch: 3,
 			tempToken: 'token',
+			storeOnly: false,
 		}
 
 		cacheOp = {
