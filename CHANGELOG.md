@@ -1,3 +1,10 @@
+## [3.14.4](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.14.3...v3.14.4) (2026-11-19)
+
+
+### Bug Fixes
+
+* **deps:** bump the nestjs group with 5 updates ([#67](https://github.com/vasilistotskas/grooveshop-media-stream/issues/67)) ([e1501fc](https://github.com/vasilistotskas/grooveshop-media-stream/commit/e1501fc2ef8eb3b6fc2bf31639e7398d4f793c16))
+
 ## [3.14.3](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.14.2...v3.14.3) (2026-11-16)
 
 
