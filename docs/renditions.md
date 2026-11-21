@@ -72,8 +72,10 @@ The storefront writes `og:image:width`/`height` for its 1200x630 og image and
 the width and height of the Article's three schema.org `ImageObject`s (16:9, 4:3,
 1:1) from the upload's stored size. A learned size can be evicted and a snapped
 one is wider than asked, and either would make that metadata false, so a
-contract size is exact on every pod from the first request, Redis or not, is
-never counted in the learned set and never leaves it. Both axes must be set, and
+contract size is exact on every pod from the first request, Redis or not, and
+is never counted, seeded or kept in the learned set: one found there (learned
+before it was listed, or promoted by a pod of an earlier release during a
+rollout) is removed on the next refresh, so it holds none of the 300 slots. Both axes must be set, and
 an entry past the width cap, the height cap or the pixel budget stops the service at boot. The
 size served for a contract size, `cover`, is the box scaled down to fit the
 source, never up: `scale = min(1, sourceWidth / width, sourceHeight / height)`,

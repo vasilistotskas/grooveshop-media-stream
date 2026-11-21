@@ -89,6 +89,11 @@ class FakeRedis {
 		return doomed.length
 	}
 
+	async zrem(_key: string, ...members: string[]): Promise<number> {
+		this.check()
+		return members.filter(member => this.zset.delete(member)).length
+	}
+
 	async zcard(): Promise<number> {
 		this.check()
 		return this.zset.size
@@ -223,6 +228,40 @@ describe('renditionSizeService', () => {
 			await service.refresh()
 
 			expect(CONTRACT.every(size => service.isKnown(size))).toBe(true)
+		})
+
+		it('frees the learned slot of a contract size already in Redis, and stops refreshing it', async () => {
+			redis.zset.set('1200x630', NOW - 4000)
+			redis.zset.set('200x200', NOW - 3000)
+			redis.zset.set('300x300', NOW - 2000)
+			redis.zset.set('400x400', NOW - 1000)
+			await service.refresh()
+
+			expect(redis.zset.has('1200x630')).toBe(false)
+			service.touch('1200x630')
+			await service.flushTouches()
+			expect(redis.zset.has('1200x630')).toBe(false)
+
+			await render('500x500', 3)
+			await service.refresh()
+			expect([
+				'200x200',
+				'300x300',
+				'400x400',
+				'500x500',
+			].every(size => service.isKnown(size))).toBe(true)
+			expect(service.isKnown('1200x630')).toBe(true)
+		})
+
+		it('does not seed a contract size into an empty set', async () => {
+			service = build({
+				'renditions.sizes.contract': ['1200x630', SEED_RENDITION_SIZES[0]],
+			})
+			await service.refresh()
+
+			expect(redis.zset.has(SEED_RENDITION_SIZES[0])).toBe(false)
+			expect(redis.zset.size).toBe(SEED_RENDITION_SIZES.length - 1)
+			expect(service.isKnown(SEED_RENDITION_SIZES[0])).toBe(true)
 		})
 
 		it.each([

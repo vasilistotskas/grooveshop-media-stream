@@ -48,7 +48,8 @@ function isPromotable(key: string): boolean {
  *   services publish as metadata with the URL (the storefront's og:image and
  *   schema.org ImageObject width and height), which they compute from the
  *   source's size and so must never be snapped. Exact from the first request,
- *   on every pod, Redis or not; never counted and never evicted. An entry
+ *   on every pod, Redis or not; never counted, seeded or evicted, and
+ *   removed from the learned set when found there, so it holds no slot. An entry
  *   past the width cap, the height cap or the pixel budget fails the boot.
  * - **Learned sizes**, the storefront's other sizes:
  *
@@ -161,10 +162,16 @@ export class RenditionSizeService implements OnModuleInit, OnModuleDestroy {
 		}
 		try {
 			await client.zremrangebyscore(KNOWN_KEY, '-inf', String(Date.now() - this.config.windowDays * DAY_MS))
+			// A size learned before it became a contract size (or promoted
+			// by a pod of an earlier release during a rollout) must not hold
+			// one of the `maxKnown` slots.
+			if (this.contract.size > 0) {
+				await client.zrem(KNOWN_KEY, ...this.contract)
+			}
 			if (await client.zcard(KNOWN_KEY) === 0) {
 				await this.seed(client)
 			}
-			this.known = new Set(await client.zrange(KNOWN_KEY, '0', '-1'))
+			this.known = new Set((await client.zrange(KNOWN_KEY, '0', '-1')).filter(key => !this.contract.has(key)))
 			await this.trimSeen(client)
 			this.noteReachability(true)
 		}
@@ -197,12 +204,13 @@ export class RenditionSizeService implements OnModuleInit, OnModuleDestroy {
 
 	private async seed(client: NonNullable<ReturnType<RedisCacheService['getClient']>>): Promise<void> {
 		const now = Date.now()
+		const seeds = SEED_RENDITION_SIZES.filter(key => !this.contract.has(key))
 		const pipeline = client.multi()
-		for (const key of SEED_RENDITION_SIZES) {
+		for (const key of seeds) {
 			pipeline.zadd(KNOWN_KEY, 'NX', now, key)
 		}
 		await pipeline.exec()
-		CorrelatedLogger.log(`Seeded ${SEED_RENDITION_SIZES.length} exact rendition sizes: the set was empty`, RenditionSizeService.name)
+		CorrelatedLogger.log(`Seeded ${seeds.length} exact rendition sizes: the set was empty`, RenditionSizeService.name)
 	}
 
 	private async trimSeen(client: NonNullable<ReturnType<RedisCacheService['getClient']>>): Promise<void> {
