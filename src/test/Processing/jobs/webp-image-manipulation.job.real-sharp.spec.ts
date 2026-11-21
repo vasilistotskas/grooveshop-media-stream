@@ -71,6 +71,24 @@ describe('webpImageManipulationJob output geometry (real Sharp)', () => {
 		await rm(directory, { recursive: true, force: true })
 	})
 
+	describe('contract sizes: the served size is the request scaled by min(1, source/request) on the limiting axis', () => {
+		// The storefront states og:image and ImageObject width/height from the
+		// source's size with this rule; these pin it to Sharp's real output.
+		it.each([
+			[2000, 1500, 1200, 630, 1200, 630],
+			[1080, 1080, 1200, 630, 1080, 567],
+			[1080, 1350, 1200, 630, 1080, 567],
+			[1080, 1080, 1200, 675, 1080, 608],
+			[1080, 1080, 1200, 900, 1080, 810],
+			[1080, 1080, 1200, 1200, 1080, 1080],
+			[1600, 600, 1200, 900, 800, 600],
+		])('a %ix%i source asked for %ix%i (cover) is %ix%i', async (sourceWidth, sourceHeight, width, height, servedWidth, servedHeight) => {
+			const source = await jpeg(`contract-${sourceWidth}x${sourceHeight}.jpg`, sourceWidth, sourceHeight)
+
+			expect(await dimensions(source, { width, height, fit: FitOptions.cover })).toEqual({ width: servedWidth, height: servedHeight })
+		})
+	})
+
 	describe('source smaller than the request', () => {
 		it.each([FitOptions.cover, FitOptions.fill])('%s returns the request scaled down to fit the source, at the requested aspect', async (fit) => {
 			// 800x800 asked for 1040x684: width is the limiting axis, 684 * 800/1040 = 526.15

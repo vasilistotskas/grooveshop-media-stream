@@ -74,6 +74,18 @@ describe('appConfigDto', () => {
 			expect(errors.find(error => error.property === 'renditions')).toBeDefined()
 		})
 
+		it.each([
+			['a one-axis size', '1200x0'],
+			['something that is not a size', '1200'],
+		])('should fail validation with a contract size that is %s', async (_label, size) => {
+			const plain = schemaDefaults()
+			plain.renditions.sizes.contract = ['1200x630', size]
+
+			const errors = await validateConfig(plain)
+
+			expect(errors.find(error => error.property === 'renditions')).toBeDefined()
+		})
+
 		it('should fail validation when a leaf field is missing', async () => {
 			const plain = schemaDefaults()
 			delete plain.shutdown.timeout

@@ -157,6 +157,8 @@ export interface RenditionSizesConfig {
 	windowDays: number
 	/** Most sizes exact at once; the least recently asked leaves first. */
 	maxKnown: number
+	/** `{width}x{height}` sizes published as metadata by other services: always exact, never evicted. */
+	contract: string[]
 }
 
 export interface RenditionsConfig {

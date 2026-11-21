@@ -184,6 +184,57 @@ describe('renditionSizeService', () => {
 		})
 	})
 
+	describe('contract sizes', () => {
+		const CONTRACT = ['1200x630', '1200x675']
+
+		beforeEach(() => {
+			service = build({ 'renditions.sizes.contract': CONTRACT })
+		})
+
+		it('answers a contract size exactly before Redis was ever read, and with Redis down', async () => {
+			connected = false
+			await service.refresh()
+
+			expect(CONTRACT.every(size => service.isKnown(size))).toBe(true)
+			expect(service.isKnown('700x410')).toBe(false)
+		})
+
+		it('never counts a contract size, so it takes no place among the learned ones', async () => {
+			await service.refresh()
+			const learned = redis.zset.size
+
+			await render('1200x630', 5)
+			service.touch('1200x630')
+			await service.flushTouches()
+
+			expect(redis.hash.has('1200x630')).toBe(false)
+			expect(redis.zset.has('1200x630')).toBe(false)
+			expect(redis.zset.size).toBe(learned)
+		})
+
+		it('keeps a contract size exact past the window and past the cap of learned sizes', async () => {
+			redis.zset.set('100x100', NOW - 4000)
+			redis.zset.set('200x200', NOW - 3000)
+			redis.zset.set('300x300', NOW - 2000)
+			redis.zset.set('400x400', NOW - 1000)
+			await service.refresh()
+			await render('500x500', 3)
+			vi.setSystemTime(NOW + 31 * DAY_MS)
+			await service.refresh()
+
+			expect(CONTRACT.every(size => service.isKnown(size))).toBe(true)
+		})
+
+		it.each([
+			['a width past the cap', '2400x1260'],
+			['a height past the cap', '1200x9000'],
+		])('refuses to start with %s', (_label, size) => {
+			expect(() => build({
+				'renditions.sizes.contract': ['1200x630', size],
+			})).toThrow(size)
+		})
+	})
+
 	describe('promotion', () => {
 		it('makes a size exact once it was rendered for the configured number of uploads', async () => {
 			await service.refresh()

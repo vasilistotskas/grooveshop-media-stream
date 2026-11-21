@@ -25,7 +25,7 @@ const MAX_SEEN_ENTRIES = 2000
 const DAY_MS = 24 * 60 * 60 * 1000
 const SIZE_KEY_RE = /^(\d+)x(\d+)$/
 
-/** Whether a size may become exact: inside the width cap and the pixel budget, and not the original size (0x0). */
+/** Whether a size may be exact: inside the width cap and the pixel budget, and not the original size (0x0). */
 function isPromotable(key: string): boolean {
 	const match = SIZE_KEY_RE.exec(key)
 	if (!match) {
@@ -40,9 +40,17 @@ function isPromotable(key: string): boolean {
 }
 
 /**
- * The sizes the storefront asks for, learned, so that a request for one is
- * answered with exactly the size it named and costs no extra pixel (any other
- * size snaps up the width ladder, see `toRendition`).
+ * The sizes answered exactly, so that a request for one gets the size it named
+ * and costs no extra pixel (any other size snaps up the width ladder, see
+ * `toRendition`). Two kinds:
+ *
+ * - **Contract sizes** (`renditions.sizes.contract`), listed: the sizes other
+ *   services publish as metadata with the URL (the storefront's og:image and
+ *   schema.org ImageObject width and height), which they compute from the
+ *   source's size and so must never be snapped. Exact from the first request,
+ *   on every pod, Redis or not; never counted and never evicted. An entry
+ *   past the width cap, the height cap or the pixel budget fails the boot.
+ * - **Learned sizes**, the storefront's other sizes:
  *
  * A size is counted each time the service renders it for an upload (a first
  * rendering, so the count is of uploads, repeated only after an expiry, a flush
@@ -57,14 +65,15 @@ function isPromotable(key: string): boolean {
  * minute and `isKnown` answers from there. A Redis that is down degrades
  * deliberately, it is not a fallback path: a pod that has a set keeps the last
  * one (switching a size to a different rendition would only turn a Redis blip
- * into a wave of misses), and a pod that never had one answers nothing exactly.
- * Neither ever errors. An empty set is seeded
+ * into a wave of misses), and a pod that never had one answers only the contract
+ * sizes exactly. Neither ever errors. An empty set is seeded
  * once from `SEED_RENDITION_SIZES`, so a first deploy starts where the logs
  * left off.
  */
 @Injectable()
 export class RenditionSizeService implements OnModuleInit, OnModuleDestroy {
 	private readonly config: RenditionSizesConfig
+	private readonly contract: ReadonlySet<string>
 	private known = new Set<string>()
 	private readonly touched = new Set<string>()
 	private refreshTimer: NodeJS.Timeout | null = null
@@ -73,6 +82,11 @@ export class RenditionSizeService implements OnModuleInit, OnModuleDestroy {
 
 	constructor(configService: ConfigService, private readonly redis: RedisCacheService) {
 		this.config = configService.get<RenditionSizesConfig>('renditions.sizes')
+		const outOfBounds = this.config.contract.filter(key => !isPromotable(key))
+		if (outOfBounds.length > 0) {
+			throw new Error(`RENDITION_SIZES_CONTRACT names sizes past the ${MAX_RENDITION_WIDTH} px width cap, the height cap or the pixel budget: ${outOfBounds.join(', ')}`)
+		}
+		this.contract = new Set(this.config.contract)
 	}
 
 	onModuleInit(): void {
@@ -94,10 +108,10 @@ export class RenditionSizeService implements OnModuleInit, OnModuleDestroy {
 
 	/** Whether the size is answered exactly. Synchronous: it is read on every request. */
 	isKnown(key: string): boolean {
-		return this.known.has(key)
+		return this.contract.has(key) || this.known.has(key)
 	}
 
-	/** Note that an exact size was asked for, so it stays exact (reported to Redis in batches). */
+	/** Note that a learned size was asked for, so it stays exact (reported to Redis in batches). */
 	touch(key: string): void {
 		if (this.known.has(key)) {
 			this.touched.add(key)
@@ -110,7 +124,7 @@ export class RenditionSizeService implements OnModuleInit, OnModuleDestroy {
 	 */
 	async recordRendering(key: string): Promise<void> {
 		const client = this.redis.getClient()
-		if (!client || this.known.has(key) || !isPromotable(key)) {
+		if (!client || this.isKnown(key) || !isPromotable(key)) {
 			return
 		}
 		try {
