@@ -1,3 +1,10 @@
+# [3.15.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.14.4...v3.15.0) (2026-11-21)
+
+
+### Features
+
+* **renditions:** answer contract sizes exactly, never snapped or evicted ([#71](https://github.com/vasilistotskas/grooveshop-media-stream/issues/71)) ([480a5bb](https://github.com/vasilistotskas/grooveshop-media-stream/commit/480a5bb6c625b4955f3f65c73946e7542ab33cf5))
+
 ## [3.14.4](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.14.3...v3.14.4) (2026-11-19)
 
 
