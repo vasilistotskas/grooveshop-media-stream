@@ -230,18 +230,18 @@ describe('renditionSizeService', () => {
 			expect(CONTRACT.every(size => service.isKnown(size))).toBe(true)
 		})
 
-		it('frees the learned slot of a contract size already in Redis, and stops refreshing it', async () => {
-			redis.zset.set('1200x630', NOW - 4000)
+		it('frees the learned slot and the count of a contract size already in Redis', async () => {
+			// The most recently asked member: without the removal, promoting a
+			// fifth size at a cap of 4 would evict 200x200 instead.
 			redis.zset.set('200x200', NOW - 3000)
 			redis.zset.set('300x300', NOW - 2000)
 			redis.zset.set('400x400', NOW - 1000)
+			redis.zset.set('1200x630', NOW)
+			redis.hash.set('1200x675', 7)
 			await service.refresh()
 
 			expect(redis.zset.has('1200x630')).toBe(false)
-			service.touch('1200x630')
-			await service.flushTouches()
-			expect(redis.zset.has('1200x630')).toBe(false)
-
+			expect(redis.hash.has('1200x675')).toBe(false)
 			await render('500x500', 3)
 			await service.refresh()
 			expect([
@@ -251,6 +251,17 @@ describe('renditionSizeService', () => {
 				'500x500',
 			].every(size => service.isKnown(size))).toBe(true)
 			expect(service.isKnown('1200x630')).toBe(true)
+		})
+
+		it('never refreshes a contract size a pod of an earlier release put back between the removal and the read', async () => {
+			redis.zset.set('1200x630', NOW - 1000)
+			vi.spyOn(redis, 'zrem').mockResolvedValue(0)
+			await service.refresh()
+
+			service.touch('1200x630')
+			await service.flushTouches()
+
+			expect(redis.zset.get('1200x630')).toBe(NOW - 1000)
 		})
 
 		it('does not seed a contract size into an empty set', async () => {

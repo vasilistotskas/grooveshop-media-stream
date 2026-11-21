@@ -78,9 +78,14 @@ before it was listed, or promoted by a pod of an earlier release during a
 rollout) is removed on the next refresh, so it holds none of the 300 slots. Both axes must be set, and
 an entry past the width cap, the height cap or the pixel budget stops the service at boot. The
 size served for a contract size, `cover`, is the box scaled down to fit the
-source, never up: `scale = min(1, sourceWidth / width, sourceHeight / height)`,
-the limiting axis at the source's size and the other `round(axis * scale)`
-(`boxWithinSource`; a 1080x1080 upload asked for 1200x630 is 1080x567). The
+source, never up (`boxWithinSource`): when the source covers the box on both
+axes it is the box; otherwise the axis with the smaller `sourceAxis /
+requestAxis` ratio is the source's and the other is `Math.round(otherAxis *
+(sourceAxis / requestAxis))`, never past the source. A 1080x1080 upload asked
+for 1200x630 is 1080x567. Evaluate it exactly so, in a double, in that order:
+a .5 case can round down (`675 * (440 / 1200)` is 247.49999999999997, so a
+440 px wide upload asked for 1200x675 is 440x247, where exact rational rounding
+says 248). The
 real-Sharp spec `webp-image-manipulation.job.real-sharp.spec.ts` pins it. Keep
 every size the storefront states in the list: removing one makes its metadata
 false for every new rendition.

@@ -162,11 +162,12 @@ export class RenditionSizeService implements OnModuleInit, OnModuleDestroy {
 		}
 		try {
 			await client.zremrangebyscore(KNOWN_KEY, '-inf', String(Date.now() - this.config.windowDays * DAY_MS))
-			// A size learned before it became a contract size (or promoted
+			// A size learned or counted before it became a contract size (or
 			// by a pod of an earlier release during a rollout) must not hold
-			// one of the `maxKnown` slots.
+			// one of the `maxKnown` slots or a count.
 			if (this.contract.size > 0) {
 				await client.zrem(KNOWN_KEY, ...this.contract)
+				await client.hdel(SEEN_KEY, ...this.contract)
 			}
 			if (await client.zcard(KNOWN_KEY) === 0) {
 				await this.seed(client)
