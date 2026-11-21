@@ -89,6 +89,11 @@ class FakeRedis {
 		return doomed.length
 	}
 
+	async zrem(_key: string, ...members: string[]): Promise<number> {
+		this.check()
+		return members.filter(member => this.zset.delete(member)).length
+	}
+
 	async zcard(): Promise<number> {
 		this.check()
 		return this.zset.size
@@ -181,6 +186,102 @@ describe('renditionSizeService', () => {
 			redis.zset.set('700x410', NOW)
 			await service.refresh()
 			expect(service.isKnown('672x340')).toBe(false)
+		})
+	})
+
+	describe('contract sizes', () => {
+		const CONTRACT = ['1200x630', '1200x675']
+
+		beforeEach(() => {
+			service = build({ 'renditions.sizes.contract': CONTRACT })
+		})
+
+		it('answers a contract size exactly before Redis was ever read, and with Redis down', async () => {
+			connected = false
+			await service.refresh()
+
+			expect(CONTRACT.every(size => service.isKnown(size))).toBe(true)
+			expect(service.isKnown('700x410')).toBe(false)
+		})
+
+		it('never counts a contract size, so it takes no place among the learned ones', async () => {
+			await service.refresh()
+			const learned = redis.zset.size
+
+			await render('1200x630', 5)
+			service.touch('1200x630')
+			await service.flushTouches()
+
+			expect(redis.hash.has('1200x630')).toBe(false)
+			expect(redis.zset.has('1200x630')).toBe(false)
+			expect(redis.zset.size).toBe(learned)
+		})
+
+		it('keeps a contract size exact past the window and past the cap of learned sizes', async () => {
+			redis.zset.set('100x100', NOW - 4000)
+			redis.zset.set('200x200', NOW - 3000)
+			redis.zset.set('300x300', NOW - 2000)
+			redis.zset.set('400x400', NOW - 1000)
+			await service.refresh()
+			await render('500x500', 3)
+			vi.setSystemTime(NOW + 31 * DAY_MS)
+			await service.refresh()
+
+			expect(CONTRACT.every(size => service.isKnown(size))).toBe(true)
+		})
+
+		it('frees the learned slot and the count of a contract size already in Redis', async () => {
+			// The most recently asked member: without the removal, promoting a
+			// fifth size at a cap of 4 would evict 200x200 instead.
+			redis.zset.set('200x200', NOW - 3000)
+			redis.zset.set('300x300', NOW - 2000)
+			redis.zset.set('400x400', NOW - 1000)
+			redis.zset.set('1200x630', NOW)
+			redis.hash.set('1200x675', 7)
+			await service.refresh()
+
+			expect(redis.zset.has('1200x630')).toBe(false)
+			expect(redis.hash.has('1200x675')).toBe(false)
+			await render('500x500', 3)
+			await service.refresh()
+			expect([
+				'200x200',
+				'300x300',
+				'400x400',
+				'500x500',
+			].every(size => service.isKnown(size))).toBe(true)
+			expect(service.isKnown('1200x630')).toBe(true)
+		})
+
+		it('never refreshes a contract size a pod of an earlier release put back between the removal and the read', async () => {
+			redis.zset.set('1200x630', NOW - 1000)
+			vi.spyOn(redis, 'zrem').mockResolvedValue(0)
+			await service.refresh()
+
+			service.touch('1200x630')
+			await service.flushTouches()
+
+			expect(redis.zset.get('1200x630')).toBe(NOW - 1000)
+		})
+
+		it('does not seed a contract size into an empty set', async () => {
+			service = build({
+				'renditions.sizes.contract': ['1200x630', SEED_RENDITION_SIZES[0]],
+			})
+			await service.refresh()
+
+			expect(redis.zset.has(SEED_RENDITION_SIZES[0])).toBe(false)
+			expect(redis.zset.size).toBe(SEED_RENDITION_SIZES.length - 1)
+			expect(service.isKnown(SEED_RENDITION_SIZES[0])).toBe(true)
+		})
+
+		it.each([
+			['a width past the cap', '2400x1260'],
+			['a height past the cap', '1200x9000'],
+		])('refuses to start with %s', (_label, size) => {
+			expect(() => build({
+				'renditions.sizes.contract': ['1200x630', size],
+			})).toThrow(size)
 		})
 	})
 

@@ -25,7 +25,7 @@ const MAX_SEEN_ENTRIES = 2000
 const DAY_MS = 24 * 60 * 60 * 1000
 const SIZE_KEY_RE = /^(\d+)x(\d+)$/
 
-/** Whether a size may become exact: inside the width cap and the pixel budget, and not the original size (0x0). */
+/** Whether a size may be exact: inside the width cap and the pixel budget, and not the original size (0x0). */
 function isPromotable(key: string): boolean {
 	const match = SIZE_KEY_RE.exec(key)
 	if (!match) {
@@ -40,9 +40,18 @@ function isPromotable(key: string): boolean {
 }
 
 /**
- * The sizes the storefront asks for, learned, so that a request for one is
- * answered with exactly the size it named and costs no extra pixel (any other
- * size snaps up the width ladder, see `toRendition`).
+ * The sizes answered exactly, so that a request for one gets the size it named
+ * and costs no extra pixel (any other size snaps up the width ladder, see
+ * `toRendition`). Two kinds:
+ *
+ * - **Contract sizes** (`renditions.sizes.contract`), listed: the sizes other
+ *   services publish as metadata with the URL (the storefront's og:image and
+ *   schema.org ImageObject width and height), which they compute from the
+ *   source's size and so must never be snapped. Exact from the first request,
+ *   on every pod, Redis or not; never counted, seeded or evicted, and
+ *   removed from the learned set when found there, so it holds no slot. An entry
+ *   past the width cap, the height cap or the pixel budget fails the boot.
+ * - **Learned sizes**, the storefront's other sizes:
  *
  * A size is counted each time the service renders it for an upload (a first
  * rendering, so the count is of uploads, repeated only after an expiry, a flush
@@ -57,14 +66,15 @@ function isPromotable(key: string): boolean {
  * minute and `isKnown` answers from there. A Redis that is down degrades
  * deliberately, it is not a fallback path: a pod that has a set keeps the last
  * one (switching a size to a different rendition would only turn a Redis blip
- * into a wave of misses), and a pod that never had one answers nothing exactly.
- * Neither ever errors. An empty set is seeded
+ * into a wave of misses), and a pod that never had one answers only the contract
+ * sizes exactly. Neither ever errors. An empty set is seeded
  * once from `SEED_RENDITION_SIZES`, so a first deploy starts where the logs
  * left off.
  */
 @Injectable()
 export class RenditionSizeService implements OnModuleInit, OnModuleDestroy {
 	private readonly config: RenditionSizesConfig
+	private readonly contract: ReadonlySet<string>
 	private known = new Set<string>()
 	private readonly touched = new Set<string>()
 	private refreshTimer: NodeJS.Timeout | null = null
@@ -73,6 +83,11 @@ export class RenditionSizeService implements OnModuleInit, OnModuleDestroy {
 
 	constructor(configService: ConfigService, private readonly redis: RedisCacheService) {
 		this.config = configService.get<RenditionSizesConfig>('renditions.sizes')
+		const outOfBounds = this.config.contract.filter(key => !isPromotable(key))
+		if (outOfBounds.length > 0) {
+			throw new Error(`RENDITION_SIZES_CONTRACT names sizes past the ${MAX_RENDITION_WIDTH} px width cap, the height cap or the pixel budget: ${outOfBounds.join(', ')}`)
+		}
+		this.contract = new Set(this.config.contract)
 	}
 
 	onModuleInit(): void {
@@ -94,10 +109,10 @@ export class RenditionSizeService implements OnModuleInit, OnModuleDestroy {
 
 	/** Whether the size is answered exactly. Synchronous: it is read on every request. */
 	isKnown(key: string): boolean {
-		return this.known.has(key)
+		return this.contract.has(key) || this.known.has(key)
 	}
 
-	/** Note that an exact size was asked for, so it stays exact (reported to Redis in batches). */
+	/** Note that a learned size was asked for, so it stays exact (reported to Redis in batches). */
 	touch(key: string): void {
 		if (this.known.has(key)) {
 			this.touched.add(key)
@@ -110,7 +125,7 @@ export class RenditionSizeService implements OnModuleInit, OnModuleDestroy {
 	 */
 	async recordRendering(key: string): Promise<void> {
 		const client = this.redis.getClient()
-		if (!client || this.known.has(key) || !isPromotable(key)) {
+		if (!client || this.isKnown(key) || !isPromotable(key)) {
 			return
 		}
 		try {
@@ -147,10 +162,17 @@ export class RenditionSizeService implements OnModuleInit, OnModuleDestroy {
 		}
 		try {
 			await client.zremrangebyscore(KNOWN_KEY, '-inf', String(Date.now() - this.config.windowDays * DAY_MS))
+			// A size learned or counted before it became a contract size (or
+			// by a pod of an earlier release during a rollout) must not hold
+			// one of the `maxKnown` slots or a count.
+			if (this.contract.size > 0) {
+				await client.zrem(KNOWN_KEY, ...this.contract)
+				await client.hdel(SEEN_KEY, ...this.contract)
+			}
 			if (await client.zcard(KNOWN_KEY) === 0) {
 				await this.seed(client)
 			}
-			this.known = new Set(await client.zrange(KNOWN_KEY, '0', '-1'))
+			this.known = new Set((await client.zrange(KNOWN_KEY, '0', '-1')).filter(key => !this.contract.has(key)))
 			await this.trimSeen(client)
 			this.noteReachability(true)
 		}
@@ -183,12 +205,13 @@ export class RenditionSizeService implements OnModuleInit, OnModuleDestroy {
 
 	private async seed(client: NonNullable<ReturnType<RedisCacheService['getClient']>>): Promise<void> {
 		const now = Date.now()
+		const seeds = SEED_RENDITION_SIZES.filter(key => !this.contract.has(key))
 		const pipeline = client.multi()
-		for (const key of SEED_RENDITION_SIZES) {
+		for (const key of seeds) {
 			pipeline.zadd(KNOWN_KEY, 'NX', now, key)
 		}
 		await pipeline.exec()
-		CorrelatedLogger.log(`Seeded ${SEED_RENDITION_SIZES.length} exact rendition sizes: the set was empty`, RenditionSizeService.name)
+		CorrelatedLogger.log(`Seeded ${seeds.length} exact rendition sizes: the set was empty`, RenditionSizeService.name)
 	}
 
 	private async trimSeen(client: NonNullable<ReturnType<RedisCacheService['getClient']>>): Promise<void> {

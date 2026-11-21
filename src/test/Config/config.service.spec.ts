@@ -247,7 +247,17 @@ describe('configService', () => {
 			expect(serviceWithDefaults.get('cache.image.negativeCacheTtl')).toBe(300)
 			expect(serviceWithDefaults.get('renditions.store.readTimeoutMs')).toBe(2000)
 			expect(serviceWithDefaults.get('renditions.store.endpoint')).toBe('')
-			expect(serviceWithDefaults.get('renditions.sizes')).toEqual({ minSources: 10, windowDays: 30, maxKnown: 300 })
+			expect(serviceWithDefaults.get('renditions.sizes')).toEqual({
+				minSources: 10,
+				windowDays: 30,
+				maxKnown: 300,
+				contract: [
+					'1200x630',
+					'1200x675',
+					'1200x900',
+					'1200x1200',
+				],
+			})
 			expect(serviceWithDefaults.get('http.healthCheck.urls')).toEqual([])
 			await expect(serviceWithDefaults.validate()).resolves.not.toThrow()
 		})

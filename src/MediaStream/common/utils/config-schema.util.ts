@@ -248,6 +248,21 @@ export const APP_CONFIG_SCHEMA: ConfigSchema = {
 	'renditions.sizes.minSources': { env: 'RENDITION_SIZES_MIN_SOURCES', default: 10, type: 'number' },
 	'renditions.sizes.windowDays': { env: 'RENDITION_SIZES_WINDOW_DAYS', default: 30, type: 'number' },
 	'renditions.sizes.maxKnown': { env: 'RENDITION_SIZES_MAX_KNOWN', default: 300, type: 'number' },
+	// Exact sizes, listed: the sizes other services publish as metadata with the
+	// URL (og:image:width/height, a schema.org ImageObject), so they compute the
+	// served size from the source size and must never see a snapped one. Always
+	// exact, never counted, never evicted. The storefront's og image and its three
+	// Article image ratios.
+	'renditions.sizes.contract': {
+		env: 'RENDITION_SIZES_CONTRACT',
+		default: [
+			'1200x630',
+			'1200x675',
+			'1200x900',
+			'1200x1200',
+		],
+		type: 'array',
+	},
 
 	// Rendition pre-generation: the cron renders the renditions an upload is
 	// shown at (learned from the renditions already made for its folder) before

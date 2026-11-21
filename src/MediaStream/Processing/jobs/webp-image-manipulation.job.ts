@@ -80,7 +80,12 @@ function downscaleFactor(source: { width: number, height: number }, target: { wi
  *   came back 1440x388, the photo a third of it).
  *
  * The limiting axis is set to the source size exactly and the other derived
- * from it, so rounding can never push the box past the source.
+ * from it, so rounding can never push the box past the source. The storefront
+ * states the served size of a contract size (og:image, ImageObject) with the
+ * same expression, `Math.round(axis * (sourceAxis / requestAxis))`, evaluated
+ * in that order in a double: a .5 case can round down (675 * (440 / 1200) is
+ * 247.49999999999997), so any change here changes that metadata and needs a
+ * `PROCESSING_VERSION` bump and the storefront's helper in the same release.
  */
 function boxWithinSource(source: { width: number, height: number }, target: { width?: number, height?: number }, fit: FitOptions): { width?: number, height?: number } {
 	const { width, height } = target

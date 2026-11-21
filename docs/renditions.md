@@ -15,7 +15,7 @@ The code wins over this page. Source files:
 |---|---|
 | `src/MediaStream/common/constants/rendition-presets.constant.ts` | The width ladder, the width cap, the quality ladder |
 | `src/MediaStream/common/utils/rendition.util.ts` | `toRendition`: the preset a request is answered with |
-| `src/MediaStream/Cache/services/rendition-size.service.ts` | The learned set of exact sizes: counts, promotes, expires, caps |
+| `src/MediaStream/Cache/services/rendition-size.service.ts` | The exact sizes: the contract list, and the learned set (counts, promotes, expires, caps) |
 | `src/MediaStream/API/controllers/media-stream-image.controller.ts` | Applies it in `buildResizeOptions`, before the request is hashed |
 | `src/MediaStream/Renditions/services/rendition-generator.service.ts` | The pre-generation cron |
 | `src/MediaStream/Renditions/services/rendition-source-scanner.service.ts` | Lists the uploads on the media volume |
@@ -54,6 +54,7 @@ that set snaps up:
 
 | Parameter | Preset |
 |---|---|
+| a contract size, see below | Exactly as asked, always |
 | a known size (`{width}x{height}`, 0 = unconstrained), see below | Exactly as asked, no extra pixel |
 | any other width | The next step of `RENDITION_WIDTHS` at or above it (29 steps, 64 to 2048 px; 11-17 % apart from 192 px up) |
 | any other height, both axes set | Follows the snapped width at the requested aspect ratio (a `cover` crop keeps its shape) |
@@ -63,6 +64,31 @@ that set snaps up:
 | quality, WebP / JPEG / PNG | A quality in `RENDITION_QUALITIES` (75, 80, 85, 90, 100) as asked; any other rounds up to the next |
 | quality, GIF / TIFF | 100 (ignored by the encoder) |
 | position | `centre` is `center`; the fits that ignore it (`inside`, `outside`, `fill`) share `center` |
+
+**Contract sizes are listed** (`RENDITION_SIZES_CONTRACT`, default
+`1200x630,1200x675,1200x900,1200x1200`): the sizes another service publishes as
+metadata with the URL, so it states the served size without fetching the image.
+The storefront writes `og:image:width`/`height` for its 1200x630 og image and
+the width and height of the Article's three schema.org `ImageObject`s (16:9, 4:3,
+1:1) from the upload's stored size. A learned size can be evicted and a snapped
+one is wider than asked, and either would make that metadata false, so a
+contract size is exact on every pod from the first request, Redis or not, and
+is never counted, seeded or kept in the learned set: one found there (learned
+before it was listed, or promoted by a pod of an earlier release during a
+rollout) is removed on the next refresh, so it holds none of the 300 slots. Both axes must be set, and
+an entry past the width cap, the height cap or the pixel budget stops the service at boot. The
+size served for a contract size, `cover`, is the box scaled down to fit the
+source, never up (`boxWithinSource`): when the source covers the box on both
+axes it is the box; otherwise the axis with the smaller `sourceAxis /
+requestAxis` ratio is the source's and the other is `Math.round(otherAxis *
+(sourceAxis / requestAxis))`, never past the source. A 1080x1080 upload asked
+for 1200x630 is 1080x567. Evaluate it exactly so, in a double, in that order:
+a .5 case can round down (`675 * (440 / 1200)` is 247.49999999999997, so a
+440 px wide upload asked for 1200x675 is 440x247, where exact rational rounding
+says 248). The
+real-Sharp spec `webp-image-manipulation.job.real-sharp.spec.ts` pins it. Keep
+every size the storefront states in the list: removing one makes its metadata
+false for every new rendition.
 
 **Known sizes are learned from traffic**, not listed in the code, so a size the
 storefront starts to use becomes exact on its own:
@@ -90,8 +116,9 @@ pod keeps the last set it read, because moving a size to a different rendition
 would turn a Redis blip into a wave of misses; a pod that never had a set snaps
 everything. Nothing errors. An empty set is seeded once from
 `SEED_RENDITION_SIZES` (`common/constants/rendition-size-seed.constant.ts`):
-the sizes of the 2026-10 request logs asked of at least ten uploads, plus the
-672, 1200 and 1440 px single-axis widths the storefront computes itself. It is
+the sizes of the 2026-10 request logs asked of at least ten uploads (less the
+contract sizes, which need no learning), plus the 672, 1200 and 1440 px
+single-axis widths the storefront computes itself. It is
 a seed, not the source of truth: a deployment that already has a set ignores
 it, and a seed entry nobody asks for leaves after the window. To refresh it,
 count distinct uploads per size in the request log (`log.context:="ImageRequest"
@@ -296,7 +323,8 @@ added behind the same admission error if the remaining 503 rate asks for it.
 | `RENDITION_STORE_WRITE_TIMEOUT_MS` | 5000 | Deadline of a PUT, DELETE or LIST; past it the image is served uncached |
 | `RENDITION_SIZES_MIN_SOURCES` | 10 | Uploads a size must be rendered for before it is answered exactly |
 | `RENDITION_SIZES_WINDOW_DAYS` | 30 | Days an exact size stays exact without being asked for |
-| `RENDITION_SIZES_MAX_KNOWN` | 300 | Most sizes exact at once; the least recently asked leaves first |
+| `RENDITION_SIZES_MAX_KNOWN` | 300 | Most learned sizes exact at once; the least recently asked leaves first |
+| `RENDITION_SIZES_CONTRACT` | `1200x630,1200x675,1200x900,1200x1200` | Sizes always answered exactly: the ones the storefront states as metadata |
 | `RENDITIONS_MEDIA_DIRECTORY` | empty (off) | Root of the tenants' uploads: `{dir}/{tenant}/uploads/` |
 | `RENDITIONS_CRON` | `*/10 * * * *` | How often the pass runs (a six-field cron with seconds works) |
 | `RENDITIONS_MIN_SOURCES` | 3 | Sources of a folder that must share a rendition before it is pre-generated |
