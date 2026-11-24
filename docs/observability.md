@@ -211,8 +211,10 @@ _time:1d kubernetes.pod_namespace:="grooveshop" kubernetes.container_name:="medi
 ```
 
 A raster file taken for SVG is a signature that shows up before any crash.
-The sniffer reads the bytes, not the extension (`isSvgHeader`), so this
-query should always return nothing and doubles as a regression check:
+The sniffer reads the bytes, not the extension (`isSvgHeader`), so a match
+here is a lead, not proof: a URL ending in a raster extension can still serve
+real SVG bytes. Check the source file's first bytes before calling it a
+sniffer regression:
 
 ```logsql
 … log.input_format:="svg" log.path:~"\\.(png|jpe?g|webp|gif|avif|tiff?)/"

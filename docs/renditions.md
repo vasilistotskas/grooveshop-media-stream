@@ -197,11 +197,11 @@ which do not use that pool, and every call is bounded:
 
 **Cost.** Cloudflare R2 charges for storage and for Class A (PUT, LIST) and
 Class B (GET, HEAD) operations, not for egress, and has a monthly free
-allowance (developers.cloudflare.com/r2/pricing). The service's use is small:
-a few hundred MB stored, tens of thousands of GETs and PUTs a month, and one
-HEAD per rendition of each upload not yet known to be complete for
-pre-generation, which repeats at every pod start. It stays inside the free
-allowance.
+allowance (developers.cloudflare.com/r2/pricing). What the service adds to the
+bill grows with uploads and renditions, plus one HEAD per rendition of each
+upload not yet known to be complete for pre-generation, repeated at every pod
+start. Read the bucket's usage in the Cloudflare dashboard rather than
+assuming it stays inside the allowance.
 
 ## Where the bucket lives
 
