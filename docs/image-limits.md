@@ -35,8 +35,8 @@ the default image, so an upload the service cannot render shows a placeholder.
 ## The contract
 
 `contract/image-limits.json` publishes the byte caps and the pixel limit.
-grooveshop-django-api copies it, pinned by git id, to `core/data/image-limits.json`
-and validates every image upload against it (`core/uploads.py`), so an upload that
+grooveshop-django-api copies it, pinned by git id, to `src/core/data/image-limits.json`
+and validates every image upload against it (`src/core/uploads.py`), so an upload that
 would render as a placeholder is refused when it is made. The copy is refreshed by
 that repository's sync script; a weekly workflow there fails when this file has
 moved on.
