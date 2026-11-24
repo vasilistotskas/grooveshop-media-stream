@@ -38,7 +38,7 @@ behind basic auth).
 
 ## Tech stack
 
-- NestJS 12 on Node.js (the supported range is `engines` in `package.json`), TypeScript, ESM
+- NestJS on Node.js (the supported range is `engines` in `package.json`), TypeScript, ESM
 - Sharp (libvips) for image processing
 - Redis (ioredis) for the shared cache tier, rate-limit counters and circuit-breaker state
 - Vitest with SWC, ESLint (`@antfu/eslint-config`)
@@ -61,7 +61,7 @@ pnpm run dev            # http://127.0.0.1:3003
 
 A request has this shape (every segment is mandatory):
 
-```
+```text
 GET /media_stream-image/media/<tenantSchema>/uploads/<path>/<width>/<height>/<fit>/<position>/<background>/<trimThreshold>/<quality>.<format>
 GET /media_stream-image/static/images/<image>/<width>/<height>/<fit>/<position>/<background>/<trimThreshold>/<quality>.<format>
 ```
@@ -93,7 +93,7 @@ Run one file with `pnpm exec vitest run <path-to-spec> --no-coverage`.
 
 ## Project layout
 
-```
+```text
 src/MediaStream/
 ├── API/          # Image controller, request validation, URL building, streaming
 ├── Cache/        # Memory, Redis and rendition-store tiers, the image cache operation, tenant flush
@@ -122,8 +122,10 @@ GitHub Container Registry. The cluster runs the version pinned in the GitOps rep
 
 ## Documentation
 
-- [`docs/`](docs/): request logs and metrics reference
-  ([`docs/observability.md`](docs/observability.md)); published on the docs site.
+- [`docs/`](docs/), published on the docs site:
+  [`observability.md`](docs/observability.md) (request logs and metrics),
+  [`renditions.md`](docs/renditions.md) (presets, the rendition store, pre-generation) and
+  [`image-limits.md`](docs/image-limits.md) (source limits and the contract the API reads).
 - [Media stream developer docs](https://docs.grooveshop.space/dev/media/) (behind basic auth).
 - [docs.grooveshop.space](https://docs.grooveshop.space): the platform documentation site.
 

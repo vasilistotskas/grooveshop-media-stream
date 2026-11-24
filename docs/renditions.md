@@ -26,24 +26,20 @@ The code wins over this page. Source files:
 
 ## Why
 
-Measured on the production request log (VictoriaLogs, 14 days to
-2026-11-01, 13.8 thousand image requests, three tenants):
+Without these mechanisms the cost of a rendition falls on a visitor:
 
-- 12.7 thousand of them were cache misses. The same rendition missed again
-  after every deploy: the disk tier was an `emptyDir` (gone with the pod), the
-  Redis tier is evicted (the Redis instance is full by design, see
-  `grooveshop-infrastructure/docs/redis.md`: media-stream's database held
-  6.5 MiB), and the memory tier is per pod.
-- A miss costs an encode (AVIF: 1.0 s p50 and 2.4 s p95 on the production
-  cores, queue wait excluded; the 2026-10-16 profile) behind a queue of 16 on
-  one pipeline per pod. A burst of first-time
-  requests (a Lighthouse run, a new store, a new layout) overflows it: 190
-  of 210 in the local reproduction below, 153 `503` in 3 minutes on
-  2026-10-19.
-- 240 distinct size combinations, 165 distinct widths and 28 aspect ratios
-  were requested. About 95 of the combinations were `0 x 0` or one-axis
-  requests from TinyMCE content, whose HTML stores the URL, so a storefront
-  release cannot change them.
+- A rendition is lost whenever its copy is: the memory tier is per pod and
+  empties on every deploy, and the shared Redis is full by design and evicts
+  (`grooveshop-infrastructure/docs/redis.md`). The same rendition then misses
+  again.
+- A miss costs an encode (AVIF is the slowest, seconds on a production core)
+  behind a bounded admission queue, one pipeline per core. A burst of
+  first-time requests (a Lighthouse run, a new store, a new layout) overflows
+  it and is answered 503.
+- Clients choose sizes. Real traffic asks for many distinct size combinations
+  and widths, and a share of them are `0 x 0` or one-axis requests from
+  TinyMCE content, whose HTML stores the URL, so a storefront release cannot
+  change them.
 
 ## 1. Presets: what is made is a finite set
 
@@ -116,7 +112,7 @@ pod keeps the last set it read, because moving a size to a different rendition
 would turn a Redis blip into a wave of misses; a pod that never had a set snaps
 everything. Nothing errors. An empty set is seeded once from
 `SEED_RENDITION_SIZES` (`common/constants/rendition-size-seed.constant.ts`):
-the sizes of the 2026-10 request logs asked of at least ten uploads (less the
+the sizes the request logs show asked of at least ten uploads (less the
 contract sizes, which need no learning), plus the 672, 1200 and 1440 px
 single-axis widths the storefront computes itself. It is
 a seed, not the source of truth: a deployment that already has a set ignores
@@ -143,21 +139,18 @@ Properties that matter:
   aspect ratio the snap would push outside the pixel budget (1 x 8000) is
   kept as asked.
 
-Replayed over the 14-day log (13.8 thousand requests, 911 uploads) with the
-seeded set this adds **1.0 % pixels** (the tail of sizes asked of fewer than ten uploads is rounded
-up; 9.6 thousand requests of the 13 thousand with a size are exact) and removes
-0.6 % of the distinct renditions (4945 to 4915). The ladder is not what raises
-the hit ratio: the storefront already asks each upload for few sizes. It bounds
-the work and the disk a client that enumerates sizes can cause, and it makes a
-pre-generation list finite. Changing the ladder re-keys the
-renditions it changes and needs no `PROCESSING_VERSION` bump.
+The ladder is not what raises the hit ratio: the storefront already asks each
+upload for few sizes. It bounds the work and the storage a client that
+enumerates sizes can cause, and it makes a pre-generation list finite.
+Changing the ladder re-keys the renditions it changes and needs no
+`PROCESSING_VERSION` bump.
 
 ## 2. The rendition store
 
 Behind the memory and Redis tiers, every rendition is kept in an
 **S3-compatible bucket** (Cloudflare R2): one object per rendition,
 `{tenant}/{id}`, holding the image envelope (metadata JSON plus bytes, the
-same form Redis holds). Both replicas share it, it survives a restart or a
+same form Redis holds). Every replica shares it, it survives a restart or a
 deploy, and it does not depend on a node. A store hit refills memory and
 Redis.
 
@@ -173,16 +166,13 @@ which do not use that pool, and every call is bounded:
 
 - The deadline is an abort signal given to the SDK **and** a race against it,
   so a stalled socket cannot outlive it. The SDK is told not to retry.
-- **The read deadline is measured, not guessed.** From a staging pod (500m
-  CPU) to R2 in the EU jurisdiction, 2026-11-02, 200 calls each on 258 real
-  objects: HEAD p50 102 / p95 182 / p99 236 ms and GET p50 136 / p95 271 /
-  p99 485 ms on a reused connection; a new TLS connection adds about 70 ms
-  (HEAD p50 172 ms); with 8 in flight, GET p99 407 ms and max 1181 ms; 50
-  HEADs at once, which open 50 sockets, p50 834 / p95 1040 ms. 2 s is past
-  every call measured, and still below what a timed-out read costs instead:
-  an encode, p50 2.5 s on that pod for a first-time rendition. The SDK keeps
-  connections alive (its default agent, `keepAlive`, 50 sockets), so only a
-  burst pays a handshake per call.
+- **The read deadline is measured, not guessed.** From a pod with a 500m CPU
+  limit to R2 in the EU jurisdiction, a GET on a reused connection had a p99
+  under half a second, a new TLS connection adds about 70 ms, and 50 HEADs at
+  once (which open 50 sockets) took about a second. 2 s is past every call
+  measured, and still below what a timed-out read costs instead: an encode of
+  a first-time rendition. The SDK keeps connections alive (its default agent,
+  `keepAlive`, 50 sockets), so only a burst pays a handshake per call.
 - Five failures in a row open a breaker for 30 s: the store is not called, a
   read is a miss at once and a write is skipped. The first call after the pause
   decides: a success closes it, a failure opens it again. A 404 is an answer,
@@ -197,25 +187,21 @@ which do not use that pool, and every call is bounded:
   flush epoch first, so the fencing of in-flight writes is unchanged: a store
   write that a flush overtakes deletes itself.
 - Objects expire by a **lifecycle rule on the bucket** (180 days, the
-  private TTL), not by the service. There is no cleanup cron, no inventory and
-  no access counting: they existed to manage a local disk. Cache warming went
-  with them, because it read their access counts; the memory tier fills on
-  demand and a store hit is one GET.
+  private TTL), not by the service. There is no cleanup cron, no inventory, no
+  access counting and no cache warming: the memory tier fills on demand and a
+  store hit is one GET.
 - The store is off while `RENDITION_STORE_ENDPOINT` or
   `RENDITION_STORE_BUCKET` is empty (development): only memory and Redis
   remain. `CACHE_FILE_DIRECTORY` is scratch space for source downloads in
   flight and the fallback image's renditions.
 
-**Cost** (Cloudflare R2 pricing, developers.cloudflare.com/r2/pricing, read
-2026-11-01). Free each month: 10 GB-month of Standard storage, 1 million Class A
-operations (PUT, LIST), 10 million Class B operations (GET, HEAD), and egress
-is always free; beyond that $0.015 per GB-month, $4.50 per million Class A,
-$0.36 per million Class B. The platform's use, from the 14-day log: about 0.3 GB
-stored, about 30 thousand GETs and 35 thousand PUTs a month, plus about 50
-thousand HEADs for pre-generation (one per rendition of each upload not yet
-known to be complete: about 5 thousand per pod start, so some 200 thousand at
-20 deploys a month with two replicas). That is under 2 % of every free
-allowance, so the expected bill is zero.
+**Cost.** Cloudflare R2 charges for storage and for Class A (PUT, LIST) and
+Class B (GET, HEAD) operations, not for egress, and has a monthly free
+allowance (developers.cloudflare.com/r2/pricing). What the service adds to the
+bill grows with uploads and renditions, plus one HEAD per rendition of each
+upload not yet known to be complete for pre-generation, repeated at every pod
+start. Read the bucket's usage in the Cloudflare dashboard rather than
+assuming it stays inside the allowance.
 
 ## Where the bucket lives
 
@@ -274,9 +260,8 @@ nothing: the state is the uploads and the store).
    tick rescans. The result goes to the store only, not to the memory and
    Redis tiers (`OperationContext.storeOnly`): those hold what visitors ask
    for, and a pass renders a folder's whole catalogue for every upload, most
-   of it asked for rarely. It used to write all three: two weeks after the
-   first pass, media-stream held 92 % of the shared Redis, most of it idle
-   for over a week. A visitor's first request for a rendition is a store
+   of it asked for rarely, which would fill the shared Redis with idle
+   entries. A visitor's first request for a rendition is a store
    hit, which fills both tiers.
 4. **Leave what cannot be rendered alone** (source missing, too large, not
    an image, or a request that cannot be built) for six hours, in memory, so a
@@ -295,9 +280,9 @@ next pass.
 
 ## Overload
 
-Admission control is unchanged: a request that **needs an encode** beyond
-the queue is still answered 503 with `Retry-After` (`ProcessingOverloadedError`).
-What changes is how often that is a visitor's request:
+Admission control still applies: a request that **needs an encode** beyond
+the queue is answered 503 with `Retry-After` (`ProcessingOverloadedError`).
+Pre-generation keeps that from being a visitor's request most of the time:
 
 - a stored rendition is served from memory, Redis or the store and never
   reaches admission, whatever else is queued;
@@ -306,11 +291,10 @@ What changes is how often that is a visitor's request:
 - what is left is a rendition nobody learned yet (a new size, a new
   design), the first time.
 
-There is no "serve the nearest rendition or the original instead of a 503".
-That was the plan's fourth point and is not built: the original can be
-several MB, an SVG original must not be served unsanitised, and an edge
-that caches a stand-in under the real URL would pin it for the TTL. It can be
-added behind the same admission error if the remaining 503 rate asks for it.
+There is no "serve the nearest rendition or the original instead of a 503":
+the original can be several MB, an SVG original must not be served
+unsanitised, and an edge that caches a stand-in under the real URL would pin
+it for the TTL.
 
 ## Configuration
 
@@ -319,7 +303,7 @@ added behind the same admission error if the remaining 503 rate asks for it.
 | `RENDITION_STORE_ENDPOINT` | empty (off) | S3 API endpoint, `https://<ACCOUNT_ID>.eu.r2.cloudflarestorage.com` for an EU R2 bucket |
 | `RENDITION_STORE_BUCKET` | empty (off) | The bucket |
 | `RENDITION_STORE_ACCESS_KEY_ID`, `RENDITION_STORE_SECRET_ACCESS_KEY` | empty | An R2 token scoped to object read and write on the bucket |
-| `RENDITION_STORE_READ_TIMEOUT_MS` | 2000 | Deadline of a GET or HEAD; past it the read is a miss (the measurements are under "The rendition store") |
+| `RENDITION_STORE_READ_TIMEOUT_MS` | 2000 | Deadline of a GET or HEAD; past it the read is a miss (see "The rendition store") |
 | `RENDITION_STORE_WRITE_TIMEOUT_MS` | 5000 | Deadline of a PUT, DELETE or LIST; past it the image is served uncached |
 | `RENDITION_SIZES_MIN_SOURCES` | 10 | Uploads a size must be rendered for before it is answered exactly |
 | `RENDITION_SIZES_WINDOW_DAYS` | 30 | Days an exact size stays exact without being asked for |
@@ -345,34 +329,3 @@ Pre-generation needs the store; with the store off it stays off too.
 Verifying a rollout: upload an image to a folder with history, wait one
 cycle, request one of the folder's renditions. It must be `store` (or
 `memory`), not `miss`; restart a pod and ask again: still `store`.
-
-## Local reproduction
-
-One CPU, queue 16, 10 s wait (production's admission), a local S3-compatible
-server (SeaweedFS) standing in for R2. 6 existing blog images asked at the 7
-renditions the storefront uses for a blog cover (history), then 30 new uploads,
-then every rendition of every new upload requested at once with 40 in flight:
-
-| | Responses | p95 |
-|---|---|---|
-| Without pre-generation (no store) | 22 x 200, **188 x 503** | 2.5 s |
-| With pre-generation (210 renditions made in 67 s while serving) | **210 x 200** | 64 ms |
-| The same 210 after a restart that empties Redis and the scratch directory | **210 x 200**, 210 store hits, 0 misses, 0 shed | 127 ms |
-
-During that pre-generation, requests for stored renditions kept a 3 ms p95
-(max 33 ms), and requests for renditions nobody had made were all served, p95
-522 ms (their own encode plus at most the background encode in flight).
-
-A store that is down or hangs, one visitor asking for 30 renditions nobody
-has made, one after the other (the store endpoint is a socket that accepts and
-never answers, or a closed port):
-
-| Store | Responses | Latency |
-|---|---|---|
-| Off | 30 x 200 | p50 30 ms |
-| Hangs | 30 x 200 | the first miss waited out the read timeout (1 s at the time; 1.2 s at most); then the breaker opened and the rest ran at p50 29 ms |
-| Refuses connections | 30 x 200 | p50 30 ms |
-
-Writes to a hanging store ran in the background (5 s deadline) and never
-delayed a response. In every case the image was served; none became the
-default image.

@@ -38,8 +38,8 @@ key under `log.*` (`manifests/app-constructs/victoria-logs/values.yaml` in
 
 ```json
 {"level":"log","pid":1,"timestamp":1790000000000,"message":"image ok 200 143ms","context":"ImageRequest",
- "correlation_id":"3f0c…","schema":"webside","source":"UPLOADED_MEDIA",
- "path":"media/webside/uploads/products/a.png/640/480/cover/centre/transparent/0/80.avif",
+ "correlation_id":"3f0c…","schema":"acme","source":"UPLOADED_MEDIA",
+ "path":"media/acme/uploads/products/a.png/640/480/cover/centre/transparent/0/80.avif",
  "width":640,"height":480,"fit":"cover","position":"centre","format":"avif","quality":80,
  "cache":"miss","input_format":"png","input_bytes":812345,"output_format":"avif","output_bytes":23456,
  "admission_wait_ms":12,"duration_ms":143,"status":200,"outcome":"ok"}
@@ -108,7 +108,7 @@ A miss writes one more line after the download and before any decoder
 
 ```json
 {"level":"log","message":"image decode png 812345B","context":"ImageDecode","correlation_id":"3f0c…",
- "schema":"webside","source":"UPLOADED_MEDIA","path":"media/webside/uploads/products/a.png/…",
+ "schema":"acme","source":"UPLOADED_MEDIA","path":"media/acme/uploads/products/a.png/…",
  "resource_id":"9b1e…","input_format":"png","input_bytes":812345}
 ```
 
@@ -126,8 +126,8 @@ at WARN, then is left alone for six hours on that pod (each replica keeps
 its own list, so two replicas each write it once):
 
 ```json
-{"level":"warn","message":"Rendition of webside/products/IMG_20210214_130445.jpg at 1200x630 avif not generated, left alone for 6 h: Declared Content-Length 9263001 bytes exceeds the jpeg limit",
- "context":"RenditionGeneratorService","schema":"webside","upload":"products/IMG_20210214_130445.jpg",
+{"level":"warn","message":"Rendition of acme/products/photo.jpg at 1200x630 avif not generated, left alone for 6 h: Declared Content-Length 9263001 bytes exceeds the jpeg limit",
+ "context":"RenditionGeneratorService","schema":"acme","upload":"products/photo.jpg",
  "width":1200,"height":630,"fit":"cover","position":"entropy","format":"avif","quality":55,
  "error_class":"UpstreamResourceTooLargeError","error":"Declared Content-Length 9263001 bytes exceeds the jpeg limit","retry_in_hours":6}
 ```
@@ -163,7 +163,7 @@ Scraped from `GET /metrics` with the `mediastream_` prefix.
 | `mediastream_image_request_duration_seconds` | histogram | `outcome`, `cache` | Same time as `duration_ms` |
 | `mediastream_image_input_bytes` | histogram | `format` (sniffed) | Once per completed upstream download (the request that led; coalesced waiters add nothing) |
 
-These metrics were already there and still apply: `mediastream_cache_operations_total{operation,cache_type,status}`
+Other metrics used below: `mediastream_cache_operations_total{operation,cache_type,status}`
 (one sample for each layer probed),
 `mediastream_image_processing_duration_seconds`,
 `mediastream_processing_pipelines{state}`,
@@ -173,21 +173,17 @@ These metrics were already there and still apply: `mediastream_cache_operations_
 **Labels are closed sets.** `outcome` is the table above, `format` is a
 supported output format or `none`, `cache` is `memory` / `redis` / `store` /
 `miss` or `none`, and the input `format` is one of the seven sniffed
-formats. That is at most 10 × 8 × 5 series for the counter.
+formats. That is at most 11 × 7 × 5 series for the counter.
 
 **No metric carries the tenant schema, and none carries a client path.**
 Any string that matches the schema pattern reaches the route, and a
 request for a schema that does not exist still gets a default image, so a
 tenant label's values would be chosen by whoever sends requests, and every
-new one is a new series on vmsingle. The service has no list of real
-schemas to check against: the tenant feed from Django carries hostnames
-only. So the `tenant_schema` label that `mediastream_http_*`,
-`mediastream_cache_operations_total`, `mediastream_cache_operation_duration_seconds`
-and `mediastream_image_processing_*` used to carry was removed, and
-per-tenant breakdowns come from the `schema` log field. The HTTP `route`
+new one would be a new series. The service has no list of real schemas to
+check against: the tenant feed from Django carries hostnames only.
+Per-tenant breakdowns come from the `schema` log field. The HTTP `route`
 label is the registered route pattern (`/media_stream-image/*path`,
-`/health/live`, …) or `unmatched`, where it used to be the first five
-segments of whatever path a 404 had
+`/health/live`, …) or `unmatched`, never the path a client sent
 (`src/MediaStream/Metrics/middleware/metrics.middleware.ts`).
 
 ## Queries
@@ -201,14 +197,12 @@ _time:1h kubernetes.pod_namespace:="grooveshop" kubernetes.container_name:="medi
 
 That prefix is written `…` below.
 
-**Finding the poison image of 2026-09-25.** Both pods crashed 11 times in
-20 minutes. A PNG with C2PA credentials was taken for an SVG and parsed
-by jsdom until the heap ran out. With these lines, one query finds it: the
-decodes that never finished. It would have returned the two webside PNGs,
-with their paths:
+**Finding the image that crashed a pod.** A decoder that runs the process
+out of memory writes no request line, but its decode line is already on
+stdout. The decodes that never finished are the suspects:
 
 ```logsql
-_time:[2026-09-25T00:00:00Z, 2026-09-26T00:00:00Z) kubernetes.pod_namespace:="grooveshop" kubernetes.container_name:="media-stream"
+_time:1d kubernetes.pod_namespace:="grooveshop" kubernetes.container_name:="media-stream"
   log.context:in("ImageDecode", "ImageRequest")
   | stats by (log.correlation_id, log.schema, log.path, log.input_format, log.input_bytes)
       count() if (log.context:="ImageDecode") decoded,
@@ -216,10 +210,11 @@ _time:[2026-09-25T00:00:00Z, 2026-09-26T00:00:00Z) kubernetes.pod_namespace:="gr
   | filter decoded:>0 finished:=0
 ```
 
-The same incident also had a signature that would have shown up before
-any crash: a raster file name the sniffer took for SVG. Since the
-`isSvgHeader` fix this should always return nothing, so it is also a
-regression check:
+A raster file taken for SVG is a signature that shows up before any crash.
+The sniffer reads the bytes, not the extension (`isSvgHeader`), so a match
+here is a lead, not proof: a URL ending in a raster extension can still serve
+real SVG bytes. Check the source file's first bytes before calling it a
+sniffer regression:
 
 ```logsql
 … log.input_format:="svg" log.path:~"\\.(png|jpe?g|webp|gif|avif|tiff?)/"
