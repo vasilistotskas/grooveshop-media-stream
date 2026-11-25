@@ -1,3 +1,5 @@
+# Refuse an install whose dependencies do not support this Node version.
+engineStrict: true
 allowBuilds:
   '@nestjs/core': true
   '@swc/core': true

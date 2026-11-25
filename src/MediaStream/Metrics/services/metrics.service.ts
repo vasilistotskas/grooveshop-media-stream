@@ -5,7 +5,7 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as process from 'node:process'
 import { Injectable, Logger } from '@nestjs/common'
-import * as promClient from 'prom-client'
+import * as promClient from '@prometheus-io/client'
 import { errorMessage } from '#microservice/common/utils/error-message.util'
 import { storageDirectory } from '#microservice/common/utils/storage-path.util'
 import { ConfigService } from '#microservice/Config/config.service'
@@ -40,34 +40,34 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	private readonly _logger = new Logger(MetricsService.name)
 	private readonly register: promClient.Registry
 
-	private readonly httpRequestsTotal: promClient.Counter
-	private readonly httpRequestDuration: promClient.Histogram
-	private readonly httpRequestSize: promClient.Histogram
-	private readonly httpResponseSize: promClient.Histogram
+	private readonly httpRequestsTotal: promClient.Counter<'method' | 'route' | 'status_code'>
+	private readonly httpRequestDuration: promClient.Histogram<'method' | 'route' | 'status_code'>
+	private readonly httpRequestSize: promClient.Histogram<'method' | 'route'>
+	private readonly httpResponseSize: promClient.Histogram<'method' | 'route' | 'status_code'>
 
-	private readonly memoryUsage: promClient.Gauge
-	private readonly diskSpaceUsage: promClient.Gauge
-	private readonly cpuUsage: promClient.Gauge
-	private readonly loadAverage: promClient.Gauge
+	private readonly memoryUsage: promClient.Gauge<'type'>
+	private readonly diskSpaceUsage: promClient.Gauge<'type' | 'path'>
+	private readonly cpuUsage: promClient.Gauge<'type'>
+	private readonly loadAverage: promClient.Gauge<'period'>
 
-	private readonly cacheHitRatio: promClient.Gauge
-	private readonly cacheOperationsTotal: promClient.Counter
-	private readonly cacheOperationDuration: promClient.Histogram
+	private readonly cacheHitRatio: promClient.Gauge<'cache_type'>
+	private readonly cacheOperationsTotal: promClient.Counter<'operation' | 'cache_type' | 'status'>
+	private readonly cacheOperationDuration: promClient.Histogram<'operation' | 'cache_type' | 'status'>
 
-	private readonly imageProcessingDuration: promClient.Histogram
-	private readonly imageProcessingTotal: promClient.Counter
-	private readonly imageProcessingErrors: promClient.Counter
-	private readonly imageRequestsTotal: promClient.Counter
-	private readonly imageRequestDuration: promClient.Histogram
-	private readonly imageInputBytes: promClient.Histogram
+	private readonly imageProcessingDuration: promClient.Histogram<'operation' | 'format' | 'status'>
+	private readonly imageProcessingTotal: promClient.Counter<'operation' | 'format' | 'status'>
+	private readonly imageProcessingErrors: promClient.Counter<'operation' | 'error_type'>
+	private readonly imageRequestsTotal: promClient.Counter<'outcome' | 'format' | 'cache'>
+	private readonly imageRequestDuration: promClient.Histogram<'outcome' | 'cache'>
+	private readonly imageInputBytes: promClient.Histogram<'format'>
 
-	private readonly activeConnections: promClient.Gauge
-	private readonly errorTotal: promClient.Counter
+	private readonly activeConnections: promClient.Gauge<'type'>
+	private readonly errorTotal: promClient.Counter<'type' | 'operation'>
 	private readonly requestsInFlight: promClient.Gauge
 	private readonly uptime: promClient.Gauge
 
-	private readonly rateLimitAttemptsTotal: promClient.Counter
-	private readonly rateLimitBlockedTotal: promClient.Counter
+	private readonly rateLimitAttemptsTotal: promClient.Counter<'request_type' | 'status'>
+	private readonly rateLimitBlockedTotal: promClient.Counter<'request_type'>
 
 	private readonly eventLoopLag: promClient.Histogram
 
@@ -75,11 +75,11 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 	private readonly tenantSuspendedSchemasCount: promClient.Gauge
 	private readonly tenantDomainsLastRefreshTimestamp: promClient.Gauge
 
-	private readonly processingPipelines: promClient.Gauge
-	private readonly processingRejectedTotal: promClient.Counter
-	private readonly renditionPregenerationTotal: promClient.Counter
+	private readonly processingPipelines: promClient.Gauge<'state'>
+	private readonly processingRejectedTotal: promClient.Counter<'reason'>
+	private readonly renditionPregenerationTotal: promClient.Counter<'result'>
 	private readonly renditionBacklogSources: promClient.Gauge
-	private readonly renditionStoreOperationsTotal: promClient.Counter
+	private readonly renditionStoreOperationsTotal: promClient.Counter<'operation' | 'result'>
 
 	private startTime: number = Date.now()
 	private requestsInFlightCount: number = 0

@@ -1,6 +1,6 @@
 ARG NODE_VERSION=26.13.0
 # Keep in step with "packageManager" in package.json.
-ARG PNPM_VERSION=12.18.0
+ARG PNPM_VERSION=12.23.0
 
 FROM ghcr.io/pnpm/pnpm:${PNPM_VERSION} AS pnpm
 
@@ -17,7 +17,7 @@ RUN for bin in pnpm pnpx pnx; do ln -s "/opt/pnpm/$bin" "/usr/local/bin/$bin"; d
 WORKDIR /usr/src/app
 
 # Manifests first so the dependency layers survive source edits.
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 FROM base AS prod-deps
 

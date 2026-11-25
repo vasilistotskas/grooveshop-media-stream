@@ -47,7 +47,7 @@ All source code lives under `src/MediaStream/`. Each domain is a NestJS module:
 - **Correlation** — Request correlation IDs (AsyncLocalStorage), timing middleware, per-request performance phases
 - **Health** — Health indicators (disk space of the scratch directory, memory, Sharp, cache, Redis, HTTP, tenant domains); thresholds are code constants
 - **HTTP** — HTTP client with retry and a Redis-persisted circuit breaker
-- **Metrics** — Prometheus metrics via prom-client (prefixed `mediastream_`)
+- **Metrics** — Prometheus metrics via @prometheus-io/client (prefixed `mediastream_`)
 - **Processing** — Stateless Sharp jobs (fetch, identity generation, format manipulation) and `SharpConfigService` (global Sharp concurrency/cache/SIMD applied at boot)
 - **RateLimit** — `AdaptiveRateLimitGuard` (`CanActivate`) over `RateLimitService`: a Redis Lua counter (EVALSHA via `defineCommand`) with an in-memory fallback. `RATE_LIMIT_ENABLED=false` is the only kill-switch; there is no development-mode skip
 - **Renditions** — Pre-generation of an upload's renditions (`RenditionGeneratorService` cron, `RenditionSourceScanner`, the catalogue in `Cache/`); off while `RENDITIONS_MEDIA_DIRECTORY` or the rendition store is unset. See `docs/renditions.md`
