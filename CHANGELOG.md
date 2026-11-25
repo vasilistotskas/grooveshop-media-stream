@@ -1,3 +1,10 @@
+## [3.15.1](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.15.0...v3.15.1) (2026-11-25)
+
+
+### Bug Fixes
+
+* **deps:** bump NestJS 12.6, terminus 12.2, ioredis 6.1 and the Prometheus client ([#73](https://github.com/vasilistotskas/grooveshop-media-stream/issues/73)) ([e2dfe29](https://github.com/vasilistotskas/grooveshop-media-stream/commit/e2dfe29233c8797c247c76a59272691520af835d))
+
 # [3.15.0](https://github.com/vasilistotskas/grooveshop-media-stream/compare/v3.14.4...v3.15.0) (2026-11-21)
 
 
