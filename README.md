@@ -109,7 +109,7 @@ src/MediaStream/
 └── common/       # Shared errors, utilities, constants
 ```
 
-Tests live in `src/test/`, mirroring this tree. [`CLAUDE.md`](CLAUDE.md) describes the request
+Tests live in `src/test/`, mirroring this tree. [`AGENTS.md`](AGENTS.md) describes the request
 flow, the cache and the conventions in detail.
 
 ## Deployment and release
